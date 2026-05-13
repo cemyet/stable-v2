@@ -1,0 +1,144 @@
+{% extends "_layout.html" %}
+
+{% block title %}stable{% endblock %}
+
+{% block extra_style %}
+  .search-box {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 25vh;
+    margin-bottom: 32px;
+  }
+  .search-box input {
+    width: 100%;
+    font-size: 16px;
+    padding: 12px 16px;
+  }
+  .search-box input::placeholder { color: var(--fg-muted); }
+
+  .results {
+    width: 100%;
+    max-width: 480px;
+    list-style: none;
+  }
+  .results li {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .results li a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 0;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .results li:hover { background: var(--hover); }
+  .results li a:hover {
+    color: inherit !important;
+    background: none !important;
+    margin: 0 !important;
+    padding: 10px 0 !important;
+    border-radius: 0 !important;
+  }
+  .results li:hover .horse-name { color: var(--fg); }
+  .results li:hover .horse-meta { color: var(--fg-muted); }
+
+  .horse-name { color: var(--fg); }
+
+  .star-mark {
+    color: var(--fg-muted);
+    font-size: 15px;
+    margin-left: 4px;
+  }
+
+  .horse-meta {
+    color: var(--fg-muted);
+    font-size: 12px;
+    text-align: right;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+
+  .empty {
+    color: var(--fg-muted);
+    margin-top: 20px;
+    text-align: center;
+  }
+
+  .count {
+    color: var(--fg-muted);
+    font-size: 12px;
+    margin-bottom: 12px;
+    width: 100%;
+    max-width: 480px;
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="search-box">
+    <input type="text" id="q" placeholder="search..." autofocus autocomplete="off">
+  </div>
+
+  <div class="count" id="count"></div>
+  <ul class="results" id="results"></ul>
+  <div class="empty" id="empty"></div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const input = document.getElementById('q');
+    const resultsList = document.getElementById('results');
+    const countEl = document.getElementById('count');
+    const emptyEl = document.getElementById('empty');
+    let timer = null;
+
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(doSearch, 250);
+    });
+
+    async function doSearch() {
+      const q = input.value.trim();
+      if (q.length < 2) {
+        resultsList.innerHTML = '';
+        countEl.textContent = '';
+        emptyEl.textContent = '';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+
+        if (data.length === 0) {
+          resultsList.innerHTML = '';
+          countEl.textContent = '';
+          emptyEl.textContent = 'no matches';
+          return;
+        }
+
+        emptyEl.textContent = '';
+        countEl.textContent = `${data.length}${data.length === 50 ? '+' : ''} results`;
+
+        resultsList.innerHTML = data.map(h => {
+          const year = h.date_of_birth ? h.date_of_birth.substring(0, 4) : '';
+          const genderMap = {'hingst': 'stallion', 'valack': 'gelding', 'sto': 'mare'};
+          const gender = genderMap[h.gender] || h.gender || '';
+          const meta = [gender, year].filter(Boolean).join(' \u00b7 ');
+          let earningsValue = 0;
+          if (h.earnings) {
+            const m = String(h.earnings).match(/[\d ]+/);
+            if (m) earningsValue = parseInt(m[0].replace(/\s/g, ''), 10) || 0;
+          }
+          const starCount = Math.min(5, Math.floor(earningsValue / 5_000_000));
+          const star = starCount > 0 ? '<span class="star-mark">' + '\u2605'.repeat(starCount) + '</span>' : '';
+          const nameWithFlag = flagify(h.name);
+          return `<li><a href="/horse/${h.horse_id}"><span class="horse-name">${nameWithFlag}${star}</span><span class="horse-meta">${esc(meta)}</span></a></li>`;
+        }).join('');
+      } catch (e) {
+        emptyEl.textContent = 'error';
+      }
+    }
+  </script>
+{% endblock %}

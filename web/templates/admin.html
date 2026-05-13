@@ -1,0 +1,298 @@
+{% extends "_layout.html" %}
+
+{% block title %}admin - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .admin-page {
+    width: 100%;
+    max-width: 720px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 6px;
+    text-transform: lowercase;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+
+  .run-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 24px;
+  }
+  .run-btn {
+    padding: 10px 28px;
+    font-size: 13px;
+    letter-spacing: 2px;
+  }
+  .st-btn {
+    padding: 10px 18px;
+    font-size: 11px;
+    color: var(--fg-muted);
+  }
+  .run-btn:disabled, .st-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .cancel-btn {
+    padding: 10px 18px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    border-color: var(--accent-cold);
+    color: var(--accent-cold);
+  }
+  .cancel-btn[hidden] { display: none; }
+
+  .run-status {
+    font-size: 12px;
+    color: var(--fg-muted);
+    line-height: 1.5;
+  }
+  .run-status .tag {
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 10px;
+    margin-right: 8px;
+  }
+  .tag.running  { color: var(--accent-win); border-color: var(--accent-win); }
+  .tag.success  { color: var(--accent-hot); border-color: var(--accent-hot); }
+  .tag.failed   { color: var(--accent-cold); border-color: var(--accent-cold); }
+
+  .summary-line {
+    margin-top: 4px;
+    color: var(--fg);
+    font-size: 13px;
+  }
+
+  details.log-wrap {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+  }
+  details.log-wrap > summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    list-style: none;
+  }
+  details.log-wrap > summary::-webkit-details-marker { display: none; }
+  details.log-wrap[open] > summary { border-bottom: 1px solid var(--border); }
+
+  pre.log {
+    background: transparent;
+    margin: 0;
+    padding: 12px 14px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--fg-muted);
+    max-height: 360px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  h2.section {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    margin: 32px 0 8px;
+  }
+
+  table.runs {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.runs th {
+    text-align: left; color: var(--fg-muted); font-weight: 400;
+    padding: 5px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.runs td {
+    padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--fg-muted);
+  }
+  table.runs tr:hover { background: var(--hover); cursor: pointer; }
+  table.runs td.summary-cell { color: var(--fg); }
+{% endblock %}
+
+{% block content %}
+  <div class="admin-page">
+    <h1>admin</h1>
+
+    <div class="run-row">
+      <button class="ghost run-btn" id="runBtn">update races</button>
+      <button class="ghost run-btn st-btn" id="stBtn">scan st horses</button>
+      <button class="ghost cancel-btn" id="cancelBtn" hidden>cancel</button>
+      <div class="run-status">
+        <div id="statusLine">no run yet</div>
+        <div class="summary-line" id="summaryLine"></div>
+      </div>
+    </div>
+
+    <details class="log-wrap">
+      <summary>log</summary>
+      <pre class="log" id="log"></pre>
+    </details>
+
+    <h2 class="section">previous runs</h2>
+    <table class="runs">
+      <thead><tr>
+        <th>id</th><th>type</th><th>started</th><th>elapsed</th><th>status</th><th>summary</th>
+      </tr></thead>
+      <tbody id="runsTable"></tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    let activeRunId = null;
+    let pollTimer = null;
+
+    const runBtn      = document.getElementById('runBtn');
+    const stBtn       = document.getElementById('stBtn');
+    const cancelBtn   = document.getElementById('cancelBtn');
+    const logEl       = document.getElementById('log');
+    const statusEl    = document.getElementById('statusLine');
+    const summaryEl   = document.getElementById('summaryLine');
+    const runsTab     = document.getElementById('runsTable');
+
+    function fmtTs(s) {
+      if (!s) return '';
+      const d = new Date(s);
+      if (isNaN(d)) return s;
+      return d.toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
+    }
+    function fmtDur(a, b) {
+      if (!a || !b) return '';
+      const dur = (new Date(b) - new Date(a)) / 1000;
+      if (dur < 60) return Math.round(dur) + 's';
+      if (dur < 3600) return Math.floor(dur / 60) + 'm ' + Math.round(dur % 60) + 's';
+      return Math.floor(dur / 3600) + 'h ' + Math.floor((dur % 3600) / 60) + 'm';
+    }
+
+    function summarizeRun(s) {
+      if (!s) return '';
+      const parts = [];
+      if (s.new_races != null)    parts.push(`+${s.new_races} new races`);
+      if (s.new_horses)           parts.push(`+${s.new_horses} new horses`);
+      if (s.refreshed_horses)     parts.push(`${s.refreshed_horses} refreshed`);
+      if (s.current_latest)       parts.push(`latest ${s.current_latest}`);
+      return parts.join('   \u00b7   ');
+    }
+
+    function setButtonsDisabled(v) { runBtn.disabled = v; stBtn.disabled = v; }
+
+    async function startRun(mode) {
+      setButtonsDisabled(true);
+      logEl.textContent = '';
+      summaryEl.textContent = '';
+      statusEl.innerHTML = `<span class="tag running">starting ${mode}</span>`;
+      try {
+        const res = await fetch('/api/admin/run', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({mode}),
+        });
+        const data = await res.json();
+        activeRunId = data.job_run_id;
+        if (data.already_running) {
+          statusEl.innerHTML = `<span class="tag running">running</span>` +
+            `attaching to existing run #${activeRunId}`;
+        }
+        startPolling();
+      } catch (e) {
+        setButtonsDisabled(false);
+        statusEl.innerHTML = `<span class="tag failed">error</span>could not start`;
+      }
+    }
+
+    function startPolling() {
+      stopPolling();
+      pollTimer = setInterval(pollOnce, 1500);
+      pollOnce();
+    }
+    function stopPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+    }
+
+    async function pollOnce() {
+      if (!activeRunId) return;
+      try {
+        const res = await fetch(`/api/admin/status?id=${activeRunId}`);
+        const r = await res.json();
+        const dur = fmtDur(r.started_at, r.finished_at || new Date().toISOString());
+        statusEl.innerHTML =
+          `<span class="tag ${r.status}">${r.status}</span>` +
+          `run #${r.job_run_id} \u00b7 started ${fmtTs(r.started_at)} \u00b7 ${dur}`;
+        summaryEl.textContent = summarizeRun(r.summary);
+        logEl.textContent = r.log || '';
+        logEl.scrollTop = logEl.scrollHeight;
+        cancelBtn.hidden = (r.status !== 'running');
+        cancelBtn.disabled = false;
+        if (r.status !== 'running') {
+          stopPolling();
+          setButtonsDisabled(false);
+          loadRuns();
+        }
+      } catch (e) { /* keep polling */ }
+    }
+
+    async function cancelRun() {
+      if (!activeRunId) return;
+      if (!confirm(`Cancel update run #${activeRunId}?`)) return;
+      cancelBtn.disabled = true;
+      try {
+        await fetch('/api/admin/cancel', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({job_run_id: activeRunId}),
+        });
+        pollOnce();
+      } catch (e) {
+        cancelBtn.disabled = false;
+      }
+    }
+
+    async function loadRuns() {
+      const res = await fetch('/api/admin/status');
+      const runs = await res.json();
+      runsTab.innerHTML = runs.map(r => {
+        const dur = fmtDur(r.started_at, r.finished_at);
+        const sum = summarizeRun(r.summary);
+        const label = r.job_name === 'update_st' ? 'st' : 'atg';
+        return `
+          <tr data-id="${r.job_run_id}">
+            <td>${r.job_run_id}</td>
+            <td class="muted">${esc(label)}</td>
+            <td>${esc(fmtTs(r.started_at))}</td>
+            <td>${esc(dur || (r.status === 'running' ? '...' : ''))}</td>
+            <td><span class="tag ${r.status}">${esc(r.status)}</span></td>
+            <td class="summary-cell">${esc(sum)}</td>
+          </tr>`;
+      }).join('');
+      runsTab.querySelectorAll('tr[data-id]').forEach(tr => {
+        tr.addEventListener('click', () => {
+          activeRunId = parseInt(tr.dataset.id, 10);
+          startPolling();
+        });
+      });
+    }
+
+    runBtn.addEventListener('click', () => startRun('atg'));
+    stBtn.addEventListener('click', () => startRun('st'));
+    cancelBtn.addEventListener('click', cancelRun);
+    loadRuns();
+  </script>
+{% endblock %}

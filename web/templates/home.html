@@ -1,0 +1,286 @@
+{% extends "_layout.html" %}
+
+{% block title %}home - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .home-page { width: 100%; max-width: 1100px; }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 32px 0 12px;
+  }
+  .section-header:first-child { margin-top: 0; }
+  .section-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+  }
+
+  .upcoming-card {
+    border: 1px solid var(--border);
+    background: var(--hover);
+    padding: 28px 18px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .upcoming-placeholder {
+    color: var(--fg-muted);
+    font-size: 12px;
+    opacity: 0.5;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 640px) {
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    border: 1px solid var(--border);
+    background: var(--hover);
+    padding: 14px 16px;
+  }
+  .card-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    margin-bottom: 10px;
+  }
+
+  .period-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .period-btn {
+    padding: 2px 8px;
+    font-size: 10px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    letter-spacing: 1px;
+  }
+  .period-btn:not(:last-child) { border-right: 1px solid var(--border); }
+  .period-btn:hover { color: var(--fg); }
+  .period-btn.active {
+    color: var(--fg);
+    background: var(--border);
+  }
+
+  .sort-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sort-tab {
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+  .sort-tab:hover { color: var(--fg); }
+  .sort-tab.active {
+    color: var(--fg);
+    border-bottom-color: var(--fg);
+  }
+
+  table.top-list {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+  }
+  table.top-list th {
+    text-align: left;
+    font-weight: 400;
+    color: var(--fg-muted);
+    padding: 3px 5px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.top-list td {
+    padding: 3px 5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.top-list .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.top-list .muted { color: var(--fg-muted); }
+  table.top-list a { }
+  table.form-list a { }
+  table.top-list .flag { height: 10px; vertical-align: baseline; margin-left: 3px; }
+  .delta-hot  { color: var(--accent-hot); }
+  .delta-cold { color: var(--accent-cold); }
+  .rank { color: var(--fg-muted); font-size: 10px; }
+
+{% endblock %}
+
+{% block content %}
+  <div class="home-page">
+
+    <div class="section-header">
+      <div class="section-title">upcoming races</div>
+    </div>
+    <div class="upcoming-card">
+      <div class="upcoming-placeholder">—</div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">form — last 7 days</div>
+    </div>
+    <div class="grid-2" id="formGrid">
+      <div class="card"><div class="card-title">loading...</div></div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">leaderboard</div>
+      <div class="period-toggle" id="periodToggle">
+        <button class="period-btn active" data-period="ytd">ytd</button>
+        <button class="period-btn" data-period="all">all time</button>
+      </div>
+    </div>
+    <div class="card" id="horseBoard">
+      <div class="card-title">horses</div>
+      <div class="sort-tabs" data-target="horseBoard" data-endpoint="/api/home/top-horses">
+        <button class="sort-tab active" data-sort="earnings">earnings</button>
+        <button class="sort-tab" data-sort="wins">wins</button>
+        <button class="sort-tab" data-sort="win_rate">win%</button>
+      </div>
+      <div class="board-body">loading...</div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    let currentPeriod = 'ytd';
+
+    function fmtDelta(d) {
+      const v = d / 10;
+      const sign = v >= 0 ? '+' : '';
+      const cls = v > 0 ? 'delta-hot' : v < 0 ? 'delta-cold' : '';
+      return `<span class="${cls}">${sign}${v.toFixed(1)}</span>`;
+    }
+
+    function fmtWr(v) {
+      return v != null ? `${(v / 10).toFixed(0)}%` : '';
+    }
+
+    function fmtEarn(n) {
+      if (n == null) return '';
+      return n.toLocaleString('sv-SE');
+    }
+
+    /* ---- form tables ---- */
+    function buildFormTable(title, rows, role) {
+      if (!rows.length) return '';
+      const urlBase = role === 'trainer' ? '/trainer/' : '/driver/';
+      const head = `<thead><tr>
+        <th></th><th>name</th>
+        <th class="num">career</th><th class="num">30d</th>
+        <th class="num">Δ</th><th class="num">odds Δ</th>
+      </tr></thead>`;
+      const body = rows.map((r, i) => `<tr>
+        <td class="rank">${i + 1}</td>
+        <td><a href="${urlBase}${r.id}">${esc(r.name)}</a></td>
+        <td class="num muted">${fmtWr(r.wr)}</td>
+        <td class="num muted">${fmtWr(r.form)}</td>
+        <td class="num">${fmtDelta(r.delta)}</td>
+        <td class="num">${r.form_odds != null ? fmtDelta(r.form_odds) : ''}</td>
+      </tr>`).join('');
+      return `<div class="card">
+        <div class="card-title">${title}</div>
+        <table class="top-list">${head}<tbody>${body}</tbody></table>
+      </div>`;
+    }
+
+    async function loadForm() {
+      const res = await fetch('/api/home/form-leaders');
+      if (!res.ok) return;
+      const d = await res.json();
+      document.getElementById('formGrid').innerHTML = [
+        buildFormTable('trainers — in form', d.trainer_hot || [], 'trainer'),
+        buildFormTable('trainers — out of form', d.trainer_cold || [], 'trainer'),
+        buildFormTable('drivers — in form', d.driver_hot || [], 'driver'),
+        buildFormTable('drivers — out of form', d.driver_cold || [], 'driver'),
+      ].join('');
+    }
+
+    /* ---- leaderboard tables ---- */
+    function renderHorseBoard(rows) {
+      const head = `<thead><tr>
+        <th></th><th>name</th>
+        <th class="num">starts</th><th class="num">wins</th>
+        <th class="num">win%</th><th class="num">earnings</th>
+      </tr></thead>`;
+      const body = rows.map((r, i) => `<tr>
+        <td class="rank">${i + 1}</td>
+        <td><a href="/horse/${r.horse_id}">${flagify(r.name)}</a></td>
+        <td class="num muted">${r.starts}</td>
+        <td class="num">${r.wins}</td>
+        <td class="num muted">${fmtWr(r.win_rate)}</td>
+        <td class="num">${fmtEarn(r.earnings)}</td>
+      </tr>`).join('');
+      return `<table class="top-list">${head}<tbody>${body}</tbody></table>`;
+    }
+
+    async function loadBoard(cardId) {
+      const card = document.getElementById(cardId);
+      const tabs = card.querySelector('.sort-tabs');
+      const body = card.querySelector('.board-body');
+      const endpoint = tabs.dataset.endpoint;
+      const sort = tabs.querySelector('.sort-tab.active').dataset.sort;
+      const sep = endpoint.includes('?') ? '&' : '?';
+      const res = await fetch(`${endpoint}${sep}sort=${sort}&period=${currentPeriod}`);
+      if (!res.ok) { body.textContent = 'error'; return; }
+      const rows = await res.json();
+      body.innerHTML = renderHorseBoard(rows);
+    }
+
+    function loadAllBoards() {
+      loadBoard('horseBoard');
+    }
+
+    document.querySelectorAll('.sort-tabs').forEach(tabs => {
+      tabs.querySelectorAll('.sort-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.querySelectorAll('.sort-tab').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          loadBoard(tabs.dataset.target);
+        });
+      });
+    });
+
+    document.getElementById('periodToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentPeriod = btn.dataset.period;
+        loadAllBoards();
+      });
+    });
+
+    loadForm();
+    loadAllBoards();
+  </script>
+{% endblock %}

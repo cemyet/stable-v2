@@ -1,0 +1,576 @@
+{% extends "_layout.html" %}
+
+{% block title %}driver - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .driver-page { width: 100%; max-width: 760px; }
+
+  .driver-name {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .driver-sub {
+    color: var(--fg-muted);
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-bottom: 32px;
+  }
+
+  .chart-card {
+    border: 1px solid var(--border);
+    background: var(--hover);
+    padding: 20px 18px 14px;
+  }
+  .chart-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    margin-bottom: 4px;
+  }
+  .chart-help {
+    color: var(--fg-muted);
+    font-size: 11px;
+    line-height: 1.5;
+    margin-bottom: 14px;
+    opacity: 0.7;
+  }
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 280px;
+  }
+  svg.form-chart {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+  }
+  .grid-line { stroke: var(--border); stroke-width: 1; }
+  .axis-text { fill: var(--fg-muted); font-size: 10px; letter-spacing: 1px; }
+  .zero-line {
+    stroke: var(--border-focus);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+  }
+
+  .form-line { fill: none; stroke-width: 1.6;
+               stroke-linejoin: round; stroke-linecap: round; }
+  .form-dot  { stroke: none; }
+  .form-dot.thin { opacity: 0.35; }
+
+  .form-line.df      { stroke: var(--chart-form); }
+  .form-dot.df       { stroke: none; fill: var(--chart-form); }
+  .form-line.df-odds { stroke: var(--chart-odds); }
+  .form-dot.df-odds  { stroke: none; fill: var(--chart-odds); }
+  .form-line.d-wr    { stroke: var(--chart-wr); }
+  .form-dot.d-wr     { stroke: none; fill: var(--chart-wr); }
+
+  .chart-legend {
+    display: flex;
+    gap: 6px 16px;
+    flex-wrap: wrap;
+    margin: 12px 0 0 0;
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  .chart-legend .swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    margin-right: 5px;
+    vertical-align: middle;
+    border-radius: 50%;
+  }
+  .chart-legend label {
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+  }
+  .chart-legend label.off { opacity: 0.3; text-decoration: line-through; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    letter-spacing: 0.5px;
+    transform: translate(-50%, -100%);
+    margin-top: -10px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .tooltip strong { color: var(--fg); font-weight: 500; }
+
+  /* Recent entries */
+  .recent-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    margin: 32px 0 10px;
+  }
+  table.recent {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+  }
+  table.recent th {
+    text-align: left;
+    font-weight: 400;
+    color: var(--fg-muted);
+    padding: 4px 6px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.recent td {
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.recent .num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.recent .muted { color: var(--fg-muted); }
+  table.recent .sform { text-align: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+  table.recent .winrate { text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  table.recent .center { text-align: center; }
+  table.recent tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
+  table.recent tr.scratched,
+  table.recent tr.scratched:hover {
+    background-image: linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.6px),
+      rgba(190, 60, 60, 0.55) calc(50% - 0.6px),
+      rgba(190, 60, 60, 0.55) calc(50% + 0.6px),
+      transparent calc(50% + 0.6px)
+    );
+  }
+  table.recent tr.dq td { opacity: 0.5; }
+  table.recent a { }
+  table.recent a:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
+  .shoe-icon { width: 14px; height: 14px; vertical-align: middle; }
+  .shoe-changed { color: var(--accent-warn); }
+  .sulky-changed { color: var(--accent-warn); }
+  .pos-1 { color: var(--accent-win); }
+  .dq, .withdrew { color: var(--fg-muted); }
+  .sex-age { color: var(--fg-muted); font-size: 11px; }
+  .short-name { text-decoration: none; cursor: pointer; }
+  .short-name:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
+  .sform-hot { color: var(--accent-hot); }
+  .sform-cold { color: var(--accent-cold); }
+{% endblock %}
+
+{% block content %}
+  <div class="driver-page">
+    <h1 class="driver-name" id="driverName">driver</h1>
+    <div class="driver-sub" id="driverSub"></div>
+
+    <div class="chart-card">
+      <div class="chart-title">driver form — last 3 years (weekly)</div>
+      <div class="chart-help">
+        df = 30d win rate. df± = how much driver over/underperforms vs market odds.
+        click labels to toggle.
+      </div>
+      <div class="chart-wrap">
+        <svg class="form-chart" id="chart" preserveAspectRatio="none"></svg>
+        <div class="tooltip" id="tip"></div>
+      </div>
+      <div class="chart-legend" id="legend">
+        <label data-key="df"><span class="swatch" style="background:var(--chart-form)"></span>df (30d win%)</label>
+        <label data-key="df-odds"><span class="swatch" style="background:var(--chart-odds)"></span>df± (vs odds)</label>
+        <label data-key="d-wr"><span class="swatch" style="background:var(--chart-wr)"></span>d_wr (career win%)</label>
+      </div>
+    </div>
+
+    <div class="recent-title">recent entries</div>
+    <div id="recentEntries"></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const driverId = {{ driver_id | tojson }};
+
+    const SERIES = [
+      {
+        key: 'df', medianKey: 'median_df', scoredKey: 'scored',
+        label: 'df', group: 'pct', dots: true,
+        fmt: v => `${(v/10).toFixed(1)}%`,
+      },
+      {
+        key: 'df-odds', medianKey: 'median_df_odds', scoredKey: 'scored_odds',
+        label: 'df±', group: 'dlt', dots: true,
+        fmt: v => `${v >= 0 ? '+' : ''}${(v/10).toFixed(1)}pp`,
+      },
+      {
+        key: 'd-wr', medianKey: 'median_d_wr', scoredKey: 'scored_wr',
+        label: 'd_wr', group: 'pct', dots: false,
+        fmt: v => `${(v/10).toFixed(1)}%`,
+      },
+    ];
+
+    const visible = { df: true, 'df-odds': true, 'd-wr': true };
+
+    function drawChart(series) {
+      const svg = document.getElementById('chart');
+      const tip = document.getElementById('tip');
+      svg.innerHTML = '';
+
+      const seriesPoints = {};
+      SERIES.forEach(s => {
+        seriesPoints[s.key] = series
+          .filter(p => p[s.medianKey] != null)
+          .map(p => ({
+            month:  p.month,
+            value:  p[s.medianKey],
+            scored: p[s.scoredKey],
+            starts: p.starts,
+          }));
+      });
+
+      const anyValid = SERIES.some(s => visible[s.key] && seriesPoints[s.key].length);
+      if (!anyValid) {
+        svg.innerHTML =
+          '<text x="50%" y="50%" class="axis-text" text-anchor="middle">no data</text>';
+        return;
+      }
+
+      const W = 760, H = 280;
+      const M = { top: 16, right: 12, bottom: 26, left: 40 };
+      const innerW = W - M.left - M.right;
+      const innerH = H - M.top - M.bottom;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+      const scales = {};
+
+      const pctSeries = SERIES.filter(s => s.group === 'pct' && visible[s.key]);
+      if (pctSeries.length) {
+        const vals = pctSeries.flatMap(s => seriesPoints[s.key].map(p => p.value));
+        if (vals.length) {
+          const lo = Math.max(0, Math.min(...vals) - 30);
+          const hi = Math.min(600, Math.max(...vals) + 30);
+          scales.pct = { min: lo, max: hi };
+        }
+      }
+      if (visible['df-odds']) {
+        const vals = seriesPoints['df-odds'].map(p => p.value);
+        const absMax = Math.max(30, Math.max(...vals.map(v => Math.abs(v))));
+        scales.dlt = { min: -(absMax + 15), max: absMax + 15 };
+      }
+
+      const bothVisible = pctSeries.length > 0 && visible['df-odds'];
+
+      const yOf = (v, group) => {
+        const sc = scales[group];
+        return M.top + (1 - (v - sc.min) / (sc.max - sc.min)) * innerH;
+      };
+
+      const xAllMonths = SERIES.filter(s => visible[s.key])
+        .flatMap(s => seriesPoints[s.key].map(p => p.month));
+      if (!xAllMonths.length) return;
+      const t0 = new Date(xAllMonths.reduce((a, b) => a < b ? a : b)).getTime();
+      const tN = new Date(xAllMonths.reduce((a, b) => a > b ? a : b)).getTime();
+      const tSpan = Math.max(1, tN - t0);
+      const xOf = m => M.left + ((new Date(m).getTime() - t0) / tSpan) * innerW;
+
+      let gridHtml = '';
+
+      if (pctSeries.length && scales.pct) {
+        const sc = scales.pct;
+        for (let t = 0; t <= 600; t += 50) {
+          if (t < sc.min || t > sc.max) continue;
+          const y = yOf(t, 'pct');
+          gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
+          gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${(t/10).toFixed(0)}%</text>`;
+        }
+      }
+
+      if (visible['df-odds'] && scales.dlt) {
+        const sc = scales.dlt;
+        const step = (sc.max - sc.min) > 150 ? 50 : 20;
+        for (let t = -500; t <= 500; t += step) {
+          if (t < sc.min || t > sc.max) continue;
+          const y = yOf(t, 'dlt');
+          if (t === 0) {
+            gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="zero-line"/>`;
+          }
+          if (bothVisible) {
+            gridHtml += `<text x="${W - M.right + 6}" y="${y + 3}" class="axis-text" text-anchor="start">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+          } else {
+            gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
+            gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+          }
+        }
+      }
+
+      const sortedMonths = [...new Set(xAllMonths)].sort();
+      const xTicks = [];
+      let lastYear = null;
+      sortedMonths.forEach(m => {
+        const yr = new Date(m).getFullYear();
+        if (yr !== lastYear) { xTicks.push({ x: xOf(m), label: yr }); lastYear = yr; }
+      });
+      const xAxisHtml = xTicks.map(t =>
+        `<text x="${t.x}" y="${H - 8}" class="axis-text" text-anchor="middle">${t.label}</text>`
+      ).join('');
+
+      let linesHtml = '', dotsHtml = '';
+      SERIES.filter(s => visible[s.key]).forEach(s => {
+        const pts = seriesPoints[s.key];
+        if (pts.length >= 2) {
+          const points = pts.map(p => `${xOf(p.month)},${yOf(p.value, s.group)}`).join(' ');
+          linesHtml += `<polyline class="form-line ${s.key}" points="${points}"/>`;
+        }
+        if (s.dots) {
+          pts.forEach(p => {
+            const cls = `form-dot ${s.key}` + (p.scored < 3 ? ' thin' : '');
+            dotsHtml += `<circle class="${cls}"
+                          cx="${xOf(p.month)}" cy="${yOf(p.value, s.group)}" r="2"
+                          data-series="${s.label}" data-month="${p.month}"
+                          data-value="${p.value}" data-scored="${p.scored}"
+                          data-starts="${p.starts}" data-fmt="${s.key}"/>`;
+          });
+        }
+      });
+
+      svg.innerHTML = gridHtml + xAxisHtml + linesHtml + dotsHtml;
+
+      const wrap = svg.parentElement;
+      const fmtMap = {};
+      SERIES.forEach(s => fmtMap[s.key] = s.fmt);
+      svg.querySelectorAll('circle.form-dot').forEach(c => {
+        c.addEventListener('mouseenter', () => {
+          const month  = c.dataset.month.slice(0, 7);
+          const sLabel = c.dataset.series;
+          const val    = parseInt(c.dataset.value);
+          const scored = c.dataset.scored;
+          const starts = c.dataset.starts;
+          const display = fmtMap[c.dataset.fmt](val);
+          tip.innerHTML =
+            `<strong>${month}</strong><br>` +
+            `${sLabel} ${display}<br>` +
+            `${scored}/${starts} scored`;
+          const wrapRect = wrap.getBoundingClientRect();
+          const dotRect  = c.getBoundingClientRect();
+          tip.style.left = (dotRect.left - wrapRect.left + dotRect.width / 2) + 'px';
+          tip.style.top  = (dotRect.top  - wrapRect.top) + 'px';
+          tip.style.opacity = 1;
+        });
+        c.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+      });
+    }
+
+    let lastSeries = null;
+    document.getElementById('legend').addEventListener('click', e => {
+      const label = e.target.closest('label[data-key]');
+      if (!label || !lastSeries) return;
+      const key = label.dataset.key;
+      visible[key] = !visible[key];
+      label.classList.toggle('off', !visible[key]);
+      drawChart(lastSeries);
+    });
+
+    async function init() {
+      const res = await fetch(`/api/driver/${driverId}`);
+      if (!res.ok) {
+        document.getElementById('chart').innerHTML =
+          '<text x="50%" y="50%" class="axis-text" text-anchor="middle">driver not found</text>';
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('driverName').textContent = data.name || 'driver';
+      const subParts = [];
+      if (data.short) subParts.push(data.short.toLowerCase());
+      const totalStarts = data.series.reduce((s, p) => s + p.starts, 0);
+      const totalScored = data.series.reduce((s, p) => s + p.scored, 0);
+      if (totalStarts) subParts.push(`${totalStarts.toLocaleString()} starts`);
+      if (totalScored) subParts.push(`${totalScored.toLocaleString()} scored`);
+      document.getElementById('driverSub').textContent = subParts.join('  \u00b7  ');
+      lastSeries = data.series;
+      drawChart(lastSeries);
+
+      if (data.recent && data.recent.length) renderRecent(data.recent);
+    }
+
+    function fmtTimeVal(v) {
+      if (v == null || v === 0) return '';
+      const mins  = Math.floor(v / 60);
+      const secs  = (v - mins * 60).toFixed(1).replace('.', ',');
+      return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+    }
+
+    function sexAge(e) {
+      const s = (e.sex || '').toLowerCase();
+      const a = e.age != null ? e.age : '';
+      if (!s && !a) return '';
+      return `${s}${a}`;
+    }
+
+    function horseCell(e) {
+      const name = flagify(e.horse_name);
+      const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+      const sa = sexAge(e);
+      const saSpan = sa ? ` <span class="sex-age">${esc(sa)}</span>` : '';
+      return link + saSpan;
+    }
+
+    function shortCell(short, full, href) {
+      if (!short) return '';
+      const tag  = href ? 'a' : 'span';
+      const attr = href ? ` href="${esc(href)}"` : '';
+      return `<${tag} class="short-name"${attr} title="${esc(full || '')}">${esc(short)}</${tag}>`;
+    }
+
+    function wrCell(v) {
+      if (v == null) return '';
+      return `<span class="muted">${(v / 10).toFixed(0)}%</span>`;
+    }
+
+    function deltaCell(form, wr) {
+      if (form == null || wr == null) return '';
+      const d = (form - wr) / 10;
+      const sign = d >= 0 ? '+' : '';
+      const cls = d < -3 ? 'sform sform-cold'
+               : d > 3  ? 'sform sform-hot'
+                         : 'sform';
+      return `<span class="${cls}">${sign}${d.toFixed(1)}</span>`;
+    }
+
+    function tfCell(v) {
+      if (v == null) return '';
+      return `<span class="sform">${(v / 10).toFixed(1)}</span>`;
+    }
+
+    function tfOddsCell(v) {
+      if (v == null) return '';
+      const n = v / 10;
+      const sign = n >= 0 ? '+' : '';
+      const cls = n < -3 ? 'sform sform-cold'
+               : n > 3  ? 'sform sform-hot'
+                         : 'sform';
+      return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
+    }
+
+    function sulkyCell(e) {
+      if (!e.sulky) return '';
+      const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+      return e.sulky_changed
+        ? `<span class="sulky-changed" title="changed">${esc(txt)}</span>`
+        : esc(txt);
+    }
+
+    const SHOE_ON_PATH =
+      'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+      ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+      'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+      's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+    const SHOE_OFF_PATH =
+      'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+      'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+      'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+      'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+      'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+      '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+      '.22-.04.36-.04.42.12l.42 1.24Z' +
+      'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+
+    function shoeIcon(has, changed) {
+      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '');
+      const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
+      </svg>`;
+    }
+
+    function shoeCells(code, frontChanged, backChanged) {
+      if (!code) return '';
+      const frontHas = code === '3' || code === '4';
+      const backHas  = code === '2' || code === '4';
+      return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+    }
+
+    const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
+    function isDq(e) {
+      return e.dq || e.gal || (e.placement_text && DQ_RE.test(e.placement_text));
+    }
+
+    function posDisplay(e) {
+      if (e.withdrawn) {
+        const t = e.placement_text || 'str';
+        return `<span class="withdrew">${esc(t)}</span>`;
+      }
+      if (isDq(e)) {
+        const raw = e.placement_text || '';
+        const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
+        return `<span class="dq">${esc(label)}</span>`;
+      }
+      const t = e.placement_text || (e.placement != null ? String(e.placement) : '');
+      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>`;
+      if (!t)                return `<span class="muted">–</span>`;
+      return esc(t);
+    }
+
+    function renderRecent(entries) {
+      const head = `<thead><tr>
+        <th>date</th>
+        <th>track</th>
+        <th>pos</th>
+        <th class="num">#</th>
+        <th>horse</th>
+        <th>trainer</th>
+        <th class="winrate">t_wr</th>
+        <th class="sform">tΔ</th>
+        <th class="sform">tf±</th>
+        <th class="winrate">d_wr</th>
+        <th class="sform">dΔ</th>
+        <th class="sform">df±</th>
+        <th class="num">odds</th>
+        <th class="num">sulky</th>
+        <th class="center">shoes</th>
+        <th>time</th>
+      </tr></thead>`;
+      const rows = entries.map(e => {
+        const cls = e.withdrawn ? ' class="scratched"' : '';
+        const raceLink = e.atg_id ? `/race/atg/${e.atg_id}`
+                       : e.race_id ? `/race/${e.race_id}`
+                       : null;
+        const dateCell = raceLink
+          ? `<a href="${raceLink}">${esc(e.race_date || '')}</a>`
+          : esc(e.race_date || '');
+        const time = e.time_text || fmtTimeVal(e.time_val);
+        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+        return `<tr${cls}>
+          <td class="muted">${dateCell}</td>
+          <td class="muted">${esc(e.track || '')}</td>
+          <td>${posDisplay(e)}</td>
+          <td class="num muted">${e.number || ''}</td>
+          <td>${horseCell(e)}</td>
+          <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
+          <td class="winrate">${wrCell(e.t_wr)}</td>
+          <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+          <td class="sform">${tfOddsCell(e.tf_odds)}</td>
+          <td class="winrate">${wrCell(e.d_wr)}</td>
+          <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
+          <td class="sform">${tfOddsCell(e.df_odds)}</td>
+          <td class="num muted">${e.odds != null ? e.odds : ''}</td>
+          <td class="num muted">${sulkyCell(e)}</td>
+          <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+          <td class="muted">${esc(time)}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('recentEntries').innerHTML =
+        `<table class="recent">${head}<tbody>${rows}</tbody></table>`;
+    }
+
+    init();
+  </script>
+{% endblock %}

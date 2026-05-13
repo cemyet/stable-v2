@@ -1,0 +1,346 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ horse.name }} - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .horse-page {
+    width: 100%;
+    max-width: 880px;
+  }
+
+  .horse-title {
+    font-size: 38px;
+    font-weight: 550;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .horse-title a.ext {
+    color: inherit;
+    text-decoration: none;
+  }
+  .horse-title a.ext:hover {
+    color: var(--fg) !important;
+    background: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  .ext-arrow {
+    font-size: 16px;
+    vertical-align: super;
+    color: var(--fg-muted);
+    margin-left: 4px;
+    text-decoration: none;
+  }
+  .horse-title:hover .ext-arrow { color: var(--fg); }
+
+  .sources {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .source-chip {
+    display: inline-block;
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    border-radius: 3px;
+  }
+
+  .pedigree {
+    color: var(--fg-muted);
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .pedigree a { color: var(--fg); }
+
+  .horse-desc {
+    font-size: 12px;
+    color: var(--fg-muted);
+    margin-bottom: 24px;
+  }
+
+  .meta-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    color: var(--fg-muted);
+    font-size: 13px;
+    margin-bottom: 36px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .meta-row span b {
+    color: var(--fg);
+    font-weight: 400;
+    margin-left: 6px;
+  }
+
+  h2.section {
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    margin: 32px 0 14px;
+  }
+
+  table.history,
+  table.offspring {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.history th, table.offspring th {
+    text-align: left;
+    color: var(--fg-muted);
+    font-weight: 400;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  table.history td, table.offspring td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.history tr:hover, table.offspring tr:hover {
+    background: var(--hover);
+  }
+  table.history tr.clickable { cursor: pointer; }
+  table.history td.num, table.offspring td.num { text-align: right; }
+  table.history th.num, table.offspring th.num { text-align: right; }
+  table.history td.muted { color: var(--fg-muted); }
+
+  table.history tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
+  table.history tr.scratched,
+  table.history tr.scratched:hover {
+    background-image: linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.6px),
+      rgba(190, 60, 60, 0.55) calc(50% - 0.6px),
+      rgba(190, 60, 60, 0.55) calc(50% + 0.6px),
+      transparent calc(50% + 0.6px)
+    );
+  }
+
+
+  .pos-1 { color: var(--accent-win); }
+
+  .dq, .withdrew { color: var(--fg-muted); }
+
+  .empty-section {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 12px 0;
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="horse-page">
+    <div class="sources" id="sources"></div>
+    <h1 class="horse-title" id="horseName"></h1>
+    <div class="pedigree" id="pedigree"></div>
+    <div class="horse-desc" id="horseDesc"></div>
+
+    <div class="meta-row" id="metaRow"></div>
+
+    <h2 class="section">race history</h2>
+    <div id="historyMount"><div class="empty-section">loading...</div></div>
+
+    <h2 class="section">offspring</h2>
+    <div id="offspringMount"><div class="empty-section">loading...</div></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const horse = {{ horse | tojson }};
+
+    function stripCountry(name) {
+      if (!name) return '';
+      return name.replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').toLowerCase();
+    }
+
+    // Source badges (chips per source that contributed data).
+    if (horse.sources && horse.sources.length) {
+      document.getElementById('sources').innerHTML = horse.sources.map(s =>
+        `<span class="source-chip">${esc(s)}</span>`
+      ).join('');
+    }
+
+    // Header: horse name + flag, with optional ext-link to TravSport when st_id present.
+    const nameHtml = flagify(horse.name, true);
+    if (horse.st_id) {
+      const url = `https://sportapp.travsport.se/sportinfo/horse/ts${horse.st_id}`;
+      document.getElementById('horseName').innerHTML =
+        `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener">` +
+        `${nameHtml}<span class="ext-arrow">↗</span></a>`;
+    } else {
+      document.getElementById('horseName').innerHTML = nameHtml;
+    }
+
+    const ped = [];
+    if (horse.father) {
+      const f = esc(stripCountry(horse.father));
+      ped.push(horse.father_id ? `<a href="/horse/${horse.father_id}">${f}</a>` : f);
+    } else { ped.push(''); }
+    if (horse.mother) {
+      const m = esc(stripCountry(horse.mother));
+      ped.push(horse.mother_id ? `<a href="/horse/${horse.mother_id}">${m}</a>` : m);
+    } else { ped.push(''); }
+    let pedStr = ped[0] + ' \u2013 ' + ped[1];
+    if (horse.mother_father) {
+      pedStr += ' (' + esc(stripCountry(horse.mother_father)) + ')';
+    }
+    document.getElementById('pedigree').innerHTML = pedStr;
+
+    // Birth year + gender as a single unlabelled descriptor below pedigree.
+    const descParts = [];
+    if (horse.date_of_birth) descParts.push(horse.date_of_birth.substring(0, 4));
+    if (horse.gender) descParts.push(horse.gender);
+    if (horse.breed) descParts.push(horse.breed);
+    document.getElementById('horseDesc').textContent = descParts.join(' · ');
+
+    // Starts as "14 (2-3-9)" = starts (wins-placed-unplaced).
+    const startsStr = horse.starts
+      ? horse.starts + (horse.wins != null
+          ? ` (${horse.wins}-${horse.placed ?? 0}-${horse.unplaced ?? 0})`
+          : '')
+      : '';
+
+    const meta = [];
+    if (startsStr)       meta.push(['starts',   startsStr]);
+    if (horse.win_rate)  meta.push(['win rate', horse.win_rate + '%']);
+    if (horse.earnings)  meta.push(['earnings', horse.earnings]);
+    if (horse.trainer) {
+      const t = horse.trainer_id
+        ? `<a href="/trainer/${horse.trainer_id}">${esc(horse.trainer)}</a>`
+        : esc(horse.trainer);
+      meta.push(['trainer', t, true]);
+    }
+    if (horse.stable)    meta.push(['stable',   horse.stable]);
+    else if (horse.owner) meta.push(['owner',   horse.owner]);
+    if (horse.breeder)   meta.push(['breeder',  horse.breeder]);
+    document.getElementById('metaRow').innerHTML = meta.map(([k, v, raw]) =>
+      `<span>${esc(k)}<b>${raw ? v : esc(v)}</b></span>`).join('');
+
+    // Convert time_val (seconds per km, e.g. 74.4) to Swedish display format ("14,4").
+    // Minutes are implicit (1 min is the standard), so we just subtract 60 for one-minute times.
+    // Two-minute-plus times (e.g. kallblod) get the minute prefix: "1.21,5".
+    function fmtTimeVal(v) {
+      if (v == null || v === 0) return '';
+      const mins  = Math.floor(v / 60);
+      const secs  = (v - mins * 60).toFixed(1);
+      const secStr = secs.replace('.', ',');
+      return mins <= 1 ? secStr : (mins - 1) + '.' + secStr;
+    }
+
+    function placementCell(p) {
+      // Prefer placement_text (TravSport); fall back to numeric placement (ATG-only rows).
+      const t = p.placement_text || (p.placement_num != null ? String(p.placement_num) : '');
+      if (p.disqualified) return `<span class="dq">${esc(t || 'd')}</span>`;
+      if (p.withdrawn)    return `<span class="withdrew">${esc(t || 'utg')}</span>`;
+      const n = p.placement_num;
+      return n === 1 ? `<span class="pos-1">${esc(t)}</span>` : esc(t);
+    }
+
+    async function loadHistory() {
+      const res = await fetch(`/api/horse/${horse.horse_id}/races`);
+      const rows = await res.json();
+      const mount = document.getElementById('historyMount');
+      if (!rows.length) {
+        mount.innerHTML = '<div class="empty-section">no races recorded</div>';
+        return;
+      }
+      const head = `
+        <thead>
+          <tr>
+            <th>date</th>
+            <th>track</th>
+            <th>result</th>
+            <th>time</th>
+            <th class="num">#</th>
+            <th>start</th>
+            <th class="num">dist</th>
+            <th>odds</th>
+            <th>driver</th>
+            <th class="num">prize</th>
+          </tr>
+        </thead>`;
+      const body = rows.map(r => {
+        const date = r.race_date || '';
+        const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
+        const progNum = r.program_number || '';
+        // Show time_text when available; otherwise convert time_val (seconds) to display format.
+        const timeDisp = r.km_time_text || fmtTimeVal(r.time_val);
+        // ATG races take precedence as the canonical race id.
+        const raceHref = r.atg_id  ? `/race/atg/${encodeURIComponent(r.atg_id)}`
+                       : r.race_id ? `/race/${r.race_id}`
+                       : null;
+        const trCls = (r.withdrawn ? 'scratched' : '') + (raceHref ? ' clickable' : '');
+        const trAttrs = trCls.trim() ? ` class="${trCls.trim()}"` : '';
+        const trData  = raceHref ? ` data-href="${esc(raceHref)}"` : '';
+        return `
+          <tr${trAttrs}${trData}>
+            <td class="muted">${esc(date)}</td>
+            <td>${esc(r.track_label || '')}</td>
+            <td>${placementCell(r)}</td>
+            <td>${esc(timeDisp)}</td>
+            <td class="muted num">${esc(progNum)}</td>
+            <td class="muted">${esc(startType)}</td>
+            <td class="muted num">${esc(r.distance || '')}</td>
+            <td class="muted">${esc(r.odds_text || '')}</td>
+            <td class="muted">${r.driver_id
+              ? `<a href="/driver/${r.driver_id}">${esc(fmtName(r.driver_name))}</a>`
+              : esc(fmtName(r.driver_name))}</td>
+            <td class="num">${esc(r.prize_kr || '')}</td>
+          </tr>`;
+      }).join('');
+      mount.innerHTML = `<table class="history">${head}<tbody>${body}</tbody></table>`;
+      mount.querySelectorAll('tr.clickable').forEach(tr => {
+        tr.addEventListener('click', () => { window.location.href = tr.dataset.href; });
+      });
+    }
+
+    async function loadOffspring() {
+      const res = await fetch(`/api/horse/${horse.horse_id}/offspring`);
+      const rows = await res.json();
+      const mount = document.getElementById('offspringMount');
+      if (!rows.length) {
+        mount.innerHTML = '<div class="empty-section">no offspring recorded</div>';
+        return;
+      }
+      const head = `
+        <thead>
+          <tr>
+            <th>name</th>
+            <th>year</th>
+            <th>sex</th>
+            <th class="num">starts</th>
+            <th class="num">wins</th>
+            <th class="num">earnings</th>
+          </tr>
+        </thead>`;
+      const body = rows.map(o => `
+        <tr>
+          <td><a href="/horse/${o.horse_id}">${flagify(o.name)}</a></td>
+          <td class="muted">${esc(o.year || '')}</td>
+          <td class="muted">${esc(o.gender || '')}</td>
+          <td class="muted num">${o.starts || ''}</td>
+          <td class="muted num">${o.wins || ''}</td>
+          <td class="num">${esc(o.earnings || '')}</td>
+        </tr>`).join('');
+      mount.innerHTML = `<table class="offspring">${head}<tbody>${body}</tbody></table>`;
+    }
+
+    loadHistory();
+    loadOffspring();
+  </script>
+{% endblock %}

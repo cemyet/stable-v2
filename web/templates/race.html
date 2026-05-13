@@ -1,0 +1,527 @@
+{% extends "_layout.html" %}
+
+{% block title %}race - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .race-page {
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .race-title {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .race-sub {
+    color: var(--fg-muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .mode-toggle button {
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 8px 18px;
+    cursor: pointer;
+    text-transform: lowercase;
+    transition: color 0.15s, background 0.15s;
+  }
+  .mode-toggle button + button {
+    border-left: 1px solid var(--border);
+  }
+  .mode-toggle button.active {
+    color: var(--fg);
+    background: var(--hover);
+  }
+  .mode-toggle button:hover:not(.active) { color: var(--fg); }
+
+  table.entries {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.entries th {
+    text-align: left;
+    color: var(--fg-muted);
+    font-weight: 400;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  table.entries th.num { text-align: right; }
+  table.entries td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.entries td.num { text-align: right; }
+  table.entries td.muted { color: var(--fg-muted); }
+  table.entries td.center { text-align: center; }
+
+  .sex-age {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+
+  .short-name {
+    cursor: help;
+    text-decoration: none;
+  }
+  a.short-name { cursor: pointer; }
+
+  /* s_form numeric: subtle color split so trends pop without shouting. */
+  .sform { font-variant-numeric: tabular-nums; text-align: right; }
+  .sform-cold { color: var(--accent-cold); }
+  .sform-hot  { color: var(--accent-hot); }
+
+  /* Shoe icons: inline SVG horseshoes, two side-by-side (front, back).
+     OFF state uses ATG's exact ShoeOffFilledIcon path. ON state matches the
+     same rotation/weight. 'shoe-changed' colors the icon red. */
+  .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .shoe-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--fg);
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .shoe-icon.shoe-changed { color: var(--accent-warn); }
+
+  .sulky-changed { color: var(--accent-warn); }
+
+  .pos-1 { color: var(--accent-win); }
+
+  .dq, .withdrew { color: var(--fg-muted); }
+
+  table.entries tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
+  table.entries tr.scratched {
+    background-image: linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.6px),
+      rgba(255, 45, 45, 0.7) calc(50% - 0.6px),
+      rgba(255, 45, 45, 0.7) calc(50% + 0.6px),
+      transparent calc(50% + 0.6px)
+    );
+  }
+
+  /* Tillägg divider: a small inset row between distance groups (volts). */
+  table.entries tr.tillagg-row td {
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--hover);
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: lowercase;
+  }
+
+  .empty-section {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 12px 0;
+    text-align: center;
+  }
+
+  /* Win-rate column: low-emphasis, right-aligned to match # column. */
+  table.entries th.winrate, table.entries td.winrate {
+    text-align: right;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Footer line below the result table (e.g. "segermarginal: 1 längd"). */
+  .race-footer {
+    margin-top: 14px;
+    color: var(--fg-muted);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="race-page">
+    <h1 class="race-title" id="raceTitle">race</h1>
+    <div class="race-sub" id="raceSub"></div>
+
+    <div class="mode-toggle">
+      <button id="modeListBtn" class="active">list</button>
+      <button id="modeResultBtn">result</button>
+    </div>
+
+    <div id="mount"><div class="empty-section">loading...</div></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const raceKey = {{ race_key | tojson }};
+    const isAtg   = {{ is_atg   | tojson }};
+    const apiUrl  = isAtg
+      ? `/api/race/atg/${encodeURIComponent(raceKey)}`
+      : `/api/race/${raceKey}`;
+
+    let raceData = null;
+    let mode = 'list';
+
+    // --- formatters --------------------------------------------------------
+
+    // Sex+age e.g. 'h4'. Sex letters are h/v/s already (entry.sex).
+    function sexAge(e) {
+      const s = (e.sex || '').toLowerCase();
+      const a = e.age != null ? e.age : '';
+      if (!s && !a) return '';
+      return `${s}${a}`;
+    }
+
+    // Sulky type: 'AM' -> 'Am.', 'VA' -> 'Va.'. Wrap in red span when changed.
+    function sulkyCell(e) {
+      if (!e.sulky) return '';
+      const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+      return e.sulky_changed
+        ? `<span class="sulky-changed" title="changed since last race">${esc(txt)}</span>`
+        : esc(txt);
+    }
+
+    // Horseshoe icons matching ATG's style: rotated 90° clockwise so the
+    // curve faces right and the prongs face left.
+    //   - has=true  -> filled horseshoe (no slash)
+    //   - has=false -> ATG's exact ShoeOffFilledIcon (horseshoe + diagonal slash)
+    //   - changed=true colours the icon red
+    // ATG's actual ShoeOnFilledIcon path (24x24 viewBox).
+    const SHOE_ON_PATH =
+      'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+      ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+      'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+      's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+    // ATG's actual ShoeOffFilledIcon path (24x24 viewBox).
+    const SHOE_OFF_PATH =
+      'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+      'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+      'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+      'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+      'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+      '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+      '.22-.04.36-.04.42.12l.42 1.24Z' +
+      'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+
+    function shoeIcon(has, changed) {
+      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '');
+      const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
+      </svg>`;
+    }
+
+    // Two horseshoes side-by-side: front, back.
+    // shoe_code: '1' = none, '2' = back only, '3' = front only, '4' = both.
+    function shoeCells(code, frontChanged, backChanged) {
+      if (!code) return '';
+      const frontHas = code === '3' || code === '4';
+      const backHas  = code === '2' || code === '4';
+      return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+    }
+
+    // Trainer/driver short with full name on hover. If `href` is given the
+    // cell becomes a link (used for trainers -> /trainer/<id>).
+    function shortCell(short, full, href) {
+      if (!short) return '';
+      const tag  = href ? 'a' : 'span';
+      const attr = href ? ` href="${esc(href)}"` : '';
+      return `<${tag} class="short-name"${attr} title="${esc(full || '')}">${esc(short)}</${tag}>`;
+    }
+
+    function tfCell(v) {
+      if (v == null) return '';
+      return `<span class="sform">${(v / 10).toFixed(1)}</span>`;
+    }
+
+    function wrCell(v) {
+      if (v == null) return '';
+      return `<span class="muted">${(v / 10).toFixed(0)}%</span>`;
+    }
+
+    function deltaCell(form, wr) {
+      if (form == null || wr == null) return '';
+      const d = (form - wr) / 10;
+      const sign = d >= 0 ? '+' : '';
+      const cls = d < -3 ? 'sform sform-cold'
+               : d > 3  ? 'sform sform-hot'
+                         : 'sform';
+      return `<span class="${cls}">${sign}${d.toFixed(1)}</span>`;
+    }
+
+    function tfOddsCell(v) {
+      if (v == null) return '';
+      const n = v / 10;
+      const sign = n >= 0 ? '+' : '';
+      const cls = n < -3 ? 'sform sform-cold'
+               : n > 3  ? 'sform sform-hot'
+                         : 'sform';
+      return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
+    }
+
+    // Horse cell: name + flag + small sex/age.
+    function horseCell(e) {
+      const name = flagify(e.horse_name);
+      const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+      const sa = sexAge(e);
+      const saSpan = sa ? ` <span class="sex-age">${esc(sa)}</span>` : '';
+      return link + saSpan;
+    }
+
+    // --- loading -----------------------------------------------------------
+
+    async function loadRace() {
+      const res = await fetch(apiUrl);
+      if (!res.ok) {
+        document.getElementById('mount').innerHTML = '<div class="empty-section">not found</div>';
+        return;
+      }
+      raceData = await res.json();
+      renderHeader();
+      render();
+    }
+
+    function renderHeader() {
+      const sm = raceData.start_method === 'A' ? 'auto'
+              : raceData.start_method === 'V' ? 'volt' : '';
+      const trackLine = (raceData.track || '').toLowerCase();
+      const titleParts = [
+        trackLine,
+        raceData.race_number ? `lopp ${raceData.race_number}` : '',
+      ].filter(Boolean);
+      document.getElementById('raceTitle').textContent = titleParts.join(' \u00b7 ');
+      const subParts = [
+        raceData.race_date,
+        raceData.distance ? raceData.distance + 'm' : '',
+        sm,
+        raceData.race_class || '',
+      ].filter(Boolean);
+      document.getElementById('raceSub').textContent = subParts.join(' \u00b7 ');
+    }
+
+    function render() {
+      if (!raceData) return;
+      const mount = document.getElementById('mount');
+      const entries = raceData.results || [];
+      if (!entries.length) {
+        mount.innerHTML = '<div class="empty-section">no entries</div>';
+        return;
+      }
+      if (mode === 'list')   renderList(mount, entries);
+      else                    renderResult(mount, entries);
+    }
+
+    // Win rate "12%" or '' if no starts. `which` = 'pre' or 'post'.
+    function winRate(e, which) {
+      const s = which === 'pre' ? e.pre_starts : e.post_starts;
+      const w = which === 'pre' ? e.pre_wins   : e.post_wins;
+      if (!s) return '';
+      return Math.round((w / s) * 100) + '%';
+    }
+
+    // List view: starting list, ordered by program number, scratched stay in place.
+    // For volt starts the distance changes between volts; we insert a small
+    // "tillägg" divider row labelled with the offset from the base distance.
+    function renderList(mount, entries) {
+      const sorted = entries.slice().sort((a, b) => {
+        const an = a.number == null ? 999 : a.number;
+        const bn = b.number == null ? 999 : b.number;
+        return an - bn;
+      });
+      const distances = sorted.map(e => e.distance).filter(d => d != null);
+      const baseDist = distances.length ? Math.min(...distances) : null;
+      const head = `
+        <thead><tr>
+          <th class="num">#</th>
+          <th>horse</th>
+          <th>driver</th>
+          <th class="winrate">d_wr</th>
+          <th class="sform">dΔ</th>
+          <th class="sform">df±</th>
+          <th>trainer</th>
+          <th class="winrate">t_wr</th>
+          <th class="sform">tΔ</th>
+          <th class="sform">tf±</th>
+          <th class="num">odds</th>
+          <th class="winrate">w%</th>
+          <th class="num">sulky</th>
+          <th class="center">shoes</th>
+        </tr></thead>`;
+      const COLS = 14;
+      let prevDist = null;
+      const rows = [];
+      sorted.forEach(e => {
+        if (
+          e.distance != null && baseDist != null &&
+          prevDist != null && e.distance !== prevDist
+        ) {
+          const offset = e.distance - baseDist;
+          rows.push(`
+            <tr class="tillagg-row">
+              <td colspan="${COLS}">${offset}m</td>
+            </tr>`);
+        }
+        if (e.distance != null) prevDist = e.distance;
+        const cls = e.withdrawn ? ' class="scratched"' : '';
+        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+        const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
+        rows.push(`
+          <tr${cls}>
+            <td class="num muted">${e.number || ''}</td>
+            <td>${horseCell(e)}</td>
+            <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
+            <td class="winrate">${wrCell(e.d_wr)}</td>
+            <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
+            <td class="sform">${tfOddsCell(e.df_odds)}</td>
+            <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
+            <td class="winrate">${wrCell(e.t_wr)}</td>
+            <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+            <td class="sform">${tfOddsCell(e.tf_odds)}</td>
+            <td class="num muted">${e.odds != null ? e.odds : ''}</td>
+            <td class="winrate">${winRate(e, 'pre')}</td>
+            <td class="num muted">${sulkyCell(e)}</td>
+            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+          </tr>`);
+      });
+      mount.innerHTML = `<table class="entries">${head}<tbody>${rows.join('')}</tbody></table>`;
+    }
+
+    const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
+    function isDq(e) {
+      return e.dq || e.gal || (e.placement_text && DQ_RE.test(e.placement_text));
+    }
+
+    // Sort buckets: placed -> unplaced -> DQ -> withdrawn.
+    function resultBucket(e) {
+      if (e.withdrawn) return 3;
+      if (isDq(e))     return 2;
+      if (e.placement != null) return 0;
+      return 1;
+    }
+
+    function renderResult(mount, entries) {
+      const sorted = entries.slice().sort((a, b) => {
+        const ba = resultBucket(a);
+        const bb = resultBucket(b);
+        if (ba !== bb) return ba - bb;
+        if (ba === 0) {
+          if (a.placement !== b.placement) return a.placement - b.placement;
+        }
+        if (ba === 1 && a.time_val != null && b.time_val != null) {
+          return a.time_val - b.time_val;
+        }
+        const an = a.number == null ? 999 : a.number;
+        const bn = b.number == null ? 999 : b.number;
+        return an - bn;
+      });
+      const head = `
+        <thead><tr>
+          <th>pos</th>
+          <th class="num">#</th>
+          <th>horse</th>
+          <th>driver</th>
+          <th class="winrate">d_wr</th>
+          <th class="sform">dΔ</th>
+          <th class="sform">df±</th>
+          <th>trainer</th>
+          <th class="winrate">t_wr</th>
+          <th class="sform">tΔ</th>
+          <th class="sform">tf±</th>
+          <th class="num">odds</th>
+          <th class="winrate">w%</th>
+          <th class="num">sulky</th>
+          <th class="center">shoes</th>
+          <th>time</th>
+        </tr></thead>`;
+      const body = sorted.map(e => {
+        const cls = e.withdrawn ? ' class="scratched"' : '';
+        const posCell = posDisplay(e);
+        const time = e.time_text || fmtTimeVal(e.time_val);
+        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+        const driverHref2 = e.driver_id ? `/driver/${e.driver_id}` : null;
+        return `
+          <tr${cls}>
+            <td>${posCell}</td>
+            <td class="num muted">${e.number || ''}</td>
+            <td>${horseCell(e)}</td>
+            <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref2)}</td>
+            <td class="winrate">${wrCell(e.d_wr)}</td>
+            <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
+            <td class="sform">${tfOddsCell(e.df_odds)}</td>
+            <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
+            <td class="winrate">${wrCell(e.t_wr)}</td>
+            <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+            <td class="sform">${tfOddsCell(e.tf_odds)}</td>
+            <td class="num muted">${e.odds != null ? e.odds : ''}</td>
+            <td class="winrate">${winRate(e, 'post')}</td>
+            <td class="num muted">${sulkyCell(e)}</td>
+            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+            <td>${esc(time)}</td>
+          </tr>`;
+      }).join('');
+      const footer = raceData.victory_margin
+        ? `<div class="race-footer">segermarginal: ${esc(raceData.victory_margin)}</div>`
+        : '';
+      mount.innerHTML = `<table class="entries">${head}<tbody>${body}</tbody></table>${footer}`;
+    }
+
+    function posDisplay(e) {
+      if (e.withdrawn) {
+        const t = e.placement_text || 'str';
+        return `<span class="withdrew">${esc(t)}</span>`;
+      }
+      if (isDq(e)) {
+        // Prefer placement_text (e.g. "1g", "gdk") if it's a real code,
+        // otherwise show "g" for gallop or "d" for generic DQ.
+        // Never show an inferred numeric position here — it's not a real finish.
+        const raw = e.placement_text || '';
+        const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
+        return `<span class="dq">${esc(label)}</span>`;
+      }
+      const t = e.placement_text || (e.placement != null ? String(e.placement) : '');
+      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>`;
+      if (!t)                return `<span class="muted">–</span>`;
+      return esc(t);
+    }
+
+    // Same conversion helper as on the horse page (seconds per km -> '14,4').
+    function fmtTimeVal(v) {
+      if (v == null || v === 0) return '';
+      const mins  = Math.floor(v / 60);
+      const secs  = (v - mins * 60).toFixed(1);
+      const secStr = secs.replace('.', ',');
+      return mins <= 1 ? secStr : (mins - 1) + '.' + secStr;
+    }
+
+    document.getElementById('modeListBtn').addEventListener('click', () => {
+      mode = 'list';
+      document.getElementById('modeListBtn').classList.add('active');
+      document.getElementById('modeResultBtn').classList.remove('active');
+      render();
+    });
+    document.getElementById('modeResultBtn').addEventListener('click', () => {
+      mode = 'result';
+      document.getElementById('modeResultBtn').classList.add('active');
+      document.getElementById('modeListBtn').classList.remove('active');
+      render();
+    });
+
+    loadRace();
+  </script>
+{% endblock %}

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}stable{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #151515;
+      --fg: #e8e4dc;
+      --fg-muted: #706b65;
+      --border: #2e2e2e;
+      --border-focus: #666;
+      --hover: #1c1c1c;
+      --flag-opacity: 0.8;
+      --fg-heading: #e8e4dc;
+      --accent-win: #d6c280;
+      --accent-hot: #4caf50;
+      --accent-cold: #e53935;
+      --accent-warn: #ff2d2d;
+      --chart-form: #e8e4dc;
+      --chart-odds: #d4a64f;
+      --chart-wr: #7eaed4;
+    }
+    html.light {
+      --bg: rgb(255, 246, 207);
+      --fg: rgb(89, 89, 83);
+      --fg-heading: rgb(42, 62, 80);
+      --fg-muted: #8a8070;
+      --border: rgb(215, 209, 186);
+      --border-focus: #a09050;
+      --hover: #f0e8c0;
+      --flag-opacity: 1;
+      --accent-win: #2a3e50;
+      --accent-hot: #1a6e2e;
+      --accent-cold: #a01010;
+      --accent-warn: #a01010;
+      --chart-form: #3a7bd5;
+      --chart-odds: #e07020;
+      --chart-wr: #2a5e8a;
+    }
+    html.light h1, html.light h2, html.light h3,
+    html.light .horse-title, html.light .topnav a.active,
+    html.light .trainer-name, html.light .driver-name {
+      color: var(--fg-heading);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html.theme-ready body,
+    html.theme-ready body * {
+      transition: background-color 0.4s ease, color 0.4s ease,
+                  border-color 0.4s ease;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 80px 20px 40px;
+    }
+
+    /* ---------- top nav ---------- */
+
+    .topnav {
+      position: fixed;
+      top: 18px;
+      left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+
+    .topnav a {
+      pointer-events: auto;
+      color: var(--fg-muted);
+      text-decoration: none;
+      padding: 6px 14px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      border: 1px solid transparent;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .topnav a:hover { color: var(--fg); }
+    .topnav a.active { color: var(--fg); border-color: var(--border); }
+
+
+    /* ---------- generic helpers used by all pages ---------- */
+
+    a { color: inherit; text-decoration: none; }
+    a:hover {
+      color: rgb(255, 255, 255) !important;
+      background: rgb(78, 187, 53);
+      text-decoration: none;
+      border-radius: 3px;
+      padding: 1px 4px;
+      margin: 0 -4px;
+    }
+    .topnav a:hover {
+      color: var(--fg) !important;
+      background: none;
+      padding: 6px 14px;
+      margin: 0;
+      border-radius: 0;
+    }
+
+    .flag {
+      display: inline-block;
+      width: 12px;
+      height: 9px;
+      object-fit: cover;
+      vertical-align: baseline;
+      position: relative;
+      top: 0px;
+      border-radius: 1px;
+      opacity: var(--flag-opacity);
+    }
+    .flag-lg { width: 30px; height: 21px; top: 0; }
+
+    .muted { color: var(--fg-muted); }
+
+    button.ghost {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    button.ghost:hover:not(:disabled) { border-color: var(--border-focus); }
+    button.ghost:disabled { opacity: 0.5; cursor: progress; }
+
+    input[type="text"], input[type="date"] {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--fg);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus, input[type="date"]:focus { border-color: var(--border-focus); }
+    input[type="date"] { color-scheme: dark; }
+    html.light input[type="date"] { color-scheme: light; }
+
+    {% block extra_style %}{% endblock %}
+  </style>
+</head>
+<body>
+
+  <nav class="topnav">
+    <a href="/home"   class="{% if active_tab == 'home' %}active{% endif %}">home</a>
+    <a href="/"       class="{% if active_tab == 'stable' %}active{% endif %}">search</a>
+    <a href="/ml"     class="{% if active_tab == 'ml' %}active{% endif %}">ml</a>
+    <a href="/admin"  class="{% if active_tab == 'admin' %}active{% endif %}">admin</a>
+  </nav>
+  <label id="themeToggle" aria-label="Toggle theme" style="
+    position:fixed;top:20px;right:20px;z-index:100;
+    display:flex;align-items:center;gap:7px;cursor:pointer;
+    font-size:11px;color:var(--fg-muted);letter-spacing:1px;user-select:none;">
+    <span id="themeLabel">dark</span>
+    <span style="
+      position:relative;display:inline-block;width:32px;height:18px;">
+      <input type="checkbox" id="themeCheck" style="opacity:0;width:0;height:0;position:absolute;">
+      <span id="themeTrack" style="
+        position:absolute;inset:0;border-radius:9px;
+        background:var(--border);cursor:pointer;
+        transition:background 0.3s;"></span>
+      <span id="themeThumb" style="
+        position:absolute;top:3px;left:3px;
+        width:12px;height:12px;border-radius:50%;
+        background:var(--fg-muted);
+        transition:transform 0.3s,background 0.3s;"></span>
+    </span>
+  </label>
+
+  {% block content %}{% endblock %}
+
+  <script>
+    // Shared helpers reused across pages.
+    function esc(s) {
+      const el = document.createElement('span');
+      el.textContent = s == null ? '' : String(s);
+      return el.innerHTML;
+    }
+
+    function flagify(name, large) {
+      if (!name) return '';
+      const cls = large ? 'flag flag-lg' : 'flag';
+      const hasCode = /\([A-Z]{2}\)/.test(name);
+      let result = esc(name.replace(/\*/g, '')).replace(/\(([A-Z]{2})\)/g, (_, code) => {
+        return `<img class="${cls}" src="https://flagcdn.com/${code.toLowerCase()}.svg" alt="${code}">`;
+      });
+      if (!hasCode) {
+        result += ` <img class="${cls}" src="https://flagcdn.com/se.svg" alt="SE">`;
+      }
+      return result;
+    }
+
+    // Reverse "Lastname Firstname" -> "Firstname Lastname" for display.
+    // TravSport stores person names with surname first.
+    function fmtName(name) {
+      if (!name) return '';
+      const parts = name.trim().split(/\s+/);
+      if (parts.length < 2) return name;
+      const [last, ...first] = parts;
+      return first.join(' ') + ' ' + last;
+    }
+
+    (function() {
+      const html   = document.documentElement;
+      const check  = document.getElementById('themeCheck');
+      const thumb  = document.getElementById('themeThumb');
+      const label  = document.getElementById('themeLabel');
+
+      function applyTheme(light, animate) {
+        if (!animate) html.classList.remove('theme-ready');
+        html.classList.toggle('light', light);
+        check.checked = light;
+        thumb.style.transform = light ? 'translateX(14px)' : '';
+        thumb.style.background = light ? 'var(--fg)' : 'var(--fg-muted)';
+        label.textContent = light ? 'light' : 'dark';
+        if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => html.classList.add('theme-ready')));
+      }
+
+      // Restore saved preference without animation
+      applyTheme(localStorage.getItem('theme') === 'light', false);
+
+      check.addEventListener('change', () => {
+        const isLight = check.checked;
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        applyTheme(isLight, true);
+      });
+    })();
+
+  </script>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>
