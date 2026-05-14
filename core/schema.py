@@ -87,6 +87,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS horse_usta_id_uk   ON horse (usta_id)   WHERE 
 CREATE UNIQUE INDEX IF NOT EXISTS horse_letrot_id_uk ON horse (letrot_id) WHERE letrot_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS horse_kmtid_id_uk  ON horse (kmtid_id)  WHERE kmtid_id  IS NOT NULL;
 
+-- New foreign sources (added late — use ALTER for idempotency).
+ALTER TABLE horse ADD COLUMN IF NOT EXISTS hvt_id     TEXT;
+ALTER TABLE horse ADD COLUMN IF NOT EXISTS breedly_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS horse_hvt_id_uk     ON horse (hvt_id)     WHERE hvt_id     IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS horse_breedly_id_uk ON horse (breedly_id) WHERE breedly_id IS NOT NULL;
+
 -- Cross-source matching helpers
 CREATE UNIQUE INDEX IF NOT EXISTS horse_reg_uk  ON horse (registration_number) WHERE registration_number IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS horse_ueln_uk ON horse (ueln_number)         WHERE ueln_number         IS NOT NULL;
@@ -131,6 +137,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS person_st_id_uk     ON person (st_id)     WHER
 CREATE UNIQUE INDEX IF NOT EXISTS person_atg_id_uk    ON person (atg_id)    WHERE atg_id    IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS person_usta_id_uk   ON person (usta_id)   WHERE usta_id   IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS person_letrot_id_uk ON person (letrot_id) WHERE letrot_id IS NOT NULL;
+
+ALTER TABLE person ADD COLUMN IF NOT EXISTS hvt_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS person_hvt_id_uk ON person (hvt_id) WHERE hvt_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS person_name_trgm ON person USING gin (name gin_trgm_ops);
 
 -- =====================================================================
@@ -215,6 +225,14 @@ CREATE INDEX IF NOT EXISTS race_pools_gin      ON race USING gin (pool_types);
 CREATE INDEX IF NOT EXISTS race_st_day_idx     ON race (st_race_day_id) WHERE st_race_day_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS race_atg_day_idx    ON race (atg_race_day_id) WHERE atg_race_day_id IS NOT NULL;
 
+-- kmtid race id (e.g. '2026-05-09_6_1' = date_atgTrackId_raceNumber).
+ALTER TABLE race ADD COLUMN IF NOT EXISTS kmtid_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS race_kmtid_id_uk ON race (kmtid_id) WHERE kmtid_id IS NOT NULL;
+
+-- HVT raceday id, when known (foreign source — German raceday).
+ALTER TABLE race ADD COLUMN IF NOT EXISTS hvt_race_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS race_hvt_id_uk ON race (hvt_race_id) WHERE hvt_race_id IS NOT NULL;
+
 -- =====================================================================
 -- ENTRY — one row per (race, horse). The workhorse table.
 -- =====================================================================
@@ -278,6 +296,33 @@ CREATE INDEX IF NOT EXISTS entry_driver_idx       ON entry (driver_id)  WHERE dr
 CREATE INDEX IF NOT EXISTS entry_trainer_idx      ON entry (trainer_id) WHERE trainer_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS entry_horse_winner_idx ON entry (horse_id)   WHERE placement = 1;
 CREATE INDEX IF NOT EXISTS entry_horse_placed_idx ON entry (horse_id)   WHERE placement BETWEEN 1 AND 3;
+
+-- ---------------------------------------------------------------------------
+-- Foreign-currency support: every prize is stored in SEK (`prize_kr`) for
+-- consistency. For non-SEK sources we *also* keep the original amount + ccy
+-- in the columns below, so we can recompute later if FX assumptions change.
+-- ---------------------------------------------------------------------------
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS prize_currency CHAR(3) DEFAULT 'SEK';
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS prize_original NUMERIC(14,2);
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS prize_fx_rate  NUMERIC(12,6);
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS prize_fx_date  DATE;
+
+-- ---------------------------------------------------------------------------
+-- kmtid (atgx GPS) sectional data — promoted "hot" splits as columns,
+-- full per-100m intervals retained in `kmtid_intervals` JSONB.
+-- All times are in milliseconds (kmtid native unit).
+-- ---------------------------------------------------------------------------
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_first_200ms          REAL;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_last_200ms           REAL;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_best_100ms           REAL;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_best_100_start_m     INTEGER;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_actual_distance_m    INTEGER;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_actual_km_time_ms    REAL;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_slipstream_distance_m INTEGER;
+ALTER TABLE entry ADD COLUMN IF NOT EXISTS kmtid_intervals             JSONB;
+
+CREATE INDEX IF NOT EXISTS entry_kmtid_present_idx
+    ON entry (race_id) WHERE kmtid_actual_km_time_ms IS NOT NULL;
 
 -- =====================================================================
 -- ROLE-HISTORY tables — time-ranged owner / trainer / driver assignments

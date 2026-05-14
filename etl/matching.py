@@ -31,11 +31,11 @@ from psycopg2.extras import Json
 # ---------------------------------------------------------------------------
 
 PRIORITY = {
-    "horse":  ("usta", "st", "letrot", "atg", "kmtid"),
-    "race":   ("atg", "st", "usta", "letrot", "kmtid"),
-    "entry":  ("atg", "st", "usta", "letrot", "kmtid"),
-    "person": ("st", "atg", "usta", "letrot", "kmtid"),
-    "track":  ("st", "atg", "usta", "letrot", "kmtid"),
+    "horse":  ("usta", "st", "letrot", "hvt", "atg", "breedly", "kmtid"),
+    "race":   ("atg", "st", "usta", "letrot", "hvt", "kmtid"),
+    "entry":  ("atg", "st", "usta", "letrot", "hvt", "kmtid"),
+    "person": ("st", "atg", "usta", "letrot", "hvt", "kmtid"),
+    "track":  ("st", "atg", "usta", "letrot", "hvt", "kmtid"),
 }
 
 
@@ -48,8 +48,14 @@ def _rank(concept: str, source: str) -> int:
 
 
 def _winning(concept: str, incoming_source: str, current_source: str | None) -> bool:
-    """True iff `incoming_source` outranks `current_source`."""
+    """True iff `incoming_source` should overwrite the row's canonical fields.
+
+    Same source always wins (re-fetch refreshes the values); otherwise it
+    must outrank the current primary_source.
+    """
     if not current_source:
+        return True
+    if incoming_source == current_source:
         return True
     return _rank(concept, incoming_source) < _rank(concept, current_source)
 

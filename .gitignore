@@ -6,3 +6,8 @@ venv/
 .DS_Store
 logs/*.log
 logs/*.txt
+logs/*.html
+logs/*.js
+logs/*.cookies
+# fx_cache.json is regenerated on demand from Riksbank API
+logs/fx_cache.json
