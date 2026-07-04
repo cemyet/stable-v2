@@ -3,11 +3,22 @@
 {% block title %}race - stable{% endblock %}
 
 {% block extra_style %}
-  body { padding: 80px 20px 60px; }
+  body {
+    padding: 80px 24px 60px;
+    align-items: stretch;
+  }
 
   .race-page {
     width: 100%;
-    max-width: 760px;
+    max-width: none;
+    align-self: stretch;
+    padding-left: 44px;
+  }
+
+  #mount {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .race-title {
@@ -21,6 +32,14 @@
     font-size: 13px;
     margin-bottom: 24px;
   }
+  .source-link {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-decoration: none;
+    opacity: 0.7;
+  }
+  .source-link:hover { opacity: 1; color: var(--accent-glow); text-shadow: var(--glow-shadow); font-weight: var(--highlight-weight); }
 
   .mode-toggle {
     display: inline-flex;
@@ -48,6 +67,12 @@
   }
   .mode-toggle button:hover:not(.active) { color: var(--fg); }
 
+  table.entries th.gal-col-toggle {
+    cursor: pointer;
+    user-select: none;
+  }
+  table.entries th.gal-col-toggle:hover { color: var(--fg); }
+
   table.entries {
     width: 100%;
     border-collapse: collapse;
@@ -69,6 +94,7 @@
   }
   table.entries td.num { text-align: right; }
   table.entries td.muted { color: var(--fg-muted); }
+  table.entries th.center,
   table.entries td.center { text-align: center; }
 
   .sex-age {
@@ -83,8 +109,15 @@
     text-decoration: none;
   }
   a.short-name { cursor: pointer; }
+  a.short-name:hover {
+    color: var(--accent-glow);
+    text-shadow: var(--glow-shadow);
+    font-weight: var(--highlight-weight);
+  }
 
   /* s_form numeric: subtle color split so trends pop without shouting. */
+  table.entries th.sform,
+  table.entries td.sform,
   .sform { font-variant-numeric: tabular-nums; text-align: right; }
   .sform-cold { color: var(--accent-cold); }
   .sform-hot  { color: var(--accent-hot); }
@@ -104,12 +137,12 @@
 
   .sulky-changed { color: var(--accent-warn); }
 
-  .pos-1 { color: var(--accent-win); }
-
   .dq, .withdrew { color: var(--fg-muted); }
+  .gal-mark { font-size: .72em; color: var(--fg-muted); vertical-align: super; }
 
   table.entries tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
-  table.entries tr.scratched {
+  table.entries tr.scratched,
+  table.entries tr.scratched:hover {
     background-image: linear-gradient(
       to bottom,
       transparent calc(50% - 0.6px),
@@ -117,6 +150,10 @@
       rgba(255, 45, 45, 0.7) calc(50% + 0.6px),
       transparent calc(50% + 0.6px)
     );
+  }
+
+  table.entries tbody tr:hover:not(.tillagg-row):not(.scratched) {
+    background: var(--hover);
   }
 
   /* Tillägg divider: a small inset row between distance groups (volts). */
@@ -144,6 +181,13 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* xLabs GPS columns — same muted treatment as the horse-page history. */
+  table.entries th.gps, table.entries td.gps {
+    text-align: right;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Footer line below the result table (e.g. "segermarginal: 1 längd"). */
   .race-footer {
     margin-top: 14px;
@@ -151,19 +195,63 @@
     font-size: 12px;
     letter-spacing: 0.5px;
   }
+
+  /* Upcoming-race live pool banner. */
+  .live-banner {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px;
+    width: fit-content;
+    max-width: 100%;
+    font-size: 12px; color: var(--fg-muted); margin-bottom: 18px;
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px;
+  }
+  .live-banner .lb-game { color: var(--fg); letter-spacing: 1px; }
+  .live-banner .lb-dot { opacity: 0.4; }
+  .live-banner .lb-live {
+    display: inline-flex; align-items: center; gap: 5px; color: var(--accent-hot, #ff5a5a);
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .live-banner .lb-live::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent-hot, #ff5a5a); animation: lbpulse 1.6s infinite;
+  }
+  @keyframes lbpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* live odds / row% / gal-risk cells */
+  table.entries th.live, table.entries td.live { text-align: right; font-variant-numeric: tabular-nums; }
+  table.entries th.rowpct, table.entries td.rowpct {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  td.rowpct .trend-slot {
+    display: inline-block;
+    width: 11px;
+    margin-right: 2px;
+    text-align: center;
+  }
+  .trend-up   { color: var(--accent-hot, #ff5a5a); font-size: 10px; }
+  .trend-down { color: var(--accent-cold, #5aa6ff); font-size: 10px; }
+  .gal-risk { font-variant-numeric: tabular-nums; }
+  .gal-empty { color: var(--fg-muted); }
+  .gal-lo  { color: var(--fg-muted); }
+  .gal-mid { color: var(--chart-odds, #d97706); }
+  .gal-hi  { color: var(--accent-cold, #b00010); }
+  .fav { color: var(--fg); font-weight: var(--highlight-weight, 600); }
 {% endblock %}
 
 {% block content %}
   <div class="race-page">
+    <a class="page-back" href="/home" aria-label="Back"></a>
     <h1 class="race-title" id="raceTitle">race</h1>
     <div class="race-sub" id="raceSub"></div>
 
-    <div class="mode-toggle">
+    <div class="live-banner" id="liveBanner" style="display:none"></div>
+
+    <div class="mode-toggle" id="modeToggle">
       <button id="modeListBtn" class="active">list</button>
       <button id="modeResultBtn">result</button>
     </div>
 
-    <div id="mount"><div class="empty-section">loading...</div></div>
+    <div id="mount"><div class="empty-section"></div></div>
   </div>
 {% endblock %}
 
@@ -176,13 +264,50 @@
       : `/api/race/${raceKey}`;
 
     let raceData = null;
+    let liveData = null;
     let mode = 'list';
+    let galModelMode = localStorage.getItem('galModelMode') || 'track';
+
+    function activeXgal(e) {
+      if (galModelMode === 'general')
+        return e.xgal_general ?? e.xgal_track;
+      return e.xgal_track ?? e.xgal_general;
+    }
+
+    function galModelNote() {
+      const m = raceData?.gal_models;
+      if (!m) return 'xgal — expected galopp';
+      const pick = (galModelMode === 'general' || !m.has_track_model) ? m.general : m.track;
+      const name = pick?.name || '?';
+      const scope = (galModelMode === 'general' || !m.has_track_model) ? 'general' : 'track';
+      return `${scope} model · ${name}`;
+    }
+
+    function galColLabel() {
+      return galModelMode === 'general' ? 'xgal' : 'xgal*';
+    }
+
+    function galColHead() {
+      const meta = raceData?.gal_models;
+      const clickable = !!meta?.has_track_model;
+      const label = clickable ? galColLabel() : 'xgal';
+      const hint = clickable ? ' — click to switch model' : '';
+      const cls = clickable ? 'live gal-col-toggle' : 'live';
+      return `<th class="${cls}" title="${esc(galModelNote() + hint)}"${clickable ? ' tabindex="0" role="button"' : ''}>${label}</th>`;
+    }
+
+    function toggleGalModel() {
+      if (!raceData?.gal_models?.has_track_model) return;
+      galModelMode = galModelMode === 'track' ? 'general' : 'track';
+      localStorage.setItem('galModelMode', galModelMode);
+      render();
+    }
 
     // --- formatters --------------------------------------------------------
 
-    // Sex+age e.g. 'h4'. Sex letters are h/v/s already (entry.sex).
+    // Sex+age e.g. 'h4'. Sex normaliser handles ATG (G/M/S) → Swedish (v/s/h).
     function sexAge(e) {
-      const s = (e.sex || '').toLowerCase();
+      const s = swedishSex(e.sex);
       const a = e.age != null ? e.age : '';
       if (!s && !a) return '';
       return `${s}${a}`;
@@ -275,6 +400,16 @@
       return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
     }
 
+    // actual recent form: avg finishing percentile (0–100). Higher = better.
+    function tfPerfCell(v) {
+      if (v == null) return '';
+      const n = v / 10;
+      const cls = n >= 65 ? 'sform sform-hot'
+               : n <= 40 ? 'sform sform-cold'
+                         : 'sform';
+      return `<span class="${cls}">${n.toFixed(1)}</span>`;
+    }
+
     // Horse cell: name + flag + small sex/age.
     function horseCell(e) {
       const name = flagify(e.horse_name);
@@ -295,24 +430,97 @@
       raceData = await res.json();
       renderHeader();
       render();
+      if (raceData.is_upcoming && isAtg) loadLive();
+    }
+
+    // Live pools (win/place odds + spelprocent) for upcoming races.
+    async function loadLive() {
+      document.getElementById('modeToggle').style.display = 'none';
+      try {
+        const r = await fetch(`/api/race/atg/${encodeURIComponent(raceKey)}/live`);
+        if (!r.ok) return;
+        liveData = await r.json();
+      } catch (_) { return; }
+      renderLiveBanner();
+      render();
+    }
+
+    // index live starts by program number for merge with our entries.
+    function liveByNumber() {
+      const m = {};
+      (liveData?.starts || []).forEach(s => { if (s.number != null) m[s.number] = s; });
+      return m;
+    }
+
+    function renderLiveBanner() {
+      if (!liveData) return;
+      const el = document.getElementById('liveBanner');
+      const parts = [];
+      if (liveData.gameType) {
+        const leg = liveData.leg ? `${liveData.gameType}<span class="lb-dot"> · </span>${liveData.leg}` : liveData.gameType;
+        parts.push(`<span class="lb-game">${leg}</span>`);
+      }
+      if (liveData.turnover) parts.push(`<span>pool ${(liveData.turnover/100).toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>`);
+      if (liveData.startTime) {
+        const t = String(liveData.startTime).slice(11,16);
+        if (t) parts.push(`<span>${t}</span>`);
+      }
+      if (liveData.status === 'bettable' || liveData.status === 'upcoming') parts.push(`<span class="lb-live">live</span>`);
+      el.innerHTML = parts.join('<span class="lb-dot"> · </span>');
+      el.style.display = parts.length ? '' : 'none';
+    }
+
+    // --- live cells --------------------------------------------------------
+    function rowPctCell(s) {
+      if (!s || s.betDist == null) return '';
+      const pct = s.betDist;
+      let tr = '<span class="trend-slot"></span>';
+      if (s.trend != null && Math.abs(s.trend) > 0.003) {
+        tr = s.trend > 0
+          ? '<span class="trend-slot trend-up">▲</span>'
+          : '<span class="trend-slot trend-down">▼</span>';
+      }
+      return `${tr}${pct.toFixed(1)}%`;
+    }
+    function oddsCell(s) {
+      if (!s || s.winOdds == null) return '';
+      const plats = (s.platsMin != null) ? `place ${s.platsMin}${s.platsMax && s.platsMax !== s.platsMin ? '–' + s.platsMax : ''}` : '';
+      return `<span title="${esc(plats)}">${s.winOdds.toFixed(2)}</span>`;
+    }
+    function galRiskCell(e) {
+      const risk = activeXgal(e);
+      if (risk == null) return '<span class="gal-empty">·</span>';
+      const p = risk * 100;
+      const cls = p >= 25 ? 'gal-hi' : p >= 15 ? 'gal-mid' : 'gal-lo';
+      return `<span class="gal-risk ${cls}">${p.toFixed(0)}%</span>`;
     }
 
     function renderHeader() {
       const sm = raceData.start_method === 'A' ? 'auto'
               : raceData.start_method === 'V' ? 'volt' : '';
       const trackLine = (raceData.track || '').toLowerCase();
+      const trackHtml = raceData.track_id
+        ? `<a href="/track/${raceData.track_id}">${esc(trackLine)}</a>`
+        : esc(trackLine);
       const titleParts = [
-        trackLine,
-        raceData.race_number ? `lopp ${raceData.race_number}` : '',
+        trackHtml,
+        raceData.race_number ? esc(`lopp ${raceData.race_number}`) : '',
       ].filter(Boolean);
-      document.getElementById('raceTitle').textContent = titleParts.join(' \u00b7 ');
+      document.getElementById('raceTitle').innerHTML = titleParts.join(' \u00b7 ');
       const subParts = [
         raceData.race_date,
         raceData.distance ? raceData.distance + 'm' : '',
         sm,
         raceData.race_class || '',
       ].filter(Boolean);
-      document.getElementById('raceSub').textContent = subParts.join(' \u00b7 ');
+
+      // Source pills — one per source that has data on this race row.
+      // Multi-pill = this race was constructed by merging across sources;
+      // single pill = data is from one source only (useful to spot races
+      // that *should* have been merged but weren't).
+      const pillsHtml = srcPillsList(raceData.source_pills || []);
+      document.getElementById('raceSub').innerHTML =
+        esc(subParts.join(' \u00b7 ')) + (pillsHtml ? ' ' + pillsHtml : '');
     }
 
     function render() {
@@ -323,47 +531,19 @@
         mount.innerHTML = '<div class="empty-section">no entries</div>';
         return;
       }
-      if (mode === 'list')   renderList(mount, entries);
-      else                    renderResult(mount, entries);
+      if (raceData.is_upcoming) {
+        document.getElementById('modeToggle').style.display = 'none';
+        renderUpcoming(mount, entries);
+      }
+      else if (mode === 'list') renderList(mount, entries);
+      else                      renderResult(mount, entries);
     }
 
-    // Win rate "12%" or '' if no starts. `which` = 'pre' or 'post'.
-    function winRate(e, which) {
-      const s = which === 'pre' ? e.pre_starts : e.post_starts;
-      const w = which === 'pre' ? e.pre_wins   : e.post_wins;
-      if (!s) return '';
-      return Math.round((w / s) * 100) + '%';
-    }
-
-    // List view: starting list, ordered by program number, scratched stay in place.
-    // For volt starts the distance changes between volts; we insert a small
-    // "tillägg" divider row labelled with the offset from the base distance.
-    function renderList(mount, entries) {
-      const sorted = entries.slice().sort((a, b) => {
-        const an = a.number == null ? 999 : a.number;
-        const bn = b.number == null ? 999 : b.number;
-        return an - bn;
-      });
+    // For volt starts the distance changes between program numbers; insert a
+    // small tillägg divider row labelled with the offset from the base distance.
+    function rowsWithTillaggDividers(sorted, colSpan, rowBuilder) {
       const distances = sorted.map(e => e.distance).filter(d => d != null);
       const baseDist = distances.length ? Math.min(...distances) : null;
-      const head = `
-        <thead><tr>
-          <th class="num">#</th>
-          <th>horse</th>
-          <th>driver</th>
-          <th class="winrate">d_wr</th>
-          <th class="sform">dΔ</th>
-          <th class="sform">df±</th>
-          <th>trainer</th>
-          <th class="winrate">t_wr</th>
-          <th class="sform">tΔ</th>
-          <th class="sform">tf±</th>
-          <th class="num">odds</th>
-          <th class="winrate">w%</th>
-          <th class="num">sulky</th>
-          <th class="center">shoes</th>
-        </tr></thead>`;
-      const COLS = 14;
       let prevDist = null;
       const rows = [];
       sorted.forEach(e => {
@@ -374,37 +554,150 @@
           const offset = e.distance - baseDist;
           rows.push(`
             <tr class="tillagg-row">
-              <td colspan="${COLS}">${offset}m</td>
+              <td colspan="${colSpan}">${offset}m</td>
             </tr>`);
         }
         if (e.distance != null) prevDist = e.distance;
+        rows.push(rowBuilder(e));
+      });
+      return rows;
+    }
+
+    // Upcoming-race view: starting list with live betting + model gal-risk.
+    function renderUpcoming(mount, entries) {
+      const live = liveByNumber();
+      const favNum = (liveData?.starts || []).reduce((best, s) =>
+        (s.betDist != null && (best == null || s.betDist > best.betDist)) ? s : best, null)?.number;
+      const sorted = entries.slice().sort((a, b) => (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
+      const head = `
+        <thead><tr>
+          <th class="num">#</th>
+          <th>horse</th>
+          <th class="rowpct" title="share of pool (bet distribution)">row%</th>
+          <th>driver</th>
+          <th>trainer</th>
+          <th class="sform">tΔ</th>
+          <th class="live" title="win odds (live)">odds</th>
+          <th class="winrate" title="career win rate">win%</th>
+          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
+          ${galColHead()}
+          <th class="center">shoes</th>
+          <th class="num">sulky</th>
+        </tr></thead>`;
+      const COLS = 12;
+      const rows = rowsWithTillaggDividers(sorted, COLS, e => {
+        const s = live[e.number];
+        const scratched = e.withdrawn || (s && s.scratched);
+        const cls = scratched ? ' class="scratched"' : '';
+        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+        const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
+        const nameCls = (favNum != null && e.number === favNum) ? ' class="fav"' : '';
+        return `
+          <tr${cls}>
+            <td class="num muted">${e.number || ''}</td>
+            <td${nameCls}>${horseCell(e)}</td>
+            <td class="rowpct">${rowPctCell(s)}</td>
+            <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
+            <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
+            <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+            <td class="live muted">${oddsCell(s)}</td>
+            <td class="winrate">${winRate(e, 'pre')}</td>
+            <td class="winrate">${galAdjWinRate(e, 'pre')}</td>
+            <td class="live">${galRiskCell(e)}</td>
+            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+            <td class="num muted">${sulkyCell(e)}</td>
+          </tr>`;
+      }).join('');
+      mount.innerHTML = `<table class="entries">${head}<tbody>${rows}</tbody></table>`;
+      const galHdr = mount.querySelector('.gal-col-toggle');
+      if (galHdr) {
+        galHdr.addEventListener('click', toggleGalModel);
+        galHdr.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGalModel(); }
+        });
+      }
+    }
+
+    // Win rate "12%" or '' if no starts. `which` = 'pre' or 'post'.
+    function winRate(e, which) {
+      const s = which === 'pre' ? e.pre_starts : e.post_starts;
+      const w = which === 'pre' ? e.pre_wins   : e.post_wins;
+      if (!s) return '';
+      return Math.round((w / s) * 100) + '%';
+    }
+
+    // Gal-adjusted win rate: win% over clean starts (galopp & DQ excluded).
+    function galAdjWinRate(e, which) {
+      const s = which === 'pre' ? e.pre_galadj_starts : e.post_galadj_starts;
+      const w = which === 'pre' ? e.pre_galadj_wins   : e.post_galadj_wins;
+      if (!s) return '';
+      return Math.round((w / s) * 100) + '%';
+    }
+
+    // List view: starting list, ordered by program number, scratched stay in place.
+    function renderList(mount, entries) {
+      const sorted = entries.slice().sort((a, b) => {
+        const an = a.number == null ? 999 : a.number;
+        const bn = b.number == null ? 999 : b.number;
+        return an - bn;
+      });
+      const head = `
+        <thead><tr>
+          <th class="num">#</th>
+          <th>horse</th>
+          <th>driver</th>
+          <th>trainer</th>
+          <th class="winrate">t_wr</th>
+          <th class="sform">tΔ</th>
+          <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
+          <th class="sform" title="trainer market± — avg positions the trainer's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">t mkt</th>
+          <th class="num">odds</th>
+          <th class="winrate">w%</th>
+          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
+          <th class="num">sulky</th>
+          <th class="center">shoes</th>
+          <th title="source(s) that contributed this entry row">src</th>
+        </tr></thead>`;
+      const COLS = 14;
+      const rows = rowsWithTillaggDividers(sorted, COLS, e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
         const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
         const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
-        rows.push(`
+        return `
           <tr${cls}>
             <td class="num muted">${e.number || ''}</td>
             <td>${horseCell(e)}</td>
             <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
-            <td class="winrate">${wrCell(e.d_wr)}</td>
-            <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
-            <td class="sform">${tfOddsCell(e.df_odds)}</td>
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
             <td class="winrate">${wrCell(e.t_wr)}</td>
             <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+            <td class="sform">${tfPerfCell(e.tf_perf)}</td>
             <td class="sform">${tfOddsCell(e.tf_odds)}</td>
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
             <td class="winrate">${winRate(e, 'pre')}</td>
+            <td class="winrate">${galAdjWinRate(e, 'pre')}</td>
             <td class="num muted">${sulkyCell(e)}</td>
             <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
-          </tr>`);
-      });
-      mount.innerHTML = `<table class="entries">${head}<tbody>${rows.join('')}</tbody></table>`;
+            <td>${srcPillsList((e.contributors && e.contributors.length
+                                ? e.contributors
+                                : (e.primary_source ? [e.primary_source] : [])
+                               ).map(s => ({key: s})), {size: 'sm'})}</td>
+          </tr>`;
+      }).join('');
+      mount.innerHTML = `<table class="entries">${head}<tbody>${rows}</tbody></table>`;
     }
 
     const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
     function isDq(e) {
-      return e.dq || e.gal || (e.placement_text && DQ_RE.test(e.placement_text));
+      // A true DQ is disqualified, or carries a DQ code in placement_text.
+      if (e.dq) return true;
+      if (e.placement_text && DQ_RE.test(e.placement_text)) return true;
+      // Breaking gait (galopp) is NOT a DQ when the horse was still
+      // classified with a real finishing position — it keeps its place
+      // and just gets a small 'g' marker. Only an unclassified gait-break
+      // (no placement) drops to the DQ bucket.
+      if (e.gal && e.placement == null) return true;
+      return false;
     }
 
     // Sort buckets: placed -> unplaced -> DQ -> withdrawn.
@@ -430,24 +723,33 @@
         const bn = b.number == null ? 999 : b.number;
         return an - bn;
       });
+      // xLabs columns appear only when the race has GPS coverage; on
+      // non-covered races they'd be 3 empty columns wasting space.
+      const showGps = !!raceData.has_kmtid;
+      const gpsHeadCells = showGps ? `
+          <th class="gps" title="extra meters ran beyond nominal (xLabs GPS)">+m</th>
+          <th class="gps" title="best 100m km-time-equivalent (xLabs GPS)">peak</th>
+          <th class="gps" title="distance ran in slipstream (xLabs GPS)">slip</th>
+      ` : '';
       const head = `
         <thead><tr>
           <th>pos</th>
           <th class="num">#</th>
           <th>horse</th>
           <th>driver</th>
-          <th class="winrate">d_wr</th>
-          <th class="sform">dΔ</th>
-          <th class="sform">df±</th>
           <th>trainer</th>
           <th class="winrate">t_wr</th>
           <th class="sform">tΔ</th>
-          <th class="sform">tf±</th>
+          <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
+          <th class="sform" title="trainer market± — avg positions the trainer's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">t mkt</th>
           <th class="num">odds</th>
           <th class="winrate">w%</th>
+          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
           <th class="num">sulky</th>
           <th class="center">shoes</th>
           <th>time</th>
+          ${gpsHeadCells}
+          <th title="source(s) that contributed this entry row">src</th>
         </tr></thead>`;
       const body = sorted.map(e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
@@ -455,24 +757,46 @@
         const time = e.time_text || fmtTimeVal(e.time_val);
         const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
         const driverHref2 = e.driver_id ? `/driver/${e.driver_id}` : null;
+        let gpsCells = '';
+        if (showGps) {
+          let extra = '', peak = '', slip = '';
+          if (e.kmtid_actual_m != null && e.distance) {
+            // Only show "+m" for horses that actually completed the distance.
+            // A negative delta means they broke / were withdrawn mid-race —
+            // peak/slip can still be informative but the +m column would be
+            // misleading (it'd say e.g. "-73m" which reads like a bonus).
+            const d = e.kmtid_actual_m - e.distance;
+            if (d > 0) extra = '+' + d;
+          }
+          if (e.kmtid_best_100ms != null) peak = fmtTimeVal(e.kmtid_best_100ms / 1000);
+          if (e.kmtid_slip_m != null && e.kmtid_slip_m > 0) slip = e.kmtid_slip_m;
+          gpsCells = `
+            <td class="gps">${esc(extra)}</td>
+            <td class="gps">${esc(peak)}</td>
+            <td class="gps">${esc(slip)}</td>`;
+        }
         return `
           <tr${cls}>
             <td>${posCell}</td>
             <td class="num muted">${e.number || ''}</td>
             <td>${horseCell(e)}</td>
             <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref2)}</td>
-            <td class="winrate">${wrCell(e.d_wr)}</td>
-            <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
-            <td class="sform">${tfOddsCell(e.df_odds)}</td>
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
             <td class="winrate">${wrCell(e.t_wr)}</td>
             <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+            <td class="sform">${tfPerfCell(e.tf_perf)}</td>
             <td class="sform">${tfOddsCell(e.tf_odds)}</td>
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
             <td class="winrate">${winRate(e, 'post')}</td>
+            <td class="winrate">${galAdjWinRate(e, 'post')}</td>
             <td class="num muted">${sulkyCell(e)}</td>
             <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
             <td>${esc(time)}</td>
+            ${gpsCells}
+            <td>${srcPillsList((e.contributors && e.contributors.length
+                                ? e.contributors
+                                : (e.primary_source ? [e.primary_source] : [])
+                               ).map(s => ({key: s})), {size: 'sm'})}</td>
           </tr>`;
       }).join('');
       const footer = raceData.victory_margin
@@ -494,10 +818,17 @@
         const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
         return `<span class="dq">${esc(label)}</span>`;
       }
-      const t = e.placement_text || (e.placement != null ? String(e.placement) : '');
-      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>`;
+      // Classified finisher. A gait-breaker that still placed keeps its
+      // numeric position (even on legacy rows whose placement_text is 'g')
+      // and gets a small 'g' marker.
+      const galMark = (e.gal && e.placement != null)
+        ? ` <span class="gal-mark" title="galopp">g</span>` : '';
+      const t = (e.gal && e.placement != null)
+        ? String(e.placement)
+        : (e.placement_text || (e.placement != null ? String(e.placement) : ''));
+      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>${galMark}`;
       if (!t)                return `<span class="muted">–</span>`;
-      return esc(t);
+      return esc(t) + galMark;
     }
 
     // Same conversion helper as on the horse page (seconds per km -> '14,4').

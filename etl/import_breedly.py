@@ -35,6 +35,7 @@ from psycopg2.extras import Json
 
 from core.db import buffer_prune
 from etl.matching import upsert_horse
+from core.identity import resolve_horse
 from scrapers.breedly import (
     make_client,
     fetch_horse_by_slug,
@@ -176,9 +177,14 @@ def _upsert_breedly_horse(cur, h: dict) -> int:
             (breedly_id, st_id_int, existing_id),
         )
 
-    horse_id = upsert_horse(
-        cur, "breedly", breedly_id,
-        canonical, raw_payload=raw,
+    horse_id = resolve_horse(
+        cur,
+        source="breedly",
+        source_id=breedly_id,
+        canonical_fields=canonical,
+        raw_payload=raw,
+        sire_name=h.get("fatherName"),
+        dam_name=h.get("motherName"),
     )
 
     if st_id_int is not None:

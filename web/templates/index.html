@@ -3,46 +3,160 @@
 {% block title %}stable{% endblock %}
 
 {% block extra_style %}
-  .search-box {
+  /* Search input sits on the viewport midline; kind toggle floats above it.
+     Results flow normally underneath (no absolute positioning). */
+  .search-hero {
     width: 100%;
     max-width: 480px;
-    margin-top: 25vh;
-    margin-bottom: 32px;
+  }
+  .search-top {
+    /* 80px = body top padding for fixed nav; aligns input to viewport midline */
+    min-height: calc(50vh - 80px);
+    display: grid;
+    grid-template-rows: 1fr auto 1fr auto;
+    width: 100%;
+  }
+  .kind-toggle {
+    grid-row: 2;
+    display: flex;
+    justify-content: center;
+  }
+  .search-box {
+    grid-row: 4;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: -12px;
+  }
+  .search-field {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+  }
+  .search-measure {
+    position: absolute;
+    visibility: hidden;
+    white-space: pre;
+    pointer-events: none;
+    font-size: 16px;
+    line-height: 1.2;
+    padding: 8px 0;
+  }
+  .fake-caret {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 1.05em;
+    margin-top: -0.525em;
+    pointer-events: none;
+    background: var(--accent-glow);
+    box-shadow: var(--caret-shadow);
+    opacity: 0;
+  }
+  .search-field.is-focused .fake-caret {
+    opacity: 1;
+    animation: caret-blink 1.05s step-end infinite;
+  }
+  @keyframes caret-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
   }
   .search-box input {
+    position: relative;
+    z-index: 1;
     width: 100%;
     font-size: 16px;
-    padding: 12px 16px;
+    line-height: 1.2;
+    padding: 8px 0;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    caret-color: transparent;
+    color: var(--fg);
   }
-  .search-box input::placeholder { color: var(--fg-muted); }
+  .search-box input:focus {
+    border: none;
+    outline: none;
+    box-shadow: none;
+  }
+  .kind-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--fg);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: var(--highlight-weight);
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 4px 0;
+    /* cancel trailing letter-spacing so the word centers optically */
+    margin-right: -8px;
+    transition: opacity 0.15s, color 0.15s, text-shadow 0.15s;
+    opacity: 0.85;
+  }
+  .kind-toggle button:hover { opacity: 1; }
+  .kind-toggle button.flash {
+    animation: kind-flash 520ms ease-out;
+  }
+  @keyframes kind-flash {
+    0% {
+      color: var(--accent-glow);
+      text-shadow: var(--glow-shadow-strong);
+    }
+    100% {
+      color: var(--fg);
+      text-shadow: none;
+    }
+  }
 
   .results {
     width: 100%;
     max-width: 480px;
     list-style: none;
   }
-  .results li {
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
-  }
   .results li a {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    padding: 10px 0;
+    padding: 4px 0;
     text-decoration: none;
     cursor: pointer;
   }
-  .results li:hover { background: var(--hover); }
+  /* Glow only on the name — not the whole row or the meta column. */
   .results li a:hover {
     color: inherit !important;
     background: none !important;
     margin: 0 !important;
-    padding: 10px 0 !important;
+    padding: 4px 0 !important;
     border-radius: 0 !important;
+    text-shadow: none !important;
+    font-weight: inherit !important;
   }
-  .results li:hover .horse-name { color: var(--fg); }
-  .results li:hover .horse-meta { color: var(--fg-muted); }
+  .results li a:hover .horse-name {
+    color: var(--accent-glow) !important;
+    text-shadow: var(--glow-shadow);
+    font-weight: var(--highlight-weight);
+  }
+  .results li a:hover .star-mark {
+    color: var(--fg-muted) !important;
+    text-shadow: none !important;
+    font-weight: 400 !important;
+  }
+  .results li a:hover .horse-meta {
+    color: var(--fg-muted) !important;
+    text-shadow: none !important;
+    font-weight: inherit !important;
+  }
+
+  .horse-name-wrap {
+    display: inline-flex;
+    align-items: baseline;
+    min-width: 0;
+  }
 
   .horse-name { color: var(--fg); }
 
@@ -54,7 +168,7 @@
 
   .horse-meta {
     color: var(--fg-muted);
-    font-size: 12px;
+    font-size: 11px;
     text-align: right;
     flex-shrink: 0;
     margin-left: 16px;
@@ -68,34 +182,91 @@
 
   .count {
     color: var(--fg-muted);
-    font-size: 12px;
-    margin-bottom: 12px;
+    font-size: 11px;
+    margin-bottom: 8px;
     width: 100%;
     max-width: 480px;
   }
 {% endblock %}
 
 {% block content %}
-  <div class="search-box">
-    <input type="text" id="q" placeholder="search..." autofocus autocomplete="off">
+  <div class="search-hero">
+    <div class="search-top">
+      <div class="kind-toggle">
+        <button type="button" id="kindBtn" title="click to cycle: horse → driver → trainer → track">horse</button>
+      </div>
+      <div class="search-box">
+        <div class="search-field" id="searchField">
+          <span class="search-measure" id="searchMeasure" aria-hidden="true"></span>
+          <span class="fake-caret" id="fakeCaret" aria-hidden="true"></span>
+          <input type="text" id="q" autofocus autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+    </div>
+    <div class="search-results">
+      <div class="count" id="count"></div>
+      <ul class="results" id="results"></ul>
+      <div class="empty" id="empty"></div>
+    </div>
   </div>
-
-  <div class="count" id="count"></div>
-  <ul class="results" id="results"></ul>
-  <div class="empty" id="empty"></div>
 {% endblock %}
 
 {% block scripts %}
   <script>
-    const input = document.getElementById('q');
+    const input       = document.getElementById('q');
+    const searchField = document.getElementById('searchField');
+    const searchMeasure = document.getElementById('searchMeasure');
+    const fakeCaret   = document.getElementById('fakeCaret');
     const resultsList = document.getElementById('results');
-    const countEl = document.getElementById('count');
-    const emptyEl = document.getElementById('empty');
+    const countEl     = document.getElementById('count');
+    const emptyEl     = document.getElementById('empty');
+    const kindBtn     = document.getElementById('kindBtn');
     let timer = null;
 
+    function positionFakeCaret() {
+      const text = input.value;
+      searchMeasure.textContent = text;
+      const textWidth = searchMeasure.getBoundingClientRect().width;
+      const fieldWidth = searchField.getBoundingClientRect().width;
+      const caretWidth = fakeCaret.getBoundingClientRect().width;
+      const left = (fieldWidth - textWidth - caretWidth) / 2 + textWidth;
+      fakeCaret.style.left = `${left}px`;
+    }
+
+    function syncFakeCaret() {
+      searchField.classList.toggle('is-focused', document.activeElement === input);
+      positionFakeCaret();
+    }
+
+    input.addEventListener('focus', syncFakeCaret);
+    input.addEventListener('blur', syncFakeCaret);
     input.addEventListener('input', () => {
+      positionFakeCaret();
       clearTimeout(timer);
       timer = setTimeout(doSearch, 250);
+    });
+    input.addEventListener('keyup', positionFakeCaret);
+    input.addEventListener('click', positionFakeCaret);
+    window.addEventListener('resize', positionFakeCaret);
+    syncFakeCaret();
+
+    // Cycle order. The label below the button matches the active kind.
+    const KINDS = ['horse', 'driver', 'trainer', 'track'];
+    let activeKind = 'horse';
+
+    kindBtn.addEventListener('click', () => {
+      activeKind = KINDS[(KINDS.indexOf(activeKind) + 1) % KINDS.length];
+      kindBtn.textContent = activeKind;
+      kindBtn.classList.remove('flash');
+      void kindBtn.offsetWidth; // restart animation on rapid clicks
+      kindBtn.classList.add('flash');
+      // clear stale results to avoid the old kind's rendering flashing through
+      resultsList.innerHTML = '';
+      countEl.textContent = '';
+      emptyEl.textContent = '';
+      doSearch();
+      input.focus();
+      syncFakeCaret();
     });
 
     async function doSearch() {
@@ -108,7 +279,7 @@
       }
 
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&kind=${activeKind}`);
         const data = await res.json();
 
         if (data.length === 0) {
@@ -121,24 +292,63 @@
         emptyEl.textContent = '';
         countEl.textContent = `${data.length}${data.length === 50 ? '+' : ''} results`;
 
-        resultsList.innerHTML = data.map(h => {
-          const year = h.date_of_birth ? h.date_of_birth.substring(0, 4) : '';
-          const genderMap = {'hingst': 'stallion', 'valack': 'gelding', 'sto': 'mare'};
-          const gender = genderMap[h.gender] || h.gender || '';
-          const meta = [gender, year].filter(Boolean).join(' \u00b7 ');
-          let earningsValue = 0;
-          if (h.earnings) {
-            const m = String(h.earnings).match(/[\d ]+/);
-            if (m) earningsValue = parseInt(m[0].replace(/\s/g, ''), 10) || 0;
-          }
-          const starCount = Math.min(5, Math.floor(earningsValue / 5_000_000));
-          const star = starCount > 0 ? '<span class="star-mark">' + '\u2605'.repeat(starCount) + '</span>' : '';
-          const nameWithFlag = flagify(h.name);
-          return `<li><a href="/horse/${h.horse_id}"><span class="horse-name">${nameWithFlag}${star}</span><span class="horse-meta">${esc(meta)}</span></a></li>`;
-        }).join('');
+        const renderer = {
+          horse:   renderHorseRow,
+          driver:  renderPersonRow,
+          trainer: renderPersonRow,
+          track:   renderTrackRow,
+        }[activeKind];
+        resultsList.innerHTML = data.map(renderer).join('');
       } catch (e) {
         emptyEl.textContent = 'error';
       }
+    }
+
+    // ----- per-kind row renderers -----
+
+    function renderHorseRow(h) {
+      const year = h.date_of_birth ? h.date_of_birth.substring(0, 4) : '';
+      const genderMap = {'hingst': 'stallion', 'valack': 'gelding', 'sto': 'mare'};
+      const gender = genderMap[h.gender] || h.gender || '';
+      const meta = [gender, year].filter(Boolean).join(' \u00b7 ');
+      let earningsValue = 0;
+      if (h.earnings) {
+        const m = String(h.earnings).match(/[\d ]+/);
+        if (m) earningsValue = parseInt(m[0].replace(/\s/g, ''), 10) || 0;
+      }
+      const starCount = Math.min(5, Math.floor(earningsValue / 5_000_000));
+      const star = starCount > 0 ? '<span class="star-mark">' + '\u2605'.repeat(starCount) + '</span>' : '';
+      const nameWithFlag = flagify(h.name);
+      return `<li><a href="/horse/${h.horse_id}"><span class="horse-name-wrap"><span class="horse-name">${nameWithFlag}</span>${star}</span><span class="horse-meta">${esc(meta)}</span></a></li>`;
+    }
+
+    function renderPersonRow(p) {
+      // activeKind is 'driver' or 'trainer' here. Link accordingly.
+      const href = `/${activeKind}/${p.person_id}`;
+      const entries = Number(p.entries || 0);
+      const entriesStr = entries
+        ? `${entries.toLocaleString('sv-SE').replace(/,/g, ' ')} entries`
+        : '';
+      const meta = [p.license_country || '', entriesStr].filter(Boolean).join(' \u00b7 ');
+      const nameHtml = `<span class="horse-name">${esc(p.name || '')}</span>`;
+      return `<li><a href="${href}">${nameHtml}<span class="horse-meta">${esc(meta)}</span></a></li>`;
+    }
+
+    function renderTrackRow(t) {
+      const races = Number(t.races || 0);
+      const racesStr = races
+        ? `${races.toLocaleString('sv-SE').replace(/,/g, ' ')} races`
+        : '';
+      const idBits = [];
+      if (t.st_code)      idBits.push(`st:${t.st_code}`);
+      if (t.atg_track_id) idBits.push(`atg:${t.atg_track_id}`);
+      const meta = [t.country || '', t.sport || '', racesStr, idBits.join(' / ')]
+                     .filter(Boolean).join(' \u00b7 ');
+      const nameHtml = `<span class="horse-name">${esc(t.name || '')}</span>`;
+      const href = t.track_id ? `/track/${t.track_id}` : null;
+      return href
+        ? `<li><a href="${href}">${nameHtml}<span class="horse-meta">${esc(meta)}</span></a></li>`
+        : `<li><a style="cursor:default" onclick="return false;">${nameHtml}<span class="horse-meta">${esc(meta)}</span></a></li>`;
     }
   </script>
 {% endblock %}

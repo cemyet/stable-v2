@@ -21,8 +21,6 @@
   }
 
   .chart-card {
-    border: 1px solid var(--border);
-    background: var(--hover);
     padding: 20px 18px 14px;
   }
   .chart-title {
@@ -37,12 +35,12 @@
     font-size: 11px;
     line-height: 1.5;
     margin-bottom: 14px;
-    opacity: 0.7;
+    opacity: 0.6;
   }
   .chart-wrap {
     position: relative;
     width: 100%;
-    height: 280px;
+    height: 240px;
   }
   svg.form-chart {
     width: 100%;
@@ -51,24 +49,26 @@
     overflow: visible;
   }
   .grid-line { stroke: var(--border); stroke-width: 1; }
-  .axis-text { fill: var(--fg-muted); font-size: 10px; letter-spacing: 1px; }
+  .axis-text { fill: var(--fg-muted); font-size: 10px; letter-spacing: 0.5px; }
   .zero-line {
-    stroke: var(--border-focus);
+    stroke: var(--fg-muted);
     stroke-width: 1;
-    stroke-dasharray: 2 4;
+    stroke-dasharray: 3 5;
+    opacity: 0.4;
   }
-
-  .form-line { fill: none; stroke-width: 1.6;
-               stroke-linejoin: round; stroke-linecap: round; }
+  .form-path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .form-area { opacity: 0.06; }
   .form-dot  { stroke: none; }
-  .form-dot.thin { opacity: 0.35; }
+  .form-dot.thin { opacity: 0.25; }
 
-  .form-line.tf      { stroke: var(--chart-form); }
-  .form-dot.tf       { stroke: none; fill: var(--chart-form); }
-  .form-line.tf-odds { stroke: var(--chart-odds); }
-  .form-dot.tf-odds  { stroke: none; fill: var(--chart-odds); }
-  .form-line.t-wr    { stroke: var(--chart-wr); }
-  .form-dot.t-wr     { stroke: none; fill: var(--chart-wr); }
+  .form-path.tf      { stroke: var(--chart-form); }
+  .form-area.tf      { fill: var(--chart-form); }
+  .form-dot.tf       { fill: var(--chart-form); }
+  .form-path.tf-odds { stroke: var(--chart-odds); }
+  .form-area.tf-odds { fill: var(--chart-odds); }
+  .form-dot.tf-odds  { fill: var(--chart-odds); }
+  .form-path.t-wr    { stroke: var(--chart-wr); stroke-width: 1.4; stroke-dasharray: 5 4; opacity: 0.7; }
+  .form-dot.t-wr     { fill: var(--chart-wr); }
 
   .chart-legend {
     display: flex;
@@ -111,7 +111,38 @@
   }
   .tooltip strong { color: var(--fg); font-weight: 500; }
 
-  /* Recent entries */
+  /* Section labels — used for both top-horses and recent entries. */
+  .section-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    margin: 32px 0 10px;
+  }
+
+  /* Top horses (career earnings within this trainer's barn). */
+  table.top-horses {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+  }
+  table.top-horses th {
+    text-align: left;
+    font-weight: 400;
+    color: var(--fg-muted);
+    padding: 4px 6px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  table.top-horses td {
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+  table.top-horses .num    { text-align: right; font-variant-numeric: tabular-nums; }
+  table.top-horses .muted  { color: var(--fg-muted); }
+  table.top-horses tr:hover { background: var(--hover); }
+
+  /* Recent entries (legacy class name kept for back-compat with existing JS). */
   .recent-title {
     color: var(--fg-muted);
     font-size: 11px;
@@ -156,42 +187,46 @@
   }
   table.recent tr.dq td { opacity: 0.5; }
   table.recent a { }
-  table.recent a:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
   .shoe-icon { width: 14px; height: 14px; vertical-align: middle; }
   .shoe-changed { color: var(--accent-warn); }
   .sulky-changed { color: var(--accent-warn); }
-  .pos-1 { color: var(--accent-win); }
   .dq, .withdrew { color: var(--fg-muted); }
   .sex-age { color: var(--fg-muted); font-size: 11px; }
   .short-name { text-decoration: none; cursor: pointer; }
-  .short-name:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
+  .short-name:hover {
+    color: var(--accent-glow);
+    text-shadow: var(--glow-shadow);
+    font-weight: var(--highlight-weight);
+  }
   .sform-hot { color: var(--accent-hot); }
   .sform-cold { color: var(--accent-cold); }
 {% endblock %}
 
 {% block content %}
   <div class="trainer-page">
+    <a class="page-back" href="/home" aria-label="Back"></a>
     <h1 class="trainer-name" id="trainerName">trainer</h1>
     <div class="trainer-sub" id="trainerSub"></div>
 
-    <div class="chart-card">
-      <div class="chart-title">trainer form — last 3 years (weekly)</div>
+    <div class="chart-card glass-panel">
+      <div class="chart-title">trainer win rate — last 3 years (monthly)</div>
       <div class="chart-help">
-        tf = 30d win rate. tf± = how much trainer over/underperforms vs market odds.
-        click labels to toggle.
+        3-month rolling win rate. dashed line = career win%. click labels to toggle.
       </div>
       <div class="chart-wrap">
         <svg class="form-chart" id="chart" preserveAspectRatio="none"></svg>
         <div class="tooltip" id="tip"></div>
       </div>
       <div class="chart-legend" id="legend">
-        <label data-key="tf"><span class="swatch" style="background:var(--chart-form)"></span>tf (30d win%)</label>
-        <label data-key="tf-odds"><span class="swatch" style="background:var(--chart-odds)"></span>tf± (vs odds)</label>
-        <label data-key="t-wr"><span class="swatch" style="background:var(--chart-wr)"></span>t_wr (career win%)</label>
+        <label data-key="tf"><span class="swatch" style="background:var(--chart-form)"></span>win% (3-month rolling)</label>
+        <label data-key="t-wr"><span class="swatch" style="background:var(--chart-wr)"></span>career win%</label>
       </div>
     </div>
 
-    <div class="recent-title">recent entries</div>
+    <h2 class="section-title">top horses</h2>
+    <div id="topHorsesMount"><div class="muted" style="font-size:11px;color:var(--fg-muted)"></div></div>
+
+    <h2 class="section-title">recent entries</h2>
     <div id="recentEntries"></div>
   </div>
 {% endblock %}
@@ -203,22 +238,40 @@
     const SERIES = [
       {
         key: 'tf', medianKey: 'median_tf', scoredKey: 'scored',
-        label: 'tf', group: 'pct', dots: true,
+        label: 'tf', group: 'pct', dots: true, area: true,
         fmt: v => `${(v/10).toFixed(1)}%`,
       },
       {
-        key: 'tf-odds', medianKey: 'median_tf_odds', scoredKey: 'scored_odds',
-        label: 'tf±', group: 'dlt', dots: true,
-        fmt: v => `${v >= 0 ? '+' : ''}${(v/10).toFixed(1)}pp`,
-      },
-      {
         key: 't-wr', medianKey: 'median_t_wr', scoredKey: 'scored_wr',
-        label: 't_wr', group: 'pct', dots: false,
+        label: 't_wr (career)', group: 'pct', dots: false, area: false,
         fmt: v => `${(v/10).toFixed(1)}%`,
       },
     ];
 
-    const visible = { tf: true, 'tf-odds': true, 't-wr': true };
+    const visible = { tf: true, 't-wr': true };
+
+    function smoothPath(pts) {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i];
+        const cp = (p1.x - p0.x) * 0.45;
+        d += ` C ${p0.x + cp},${p0.y} ${p1.x - cp},${p1.y} ${p1.x},${p1.y}`;
+      }
+      return d;
+    }
+
+    function areaPath(pts, yBottom) {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${yBottom} L ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i];
+        const cp = (p1.x - p0.x) * 0.45;
+        d += ` C ${p0.x + cp},${p0.y} ${p1.x - cp},${p1.y} ${p1.x},${p1.y}`;
+      }
+      d += ` L ${pts[pts.length - 1].x},${yBottom} Z`;
+      return d;
+    }
 
     function drawChart(series) {
       const svg = document.getElementById('chart');
@@ -244,43 +297,35 @@
         return;
       }
 
-      const W = 760, H = 280;
-      const M = { top: 16, right: 12, bottom: 26, left: 40 };
+      const W = 720, H = 240;
+      const M = { top: 14, right: 16, bottom: 28, left: 38 };
       const innerW = W - M.left - M.right;
       const innerH = H - M.top - M.bottom;
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-      const activeGroups = new Set(SERIES.filter(s => visible[s.key]).map(s => s.group));
-
-      // Dual-axis: tf on left (pct, permille), tf_odds on right (dlt, permille-pp).
-      // When both visible, each uses its own scale. When only one, it fills the chart.
       const scales = {};
-
       const pctSeries = SERIES.filter(s => s.group === 'pct' && visible[s.key]);
       if (pctSeries.length) {
         const vals = pctSeries.flatMap(s => seriesPoints[s.key].map(p => p.value));
         if (vals.length) {
-          const lo = Math.max(0, Math.min(...vals) - 30);
-          const hi = Math.min(600, Math.max(...vals) + 30);
+          const lo = Math.max(0, Math.min(...vals) - 20);
+          const hi = Math.min(700, Math.max(...vals) + 20);
           scales.pct = { min: lo, max: hi };
         }
       }
-      if (visible['tf-odds']) {
+      if (visible['tf-odds'] && seriesPoints['tf-odds'].length) {
         const vals = seriesPoints['tf-odds'].map(p => p.value);
-        const absMax = Math.max(30, Math.max(...vals.map(v => Math.abs(v))));
-        scales.dlt = { min: -(absMax + 15), max: absMax + 15 };
+        const absMax = Math.max(20, Math.max(...vals.map(v => Math.abs(v))));
+        scales.dlt = { min: -(absMax + 10), max: absMax + 10 };
       }
 
-      // If both visible, use left axis for tf, right for tf_odds.
-      // If only one, use full left axis.
-      const bothVisible = visible.tf && visible['tf-odds'];
-
+      const bothVisible = pctSeries.length > 0 && visible['tf-odds'] && scales.dlt;
       const yOf = (v, group) => {
         const sc = scales[group];
+        if (!sc) return M.top + innerH / 2;
         return M.top + (1 - (v - sc.min) / (sc.max - sc.min)) * innerH;
       };
 
-      // X axis.
       const xAllMonths = SERIES.filter(s => visible[s.key])
         .flatMap(s => seriesPoints[s.key].map(p => p.month));
       if (!xAllMonths.length) return;
@@ -289,38 +334,40 @@
       const tSpan = Math.max(1, tN - t0);
       const xOf = m => M.left + ((new Date(m).getTime() - t0) / tSpan) * innerW;
 
-      // Grid lines.
       let gridHtml = '';
+      const yBottom = M.top + innerH;
 
-      if (visible.tf) {
+      if (pctSeries.length && scales.pct) {
         const sc = scales.pct;
-        for (let t = 0; t <= 600; t += 50) {
+        const range = sc.max - sc.min;
+        const step = range > 300 ? 100 : range > 150 ? 50 : 25;
+        for (let t = 0; t <= 700; t += step) {
           if (t < sc.min || t > sc.max) continue;
           const y = yOf(t, 'pct');
           gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
-          gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${(t/10).toFixed(0)}%</text>`;
+          gridHtml += `<text x="${M.left - 5}" y="${y + 3.5}" class="axis-text" text-anchor="end">${(t/10).toFixed(0)}%</text>`;
         }
       }
 
-      if (visible['tf-odds']) {
+      if (visible['tf-odds'] && scales.dlt) {
         const sc = scales.dlt;
-        const step = (sc.max - sc.min) > 150 ? 50 : 20;
+        const step = (sc.max - sc.min) > 100 ? 50 : 20;
         for (let t = -500; t <= 500; t += step) {
           if (t < sc.min || t > sc.max) continue;
           const y = yOf(t, 'dlt');
           if (t === 0) {
             gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="zero-line"/>`;
           }
+          const label = `${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}`;
           if (bothVisible) {
-            gridHtml += `<text x="${W - M.right + 6}" y="${y + 3}" class="axis-text" text-anchor="start">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+            gridHtml += `<text x="${W - M.right + 5}" y="${y + 3.5}" class="axis-text" text-anchor="start">${label}</text>`;
           } else {
             gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
-            gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+            gridHtml += `<text x="${M.left - 5}" y="${y + 3.5}" class="axis-text" text-anchor="end">${label}</text>`;
           }
         }
       }
 
-      // X axis year labels.
       const sortedMonths = [...new Set(xAllMonths)].sort();
       const xTicks = [];
       let lastYear = null;
@@ -332,29 +379,28 @@
         `<text x="${t.x}" y="${H - 8}" class="axis-text" text-anchor="middle">${t.label}</text>`
       ).join('');
 
-      // Lines + dots.
-      let linesHtml = '', dotsHtml = '';
+      let areasHtml = '', pathsHtml = '', dotsHtml = '';
       SERIES.filter(s => visible[s.key]).forEach(s => {
-        const pts = seriesPoints[s.key];
+        const pts = seriesPoints[s.key].map(p => ({ x: xOf(p.month), y: yOf(p.value, s.group), ...p }));
         if (pts.length >= 2) {
-          const points = pts.map(p => `${xOf(p.month)},${yOf(p.value, s.group)}`).join(' ');
-          linesHtml += `<polyline class="form-line ${s.key}" points="${points}"/>`;
+          if (s.area !== false) {
+            areasHtml += `<path class="form-area ${s.key}" d="${areaPath(pts, yBottom)}"/>`;
+          }
+          pathsHtml += `<path class="form-path ${s.key}" d="${smoothPath(pts)}"/>`;
         }
         if (s.dots) {
           pts.forEach(p => {
-            const cls = `form-dot ${s.key}` + (p.scored < 3 ? ' thin' : '');
-            dotsHtml += `<circle class="${cls}"
-                          cx="${xOf(p.month)}" cy="${yOf(p.value, s.group)}" r="2"
-                          data-series="${s.label}" data-month="${p.month}"
-                          data-value="${p.value}" data-scored="${p.scored}"
-                          data-starts="${p.starts}" data-fmt="${s.key}"/>`;
+            const cls = `form-dot ${s.key}` + (p.scored < 2 ? ' thin' : '');
+            dotsHtml += `<circle class="${cls}" cx="${p.x}" cy="${p.y}" r="2.5"
+              data-series="${s.label}" data-month="${p.month}"
+              data-value="${p.value}" data-scored="${p.scored}"
+              data-starts="${p.starts}" data-fmt="${s.key}"/>`;
           });
         }
       });
 
-      svg.innerHTML = gridHtml + xAxisHtml + linesHtml + dotsHtml;
+      svg.innerHTML = gridHtml + xAxisHtml + areasHtml + pathsHtml + dotsHtml;
 
-      // Tooltip.
       const wrap = svg.parentElement;
       const fmtMap = {};
       SERIES.forEach(s => fmtMap[s.key] = s.fmt);
@@ -366,10 +412,7 @@
           const scored = c.dataset.scored;
           const starts = c.dataset.starts;
           const display = fmtMap[c.dataset.fmt](val);
-          tip.innerHTML =
-            `<strong>${month}</strong><br>` +
-            `${sLabel} ${display}<br>` +
-            `${scored}/${starts} scored`;
+          tip.innerHTML = `<strong>${month}</strong><br>${sLabel} ${display}<br>${scored}/${starts} starts`;
           const wrapRect = wrap.getBoundingClientRect();
           const dotRect  = c.getBoundingClientRect();
           tip.style.left = (dotRect.left - wrapRect.left + dotRect.width / 2) + 'px';
@@ -410,7 +453,33 @@
       lastSeries = data.series;
       drawChart(lastSeries);
 
+      renderTopHorses(data.top_horses || []);
       if (data.recent && data.recent.length) renderRecent(data.recent);
+    }
+
+    function renderTopHorses(rows) {
+      const mount = document.getElementById('topHorsesMount');
+      if (!rows.length) {
+        mount.innerHTML = '<div style="font-size:11px;color:var(--fg-muted);padding:6px 0">no earnings recorded under this trainer</div>';
+        return;
+      }
+      const head = `<thead><tr>
+        <th>horse</th>
+        <th class="muted">year</th>
+        <th class="num">starts</th>
+        <th class="num">wins</th>
+        <th class="num">earnings (in barn)</th>
+      </tr></thead>`;
+      const body = rows.map(h => `
+        <tr>
+          <td><a href="/horse/${h.horse_id}">${flagify(h.name || '')}</a></td>
+          <td class="muted">${esc(h.year || '')}</td>
+          <td class="num muted">${h.starts || ''}</td>
+          <td class="num muted">${h.wins || ''}</td>
+          <td class="num">${esc(h.earnings || '')}</td>
+        </tr>`).join('');
+      mount.innerHTML = `<table class="top-horses">${head}<tbody>${body}</tbody></table>`;
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
     }
 
     function fmtTimeVal(v) {
@@ -421,7 +490,7 @@
     }
 
     function sexAge(e) {
-      const s = (e.sex || '').toLowerCase();
+      const s = swedishSex(e.sex);
       const a = e.age != null ? e.age : '';
       if (!s && !a) return '';
       return `${s}${a}`;
@@ -470,6 +539,15 @@
                : n > 3  ? 'sform sform-hot'
                          : 'sform';
       return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
+    }
+
+    function tfPerfCell(v) {
+      if (v == null) return '';
+      const n = v / 10;
+      const cls = n >= 65 ? 'sform sform-hot'
+               : n <= 40 ? 'sform sform-cold'
+                         : 'sform';
+      return `<span class="${cls}">${n.toFixed(1)}</span>`;
     }
 
     function sulkyCell(e) {
@@ -541,14 +619,17 @@
         <th>driver</th>
         <th class="winrate">d_wr</th>
         <th class="sform">dΔ</th>
-        <th class="sform">df±</th>
+        <th class="sform" title="driver form — avg finishing percentile of the driver's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">d form</th>
+        <th class="sform" title="driver market± — avg positions the driver's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">d mkt</th>
         <th class="winrate">t_wr</th>
         <th class="sform">tΔ</th>
-        <th class="sform">tf±</th>
+        <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
+        <th class="sform" title="trainer market± — avg positions the trainer's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">t mkt</th>
         <th class="num">odds</th>
         <th class="num">sulky</th>
         <th class="center">shoes</th>
         <th>time</th>
+        <th title="source(s) that contributed this entry">src</th>
       </tr></thead>`;
       const rows = entries.map(e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
@@ -561,25 +642,29 @@
         const time = e.time_text || fmtTimeVal(e.time_val);
         return `<tr${cls}>
           <td class="muted">${dateCell}</td>
-          <td class="muted">${esc(e.track || '')}</td>
+          <td class="muted">${e.track_id ? `<a href="/track/${e.track_id}">${esc(e.track || '')}</a>` : esc(e.track || '')}</td>
           <td>${posDisplay(e)}</td>
           <td class="num muted">${e.number || ''}</td>
           <td>${horseCell(e)}</td>
           <td class="muted">${shortCell(e.driver_short, e.driver_name, e.driver_id ? `/driver/${e.driver_id}` : null)}</td>
           <td class="winrate">${wrCell(e.d_wr)}</td>
           <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
+          <td class="sform">${tfPerfCell(e.df_perf)}</td>
           <td class="sform">${tfOddsCell(e.df_odds)}</td>
           <td class="winrate">${wrCell(e.t_wr)}</td>
           <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+          <td class="sform">${tfPerfCell(e.tf_perf)}</td>
           <td class="sform">${tfOddsCell(e.tf_odds)}</td>
           <td class="num muted">${e.odds != null ? e.odds : ''}</td>
           <td class="num muted">${sulkyCell(e)}</td>
           <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
           <td class="muted">${esc(time)}</td>
+          <td>${srcPillsList((e.contributors || []).map(s => ({key: s})), {size: 'sm'})}</td>
         </tr>`;
       }).join('');
       document.getElementById('recentEntries').innerHTML =
         `<table class="recent">${head}<tbody>${rows}</tbody></table>`;
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(document.getElementById('recentEntries'));
     }
 
     init();

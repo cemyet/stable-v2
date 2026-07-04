@@ -36,6 +36,7 @@ from psycopg2.extras import Json
 from core.db import buffer_insert, buffer_prune
 from core.exchange import to_sek
 from etl.matching import upsert_horse, upsert_person, upsert_track, upsert_race, upsert_entry
+from core.identity import resolve_horse
 from scrapers.hvt import (
     make_client,
     search_horses,
@@ -53,32 +54,20 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _upsert_track(cur, track_name: str) -> int | None:
+    """Upsert a German trotting track via the centralized helper.
+
+    HVT doesn't expose a stable per-track id, so we synthesize one from the
+    lowercased name. The centralized matching does the cross-source dedup
+    by (lower(name), country='DE') and propagates DE onto any existing
+    NULL-country row that matches.
+    """
     if not track_name:
         return None
-
-    cur.execute(
-        """
-        SELECT track_id, source_data, primary_source FROM track
-         WHERE country = 'DE'
-           AND lower(name) = lower(%s)
-         LIMIT 1
-        """,
-        (track_name,),
+    return upsert_track(
+        cur, "hvt", f"name:{track_name.strip().lower()}",
+        {"name": track_name, "country": "DE", "sport": "trot"},
+        raw_payload={"discovered_via": "formenspiegel"},
     )
-    row = cur.fetchone()
-    if row:
-        return row[0]
-
-    # Insert a fresh DE track. country='DE', sport='trot'.
-    cur.execute(
-        """
-        INSERT INTO track (name, country, sport, source_data, primary_source, last_updated_at)
-        VALUES (%s, 'DE', 'trot', jsonb_build_object('hvt', jsonb_build_object('discovered_via', 'formenspiegel')), 'hvt', NOW())
-        RETURNING track_id
-        """,
-        (track_name,),
-    )
-    return cur.fetchone()[0]
 
 
 # ---------------------------------------------------------------------------
@@ -196,11 +185,16 @@ def _upsert_horse_from_grunddaten(conn, gd: dict) -> int:
         "dam_hvt_id":      gd.get("dam_hvt_id"),
     }
     with conn.cursor() as cur:
-        return upsert_horse(
-            cur, "hvt", str(gd["hvt_id"]),
-            canonical,
+        return resolve_horse(
+            cur,
+            source="hvt",
+            source_id=str(gd["hvt_id"]),
+            canonical_fields=canonical,
             raw_payload=raw,
+            registration_number=gd.get("registration_number"),
             ueln_number=gd.get("ueln_number"),
+            sire_name=gd.get("sire_name"),
+            dam_name=gd.get("dam_name"),
         )
 
 
@@ -213,9 +207,12 @@ def _upsert_pedigree_node(conn, ped_node: dict) -> int:
     }
     raw = {"discovered_via": "pedigree", "side": ped_node.get("side")}
     with conn.cursor() as cur:
-        return upsert_horse(
-            cur, "hvt", str(ped_node["traberid"]),
-            canonical, raw_payload=raw,
+        return resolve_horse(
+            cur,
+            source="hvt",
+            source_id=str(ped_node["traberid"]),
+            canonical_fields=canonical,
+            raw_payload=raw,
         )
 
 

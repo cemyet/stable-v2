@@ -21,7 +21,7 @@ from typing import Iterable
 from psycopg2.extras import Json
 
 from core.db import buffer_insert, buffer_prune
-from scrapers.kmtid import scrape_day, scrape_window
+from scrapers.kmtid import scrape_day, scrape_window, scrape_all_listed
 
 log = logging.getLogger(__name__)
 
@@ -303,6 +303,38 @@ def import_window(conn, days: int = 35, end_date: date | None = None) -> dict:
     return totals
 
 
+def import_from_index(conn) -> dict:
+    """Historical backfill: walk every slug listed on kmtid.atgx.se's homepage
+    (not just the trailing 30 days). Recovers ~17 months of GPS data including
+    multi-day bundles like `elitloppet` that aren't addressable by date alone."""
+    totals = {
+        "slugs_seen": 0,
+        "slugs_with_data": 0,
+        "races_seen": 0,
+        "races_matched": 0,
+        "races_skipped": 0,
+        "entries_matched": 0,
+        "entries_skipped": 0,
+    }
+    for slug, label, races in scrape_all_listed():
+        totals["slugs_seen"] += 1
+        if not races:
+            continue
+        totals["slugs_with_data"] += 1
+        with conn.cursor() as cur:
+            for r in races:
+                res = import_race(cur, r)
+                totals["races_seen"]      += 1
+                totals["races_matched"]   += res["matched"]
+                totals["races_skipped"]   += res["skipped"]
+                totals["entries_matched"] += res["entries_matched"]
+                totals["entries_skipped"] += res["entries_skipped"]
+        conn.commit()
+        log.info("kmtid %-18s totals=%s", slug, totals)
+    buffer_prune(conn, "kmtid")
+    return totals
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -313,7 +345,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
-        print("usage: python -m etl.import_kmtid <YYMMDD|window>")
+        print("usage: python -m etl.import_kmtid <YYMMDD|window|backfill>")
+        print("  YYMMDD    -- import one specific day from the date-based endpoint")
+        print("  window    -- trailing KMTID_BACKFILL_DAYS days (daily-update path)")
+        print("  backfill  -- walk the live homepage index (~17 months of history)")
         return
 
     conn = get_connection()
@@ -321,6 +356,8 @@ def main() -> None:
         arg = sys.argv[1]
         if arg == "window":
             print(import_window(conn))
+        elif arg == "backfill":
+            print(import_from_index(conn))
         else:
             try:
                 d = date(2000 + int(arg[0:2]), int(arg[2:4]), int(arg[4:6]))

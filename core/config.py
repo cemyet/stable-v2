@@ -51,6 +51,20 @@ ST_RACE_API_BASE = (
     "/organisation/TROT/sourceofdata/SPORT/racedayid/{race_day_id}"
 )
 
+# Native horse JSON API. The public sportapp pages no longer SSR-embed the
+# horse datasets (only `horse-basic-information`); the React app fetches the
+# rest from these api.travsport.se endpoints (discovered from the app JS).
+# Keys mirror v1's parse_horse_page data_type names so etl.import_st can reuse
+# the v1 field map. `{horse_id}` is the TravSport horse id (== our st_id).
+ST_API_BASE = "https://api.travsport.se/webapi"
+ST_HORSE_API_ENDPOINTS = {
+    "horse-basic-information": "horses/basicinformation/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
+    "race-results":           "horses/results/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
+    "horse-statistics":       "horses/statistics/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
+    "horse-history":          "horses/history/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
+    "lineage-small":          "horses/pedigree/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}?pedigreeTree=SMALL",
+}
+
 ST_HEADERS = {
     "User-Agent": DEFAULT_USER_AGENT,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

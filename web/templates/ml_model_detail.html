@@ -1,0 +1,164 @@
+{% extends "_layout.html" %}
+
+{% block title %}model detail — stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 110px 20px 60px; }
+
+  .md-page { width: 100%; max-width: 860px; margin: 0 auto; }
+  .md-back { font-size: 12px; color: var(--fg-muted); text-decoration: none; letter-spacing: 0.5px; }
+  .md-back:hover { color: var(--fg); }
+
+  .md-title { font-size: 26px; font-weight: 400; letter-spacing: 4px; margin: 14px 0 4px; text-transform: lowercase; }
+  .md-meta { font-size: 12px; color: var(--fg-muted); margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .md-meta .mc-tag {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--fg-muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+  }
+  .md-meta .mc-tag-target { color: var(--accent-glow, #6ea8fe); border-color: var(--accent-glow, #6ea8fe); }
+
+  .md-section {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--fg-muted); margin: 28px 0 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .md-section::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .md-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; }
+  .md-metric { display: flex; flex-direction: column; gap: 2px; }
+  .md-metric .v { font-size: 22px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .md-metric .k { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--fg-muted); }
+
+  .md-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 680px) { .md-grid { grid-template-columns: 1fr; } }
+  .md-block h4 {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--fg-muted); margin: 0 0 10px; font-weight: 400;
+  }
+
+  .imp-row { display: grid; grid-template-columns: 140px 1fr 50px; align-items: center; gap: 8px; font-size: 11px; padding: 3px 0; }
+  .imp-row .nm { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .imp-bar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+  .imp-bar > span { display: block; height: 100%; background: var(--accent-cold, #6ea8fe); }
+  .imp-row .val { text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+
+  .cal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .cal-table th, .cal-table td { text-align: right; padding: 4px 8px; font-variant-numeric: tabular-nums; }
+  .cal-table th { color: var(--fg-muted); font-weight: 400; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .cal-table td:first-child, .cal-table th:first-child { text-align: left; }
+  .cal-table tr:last-child td { color: var(--fg); }
+
+  .md-slice-info { font-size: 12px; color: var(--fg-muted); line-height: 1.8; }
+  .md-slice-info code { color: var(--fg); background: rgba(255,255,255,0.04); padding: 1px 6px; border-radius: 4px; }
+  .md-feats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .md-feat {
+    font-size: 10px; padding: 3px 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--fg-muted);
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="md-page">
+    <a href="/ml/models" class="md-back">← models</a>
+    <div id="detail"></div>
+  </div>
+
+  <script>
+    const mid = {{ model_id }};
+    const fmtPct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%');
+
+    function importanceList(imps) {
+      if (!imps || !imps.length) return '<span style="color:var(--fg-muted);font-size:11px">no data</span>';
+      const max = Math.max(...imps.map(d => d.importance), 1e-9);
+      return imps.map(d => {
+        const w = Math.max(0, d.importance / max * 100);
+        return `<div class="imp-row"><span class="nm">${esc(d.feature)}</span>`
+             + `<span class="imp-bar"><span style="width:${w.toFixed(0)}%"></span></span>`
+             + `<span class="val">${d.importance.toFixed(4)}</span></div>`;
+      }).join('');
+    }
+
+    function calTable(cal) {
+      if (!cal || !cal.length) return '';
+      const rows = cal.map(c =>
+        `<tr><td>${c.decile}</td><td>${fmtPct(c.pred)}</td><td>${fmtPct(c.actual)}</td><td>${c.n.toLocaleString()}</td></tr>`
+      ).join('');
+      return `<table class="cal-table"><thead><tr><th>decile</th><th>pred</th><th>actual</th><th>n</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function methodLabel(sl) {
+      const raw = sl?.method || 'any';
+      return raw === 'any' ? 'any method' : raw;
+    }
+
+    function trackLabel(m) {
+      if (m.scope === 'track') return m.track_name || m.slice_def?.track_name || 'track';
+      return 'any track';
+    }
+
+    fetch(`/api/ml/models/${mid}`).then(r => r.json()).then(m => {
+      const t = m.metrics?.test || {};
+      const tr = m.metrics?.train || {};
+      const sl = m.slice_def || {};
+      const yrs = sl.years ? `${sl.years[0]}–${sl.years[1]}` : '';
+
+      let html = `
+        <h2 class="md-title">${esc(m.name)}</h2>
+        <div class="md-meta">
+          <span class="mc-tag mc-tag-target">${esc(m.target)}</span>
+          <span class="mc-tag">${esc(m.algo)}</span>
+          <span class="mc-tag">${esc(trackLabel(m))}</span>
+          <span class="mc-tag">${esc(methodLabel(sl))}</span>
+          <span style="font-size:11px">${m.created_at ? m.created_at.slice(0, 10) : ''}</span>
+        </div>
+
+        <div class="md-section">test metrics</div>
+        <div class="md-metrics">
+          <div class="md-metric"><div class="v">${t.roc_auc ?? '—'}</div><div class="k">roc auc</div></div>
+          <div class="md-metric"><div class="v">${t.pr_auc ?? '—'}</div><div class="k">pr auc</div></div>
+          <div class="md-metric"><div class="v">${fmtPct(t.base_rate)}</div><div class="k">base rate</div></div>
+          <div class="md-metric"><div class="v">${t.top_decile_lift ? t.top_decile_lift + '×' : '—'}</div><div class="k">top-decile lift</div></div>
+          <div class="md-metric"><div class="v">${t.log_loss ?? '—'}</div><div class="k">log loss</div></div>
+          <div class="md-metric"><div class="v">${t.brier ?? '—'}</div><div class="k">brier</div></div>
+          <div class="md-metric"><div class="v">${t.n ? t.n.toLocaleString() : '—'}</div><div class="k">test n</div></div>
+        </div>
+
+        <div class="md-section">train metrics</div>
+        <div class="md-metrics">
+          <div class="md-metric"><div class="v">${tr.roc_auc ?? '—'}</div><div class="k">roc auc</div></div>
+          <div class="md-metric"><div class="v">${tr.pr_auc ?? '—'}</div><div class="k">pr auc</div></div>
+          <div class="md-metric"><div class="v">${tr.n ? tr.n.toLocaleString() : '—'}</div><div class="k">train n</div></div>
+          <div class="md-metric"><div class="v">${m.metrics?.n_iter ?? '—'}</div><div class="k">iterations</div></div>
+        </div>
+
+        <div class="md-section">analysis</div>
+        <div class="md-grid">
+          <div class="md-block"><h4>feature importance (all)</h4>${importanceList(m.metrics?.importances)}</div>
+          <div class="md-block"><h4>calibration</h4>${calTable(t.calibration)}</div>
+        </div>
+
+        <div class="md-section">slice definition</div>
+        <div class="md-slice-info">
+          scope: <code>${esc(m.scope)}</code> ·
+          track: <code>${esc(trackLabel(m))}</code> ·
+          years: <code>${yrs}</code> ·
+          method: <code>${esc(methodLabel(sl))}</code><br>
+          test split: <code>≥ ${sl.test_since}</code> ·
+          starters only: <code>${sl.starters_only ? 'yes' : 'no'}</code> ·
+          monotonic constraints: <code>${sl.monotonic_galrate ? 'yes' : 'no'}</code><br>
+          hyperparams: lr=<code>${sl.hyperparams?.learning_rate ?? '?'}</code>,
+          max_iter=<code>${sl.hyperparams?.max_iter ?? '?'}</code>,
+          max_leaf=<code>${sl.hyperparams?.max_leaf_nodes ?? '?'}</code>
+        </div>
+
+        <div class="md-section">features (${sl.n_features ?? (sl.features?.length ?? '?')})</div>
+        <div class="md-feats">
+          ${(sl.features || []).map(f => `<span class="md-feat">${esc(f)}</span>`).join('')}
+        </div>
+      `;
+      document.getElementById('detail').innerHTML = html;
+    }).catch(e => {
+      document.getElementById('detail').innerHTML = `<p style="color:var(--fg-muted);margin-top:30px">model not found or failed to load.</p>`;
+    });
+  </script>
+{% endblock %}

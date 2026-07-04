@@ -1,0 +1,311 @@
+{% extends "_layout.html" %}
+
+{% block title %}ml · models — stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 110px 20px 60px; }
+
+  .ml-page { width: 100%; max-width: 1000px; margin: 0 auto; }
+
+  h1 {
+    font-size: 28px; font-weight: 400; letter-spacing: 6px;
+    text-transform: lowercase; margin: 0 0 4px; text-align: center;
+  }
+  .ml-sub {
+    text-align: center; color: var(--fg-muted); font-size: 12px;
+    letter-spacing: 0.5px; margin-bottom: 22px;
+  }
+
+  .ml-layout { display: grid; grid-template-columns: 150px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 680px) { .ml-layout { grid-template-columns: 1fr; } }
+  .ml-side { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 120px; }
+  .ml-side button {
+    background: none; border: none; border-left: 2px solid transparent;
+    color: var(--fg-muted); font-family: inherit; font-size: 13px;
+    letter-spacing: 1px; text-align: left; padding: 8px 14px; cursor: pointer;
+    text-transform: lowercase;
+  }
+  .ml-side button:hover { color: var(--fg); }
+  .ml-side button.active { color: var(--fg); border-left-color: var(--accent-glow, #6ea8fe); background: var(--hover); }
+  .ml-side .ml-side-count { font-size: 10px; color: var(--fg-muted); margin-left: 6px; }
+  .ml-view { min-width: 0; }
+  .ml-view[hidden] { display: none; }
+
+  .ml-section-head {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--fg-muted); margin: 26px 4px 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ml-section-head::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .ml-panel { padding: 0; margin-bottom: 10px; overflow: hidden; }
+  .ml-empty { color: var(--fg-muted); font-size: 12px; line-height: 1.7; text-align: center; padding: 18px 0; }
+  .ml-empty em { font-style: normal; color: var(--fg); }
+
+  /* ---- collapsible model card ---- */
+  .mc-header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 18px; cursor: pointer; user-select: none;
+    transition: background 0.15s;
+  }
+  .mc-header:hover { background: var(--hover); }
+  .mc-chevron {
+    width: 14px; height: 14px; color: var(--fg-muted); transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .mc-card.open .mc-chevron { transform: rotate(90deg); }
+  .mc-name { font-size: 14px; color: var(--fg); }
+  .mc-tag {
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--fg-muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+  }
+  .mc-tag-target { color: var(--accent-glow, #6ea8fe); border-color: var(--accent-glow, #6ea8fe); }
+  .mc-auc { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--fg); margin-left: auto; }
+  .mc-auc small { font-size: 10px; color: var(--fg-muted); margin-left: 3px; }
+  .mc-when { font-size: 10px; color: var(--fg-muted); }
+
+  .mc-body { display: none; padding: 2px 18px 18px; border-top: 1px solid var(--border); }
+  .mc-card.open .mc-body { display: block; }
+
+  .mc-metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 14px 0 16px; }
+  .mc-metric { display: flex; flex-direction: column; gap: 2px; }
+  .mc-metric .v { font-size: 18px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .mc-metric .v small { font-size: 11px; color: var(--fg-muted); }
+  .mc-metric .k { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--fg-muted); }
+
+  .mc-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 22px; }
+  @media (max-width: 720px) { .mc-grid { grid-template-columns: 1fr; } }
+  .mc-block h4 {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--fg-muted); margin: 0 0 8px; font-weight: 400;
+  }
+
+  .imp-row { display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; }
+  .imp-row .nm { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .imp-bar { height: 7px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .imp-bar > span { display: block; height: 100%; background: var(--accent-cold, #6ea8fe); }
+  .imp-row .val { text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+
+  .cal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .cal-table th, .cal-table td { text-align: right; padding: 3px 6px; font-variant-numeric: tabular-nums; }
+  .cal-table th { color: var(--fg-muted); font-weight: 400; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .cal-table td:first-child, .cal-table th:first-child { text-align: left; }
+  .cal-table tr:last-child td { color: var(--fg); }
+
+  .mc-slice { margin-top: 14px; font-size: 11px; color: var(--fg-muted); line-height: 1.6; }
+  .mc-slice code { color: var(--fg); background: rgba(255,255,255,0.04); padding: 1px 5px; border-radius: 4px; }
+
+  .mc-detail-link {
+    display: inline-block; margin-top: 12px; font-size: 11px; color: var(--accent-glow, #6ea8fe);
+    text-decoration: none; letter-spacing: 0.5px;
+  }
+  .mc-detail-link:hover { text-decoration: underline; }
+
+{% endblock %}
+
+{% block content %}
+  <div class="ml-page">
+    <h1>models</h1>
+    <div class="ml-sub">trained models, their slice and forward-test performance</div>
+  </div>
+
+  <div class="ml-page">
+    <div class="ml-layout">
+      <div class="ml-side">
+        <button data-view="xgal" class="active">xgal<span class="ml-side-count" id="cnt-xgal"></span></button>
+        <button data-view="trainerform">trainer form<span class="ml-side-count" id="cnt-trainerform"></span></button>
+        <button data-view="upcoming">upcoming<span class="ml-side-count" id="cnt-upcoming"></span></button>
+        <button data-view="breeding">breeding</button>
+      </div>
+
+      <div class="ml-view" id="view-xgal">
+        <div class="ml-sub" style="text-align:left;margin:0 4px 4px">expected galopp — probability a starter breaks (gallops/DQ).</div>
+        <div class="ml-section-head">general</div>
+        <div id="xgal-general"></div>
+        <div class="ml-section-head">track-specific</div>
+        <div id="xgal-track"></div>
+      </div>
+
+      <div class="ml-view" id="view-trainerform" hidden>
+        <div class="ml-sub" style="text-align:left;margin:0 4px 4px">two complementary trainer/driver signals: <b>form</b> (finishing-percentile family — actual recent performance, predicts winning, powers the <code>form</code> column) and <b>mkt±</b> (odds-rank outperformance — a market-edge/value signal that anti-correlates with winning, powers the <code>mkt±</code> column).</div>
+        <div id="trainerform-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-upcoming" hidden>
+        <div class="ml-sub" style="text-align:left;margin:0 4px 4px">race-outcome models (winner / placement) built on the x-features above.</div>
+        <div id="upcoming-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-breeding" hidden>
+        <div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty">
+          <em>breeding models — coming soon</em><br>
+          sire/dam galopp &amp; performance models will live here.
+        </div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fmtPct = v => (v == null ? '—' : (v * 100).toFixed(1) + '%');
+
+    const chevronSvg = `<svg class="mc-chevron" viewBox="0 0 20 20" fill="currentColor"><path d="M7.3 4.3a1 1 0 011.4 0l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4-1.4L11.58 10 7.3 5.7a1 1 0 010-1.4z"/></svg>`;
+
+    function methodLabel(sl) {
+      const raw = sl?.method || 'any';
+      return raw === 'any' ? 'any method' : raw;
+    }
+
+    function trackLabel(m) {
+      if (m.scope === 'track') return m.track_name || m.slice_def?.track_name || 'track';
+      return 'any track';
+    }
+
+    function importanceList(imps) {
+      if (!imps || !imps.length) return '';
+      const top = imps.slice(0, 10);
+      const max = Math.max(...top.map(d => d.importance), 1e-9);
+      return top.map(d => {
+        const w = Math.max(0, d.importance / max * 100);
+        return `<div class="imp-row"><span class="nm">${esc(d.feature)}</span>`
+             + `<span class="imp-bar"><span style="width:${w.toFixed(0)}%"></span></span>`
+             + `<span class="val">${d.importance.toFixed(3)}</span></div>`;
+      }).join('');
+    }
+
+    function calTable(cal) {
+      if (!cal || !cal.length) return '';
+      const rows = cal.map(c =>
+        `<tr><td>${c.decile}</td><td>${fmtPct(c.pred)}</td><td>${fmtPct(c.actual)}</td><td>${c.n.toLocaleString()}</td></tr>`
+      ).join('');
+      return `<table class="cal-table"><thead><tr><th>decile</th><th>pred</th><th>actual</th><th>n</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function metric(k, v) {
+      return `<div class="mc-metric"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+    }
+
+    const VIEWS = ['xgal', 'trainerform', 'upcoming', 'breeding'];
+
+    // Which tab a model belongs to, inferred from its target / slice.
+    function categoryOf(m) {
+      const t = (m.target || '');
+      const src = m.slice_def?.source_table || '';
+      if (t.startsWith('y_gal')) return 'xgal';
+      if (src === 'trainer_form_exp' || t === 'y_beat_exp' || t === 'y_outperf'
+          || t.includes('outperf') || t.includes('beat')) return 'trainerform';
+      return 'upcoming';
+    }
+
+    // A model's headline score: AUC for classifiers, R²/ρ for regressors.
+    function headline(m) {
+      const test = m.metrics?.test || {};
+      if (test.roc_auc != null) return { val: (+test.roc_auc).toFixed(3), label: 'auc' };
+      if (m.metrics?.score != null) {
+        const reg = m.slice_def?.kind === 'reg'
+          || (m.algo || '').toLowerCase().includes('regressor');
+        return { val: (+m.metrics.score).toFixed(3), label: reg ? 'r²' : 'auc' };
+      }
+      return { val: '—', label: '' };
+    }
+
+    function card(m) {
+      const t = m.metrics?.test || {};
+      const sl = m.slice_def || {};
+      const when = m.created_at ? m.created_at.slice(0, 10) : '';
+      const hl = headline(m);
+      const trackTag = `<span class="mc-tag">${esc(trackLabel(m))}</span>`;
+
+      // Classifier (gal) cards keep the rich test-metric tiles; trainer-form
+      // (and other slice-style) models show their train/test footprint.
+      let metricsHtml, sliceHtml;
+      if (t.roc_auc != null) {
+        metricsHtml = [
+          metric('roc auc', t.roc_auc ?? '—'),
+          metric('pr auc', t.pr_auc ?? '—'),
+          metric('base rate', fmtPct(t.base_rate)),
+          metric('top-decile lift', t.top_decile_lift ? t.top_decile_lift + '×' : '—'),
+          metric('log loss', t.log_loss ?? '—'),
+          metric('brier', t.brier ?? '—'),
+        ].join('');
+        const yrs = sl.years ? `${sl.years[0]}–${sl.years[1]}` : '';
+        sliceHtml = `slice: <code>${esc(trackLabel(m))}</code> · ${yrs} · `
+          + `${sl.starters_only ? 'starters only · ' : ''}${sl.n_features ?? '?'} features · `
+          + `train <code>${(sl.n_train ?? 0).toLocaleString()}</code> (&lt;${sl.test_since}) · `
+          + `test <code>${(sl.n_test ?? 0).toLocaleString()}</code>`;
+      } else {
+        metricsHtml = [
+          metric(hl.label === 'r²' ? 'r² (test)' : 'score', hl.val),
+          metric('features', sl.n_features ?? '—'),
+          metric('train', (m.metrics?.n_train ?? 0).toLocaleString()),
+          metric('test', (m.metrics?.n_test ?? 0).toLocaleString()),
+        ].join('');
+        sliceHtml = `source <code>${esc(sl.source_table || 'entry_features')}</code>`
+          + (sl.scope_country ? ` · ${esc(sl.scope_country)}` : '')
+          + (sl.min_starts_last50 ? ` · min ${sl.min_starts_last50} starts` : '')
+          + (sl.note ? `<br><span style="opacity:.8">${esc(sl.note)}</span>` : '');
+      }
+
+      return `<div class="glass-panel ml-panel mc-card">
+        <div class="mc-header" onclick="this.parentElement.classList.toggle('open')">
+          ${chevronSvg}
+          <span class="mc-name">${esc(m.name)}</span>
+          <span class="mc-tag mc-tag-target">${esc(m.target)}</span>
+          ${trackTag}
+          <span class="mc-auc">${hl.val}<small>${hl.label}</small></span>
+          <span class="mc-when">${when}</span>
+        </div>
+        <div class="mc-body">
+          <div class="mc-metrics">${metricsHtml}</div>
+          <div class="mc-grid">
+            <div class="mc-block"><h4>feature importance (permutation)</h4>${importanceList(m.metrics?.importances)}</div>
+            <div class="mc-block"><h4>calibration (test, by risk decile)</h4>${calTable(t.calibration) || '<div class="ml-empty" style="text-align:left;padding:0">n/a for this model</div>'}</div>
+          </div>
+          <div class="mc-slice">${sliceHtml}</div>
+          <a class="mc-detail-link" href="/ml/models/${m.model_id}">view full details →</a>
+        </div>
+      </div>`;
+    }
+
+    function render(elId, list, emptyLabel) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      if (!list || !list.length) {
+        el.innerHTML = `<div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty"><em>no ${emptyLabel} models yet</em><br>train one (CLI) and it will appear here.</div></div>`;
+        return;
+      }
+      list.sort((a, b) => parseFloat(headline(b).val || 0) - parseFloat(headline(a).val || 0));
+      el.innerHTML = list.map(card).join('');
+    }
+
+    document.querySelectorAll('.ml-side button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('.ml-side button').forEach(x => x.classList.toggle('active', x === b));
+      VIEWS.forEach(v => {
+        const el = document.getElementById('view-' + v);
+        if (el) el.hidden = b.dataset.view !== v;
+      });
+    }));
+
+    function loadModels() {
+      fetch('/api/ml/models').then(r => r.json()).then(d => {
+        const all = [...(d.general || []), ...(d.track || [])];
+        const byCat = { xgal: [], trainerform: [], upcoming: [] };
+        all.forEach(m => byCat[categoryOf(m)].push(m));
+
+        render('xgal-general', byCat.xgal.filter(m => m.scope !== 'track'), 'xgal');
+        render('xgal-track',   byCat.xgal.filter(m => m.scope === 'track'), 'track xgal');
+        render('trainerform-general', byCat.trainerform, 'trainer-form');
+        render('upcoming-general',    byCat.upcoming,    'race-outcome');
+
+        for (const c of ['xgal', 'trainerform', 'upcoming']) {
+          const el = document.getElementById('cnt-' + c);
+          if (el) el.textContent = byCat[c].length || '';
+        }
+      }).catch(() => {
+        document.getElementById('xgal-general').innerHTML =
+          '<div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty">failed to load models.</div></div>';
+      });
+    }
+    loadModels();
+
+  </script>
+{% endblock %}

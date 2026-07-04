@@ -1,0 +1,177 @@
+{% extends "_layout.html" %}
+{% block title %}{{ role }} stats - stable{% endblock %}
+
+{% block content %}
+<div class="stats-page">
+  {% include 'partials/stats_ui.html' %}
+
+  <div class="stats-head">
+    <h1>{{ role }}s</h1>
+    <span class="count" id="count"></span>
+    {% if role == 'trainer' %}
+    <span class="fspacer"></span>
+    <div class="seg" id="sformPeriod" title="form / market± window: averaging period for the recent-form columns">
+      <button data-days="7">7d</button>
+      <button data-days="30" class="active">30d</button>
+      <button data-days="90">90d</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="filters__head">
+      <span class="ftitle">filters</span>
+      <span class="fspacer"></span>
+      <span class="filters__chev">▾</span>
+    </div>
+    <div class="filters__body">
+      <div class="filter-grid">
+        <div class="fld"><label>starts <span class="val" id="vStarts"></span></label><div id="sStarts"></div></div>
+        <div class="fld"><label>wins <span class="val" id="vWins"></span></label><div id="sWins"></div></div>
+        <div class="fld"><label>win% <span class="val" id="vWin"></span></label><div id="sWin"></div></div>
+        <div class="fld"><label>top3% <span class="val" id="vTop3"></span></label><div id="sTop3"></div></div>
+        <div class="fld"><label>gal% <span class="val" id="vGal"></span></label><div id="sGal"></div></div>
+        <div class="fld"><label>earnings <span class="val" id="vEarn"></span></label><div id="sEarn"></div></div>
+      </div>
+      <div class="filters__actions">
+        <button class="btn" id="applyBtn">apply</button>
+        <button class="btn btn--ghost" id="resetBtn">reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="stbl">
+      <thead id="thead">
+        <tr>
+          <th class="l">#</th>
+          <th class="l" data-sort="name" data-defdir="asc">name</th>
+          {% if role != 'trainer' %}
+          <th class="l">country</th>
+          {% endif %}
+          <th data-sort="starts">starts</th>
+          <th data-sort="wins">wins</th>
+          <th data-sort="winrate">win%</th>
+          <th data-sort="top3rate">top3%</th>
+          {% if role == 'trainer' %}
+          <th data-sort="form" title="form — avg finishing percentile of the stable's recent runners (100 = always wins, 0 = always last; galopp/DQ count as last). Actual recent form: rewards winning favourites and predicts winning, unlike mkt±.">form</th>
+          <th data-sort="s_form" title="market± — avg positions the stable's recent runners finish ahead of their odds rank. >0 = market underrates them. NB: NOT recent form / win-rate.">mkt±</th>
+          {% endif %}
+          <th data-sort="galrate" data-defdir="asc">gal%</th>
+          <th data-sort="earnings">earnings</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="foot"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ROLE = {{ role | tojson }};
+  const S = STAT;
+  S.bindPanel(document.getElementById('filters'));
+
+  const sl = {
+    starts:  S.makeSlider(document.getElementById('sStarts'), { min: 0, max: 5000, dual: true, valEl: vStarts }),
+    wins:    S.makeSlider(document.getElementById('sWins'),   { min: 0, max: 1500, dual: true, valEl: vWins }),
+    winrate: S.makeSlider(document.getElementById('sWin'),    { min: 0, max: 100, dual: false, valEl: vWin, fmt: v => v + '%' }),
+    top3:    S.makeSlider(document.getElementById('sTop3'),   { min: 0, max: 100, dual: false, valEl: vTop3, fmt: v => v + '%' }),
+    galrate: S.makeSlider(document.getElementById('sGal'),    { min: 0, max: 100, dual: true, valEl: vGal, fmt: v => v + '%' }),
+    earnings:S.makeSlider(document.getElementById('sEarn'),   { min: 0, max: 500000000, dual: false, scale: 'log', valEl: vEarn, fmt: v => S.krShort(v) }),
+  };
+
+  const state = { sort: 'earnings', dir: 'desc', offset: 0, total: 0, applied: false, sformDays: 30 };
+  const LIMIT = 50;
+
+  function buildParams() {
+    const p = { role: ROLE, sort: state.sort, dir: state.dir, limit: LIMIT, offset: state.offset };
+    if (ROLE === 'trainer') p.sform_days = state.sformDays;
+    S.addBounds(p, 'starts', sl.starts.bounds());
+    S.addBounds(p, 'wins', sl.wins.bounds());
+    S.addBounds(p, 'winrate', sl.winrate.bounds());
+    S.addBounds(p, 'top3', sl.top3.bounds());
+    S.addBounds(p, 'galrate', sl.galrate.bounds());
+    S.addBounds(p, 'earnings', sl.earnings.bounds());
+    return p;
+  }
+
+  function fmtSForm(v) {
+    if (v == null) return '';
+    const n = v / 10;
+    return (n >= 0 ? '+' : '') + n.toFixed(1);
+  }
+
+  function fmtPerf(v) {
+    if (v == null) return '';
+    return (v / 10).toFixed(1);
+  }
+
+  function row(r, i) {
+    return `<tr class="clickable" data-href="/${ROLE}/${r.person_id}">
+      <td class="l rank">${i}</td>
+      <td class="l"><a href="/${ROLE}/${r.person_id}">${esc(fmtName(r.name || ''))}</a></td>
+      ${ROLE !== 'trainer' ? `<td class="l muted">${esc(r.country || '')}</td>` : ''}
+      <td>${S.nf(r.starts)}</td>
+      <td>${S.nf(r.wins)}</td>
+      <td>${S.pct(r.winrate)}</td>
+      <td>${S.pct(r.top3rate)}</td>
+      ${ROLE === 'trainer' ? `<td>${fmtPerf(r.form)}</td>` : ''}
+      ${ROLE === 'trainer' ? `<td>${fmtSForm(r.s_form)}</td>` : ''}
+      <td>${S.pct(r.galrate)}</td>
+      <td>${S.nf(r.earnings)}</td>
+    </tr>`;
+  }
+
+  const tbody = document.getElementById('tbody');
+  const foot = document.getElementById('foot');
+  const countEl = document.getElementById('count');
+
+  async function load(reset) {
+    if (reset) { state.offset = 0; tbody.innerHTML = ''; }
+    state.applied = true;
+    foot.innerHTML = '<div class="loading">loading…</div>';
+    const res = await fetch('/api/stats/persons?' + S.qs(buildParams()));
+    const data = await res.json();
+    state.total = data.total;
+    const startIdx = state.offset;
+    if (reset && data.rows.length === 0) {
+      foot.innerHTML = `<div class="empty-state">no ${ROLE}s match these filters</div>`;
+      countEl.textContent = '0';
+      return;
+    }
+    tbody.insertAdjacentHTML('beforeend', data.rows.map((r, k) => row(r, startIdx + k + 1)).join(''));
+    state.offset += data.rows.length;
+    countEl.textContent = `${S.nf(state.total)} ${ROLE}s`;
+    foot.innerHTML = state.offset < state.total
+      ? `<button class="load-more" id="moreBtn">show more (${S.nf(state.total - state.offset)} left)</button>` : '';
+    const more = document.getElementById('moreBtn');
+    if (more) more.addEventListener('click', () => load(false));
+    tbody.querySelectorAll('tr.clickable').forEach(tr =>
+      tr.addEventListener('click', e => { if (!e.target.closest('a')) window.location.href = tr.dataset.href; }));
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(tbody);
+  }
+
+  S.bindSort(document.getElementById('thead'), state, () => { if (state.applied) load(true); });
+  const sformPeriod = document.getElementById('sformPeriod');
+  if (sformPeriod) {
+    sformPeriod.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.sformDays = Number(btn.dataset.days) || 30;
+        sformPeriod.querySelectorAll('button').forEach(x => x.classList.toggle('active', x === btn));
+        if (state.applied) load(true);
+      });
+    });
+  }
+  document.getElementById('applyBtn').addEventListener('click', () => load(true));
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.values(sl).forEach(s => s.reset());
+    tbody.innerHTML = ''; countEl.textContent = ''; state.applied = false;
+    foot.innerHTML = '<div class="empty-state">set filters and press apply</div>';
+  });
+
+  foot.innerHTML = '<div class="empty-state">set filters and press apply</div>';
+</script>
+{% endblock %}

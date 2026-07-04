@@ -1,0 +1,426 @@
+<style>
+  /* ===== /stats shared shell ===== */
+  body { padding: 80px 20px 80px; }
+  .stats-page { width: 100%; max-width: 1320px; margin: 0 auto; }
+
+  .stats-head {
+    display: flex; align-items: baseline; gap: 14px; margin: 4px 0 18px;
+  }
+  .stats-head h1 {
+    font-size: 26px; letter-spacing: 0.3px; font-weight: 600;
+    color: var(--fg-heading);
+  }
+  .stats-head .count { color: var(--fg-muted); font-size: 12px; }
+  .stats-head .fspacer { flex: 1; }
+
+  /* ---- filter panel ---- */
+  .filters {
+    border: 1px solid var(--border); background: var(--panel-bg);
+    border-radius: 10px; margin-bottom: 20px; overflow: hidden;
+  }
+  html.liquid .filters {
+    -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+    backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+  }
+  .filters__head {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 12px 16px; user-select: none;
+  }
+  .filters__head .ftitle {
+    font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--fg-muted);
+  }
+  .filters__head .fspacer { flex: 1; }
+  .filters__chev { color: var(--fg-muted); transition: transform 0.2s; font-size: 11px; }
+  .filters.is-collapsed .filters__chev { transform: rotate(-90deg); }
+  .filters.is-collapsed .filters__body { display: none; }
+  .filters__body { padding: 6px 16px 18px; }
+
+  .filter-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 18px 26px;
+  }
+  .fld { display: flex; flex-direction: column; gap: 7px; }
+  .fld > label {
+    font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--fg-muted);
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  }
+  .fld > label .val { color: var(--fg); letter-spacing: 0; font-size: 11px; text-transform: none; }
+
+  /* segmented control — uses fluid-toggle system from _layout for liquid glass thumb */
+  .seg {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: visible; flex-wrap: wrap;
+  }
+  .seg button {
+    background: none; border: none; padding: 4px 11px; font-family: inherit; font-size: 11px;
+    color: var(--fg-muted); cursor: pointer; letter-spacing: 0.4px; transition: background 0.15s, color 0.15s;
+    border-right: 1px solid var(--border);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--fg-muted); color: var(--bg); }
+  .seg button:not(.active):hover { background: var(--hover); }
+  /* When liquid theme is active, .seg becomes a fluid toggle */
+  html.liquid .seg {
+    border: none; border-radius: 9999px; overflow: visible;
+  }
+  html.liquid .seg button { border-right: none; border-radius: 9999px; padding: 5px 13px; }
+
+  /* range slider — ink-tinted fill on pearl panels, drag the bar edge (invisible thumbs) */
+  .rng {
+    --track-h: 12px;
+    --thumb-hit-w: 32px;
+    --thumb-hit-h: 28px;
+    position: relative;
+    height: calc(var(--thumb-hit-h) + 8px);
+    padding: 0 calc(var(--thumb-hit-w) / 2);
+    cursor: default;
+  }
+  .rng__track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: var(--track-h);
+    border-radius: calc(var(--track-h) / 2);
+    margin: 0;
+    background: var(--border);
+    overflow: hidden;
+  }
+  html.liquid .rng__track {
+    background: rgba(var(--liquid-ink-soft-rgb, 90, 90, 94), 0.14);
+    box-shadow:
+      inset 0 1.5px 2.5px rgba(0, 0, 0, 0.1),
+      inset 0 -0.5px 0 rgba(255, 255, 255, 0.22);
+    -webkit-backdrop-filter: blur(6px) saturate(1.1);
+    backdrop-filter: blur(6px) saturate(1.1);
+  }
+  .rng__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: calc(var(--track-h) / 2);
+    background: var(--panel-bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  }
+  html.liquid .rng__fill {
+    background: var(--slider-fill-gradient);
+    -webkit-backdrop-filter: blur(4px) saturate(1.35);
+    backdrop-filter: blur(4px) saturate(1.35);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  }
+  .rng input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    margin: 0;
+    height: var(--thumb-hit-h);
+    background: none;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .rng input[type=range].lo { z-index: 3; }
+  .rng input[type=range].hi { z-index: 4; }
+  .rng input[type=range]::-webkit-slider-runnable-track {
+    height: var(--thumb-hit-h);
+    background: transparent;
+    border: none;
+  }
+  .rng input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: auto;
+    cursor: default;
+    width: var(--thumb-hit-w);
+    height: var(--thumb-hit-h);
+    margin-top: 0;
+    border-radius: 999px;
+    opacity: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .rng input[type=range]::-moz-range-track {
+    height: var(--thumb-hit-h);
+    background: transparent;
+    border: none;
+  }
+  .rng input[type=range]::-moz-range-thumb {
+    pointer-events: auto;
+    cursor: default;
+    width: var(--thumb-hit-w);
+    height: var(--thumb-hit-h);
+    border-radius: 999px;
+    opacity: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+  .rng input[type=range]:active::-webkit-slider-thumb,
+  .rng input[type=range]:active::-moz-range-thumb { transform: none; }
+  .rng.is-dragging { cursor: default; }
+  .rng__inline-toggle {
+    margin-top: 8px; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10px; letter-spacing: 0.6px; color: var(--fg-muted); cursor: pointer; text-transform: none;
+  }
+  .rng__inline-toggle input { accent-color: var(--fg); }
+
+  .filters__actions { display: flex; gap: 10px; margin-top: 18px; align-items: center; }
+  .btn {
+    font-family: inherit; font-size: 12px; letter-spacing: 0.5px; cursor: pointer;
+    padding: 7px 18px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--fg-heading); color: var(--bg); transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn--ghost { background: none; color: var(--fg-muted); }
+  .btn--ghost:hover { background: var(--hover); opacity: 1; }
+
+  /* ---- table ---- */
+  .tbl-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.stbl { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+  table.stbl th {
+    text-align: right; color: var(--fg-muted); font-weight: 400; padding: 8px 10px;
+    border-bottom: 1px solid var(--border); letter-spacing: 0.4px; position: sticky; top: 0;
+    background: var(--bg); cursor: default;
+  }
+  table.stbl th.sortable { cursor: pointer; user-select: none; }
+  table.stbl th.sortable:hover { color: var(--fg); }
+  table.stbl th.l, table.stbl td.l { text-align: left; }
+  table.stbl th.active-sort { color: var(--fg); }
+  table.stbl th .arr { opacity: 0.5; font-size: 9px; margin-left: 2px; }
+  table.stbl td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+  table.stbl td.l { text-align: left; }
+  table.stbl td.muted { color: var(--fg-muted); }
+  table.stbl tbody tr:hover { background: var(--hover); }
+  table.stbl tbody tr.clickable { cursor: pointer; }
+  table.stbl a { text-decoration: none; color: inherit; }
+  table.stbl a:hover { color: var(--accent-glow); }
+  .rank { color: var(--fg-muted); font-size: 11px; }
+  .pill {
+    display: inline-block; font-size: 10px; letter-spacing: 0.4px; padding: 1px 7px; border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .pill.active   { color: var(--accent-hot); border-color: rgba(36,151,64,0.4); }
+  .pill.inactive { color: var(--fg-muted); }
+  .pill.deceased { color: var(--accent-cold); border-color: rgba(176,0,16,0.35); }
+
+  .load-more {
+    display: block; margin: 18px auto 0; padding: 9px 26px; font-family: inherit; font-size: 12px;
+    letter-spacing: 0.6px; color: var(--fg-muted); background: none; border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; text-transform: lowercase;
+  }
+  .load-more:hover { background: var(--hover); color: var(--fg); }
+  .empty-state { color: var(--fg-muted); text-align: center; padding: 48px 0; font-size: 13px; }
+  .loading { color: var(--fg-muted); text-align: center; padding: 32px 0; font-size: 12px; opacity: 0.7; }
+</style>
+
+<script>
+window.STAT = (function () {
+  // ---- formatting ----
+  function nf(v) { return v == null ? '' : Math.round(v).toLocaleString('sv-SE').replace(/[\u00a0,]/g, ' '); }
+  function krShort(v) {
+    if (v == null) return '';
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace('.', ',') + ' M';
+    if (a >= 1e3) return Math.round(v / 1e3) + ' k';
+    return String(Math.round(v));
+  }
+  function pct(v) { return v == null ? '–' : v.toFixed(1); }
+  function kmtime(s) {
+    if (s == null) return '';
+    const m = Math.floor(s / 60), r = s - 60 * m, whole = Math.floor(r), t = Math.round((r - whole) * 10);
+    return `${m}.${String(whole).padStart(2, '0')},${t}`;
+  }
+
+  // ---- range slider ----
+  // cfg: { min, max, step, dual, scale:'lin'|'log', fmt(v), onCommit() }
+  // single (dual=false) = a minimum threshold. Returns bounds {min,max} where
+  // an inactive end is null (slider sitting at its extreme = no constraint).
+  const RES = 1000;
+  function makeSlider(mount, cfg) {
+    const dual = !!cfg.dual;
+    const log = cfg.scale === 'log';
+    const lo0 = log ? Math.log(Math.max(cfg.min, 1)) : cfg.min;
+    const hi0 = log ? Math.log(cfg.max) : cfg.max;
+    const fmt = cfg.fmt || (v => nf(v));
+
+    function posToVal(p) {
+      if (log && p === 0) return cfg.min;
+      const x = lo0 + (hi0 - lo0) * (p / RES);
+      const v = log ? Math.exp(x) : x;
+      if (cfg.step) return Math.round(v / cfg.step) * cfg.step;
+      return Math.round(v);
+    }
+
+    mount.classList.add('rng');
+    mount.innerHTML = `
+      <div class="rng__track"><div class="rng__fill"></div></div>
+      ${dual ? `<input type="range" min="0" max="${RES}" value="0" class="lo">` : ''}
+      <input type="range" min="0" max="${RES}" value="${dual ? RES : 0}" class="hi">`;
+    const fill = mount.querySelector('.rng__fill');
+    const loEl = mount.querySelector('.lo');
+    const hiEl = mount.querySelector('.hi');
+    const valEl = cfg.valEl || null;
+
+    function curLoPos() { return dual ? +loEl.value : 0; }
+    function curHiPos() { return +hiEl.value; }
+
+    function paint() {
+      const a = dual ? curLoPos() : 0;
+      const b = curHiPos();
+      const left = (a / RES) * 100;
+      const right = (b / RES) * 100;
+      const track = fill.parentElement;
+      const trackW = track.getBoundingClientRect().width;
+      const trackH = parseFloat(getComputedStyle(mount).getPropertyValue('--track-h')) || 12;
+
+      if (dual) {
+        fill.style.left = left + '%';
+        fill.style.width = Math.max(0, right - left) + '%';
+      } else {
+        fill.style.left = '0';
+        fill.style.width = right + '%';
+      }
+
+      const fillWPct = dual ? Math.max(0, right - left) : right;
+      const fillW = (fillWPct / 100) * trackW;
+      if (trackW > 0 && fillW > 0) {
+        fill.style.borderRadius = `${Math.min(trackH / 2, fillW / 2)}px`;
+      } else {
+        fill.style.borderRadius = '';
+      }
+      if (valEl) {
+        if (dual) {
+          const lv = a > 0 ? fmt(posToVal(a)) : 'min';
+          const hv = b < RES ? fmt(posToVal(b)) : 'max';
+          valEl.textContent = (a > 0 || b < RES) ? `${lv} – ${hv}` : 'any';
+        } else {
+          valEl.textContent = b > 0 ? `≥ ${fmt(posToVal(b))}` : 'any';
+        }
+      }
+    }
+    function commit() { paint(); cfg.onCommit && cfg.onCommit(); }
+
+    function wireRangeZ(el) {
+      if (!dual) return;
+      el.addEventListener('pointerdown', () => {
+        loEl.style.zIndex = el === loEl ? '5' : '3';
+        hiEl.style.zIndex = el === hiEl ? '5' : '4';
+      });
+    }
+
+    function wireDragCursor(el) {
+      el.addEventListener('pointerdown', () => {
+        mount.classList.add('is-dragging');
+        const end = () => {
+          mount.classList.remove('is-dragging');
+          window.removeEventListener('pointerup', end);
+          window.removeEventListener('pointercancel', end);
+        };
+        window.addEventListener('pointerup', end);
+        window.addEventListener('pointercancel', end);
+      });
+    }
+
+    if (dual) {
+      loEl.addEventListener('input', () => { if (+loEl.value > +hiEl.value) loEl.value = hiEl.value; paint(); });
+      hiEl.addEventListener('input', () => { if (+hiEl.value < +loEl.value) hiEl.value = loEl.value; paint(); });
+      wireRangeZ(loEl);
+      wireRangeZ(hiEl);
+      wireDragCursor(loEl);
+      wireDragCursor(hiEl);
+    } else {
+      hiEl.addEventListener('input', paint);
+      wireDragCursor(hiEl);
+    }
+    [loEl, hiEl].forEach(el => el && el.addEventListener('change', commit));
+    paint();
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => paint()).observe(fill.parentElement);
+    }
+
+    return {
+      bounds() {
+        if (dual) {
+          const a = curLoPos(), b = curHiPos();
+          return { min: a > 0 ? posToVal(a) : null, max: b < RES ? posToVal(b) : null };
+        }
+        const b = curHiPos();
+        return { min: b > 0 ? posToVal(b) : null, max: null };
+      },
+      reset() { if (loEl) loEl.value = 0; hiEl.value = dual ? RES : 0; paint(); },
+    };
+  }
+
+  // ---- sortable header binding ----
+  // headers: NodeList of <th data-sort="key">. state {sort, dir}. onChange().
+  function bindSort(thead, state, onChange) {
+    thead.querySelectorAll('th[data-sort]').forEach(th => {
+      th.classList.add('sortable');
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (state.sort === key) state.dir = state.dir === 'asc' ? 'desc' : 'asc';
+        else { state.sort = key; state.dir = th.dataset.defdir || 'desc'; }
+        renderArrows(thead, state);
+        onChange();
+      });
+    });
+    renderArrows(thead, state);
+  }
+  function renderArrows(thead, state) {
+    thead.querySelectorAll('th[data-sort]').forEach(th => {
+      th.classList.toggle('active-sort', th.dataset.sort === state.sort);
+      let a = th.querySelector('.arr');
+      if (!a) { a = document.createElement('span'); a.className = 'arr'; th.appendChild(a); }
+      a.textContent = th.dataset.sort === state.sort ? (state.dir === 'asc' ? '▲' : '▼') : '';
+    });
+  }
+
+  // ---- collapsible filter panel ----
+  function bindPanel(panel) {
+    const head = panel.querySelector('.filters__head');
+    head.addEventListener('click', () => panel.classList.toggle('is-collapsed'));
+  }
+
+  // ---- segmented control ----
+  // mount has .seg button[data-v]; returns {value(), set(v)}; onChange(v).
+  // Adds fluid-toggle classes so liquid theme applies the glass thumb.
+  function seg(mount, onChange) {
+    mount.classList.add('fluid-toggle', 'fluid-toggle--segmented');
+    const btns = [...mount.querySelectorAll('button')];
+    btns.forEach(b => b.classList.add('fluid-toggle__btn'));
+    let cur = (mount.querySelector('button.active') || btns[0]).dataset.v;
+    btns.forEach(b => b.addEventListener('click', () => {
+      cur = b.dataset.v;
+      btns.forEach(x => x.classList.toggle('active', x === b));
+      onChange && onChange(cur);
+    }));
+    if (typeof initFluidToggles === 'function') initFluidToggles(mount.parentElement || mount);
+    return { value: () => cur, set: v => { btns.forEach(x => x.classList.toggle('active', x.dataset.v === v)); cur = v; } };
+  }
+
+  // append min/max bounds to a params object under name_min / name_max.
+  function addBounds(params, name, b) {
+    if (b.min != null) params[name + '_min'] = b.min;
+    if (b.max != null) params[name + '_max'] = b.max;
+  }
+  function qs(params) {
+    return Object.entries(params)
+      .filter(([, v]) => v != null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  }
+
+  return { nf, krShort, pct, kmtime, makeSlider, bindSort, bindPanel, seg, addBounds, qs };
+})();
+</script>

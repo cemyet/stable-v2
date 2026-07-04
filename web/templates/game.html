@@ -1,0 +1,118 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ game_type_label }} {{ track_name }} — stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .game-page {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .game-header {
+    text-align: center;
+  }
+
+  .game-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    margin: 0 0 8px;
+    line-height: 1;
+  }
+
+  .game-title .track-name {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .game-meta {
+    font-size: 12px;
+    color: var(--fg-muted);
+    opacity: 0.48;
+    letter-spacing: 0.2px;
+  }
+
+  .game-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    margin-top: 80px;
+  }
+
+  .game-panels .glass-panel--hybrid {
+    width: 100%;
+  }
+
+  a.game-race-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.12s ease;
+  }
+  a.game-race-link:hover { transform: translateY(-2px); }
+{% endblock %}
+
+{% block content %}
+  <a href="/home" class="page-back" aria-label="Back"></a>
+  <div class="game-page">
+    <div class="game-header">
+      <h1 class="game-title">
+        <span class="track-name track-name--lg">{{ game_type_label }}</span>
+        {% if track_name %}
+        <span class="track-name track-name--lg">{{ track_name }}</span>
+        {% endif %}
+      </h1>
+      {% if time_display %}
+      <div class="game-meta">{{ time_display }}</div>
+      {% endif %}
+    </div>
+    <div class="game-panels" id="gamePanels"
+         data-game-type-id="{{ game_type_id }}"
+         data-game-id="{{ game_id }}"
+         data-race-count="{{ race_count }}">
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const panelsEl = document.getElementById('gamePanels');
+  const gameTypeId = panelsEl.dataset.gameTypeId;
+  const gameId = panelsEl.dataset.gameId;
+
+  (async () => {
+    if (!gameId || typeof hybridPanelRowHtml !== 'function' || typeof gameTypeById !== 'function') return;
+    const gt = gameTypeById(gameTypeId);
+    if (!gt) return;
+
+    try {
+      const res = await fetch(`/api/atg/game/${encodeURIComponent(gameId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const races = data.races || [];
+      panelsEl.innerHTML = races.map((race, i) => {
+        const panel = hybridPanelRowHtml(gt, {
+          xp: true,
+          demo: false,
+          raceNumber: race.raceNumber ?? (i + 1),
+          starters: race.starters ?? null,
+          raceName: race.name || null,
+          distanceLabel: race.distanceLabel || null,
+        });
+        return race.atgRaceId
+          ? `<a class="game-race-link" href="/race/atg/${encodeURIComponent(race.atgRaceId)}">${panel}</a>`
+          : panel;
+      }).join('');
+    } catch (_) {}
+  })();
+</script>
+{% endblock %}

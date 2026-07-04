@@ -1,0 +1,1056 @@
+{% extends "_layout.html" %}
+
+{% block title %}matching - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 110px 20px 60px; }
+
+  .matching-page {
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 6px;
+    text-transform: lowercase;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+
+  /* Section headers + collapsible disclosure */
+  h2.section {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    margin: 28px 0 10px;
+  }
+  details.section {
+    margin: 22px 0 4px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  details.section > summary {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+  details.section > summary::-webkit-details-marker { display: none; }
+  details.section > summary::before {
+    content: '▸';
+    font-size: 9px;
+    color: var(--fg-muted);
+    transition: transform 0.15s;
+    display: inline-block;
+  }
+  details.section[open] > summary::before { transform: rotate(90deg); }
+  details.section > summary .summary-meta {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--fg-muted);
+    letter-spacing: 1px;
+    text-transform: none;
+  }
+  details.section > summary .summary-meta.clean { color: var(--accent-hot); }
+  details.section > summary .summary-meta.dirty { color: var(--accent-warn); }
+  details.section > summary:hover { color: var(--fg); }
+
+  /* ---------- health dashboard ---------- */
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .health-card {
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .health-card:hover { border-color: var(--border-focus); background: var(--hover); }
+  .health-card.active { border-color: var(--accent-first); }
+  .health-card .h-key {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  .health-card .h-count {
+    font-size: 20px; font-weight: 300; margin: 4px 0 2px;
+    color: var(--fg);
+  }
+  .health-card.zero .h-count { color: var(--accent-hot); opacity: 0.6; }
+  .health-card .h-label {
+    font-size: 11px; color: var(--fg-muted); line-height: 1.3;
+  }
+  .health-card .h-ents {
+    font-size: 10px; color: var(--fg-muted); margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* ---------- browse panel ---------- */
+  .browse-wrap {
+    margin-top: 18px;
+    padding: 14px 16px;
+    display: none;
+  }
+  .browse-wrap.visible { display: block; }
+  .browse-wrap h3 {
+    font-size: 12px; font-weight: 400;
+    letter-spacing: 2px; text-transform: lowercase;
+    color: var(--fg);
+    margin-bottom: 10px;
+  }
+  table.browse {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  table.browse th {
+    text-align: left; color: var(--fg-muted); font-weight: 400;
+    padding: 5px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.browse td {
+    padding: 5px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.browse tr:hover { background: var(--hover); cursor: pointer; }
+  table.browse .small { font-size: 10px; color: var(--fg-muted); }
+  table.browse .id-chip {
+    display: inline-block; padding: 1px 5px; margin: 0 1px;
+    border: 1px solid var(--border); border-radius: 2px;
+    font-size: 10px;
+  }
+  table.browse .suggested { color: var(--accent-first); }
+
+  /* ---------- search + manual merge ---------- */
+  .merge-panel {
+    margin-top: 28px;
+    padding: 14px 16px;
+  }
+
+  /* search */
+  .search-row {
+    display: flex; gap: 10px; align-items: center;
+    margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .search-row input[type="text"] { flex: 1; min-width: 220px; }
+
+  .search-results {
+    max-height: 280px; overflow-y: auto;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    margin-bottom: 14px;
+  }
+  .search-results .empty {
+    padding: 12px; color: var(--fg-muted);
+    text-align: center; font-size: 11px;
+  }
+  .result-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 10px; cursor: grab;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row:hover { background: var(--hover); }
+  .result-row:active { cursor: grabbing; }
+  .result-row.dragging { opacity: 0.4; }
+  .result-row .r-main { flex: 1; min-width: 0; }
+  .result-row .r-name {
+    color: var(--fg); font-size: 12px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .result-row .r-sub {
+    color: var(--fg-muted); font-size: 10px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .result-row .r-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .r-actions button {
+    padding: 3px 8px; font-size: 10px;
+    letter-spacing: 1px; cursor: pointer;
+  }
+  .entity-badge {
+    display: inline-block; flex-shrink: 0;
+    padding: 2px 6px; min-width: 50px; text-align: center;
+    font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+  /* merge pair */
+  .merge-pair {
+    display: grid;
+    grid-template-columns: 1fr 32px 1fr;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .merge-card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-height: 110px;
+    font-size: 12px;
+    line-height: 1.5;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .merge-card.drop-hover {
+    border-color: var(--border-focus);
+    background: var(--hover);
+  }
+  .merge-card .row-name { font-size: 14px; color: var(--fg); margin: 4px 0; }
+  .merge-card .card-clear {
+    position: absolute; top: 6px; right: 8px;
+    background: none; border: none; color: var(--fg-muted);
+    cursor: pointer; font-size: 14px; padding: 0;
+  }
+  .merge-card .card-clear:hover { color: var(--accent-warn); }
+  .merge-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--fg-muted); font-size: 18px;
+  }
+  .mode-banner {
+    margin-bottom: 10px; padding: 6px 10px;
+    border: 1px solid var(--border);
+    font-size: 11px; color: var(--fg-muted);
+    display: none;
+  }
+  .mode-banner.visible { display: block; }
+  .mode-banner.warn {
+    border-color: var(--accent-warn);
+    color: var(--accent-warn);
+  }
+  .merge-actions {
+    margin-top: 14px; display: flex; gap: 10px; align-items: center;
+  }
+  .merge-actions select,
+  .merge-actions input[type="text"] {
+    background: transparent; color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    font-family: inherit; font-size: 12px; padding: 5px 8px;
+  }
+  .merge-actions input[type="text"] { flex: 1; }
+  .merge-preview {
+    margin-top: 12px; font-size: 12px; color: var(--fg);
+    border-top: 1px solid var(--border); padding-top: 12px;
+    display: none;
+  }
+  .merge-preview.visible { display: block; }
+  .merge-preview .row { margin: 3px 0; }
+  .merge-preview .warn { color: var(--accent-warn); }
+
+  /* ---------- script runner ---------- */
+  .scripts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  .script-card {
+    padding: 12px 14px;
+  }
+  .script-card h3 {
+    font-size: 12px; font-weight: 400; letter-spacing: 2px;
+    text-transform: lowercase; color: var(--fg);
+    margin-bottom: 4px;
+  }
+  .script-card .desc { font-size: 11px; color: var(--fg-muted); line-height: 1.5; }
+  .script-card .actions {
+    display: flex; gap: 8px; margin-top: 10px;
+  }
+  .script-btn {
+    padding: 5px 12px; font-size: 11px; letter-spacing: 1px;
+  }
+  .script-btn.danger {
+    border-color: var(--accent-warn); color: var(--accent-warn);
+  }
+
+  details.runner-log {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+  }
+  details.runner-log > summary {
+    padding: 6px 10px; cursor: pointer; color: var(--fg-muted);
+    font-size: 11px; letter-spacing: 2px; text-transform: lowercase;
+    list-style: none;
+  }
+  details.runner-log > summary::-webkit-details-marker { display: none; }
+  details.runner-log[open] > summary { border-bottom: 1px solid var(--border); }
+  pre.runner-log-body {
+    background: transparent; margin: 0; padding: 10px 12px;
+    font-size: 10px; line-height: 1.4; color: var(--fg-muted);
+    max-height: 320px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ---------- recent merges ---------- */
+  .merges-section { margin-top: 32px; }
+
+  .section-heading {
+    display: inline-flex;
+    align-items: baseline;
+    margin: 0 0 14px;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+  }
+  .section-heading__toggle {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 2px 0 2px 8px;
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    opacity: 0.5;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .section-heading__toggle:hover { opacity: 0.78; }
+  .merges-section.is-section-collapsed .merges-section__body {
+    display: none;
+  }
+
+  table.merges {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+  }
+  table.merges th {
+    text-align: left; color: var(--fg-muted); font-weight: 400;
+    padding: 5px 8px; border-bottom: 1px solid var(--border);
+  }
+  table.merges td {
+    padding: 5px 8px; border-bottom: 1px solid var(--border); color: var(--fg-muted);
+  }
+  table.merges .rb { color: var(--accent-warn); }
+
+  .tag {
+    display: inline-block;
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 9px;
+  }
+  .tag.running  { color: var(--accent-first); border-color: var(--accent-first); }
+  .tag.success  { color: var(--accent-hot); border-color: var(--accent-hot); }
+  .tag.failed   { color: var(--accent-cold); border-color: var(--accent-cold); }
+
+  .footer-note {
+    margin-top: 30px;
+    font-size: 10px;
+    color: var(--fg-muted);
+    text-align: center;
+    letter-spacing: 1px;
+  }
+{% endblock %}
+
+{% block content %}
+<div class="matching-page">
+  <h1>matching</h1>
+
+  <!-- Manual merge — primary tool, always open -->
+  <div class="merge-panel glass-panel">
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="search...">
+      <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="typeChips">
+        <button type="button" class="period-btn fluid-toggle__btn active" data-type="all">all</button>
+        <button type="button" class="period-btn fluid-toggle__btn" data-type="horse">horses</button>
+        <button type="button" class="period-btn fluid-toggle__btn" data-type="person">persons</button>
+      </div>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+
+    <div class="mode-banner" id="modeBanner"></div>
+
+    <div class="merge-pair">
+      <div class="merge-card src" id="srcCard"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event, 'src')">
+        <button class="card-clear" id="srcClear" onclick="clearSlot('src')" title="clear" style="display:none">×</button>
+        <div class="card-body" id="srcBody"></div>
+      </div>
+      <div class="merge-arrow">→</div>
+      <div class="merge-card dst" id="dstCard"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event, 'dst')">
+        <button class="card-clear" id="dstClear" onclick="clearSlot('dst')" title="clear" style="display:none">×</button>
+        <div class="card-body" id="dstBody"></div>
+      </div>
+    </div>
+    <div class="merge-actions">
+      <label class="muted small" style="font-size:11px;">method:</label>
+      <select id="mergeMethod">
+        <option value="manual">manual</option>
+        <option value="pedigree">pedigree</option>
+        <option value="category_a">category_a</option>
+        <option value="category_b">category_b</option>
+        <option value="category_f">category_f</option>
+        <option value="category_g">category_g (person)</option>
+      </select>
+      <input id="mergeReason" type="text" placeholder="note">
+      <button class="ghost" id="previewBtn" disabled>preview</button>
+      <button class="ghost danger" id="executeBtn" disabled>execute</button>
+    </div>
+    <div class="merge-preview" id="mergePreview"></div>
+  </div>
+
+  <!-- Recent merges -->
+  <section class="merges-section" id="recentMergesSection">
+    <h2 class="section-heading">
+      <span class="section-heading__label">recent merges</span>
+      <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse recent merges">▴</button>
+    </h2>
+    <div class="merges-section__body">
+      <table class="merges" id="recentMerges">
+        <thead><tr>
+          <th>id</th><th>when</th><th>from → to</th><th>method</th><th>moved</th><th>conflicts</th><th>note</th><th>by</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Health dashboard (collapsed — most categories are zero post-cleanup) -->
+  <details class="section" id="healthDetails">
+    <summary>
+      health
+      <span class="summary-meta" id="healthSummaryMeta"></span>
+    </summary>
+    <div class="health-grid" id="healthGrid">
+      <div class="muted"></div>
+    </div>
+    <div class="browse-wrap glass-panel" id="browseWrap">
+      <h3 id="browseTitle">browse</h3>
+      <table class="browse" id="browseTable">
+        <thead></thead><tbody></tbody>
+      </table>
+    </div>
+  </details>
+
+  <!-- Cleanup scripts (collapsed — one-off mass tools) -->
+  <details class="section" id="scriptsDetails">
+    <summary>
+      cleanup scripts
+      <span class="summary-meta">advanced · dry-run first</span>
+    </summary>
+    <div class="scripts-grid" id="scriptsGrid"></div>
+    <details class="runner-log" id="runnerLog">
+      <summary>script log</summary>
+      <pre class="runner-log-body" id="runnerLogBody">no run yet</pre>
+    </details>
+  </details>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ----------------------------------------------------------------
+  // Health dashboard
+  // ----------------------------------------------------------------
+  let activeCategory = null;
+
+  async function loadHealth(force) {
+    const grid = document.getElementById('healthGrid');
+    const summaryEl = document.getElementById('healthSummaryMeta');
+    try {
+      const res = await fetch('/api/admin/matching/health' + (force ? '?refresh=1' : ''));
+      const data = await res.json();
+      const cats = data.categories || {};
+
+      // Header summary: total non-zero categories + total problem rows.
+      let nonZero = 0, totalRows = 0;
+      Object.values(cats).forEach(c => {
+        if (c.count && c.count > 0) { nonZero++; totalRows += c.count; }
+      });
+      if (nonZero === 0) {
+        summaryEl.textContent = 'all clean';
+        summaryEl.className = 'summary-meta clean';
+      } else {
+        summaryEl.textContent = `${nonZero} categor${nonZero === 1 ? 'y' : 'ies'} · ${totalRows.toLocaleString('en-US')} rows`;
+        summaryEl.className = 'summary-meta dirty';
+      }
+
+      grid.innerHTML = Object.entries(cats).map(([key, c]) => {
+        const cnt = c.count == null ? '?' : c.count.toLocaleString('en-US');
+        const ents = (c.entries && c.entries > 0) ? `${c.entries.toLocaleString('en-US')} entries` : '';
+        const isZero = c.count === 0;
+        const isErr = c.error;
+        return `
+          <div class="health-card glass-panel${isZero ? ' zero' : ''}${activeCategory === key ? ' active' : ''}"
+               data-key="${key}">
+            <div class="h-key">${key.replace('_', ' ')}</div>
+            <div class="h-count" title="${isErr ? esc(isErr) : ''}">${isErr ? 'err' : cnt}</div>
+            <div class="h-label">${esc(c.label || '')}</div>
+            <div class="h-ents">${ents}</div>
+          </div>`;
+      }).join('');
+      grid.querySelectorAll('.health-card').forEach(el => {
+        el.addEventListener('click', () => openCategory(el.dataset.key));
+      });
+      renderRecentMerges(
+        data.recent_horse_merges  || [],
+        data.recent_person_merges || [],
+      );
+    } catch (e) {
+      grid.innerHTML = `<div class="muted">health load failed: ${esc(String(e))}</div>`;
+      summaryEl.textContent = 'load failed';
+      summaryEl.className = 'summary-meta dirty';
+    }
+  }
+
+  function renderRecentMerges(horseRows, personRows) {
+    const body = document.querySelector('#recentMerges tbody');
+    // Tag entity type + normalize to a common shape, then sort by merged_at desc.
+    const tagged = [
+      ...horseRows.map(r =>  ({ ...r, _entity: 'horse'  })),
+      ...personRows.map(r => ({ ...r, _entity: 'person' })),
+    ].sort((a, b) => (b.merged_at || '').localeCompare(a.merged_at || ''));
+
+    if (!tagged.length) {
+      body.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center; padding:14px;">no merges yet</td></tr>';
+      return;
+    }
+    body.innerHTML = tagged.slice(0, 40).map(m => {
+      const ent = m._entity;
+      const from = ent === 'horse' ? m.from_horse_id : m.from_person_id;
+      const to   = ent === 'horse' ? m.to_horse_id   : m.to_person_id;
+      const loader = ent === 'horse' ? 'loadIntoMerger' : 'loadIntoMergerPerson';
+      return `
+        <tr ${m.rolled_back ? 'class="rb"' : ''}>
+          <td>${m.merge_id}</td>
+          <td>${esc((m.merged_at || '').replace('T',' ').slice(0,19))}</td>
+          <td>
+            <span class="entity-badge ${ent}">${ent}</span>
+            <a href="#" onclick="${loader}(${from}, ${to}); return false;">
+              ${from} → ${to}</a>
+          </td>
+          <td>${esc(m.method)}</td>
+          <td>${m.entries_moved}</td>
+          <td>${ent === 'horse' ? m.conflicts_resolved : '·'}</td>
+          <td>${esc((m.reason || '').slice(0, 60))}</td>
+          <td>${esc(m.merged_by || '')}</td>
+          <td>${m.rolled_back ? 'rolled back'
+                : `<button class="ghost script-btn" onclick="rollbackMerge('${ent}', ${m.merge_id})">rollback</button>`}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  async function rollbackMerge(entity, mid) {
+    if (!confirm(`Rollback ${entity} merge #${mid}? This re-creates the deleted ${entity} row and moves matching-source entries back.`)) return;
+    const url = entity === 'horse'
+      ? `/api/admin/matching/rollback/${mid}`
+      : `/api/admin/matching/rollback-person/${mid}`;
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json();
+    if (data.error) {
+      alert('rollback failed: ' + data.error);
+    } else {
+      const restored = data.horse_restored || data.person_restored;
+      alert(`rolled back. ${entity}_id=${restored}`);
+      loadHealth(true);
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Browse panel
+  // ----------------------------------------------------------------
+  async function openCategory(key) {
+    activeCategory = key;
+    document.querySelectorAll('.health-card').forEach(el => {
+      el.classList.toggle('active', el.dataset.key === key);
+    });
+    const wrap = document.getElementById('browseWrap');
+    const title = document.getElementById('browseTitle');
+    title.textContent = `browse — ${key} (top 50)`;
+    wrap.classList.add('visible');
+    const tbl = document.getElementById('browseTable');
+    tbl.querySelector('thead').innerHTML = '';
+    tbl.querySelector('tbody').innerHTML = '<tr><td class="muted"></td></tr>';
+
+    try {
+      const res = await fetch(`/api/admin/matching/browse/${encodeURIComponent(key)}`);
+      const data = await res.json();
+      const rows = data.rows || [];
+      if (!rows.length) {
+        tbl.querySelector('tbody').innerHTML = '<tr><td class="muted">no rows</td></tr>';
+        return;
+      }
+      const cols = Object.keys(rows[0]);
+      tbl.querySelector('thead').innerHTML =
+        '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '<th></th></tr>';
+      tbl.querySelector('tbody').innerHTML = rows.map(r => {
+        const cells = cols.map(c => {
+          let v = r[c];
+          if (Array.isArray(v)) {
+            v = v.slice(0, 6).map(i => `<span class="id-chip">${esc(String(i))}</span>`).join('');
+          } else if (v == null) {
+            v = '<span class="muted">·</span>';
+          } else {
+            v = esc(String(v));
+          }
+          return `<td>${v}</td>`;
+        }).join('');
+        // Buttons depend on shape:
+        let btn = '';
+        if (r.from_horse_id && r.to_horse_id) {
+          btn = `<button class="ghost script-btn" onclick="loadIntoMerger(${r.from_horse_id}, ${r.to_horse_id})">load</button>`;
+        } else if (r.from_person_id && r.to_person_id) {
+          btn = `<button class="ghost script-btn" onclick="loadIntoMergerPerson(${r.from_person_id}, ${r.to_person_id})">load</button>`;
+        } else if (r.horse_ids && r.horse_ids.length === 2) {
+          btn = `<button class="ghost script-btn" onclick="loadIntoMerger(${r.horse_ids[0]}, ${r.horse_ids[1]})">load</button>`;
+        } else if (r.horse_id) {
+          btn = `<button class="ghost script-btn" onclick="loadCandidates(${r.horse_id})">candidates</button>`;
+        }
+        return `<tr>${cells}<td>${btn}</td></tr>`;
+      }).join('');
+    } catch (e) {
+      tbl.querySelector('tbody').innerHTML = `<tr><td class="muted">load failed: ${esc(String(e))}</td></tr>`;
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Search panel + manual merge (entity-aware: horse or person)
+  // ----------------------------------------------------------------
+  //
+  // State:
+  //   slots = { src: { entity, base } | null, dst: ... }
+  // The mode of the merge panel is derived from whichever slot is filled
+  // first. Dropping a different entity type into the other slot will
+  // either silently clear the existing slot (if it's empty) or show a
+  // warning banner.
+  // ----------------------------------------------------------------
+
+  const slots = { src: null, dst: null };
+  let searchType = 'all';
+  let searchSeq  = 0;  // discard stale fetches
+
+  // ------- search -------
+  document.getElementById('typeChips').addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-type]');
+    if (!btn || btn.classList.contains('active')) return;
+    document.querySelectorAll('#typeChips button[data-type]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    searchType = btn.dataset.type;
+    runSearch();
+  });
+
+  let searchDebounce = null;
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(runSearch, 180);
+  });
+
+  async function runSearch() {
+    const q = document.getElementById('searchInput').value.trim();
+    const wrap = document.getElementById('searchResults');
+    if (q.length < 2) {
+      wrap.innerHTML = '';
+      return;
+    }
+    const my = ++searchSeq;
+    wrap.innerHTML = '<div class="empty">searching…</div>';
+    try {
+      const res = await fetch(
+        `/api/admin/matching/search?q=${encodeURIComponent(q)}&type=${searchType}&limit=40`);
+      const data = await res.json();
+      if (my !== searchSeq) return;  // a newer search has started
+      renderSearchResults(data.results || []);
+    } catch (e) {
+      wrap.innerHTML = `<div class="empty">search failed: ${esc(String(e))}</div>`;
+    }
+  }
+
+  function renderSearchResults(rows) {
+    const wrap = document.getElementById('searchResults');
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="empty">no results</div>';
+      return;
+    }
+    wrap.innerHTML = rows.map((r, i) => {
+      const idChips = Object.entries(r.ids || {})
+        .map(([k, v]) => `<span class="id-chip">${esc(k.replace('_id',''))}:${esc(String(v))}</span>`)
+        .join('');
+      return `
+        <div class="result-row" draggable="true" data-idx="${i}">
+          <span class="entity-badge ${r.entity}">${r.entity}</span>
+          <div class="r-main">
+            <div class="r-name">#${r.id} · ${esc(r.name)}</div>
+            <div class="r-sub">${esc(r.subtitle || '')} ${idChips}</div>
+          </div>
+          <div class="r-actions">
+            <button class="ghost" onclick="loadFromSearch(${i}, 'src')">→ src</button>
+            <button class="ghost" onclick="loadFromSearch(${i}, 'dst')">→ dst</button>
+          </div>
+        </div>`;
+    }).join('');
+    // Attach drag handlers and stash row data on the elements.
+    wrap.querySelectorAll('.result-row').forEach((el, i) => {
+      el._payload = rows[i];
+      el.addEventListener('dragstart', ev => {
+        el.classList.add('dragging');
+        ev.dataTransfer.setData('application/json',
+          JSON.stringify({ entity: rows[i].entity, id: rows[i].id }));
+        ev.dataTransfer.effectAllowed = 'copy';
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+    });
+  }
+
+  function loadFromSearch(idx, slot) {
+    const row = document.querySelectorAll('.result-row')[idx];
+    if (!row || !row._payload) return;
+    fillSlot(slot, row._payload.entity, row._payload.id);
+  }
+
+  // ------- drop zones -------
+  function onDragOver(ev)  { ev.preventDefault(); ev.currentTarget.classList.add('drop-hover'); }
+  function onDragLeave(ev) { ev.currentTarget.classList.remove('drop-hover'); }
+  function onDrop(ev, slot) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drop-hover');
+    let payload;
+    try {
+      payload = JSON.parse(ev.dataTransfer.getData('application/json'));
+    } catch { return; }
+    if (!payload || !payload.entity || !payload.id) return;
+    fillSlot(slot, payload.entity, payload.id);
+  }
+
+  // ------- slot management -------
+  async function fillSlot(slot, entity, id) {
+    const other = slot === 'src' ? 'dst' : 'src';
+    // Type-mismatch handling: if the other slot is filled with a different
+    // entity type, clear it and show a banner.
+    if (slots[other] && slots[other].entity !== entity) {
+      slots[other] = null;
+      renderSlot(other);
+      showBanner(`cleared ${other} slot — can only merge ${entity}↔${entity}`, true);
+    }
+
+    const url = entity === 'horse'
+      ? `/api/admin/matching/horse/${id}/candidates`
+      : `/api/admin/matching/person/${id}/candidates`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        showBanner(`${entity} #${id}: ${data.error}`, true);
+        return;
+      }
+      slots[slot] = { entity, base: data.base, candidates: data.candidates || [] };
+    } catch (e) {
+      showBanner(`load failed: ${e}`, true);
+      return;
+    }
+    renderSlot(slot);
+    syncMergeMode();
+    refreshButtons();
+    document.getElementById('mergePreview').classList.remove('visible');
+  }
+
+  function clearSlot(slot) {
+    slots[slot] = null;
+    renderSlot(slot);
+    syncMergeMode();
+    refreshButtons();
+    document.getElementById('mergePreview').classList.remove('visible');
+  }
+
+  function renderSlot(slot) {
+    const bodyId  = slot + 'Body';
+    const clearId = slot + 'Clear';
+    const slotData = slots[slot];
+    const body  = document.getElementById(bodyId);
+    const clear = document.getElementById(clearId);
+
+    if (!slotData) {
+      body.innerHTML = '';
+      clear.style.display = 'none';
+      return;
+    }
+    clear.style.display = 'block';
+    body.innerHTML = slotData.entity === 'horse'
+      ? renderHorseBody(slotData.base)
+      : renderPersonBody(slotData.base);
+  }
+
+  function renderHorseBody(h) {
+    const ids = [];
+    if (h.st_id)     ids.push(`st:${h.st_id}`);
+    if (h.atg_id)    ids.push(`atg:${h.atg_id}`);
+    if (h.letrot_id) ids.push(`letrot:${h.letrot_id}`);
+    if (h.hvt_id)    ids.push(`hvt:${h.hvt_id}`);
+    if (h.usta_id)   ids.push(`usta:${h.usta_id}`);
+    return `
+      <div class="row-name">
+        <span class="entity-badge horse">horse</span>
+        #${h.horse_id} · ${esc(h.name || '')} ${h.birth_country ? `(${esc(h.birth_country)})` : ''}
+      </div>
+      <div class="muted">dob: ${esc(h.date_of_birth || '?')}
+                          · sire: ${esc(h.sire_name || '?')}
+                          · dam: ${esc(h.dam_name || '?')}</div>
+      <div class="muted">${ids.map(i => `<span class="id-chip">${esc(i)}</span>`).join('')}</div>
+      <div class="muted">primary_source: ${esc(h.primary_source || '?')}</div>`;
+  }
+
+  function renderPersonBody(p) {
+    const ids = [];
+    if (p.st_id)     ids.push(`st:${p.st_id}`);
+    if (p.atg_id)    ids.push(`atg:${p.atg_id}`);
+    if (p.letrot_id) ids.push(`letrot:${p.letrot_id}`);
+    if (p.hvt_id)    ids.push(`hvt:${p.hvt_id}`);
+    if (p.usta_id)   ids.push(`usta:${p.usta_id}`);
+    const roles = (p.roles || []).join('/') || 'no role';
+    return `
+      <div class="row-name">
+        <span class="entity-badge person">person</span>
+        #${p.person_id} · ${esc(p.name || p.short_name || '')}
+        ${p.short_name ? `<span class="muted">(${esc(p.short_name)})</span>` : ''}
+      </div>
+      <div class="muted">${esc(roles)} · ${esc(p.license_country || '??')}</div>
+      <div class="muted">${ids.map(i => `<span class="id-chip">${esc(i)}</span>`).join('')}</div>
+      <div class="muted">primary_source: ${esc(p.primary_source || '?')}</div>`;
+  }
+
+  // Returns the current entity mode of the merge panel, or null if both slots empty.
+  function currentEntity() {
+    return (slots.src && slots.src.entity)
+        || (slots.dst && slots.dst.entity)
+        || null;
+  }
+
+  function syncMergeMode() {
+    const ent = currentEntity();
+    const sel = document.getElementById('mergeMethod');
+    // Show banner with current mode + suggest sensible default method.
+    if (!ent) {
+      document.getElementById('modeBanner').classList.remove('visible');
+      return;
+    }
+    showBanner(`merge mode: ${ent}↔${ent} — only ${ent}s can be dropped`, false);
+
+    // For persons, default method to manual; the 'pedigree' option doesn't apply.
+    if (ent === 'person' && sel.value === 'pedigree') sel.value = 'manual';
+  }
+
+  function showBanner(msg, warn) {
+    const b = document.getElementById('modeBanner');
+    b.textContent = msg;
+    b.classList.toggle('warn', !!warn);
+    b.classList.add('visible');
+  }
+
+  function slotId(s) {
+    if (!slots[s]) return null;
+    const b = slots[s].base;
+    return slots[s].entity === 'horse' ? b.horse_id : b.person_id;
+  }
+
+  function refreshButtons() {
+    const ok = slots.src && slots.dst
+            && slots.src.entity === slots.dst.entity
+            && slotId('src') !== slotId('dst');
+    document.getElementById('previewBtn').disabled = !ok;
+    document.getElementById('executeBtn').disabled = !ok;
+  }
+
+  // Called by browse table + recent merges table (always horse-mode).
+  async function loadIntoMerger(fromId, toId) {
+    document.getElementById('searchInput').value = '';
+    await fillSlot('src', 'horse', fromId);
+    await fillSlot('dst', 'horse', toId);
+    document.querySelector('.merge-panel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function loadIntoMergerPerson(fromId, toId) {
+    document.getElementById('searchInput').value = '';
+    await fillSlot('src', 'person', fromId);
+    await fillSlot('dst', 'person', toId);
+    document.querySelector('.merge-panel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function loadCandidates(hid) {
+    document.getElementById('searchInput').value = '';
+    await fillSlot('src', 'horse', hid);
+    const sug = (slots.src.candidates || []).find(x => x.match_kind === 'pedigree')
+             || (slots.src.candidates || [])[0];
+    if (sug) {
+      await fillSlot('dst', 'horse', sug.horse_id);
+      if (sug.match_kind === 'pedigree') {
+        document.getElementById('mergeMethod').value = 'pedigree';
+      }
+    }
+    document.querySelector('.merge-panel').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // ------- preview / execute -------
+  async function previewMerge() {
+    const ent = currentEntity();
+    if (!ent) return;
+    const from = ent === 'horse' ? slots.src.base.horse_id  : slots.src.base.person_id;
+    const to   = ent === 'horse' ? slots.dst.base.horse_id  : slots.dst.base.person_id;
+    const url  = ent === 'horse'
+      ? `/api/admin/matching/preview-merge?from=${from}&to=${to}`
+      : `/api/admin/matching/preview-merge-person?from=${from}&to=${to}`;
+    const data = await (await fetch(url)).json();
+    const pre = document.getElementById('mergePreview');
+    if (data.error) {
+      pre.innerHTML = `<div class="warn">error: ${esc(data.error)}</div>`;
+    } else if (ent === 'horse') {
+      pre.innerHTML = `
+        <div class="row"><b>${esc(data.from_name)}</b> → <b>${esc(data.to_name)}</b></div>
+        <div class="row">entries to move: <b>${data.entries_moved}</b></div>
+        <div class="row">same-race conflicts: <b>${data.conflicts_resolved}</b>${data.conflicts_resolved ? ' <span class="muted">(loser deleted)</span>' : ''}</div>
+        <div class="row">history rows moved: <b>${data.histories_moved}</b></div>
+        <div class="row">pedigree refs to repoint: <b>${data.pedigree_refs_repointed}</b></div>
+        <div class="row warn">source horse_id ${data.from_horse_id} will be DELETED on execute.</div>`;
+    } else {
+      pre.innerHTML = `
+        <div class="row"><b>${esc(data.from_name)}</b> → <b>${esc(data.to_name)}</b></div>
+        <div class="row">entries to repoint (driver+trainer): <b>${data.entries_moved}</b></div>
+        <div class="row">history rows moved: <b>${data.histories_moved}</b></div>
+        <div class="row warn">source person_id ${data.from_person_id} will be DELETED on execute.</div>`;
+    }
+    pre.classList.add('visible');
+  }
+
+  async function executeMerge() {
+    const ent = currentEntity();
+    if (!ent) return;
+    const method = document.getElementById('mergeMethod').value;
+    const reason = document.getElementById('mergeReason').value
+                || `manual via admin (${method})`;
+    const from = ent === 'horse' ? slots.src.base.horse_id  : slots.src.base.person_id;
+    const to   = ent === 'horse' ? slots.dst.base.horse_id  : slots.dst.base.person_id;
+    const fromName = slots.src.base.name;
+    const toName   = slots.dst.base.name;
+    if (!confirm(
+      `Merge ${ent} #${from} (${fromName || '?'}) into #${to} (${toName || '?'})?\n` +
+      `This DELETES the source row and is auditable via ${ent}_merge_log.\nProceed?`
+    )) return;
+    const url  = ent === 'horse'
+      ? '/api/admin/matching/merge'
+      : '/api/admin/matching/merge-person';
+    const body = ent === 'horse'
+      ? { from_horse_id: from, to_horse_id: to,  reason, method }
+      : { from_person_id: from, to_person_id: to, reason, method };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    const pre = document.getElementById('mergePreview');
+    if (data.error) {
+      pre.innerHTML = `<div class="warn">merge failed: ${esc(data.error)}</div>`;
+    } else {
+      pre.innerHTML = ent === 'horse'
+        ? `<div>merged. moved ${data.entries_moved}, conflicts ${data.conflicts_resolved}.</div>`
+        : `<div>merged. moved ${data.entries_moved} entries, ${data.histories_moved} histories.</div>`;
+      clearSlot('src');
+      loadHealth(true);
+    }
+    pre.classList.add('visible');
+  }
+
+  document.getElementById('previewBtn').addEventListener('click', previewMerge);
+  document.getElementById('executeBtn').addEventListener('click', executeMerge);
+
+  // ----------------------------------------------------------------
+  // Script runner
+  // ----------------------------------------------------------------
+  const SCRIPTS = [
+    { id: 'audit',          name: 'audit',             desc: 'read-only health audit (also powers this page)' },
+    { id: 'pedigree',       name: 'pedigree merge',    desc: 'merge same name+year+sire+dam groups' },
+    { id: 'synth_pairs',    name: 'synth pairs (B)',   desc: 'merge ST-guest ↔ ATG-synth horse pairs' },
+    { id: 'split_polluted', name: 'split polluted (A)',desc: 'split old ST horses with foreign entries' },
+    { id: 'same_row',       name: 'same-row clean',    desc: 'fix rows with both st_id and x: atg_id' },
+    { id: 'merge_races',    name: 'race dupes (F)',    desc: 'merge races sharing (track, date, number)' },
+    { id: 'person_pairs',   name: 'person pairs (G)',  desc: 'merge driver/trainer synth ↔ real pairs' },
+  ];
+
+  function renderScripts() {
+    document.getElementById('scriptsGrid').innerHTML = SCRIPTS.map(s => `
+      <div class="script-card glass-panel">
+        <h3>${esc(s.name)}</h3>
+        <div class="desc">${esc(s.desc)}</div>
+        <div class="actions">
+          <button class="ghost script-btn" onclick="runScript('${s.id}', false)">dry-run</button>
+          <button class="ghost script-btn danger" onclick="runScript('${s.id}', true)">execute</button>
+        </div>
+      </div>`).join('');
+  }
+
+  let activeScriptRid = null;
+  let scriptPollTimer = null;
+
+  async function runScript(id, execute) {
+    if (execute) {
+      const typed = prompt(`Type "execute" to actually run ${id} (this will mutate data):`);
+      if (typed !== 'execute') return;
+    }
+    const res = await fetch(`/api/admin/matching/script/${id}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ execute }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    activeScriptRid = data.job_run_id;
+    document.getElementById('runnerLog').open = true;
+    document.getElementById('runnerLogBody').textContent =
+      `[admin] spawned ${id} (execute=${execute}) as job ${activeScriptRid}\n`;
+    startScriptPoll();
+  }
+
+  function startScriptPoll() {
+    if (scriptPollTimer) clearInterval(scriptPollTimer);
+    scriptPollTimer = setInterval(pollScript, 1500);
+    pollScript();
+  }
+  async function pollScript() {
+    if (!activeScriptRid) return;
+    const res = await fetch(`/api/admin/status?id=${activeScriptRid}`);
+    const r = await res.json();
+    document.getElementById('runnerLogBody').textContent = r.log || '';
+    document.getElementById('runnerLogBody').scrollTop = 1e9;
+    if (r.status !== 'running') {
+      clearInterval(scriptPollTimer);
+      scriptPollTimer = null;
+      loadHealth(true);
+    }
+  }
+
+  (function initRecentMergesSection() {
+    const section = document.getElementById('recentMergesSection');
+    const btn = section.querySelector('.section-heading__toggle');
+    btn.addEventListener('click', () => {
+      const collapsed = section.classList.toggle('is-section-collapsed');
+      btn.textContent = collapsed ? '▾' : '▴';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+    });
+  })();
+
+  renderScripts();
+  loadHealth();
+  if (typeof initFluidToggles === 'function') initFluidToggles(document);
+  setInterval(() => loadHealth(false), 60000);
+</script>
+{% endblock %}

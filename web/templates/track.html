@@ -1,0 +1,386 @@
+{% extends "_layout.html" %}
+
+{% block title %}{{ track.name }} - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .track-page { width: 100%; max-width: 880px; }
+
+  .track-title {
+    font-size: 38px;
+    letter-spacing: 0.25px;
+    margin-bottom: 8px;
+    line-height: 1.15;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.08em 0.18em;
+  }
+  .track-title .flag-lg { margin-left: 0.16em; flex-shrink: 0; }
+  .track-desc { font-size: 12px; color: var(--fg-muted); opacity: 0.48; margin-bottom: 6px; }
+
+  .method-toggle {
+    display: inline-flex; gap: 0; margin-left: 12px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+  }
+  .mtog {
+    background: none; border: none; padding: 2px 10px; font-family: inherit;
+    font-size: 11px; color: var(--fg-muted); cursor: pointer; letter-spacing: 0.5px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mtog.active { background: var(--fg-muted); color: var(--bg); }
+  .mtog:not(.active):hover { background: var(--hover); }
+
+  /* post-position bar viz */
+  .bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .bar-row { display: grid; grid-template-columns: 30px 1fr 46px; align-items: center; gap: 10px; }
+  .bar-post {
+    font-family: ATGRubrik, sans-serif; font-size: 18px; line-height: 1; text-align: center;
+    color: var(--fg-heading);
+  }
+  .bar-lane { position: relative; height: 16px; border-radius: 4px; background: rgba(127,127,127,0.08); overflow: visible; }
+  .bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px;
+    transition: width 0.4s cubic-bezier(0.4,1,0.5,1), background 0.3s;
+  }
+  .bar-avg-mark {
+    position: absolute; top: -1px; bottom: -1px; width: 1.5px;
+    background: var(--fg-muted); opacity: 0.5; border-radius: 1px;
+    transition: left 0.4s cubic-bezier(0.4,1,0.5,1);
+  }
+  .bar-val { font-size: 11.5px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .bar-val.dim { color: var(--fg-muted); }
+  .bar-row.empty .bar-lane { opacity: 0.35; }
+
+  .track-passport {
+    display: flex; flex-direction: column;
+    margin-bottom: 36px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .meta-row {
+    display: flex; flex-wrap: nowrap; gap: 28px; align-items: baseline;
+    color: var(--fg-muted); font-size: 13px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .meta-row::-webkit-scrollbar { display: none; }
+  .meta-row > span { flex: 0 0 auto; white-space: nowrap; }
+  .meta-row span b { color: var(--fg); font-weight: 400; margin-left: 6px; }
+
+  /* physical facts grid */
+  .facts {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px 20px; margin: 4px 0 0;
+  }
+  .fact { display: flex; flex-direction: column; gap: 3px; }
+  .fact .k {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fg-muted);
+  }
+  .fact .v { font-size: 17px; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .fact .v small { font-size: 11px; color: var(--fg-muted); margin-left: 3px; }
+  .fact .v.muted { color: var(--fg-muted); font-size: 14px; }
+
+  .track-list-section { margin-top: 32px; }
+
+  .section-heading {
+    display: inline-flex; align-items: baseline; margin: 0 0 14px;
+    font-size: 13px; font-weight: 400; letter-spacing: 3px;
+    text-transform: lowercase; color: var(--fg-muted);
+  }
+  .section-heading__toggle {
+    flex-shrink: 0; margin: 0; padding: 2px 0 2px 8px; background: none; border: none;
+    color: var(--fg-muted); opacity: 0.5; font-family: inherit; font-size: 12px;
+    line-height: 1; cursor: pointer; appearance: none; -webkit-appearance: none;
+  }
+  .section-heading__toggle:hover { opacity: 0.78; }
+  .track-list-section.is-section-collapsed .track-list-section__body { display: none; }
+
+  table.history { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.history th {
+    text-align: left; color: var(--fg-muted); font-weight: 400;
+    padding: 6px 8px; border-bottom: 1px solid var(--border); letter-spacing: 0.5px;
+  }
+  table.history td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.history tr:hover { background: var(--hover); }
+  table.history tr.clickable { cursor: pointer; }
+  table.history td.num, table.history th.num { text-align: right; }
+  table.history td.muted { color: var(--fg-muted); }
+  .empty-section { color: var(--fg-muted); font-size: 12px; padding: 12px 0; }
+
+  .list-fold tbody tr.is-row-hidden { display: none; }
+  .list-fold tbody tr.is-row-fade-mid { opacity: 0.58; }
+  .list-fold tbody tr.is-row-fade-low { opacity: 0.22; }
+  .list-fold__toggle {
+    display: block; width: 100%; margin: 10px 0 0; padding: 0; background: none; border: none;
+    color: var(--fg-muted); opacity: 0.48; font-family: inherit; font-size: 12px;
+    text-align: center; text-transform: lowercase; cursor: pointer; appearance: none; -webkit-appearance: none;
+  }
+  .list-fold__toggle:hover { opacity: 0.65; }
+{% endblock %}
+
+{% block content %}
+  <div class="track-page">
+    <section class="track-passport">
+      <h1 class="track-title" id="trackName"></h1>
+      <div class="track-desc" id="trackDesc"></div>
+      <div class="meta-row" id="metaRow"></div>
+    </section>
+
+    <section class="track-list-section" id="physicalSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">course</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
+      </h2>
+      <div class="track-list-section__body" id="physicalMount"></div>
+    </section>
+
+    <section class="track-list-section" id="galSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">stats</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
+      </h2>
+      <div class="track-list-section__body" id="galMount"></div>
+    </section>
+
+    <section class="track-list-section" id="racesSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">recent races</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
+      </h2>
+      <div class="track-list-section__body" id="racesMount"><div class="empty-section"></div></div>
+    </section>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const track = {{ track | tojson }};
+
+    // Title: name + country flag (by code, never guessed).
+    const nameEl = document.getElementById('trackName');
+    nameEl.style.setProperty('color', 'var(--fg-heading)', 'important');
+    nameEl.style.setProperty('-webkit-text-fill-color', 'var(--fg-heading)', 'important');
+    nameEl.innerHTML =
+      `<span style="color:var(--fg-heading)!important;-webkit-text-fill-color:var(--fg-heading)!important">${esc(track.name)}</span>`
+      + countryFlag(track.country, true);
+
+    // Descriptor: sport · shape · surface · year range
+    const desc = [];
+    if (track.sport) desc.push(track.sport);
+    if (track.shape) desc.push(track.shape);
+    if (track.surface) desc.push(track.surface);
+    if (track.first_year && track.last_year) desc.push(track.first_year + '–' + track.last_year);
+    document.getElementById('trackDesc').textContent = desc.join(' · ');
+
+    // Headline meta-row (our data).
+    const meta = [];
+    if (track.races)  meta.push(['races', track.races.toLocaleString()]);
+    if (track.starts) meta.push(['starts', track.starts.toLocaleString()]);
+    if (track.gal_rate != null) meta.push(['gal rate', track.gal_rate + '%']);
+    if (track.avg_winner_odds != null) meta.push(['avg winner odds', track.avg_winner_odds.toFixed(1)]);
+    document.getElementById('metaRow').innerHTML =
+      meta.map(([k, v]) => `<span>${esc(k)}<b>${esc(v)}</b></span>`).join('');
+
+    // Static physical facts.
+    function fact(k, v, unit) {
+      if (v == null || v === '') return `<div class="fact"><div class="k">${esc(k)}</div><div class="v muted">—</div></div>`;
+      const u = unit ? `<small>${esc(unit)}</small>` : '';
+      return `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}${u}</div></div>`;
+    }
+    const wingLabel = track.auto_car_wings === 'angled' ? 'angled' :
+                      track.auto_car_wings === 'straight' ? 'straight' : null;
+    const openLabel = track.num_open_stretches == null ? null :
+                      track.num_open_stretches === 0 ? 'none' :
+                      track.num_open_stretches === 1 ? '1 (single)' :
+                      track.num_open_stretches + ' (double)';
+    document.getElementById('physicalMount').innerHTML =
+      `<div class="facts">` +
+        fact('lap length', track.track_length_m, 'm') +
+        fact('home stretch', track.home_stretch_m, 'm') +
+        fact('open stretch', openLabel) +
+        fact('width', track.track_width_m, 'm') +
+        fact('auto car wing', wingLabel) +
+        fact('surface', track.surface) +
+      `</div>`;
+
+    // Post-position bar visualization (fetched from precomputed MV).
+    let postMethod = 'auto', postMetric = 'win';
+
+    function barColor(value, avg, metric) {
+      if (value == null || avg == null || avg === 0) return 'var(--fg-muted)';
+      let rel = (value - avg) / avg;
+      if (metric === 'gal') rel = -rel;
+      const c = Math.max(-1, Math.min(1, rel / 0.4));
+      const hue = 8 + (c + 1) / 2 * (142 - 8);
+      return `hsl(${hue.toFixed(0)}, 52%, 46%)`;
+    }
+
+    async function loadPostViz() {
+      const mount = document.getElementById('galMount');
+      mount.innerHTML = '<div class="empty-section" style="opacity:0.5">loading…</div>';
+      const res = await fetch(`/api/stats/track-posts?track_id=${track.track_id}&method=${postMethod}&metric=${postMetric}`);
+      const data = await res.json();
+      const posts = data.posts;
+      if (!posts || !posts.length) {
+        mount.innerHTML = '<div class="empty-section">no post stats available</div>';
+        return;
+      }
+      mount.innerHTML = '<div class="bars">' + posts.map(p => {
+        const has = p.value != null;
+        const scale = p.max || 1;
+        const w = has ? Math.min((p.value / scale) * 100, 100) : 0;
+        const avgPos = p.avg != null ? Math.min((p.avg / scale) * 100, 100) : null;
+        const col = barColor(p.value, p.avg, postMetric);
+        const avgMark = avgPos != null
+          ? `<div class="bar-avg-mark" style="left:${avgPos.toFixed(1)}%"></div>` : '';
+        return `<div class="bar-row${has ? '' : ' empty'}">
+          <div class="bar-post">${p.post}</div>
+          <div class="bar-lane">
+            <div class="bar-fill" style="width:${w.toFixed(1)}%;background:${col}"></div>
+            ${avgMark}
+          </div>
+          <div class="bar-val${has ? '' : ' dim'}">${has ? p.value.toFixed(1) : '–'}</div>
+        </div>`;
+      }).join('') + '</div>';
+    }
+
+    // Toggle buttons for method + metric.
+    const galHeading = document.querySelector('#galSection .section-heading');
+    const methodToggle = document.createElement('span');
+    methodToggle.className = 'method-toggle';
+    methodToggle.innerHTML =
+      `<button type="button" class="mtog active" data-m="auto">auto</button>` +
+      `<button type="button" class="mtog" data-m="volt">volt</button>`;
+    galHeading.insertBefore(methodToggle, galHeading.querySelector('.section-heading__toggle'));
+
+    const metricToggle = document.createElement('span');
+    metricToggle.className = 'method-toggle';
+    metricToggle.innerHTML =
+      `<button type="button" class="mtog active" data-m="win">win%</button>` +
+      `<button type="button" class="mtog" data-m="gal">gal%</button>`;
+    galHeading.insertBefore(metricToggle, methodToggle.nextSibling);
+
+    methodToggle.querySelectorAll('.mtog').forEach(btn => {
+      btn.addEventListener('click', () => {
+        postMethod = btn.dataset.m;
+        methodToggle.querySelectorAll('.mtog').forEach(b => b.classList.toggle('active', b === btn));
+        loadPostViz();
+      });
+    });
+    metricToggle.querySelectorAll('.mtog').forEach(btn => {
+      btn.addEventListener('click', () => {
+        postMetric = btn.dataset.m;
+        metricToggle.querySelectorAll('.mtog').forEach(b => b.classList.toggle('active', b === btn));
+        loadPostViz();
+      });
+    });
+    loadPostViz();
+
+
+    if (typeof initFluidHighlights === 'function') {
+      initFluidHighlights(document.querySelector('.track-page'));
+    }
+
+    function fmtTimeVal(v) {
+      if (v == null || v === 0) return '';
+      const mins = Math.floor(v / 60);
+      const secs = (v - mins * 60).toFixed(1);
+      const secStr = secs.replace('.', ',');
+      return mins <= 1 ? secStr : (mins - 1) + '.' + secStr;
+    }
+
+    const LIST_FOLD_INITIAL = 5, LIST_FOLD_STEP = 10;
+    function applyListFoldRows(trs, disclosed, rowCount) {
+      trs.forEach((tr, i) => {
+        const n = i + 1;
+        tr.classList.remove('is-row-hidden', 'is-row-fade-mid', 'is-row-fade-low');
+        if (disclosed >= rowCount) return;
+        if (n <= disclosed - 1) return;
+        if (n === disclosed) tr.classList.add('is-row-fade-mid');
+        else if (n === disclosed + 1) tr.classList.add('is-row-fade-low');
+        else tr.classList.add('is-row-hidden');
+      });
+    }
+    function mountFoldedTable(mount, tableHtml, rowCount) {
+      if (rowCount <= LIST_FOLD_INITIAL) { mount.innerHTML = tableHtml; return { expandAll() {} }; }
+      mount.innerHTML = `<div class="list-fold"><div class="list-fold__table">${tableHtml}</div></div>`;
+      const fold = mount.querySelector('.list-fold');
+      const trs = [...fold.querySelectorAll('tbody tr')];
+      let disclosed = LIST_FOLD_INITIAL, toggleBtn = null;
+      function syncToggle() {
+        if (disclosed >= rowCount) { toggleBtn?.remove(); toggleBtn = null; applyListFoldRows(trs, rowCount, rowCount); return; }
+        applyListFoldRows(trs, disclosed, rowCount);
+        if (!toggleBtn) {
+          toggleBtn = document.createElement('button');
+          toggleBtn.type = 'button'; toggleBtn.className = 'list-fold__toggle'; toggleBtn.textContent = 'show more';
+          fold.appendChild(toggleBtn);
+          toggleBtn.addEventListener('click', () => { disclosed = Math.min(disclosed + LIST_FOLD_STEP, rowCount); syncToggle(); });
+        }
+      }
+      syncToggle();
+      return { expandAll() { disclosed = rowCount; syncToggle(); } };
+    }
+    function initListSection(sectionEl, fold) {
+      const btn = sectionEl.querySelector('.section-heading__toggle');
+      btn.addEventListener('click', () => {
+        const collapsed = sectionEl.classList.toggle('is-section-collapsed');
+        btn.textContent = collapsed ? '▾' : '▴';
+        btn.setAttribute('aria-expanded', String(!collapsed));
+        if (!collapsed && fold) fold.expandAll();
+      });
+    }
+    document.querySelectorAll('#physicalSection, #galSection').forEach(s => initListSection(s, null));
+
+    async function loadRaces() {
+      const res = await fetch(`/api/track/${track.track_id}/races`);
+      const rows = await res.json();
+      const mount = document.getElementById('racesMount');
+      if (!rows.length) {
+        mount.innerHTML = '<div class="empty-section">no races recorded</div>';
+        initListSection(document.getElementById('racesSection'), { expandAll() {} });
+        return;
+      }
+      const head = `
+        <thead><tr>
+          <th>date</th><th class="num">race</th><th>start</th>
+          <th class="num">dist</th><th class="num">field</th><th class="num">gal</th>
+          <th>winner</th><th class="num">odds</th><th>time</th><th>driver</th>
+        </tr></thead>`;
+      const body = rows.map(r => {
+        const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
+        const timeDisp = r.km_time_text || fmtTimeVal(r.time_val);
+        const galTxt = (r.gals != null && r.starters) ? `${r.gals}/${r.starters}` : '';
+        const raceHref = r.atg_id ? `/race/atg/${encodeURIComponent(r.atg_id)}`
+                       : r.race_id ? `/race/${r.race_id}` : null;
+        const trCls = raceHref ? ' class="clickable"' : '';
+        const trData = raceHref ? ` data-href="${esc(raceHref)}"` : '';
+        const winner = r.winner_id
+          ? `<a href="/horse/${r.winner_id}">${flagify(r.winner_name)}</a>`
+          : esc(r.winner_name || '');
+        const driver = r.driver_id
+          ? `<a href="/driver/${r.driver_id}">${esc(fmtName(r.driver_name))}</a>`
+          : esc(fmtName(r.driver_name));
+        return `
+          <tr${trCls}${trData}>
+            <td class="muted">${esc(r.race_date || '')}</td>
+            <td class="muted num">${esc(r.race_number || '')}</td>
+            <td class="muted">${esc(startType)}</td>
+            <td class="muted num">${esc(r.distance || '')}</td>
+            <td class="muted num">${esc(r.starters || '')}</td>
+            <td class="muted num">${esc(galTxt)}</td>
+            <td>${winner}</td>
+            <td class="num muted">${r.winner_odds ? r.winner_odds.toFixed(1) : ''}</td>
+            <td class="muted">${esc(timeDisp)}</td>
+            <td class="muted">${driver}</td>
+          </tr>`;
+      }).join('');
+      const fold = mountFoldedTable(mount, `<table class="history">${head}<tbody>${body}</tbody></table>`, rows.length);
+      initListSection(document.getElementById('racesSection'), fold);
+      mount.querySelectorAll('tr.clickable').forEach(tr => {
+        tr.addEventListener('click', () => { window.location.href = tr.dataset.href; });
+      });
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
+    }
+
+    loadRaces();
+  </script>
+{% endblock %}

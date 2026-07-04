@@ -12,34 +12,68 @@
 
   .horse-title {
     font-size: 38px;
-    font-weight: 550;
-    letter-spacing: 1px;
+    letter-spacing: 0.25px;
     margin-bottom: 8px;
+    line-height: 1.15;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.08em 0.18em;
+  }
+  .watch-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 4px;
+    color: var(--fg-muted);
+    opacity: 0.55;
+    transition: opacity 0.15s, color 0.15s;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .watch-toggle svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+  }
+  .watch-toggle .heart-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+  }
+  .watch-toggle:hover {
+    opacity: 0.85;
+    color: var(--fg);
+  }
+  .watch-toggle.is-watched {
+    opacity: 1;
+    color: var(--fg);
+  }
+  .watch-toggle.is-watched .heart-icon {
+    fill: currentColor;
+    stroke: currentColor;
   }
   .horse-title a.ext {
-    color: inherit;
     text-decoration: none;
+    line-height: 1;
+    flex-shrink: 0;
   }
-  .horse-title a.ext:hover {
-    color: var(--fg) !important;
-    background: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
+  .horse-title .flag-lg {
+    margin-left: 0.16em;
+    flex-shrink: 0;
   }
   .ext-arrow {
-    font-size: 16px;
-    vertical-align: super;
+    font-size: 17px;
+    line-height: 1;
     color: var(--fg-muted);
-    margin-left: 4px;
     text-decoration: none;
   }
-  .horse-title:hover .ext-arrow { color: var(--fg); }
-
   .sources {
     display: flex;
     gap: 6px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
   }
   .source-chip {
@@ -60,21 +94,43 @@
   }
   .pedigree a { color: var(--fg); }
 
+  .horse-ids,
   .horse-desc {
     font-size: 12px;
     color: var(--fg-muted);
-    margin-bottom: 24px;
+    opacity: 0.48;
+  }
+  .horse-ids {
+    margin-bottom: 6px;
+  }
+  .horse-desc {
+    margin-bottom: 80px;
+  }
+
+  /* Passport block — meta stats pinned to bottom, above the section divider. */
+  .horse-passport {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 36px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
   }
 
   .meta-row {
     display: flex;
-    gap: 32px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 28px;
+    align-items: baseline;
     color: var(--fg-muted);
     font-size: 13px;
-    margin-bottom: 36px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .meta-row::-webkit-scrollbar { display: none; }
+  .meta-row > span {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   .meta-row span b {
     color: var(--fg);
@@ -82,22 +138,49 @@
     margin-left: 6px;
   }
 
-  h2.section {
+  .horse-list-section { margin-top: 32px; }
+  .horse-list-section:first-of-type { margin-top: 0; }
+
+  .section-heading {
+    display: inline-flex;
+    align-items: baseline;
+    margin: 0 0 14px;
     font-size: 13px;
     font-weight: 400;
     letter-spacing: 3px;
     text-transform: lowercase;
     color: var(--fg-muted);
-    margin: 32px 0 14px;
+  }
+  .section-heading__toggle {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 2px 0 2px 8px;
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    opacity: 0.5;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .section-heading__toggle:hover {
+    opacity: 0.78;
+  }
+  .horse-list-section.is-section-collapsed .horse-list-section__body {
+    display: none;
   }
 
   table.history,
-  table.offspring {
+  table.offspring,
+  table.siblings {
     width: 100%;
     border-collapse: collapse;
     font-size: 12.5px;
   }
-  table.history th, table.offspring th {
+  table.history th, table.offspring th, table.siblings th {
     text-align: left;
     color: var(--fg-muted);
     font-weight: 400;
@@ -105,18 +188,37 @@
     border-bottom: 1px solid var(--border);
     letter-spacing: 0.5px;
   }
-  table.history td, table.offspring td {
+  table.history td, table.offspring td, table.siblings td {
     padding: 6px 8px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  table.history tr:hover, table.offspring tr:hover {
+  table.history tr:hover, table.offspring tr:hover, table.siblings tr:hover {
     background: var(--hover);
   }
   table.history tr.clickable { cursor: pointer; }
-  table.history td.num, table.offspring td.num { text-align: right; }
-  table.history th.num, table.offspring th.num { text-align: right; }
+  table.history td.num, table.offspring td.num, table.siblings td.num { text-align: right; }
+  table.history th.num, table.offspring th.num, table.siblings th.num { text-align: right; }
   table.history td.muted { color: var(--fg-muted); }
+
+  /* sibling relationship tag */
+  .rel-tag {
+    display: inline-block; font-size: 10px; letter-spacing: 0.4px;
+    padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border);
+    color: var(--fg-muted);
+  }
+  .rel-tag.full { color: var(--accent-hot); border-color: rgba(36,151,64,0.4); }
+
+  /* perfect-siblings (full) plasma toggle control in the heading */
+  .sib-perfect-ctrl {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-left: 14px;
+    text-transform: none; letter-spacing: 0;
+  }
+  .sib-perfect-ctrl .sib-perfect-label {
+    font-size: 11px; letter-spacing: 1px; color: var(--fg-muted);
+  }
+  .section-heading.has-ctrl { align-items: center; }
 
   table.history tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
   table.history tr.scratched,
@@ -131,31 +233,94 @@
   }
 
 
-  .pos-1 { color: var(--accent-win); }
-
   .dq, .withdrew { color: var(--fg-muted); }
+  .gal-mark { font-size: .72em; color: var(--fg-muted); vertical-align: super; }
 
   .empty-section {
     color: var(--fg-muted);
     font-size: 12px;
     padding: 12px 0;
   }
+
+  /* Long tables — initial peek, +10 per show more. */
+  .list-fold tbody tr.is-row-hidden {
+    display: none;
+  }
+  .list-fold tbody tr.is-row-fade-mid {
+    opacity: 0.58;
+  }
+  .list-fold tbody tr.is-row-fade-low {
+    opacity: 0.22;
+  }
+  .list-fold__toggle {
+    display: block;
+    width: 100%;
+    margin: 10px 0 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    opacity: 0.48;
+    font-family: inherit;
+    font-size: 12px;
+    text-align: center;
+    text-transform: lowercase;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .list-fold__toggle:hover {
+    opacity: 0.65;
+  }
 {% endblock %}
 
 {% block content %}
   <div class="horse-page">
-    <div class="sources" id="sources"></div>
-    <h1 class="horse-title" id="horseName"></h1>
-    <div class="pedigree" id="pedigree"></div>
-    <div class="horse-desc" id="horseDesc"></div>
+    <section class="horse-passport">
+      <div class="horse-passport__head">
+        <div class="horse-ids" id="horseIds"></div>
+        <div class="sources" id="sources"></div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <h1 class="horse-title" id="horseName"></h1>
+          <button type="button" class="watch-toggle" id="watchToggle" title="Add to watchlist" aria-label="Add to watchlist" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path class="heart-icon" d="M12 20.25l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.54L12 20.25z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="pedigree" id="pedigree"></div>
+        <div class="horse-desc" id="horseDesc"></div>
+      </div>
+      <div class="meta-row" id="metaRow"></div>
+    </section>
 
-    <div class="meta-row" id="metaRow"></div>
+    <section class="horse-list-section" id="resultsSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">results</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse results">▴</button>
+      </h2>
+      <div class="horse-list-section__body" id="historyMount"><div class="empty-section"></div></div>
+    </section>
 
-    <h2 class="section">race history</h2>
-    <div id="historyMount"><div class="empty-section">loading...</div></div>
+    <section class="horse-list-section" id="offspringSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">offspring</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse offspring">▴</button>
+      </h2>
+      <div class="horse-list-section__body" id="offspringMount"><div class="empty-section"></div></div>
+    </section>
 
-    <h2 class="section">offspring</h2>
-    <div id="offspringMount"><div class="empty-section">loading...</div></div>
+    <section class="horse-list-section" id="siblingsSection">
+      <h2 class="section-heading has-ctrl">
+        <span class="section-heading__label">siblings</span>
+        <span class="sib-perfect-ctrl">
+          <span class="sib-perfect-label">full only</span>
+          <span id="perfectSibToggle"></span>
+        </span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse siblings">▴</button>
+      </h2>
+      <div class="horse-list-section__body" id="siblingsMount"><div class="empty-section"></div></div>
+    </section>
   </div>
 {% endblock %}
 
@@ -175,15 +340,31 @@
       ).join('');
     }
 
-    // Header: horse name + flag, with optional ext-link to TravSport when st_id present.
-    const nameHtml = flagify(horse.name, true);
-    if (horse.st_id) {
-      const url = `https://sportapp.travsport.se/sportinfo/horse/ts${horse.st_id}`;
-      document.getElementById('horseName').innerHTML =
-        `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener">` +
-        `${nameHtml}<span class="ext-arrow">↗</span></a>`;
+    // Registration + UELN above title (same label style as meta-row passport fields).
+    const idParts = [];
+    if (horse.registration_number) idParts.push('reg ' + horse.registration_number);
+    if (horse.ueln_number) idParts.push('ueln ' + horse.ueln_number);
+    const idsEl = document.getElementById('horseIds');
+    if (idParts.length) {
+      idsEl.textContent = idParts.join(' ');
     } else {
-      document.getElementById('horseName').innerHTML = nameHtml;
+      idsEl.remove();
+    }
+
+    // Header: name is plain text; ST link is arrow-only (avoids muted link rendering).
+    const nameHtml = flagify(horse.name, true);
+    const el = document.getElementById('horseName');
+    el.style.setProperty('color', 'var(--fg-heading)', 'important');
+    el.style.setProperty('-webkit-text-fill-color', 'var(--fg-heading)', 'important');
+    if (horse.st_id) {
+      const url = `https://sportapp.travsport.se/sportinfo/horse/ts${horse.st_id}/pedigree`;
+      el.innerHTML =
+        `<span class="horse-title__name" style="color:var(--fg-heading)!important;-webkit-text-fill-color:var(--fg-heading)!important">${nameHtml}</span>` +
+        `<a class="ext" href="${esc(url)}" target="_blank" rel="noopener" ` +
+        `aria-label="Open on TravSport"><span class="ext-arrow">↗</span></a>`;
+    } else {
+      el.innerHTML =
+        `<span class="horse-title__name" style="color:var(--fg-heading)!important;-webkit-text-fill-color:var(--fg-heading)!important">${nameHtml}</span>`;
     }
 
     const ped = [];
@@ -206,6 +387,7 @@
     if (horse.date_of_birth) descParts.push(horse.date_of_birth.substring(0, 4));
     if (horse.gender) descParts.push(horse.gender);
     if (horse.breed) descParts.push(horse.breed);
+    if (horse.color) descParts.push(horse.color);
     document.getElementById('horseDesc').textContent = descParts.join(' · ');
 
     // Starts as "14 (2-3-9)" = starts (wins-placed-unplaced).
@@ -231,6 +413,10 @@
     document.getElementById('metaRow').innerHTML = meta.map(([k, v, raw]) =>
       `<span>${esc(k)}<b>${raw ? v : esc(v)}</b></span>`).join('');
 
+    if (typeof initFluidHighlights === 'function') {
+      initFluidHighlights(document.querySelector('.horse-page'));
+    }
+
     // Convert time_val (seconds per km, e.g. 74.4) to Swedish display format ("14,4").
     // Minutes are implicit (1 min is the standard), so we just subtract 60 for one-minute times.
     // Two-minute-plus times (e.g. kallblod) get the minute prefix: "1.21,5".
@@ -242,13 +428,96 @@
       return mins <= 1 ? secStr : (mins - 1) + '.' + secStr;
     }
 
+    const LIST_FOLD_INITIAL = 5;
+    const LIST_FOLD_STEP = 10;
+
+    function applyListFoldRows(trs, disclosed, rowCount) {
+      trs.forEach((tr, i) => {
+        const n = i + 1;
+        tr.classList.remove('is-row-hidden', 'is-row-fade-mid', 'is-row-fade-low');
+        if (disclosed >= rowCount) return;
+        if (n <= disclosed - 1) return;
+        if (n === disclosed) tr.classList.add('is-row-fade-mid');
+        else if (n === disclosed + 1) tr.classList.add('is-row-fade-low');
+        else tr.classList.add('is-row-hidden');
+      });
+    }
+
+    function mountFoldedTable(mount, tableHtml, rowCount) {
+      if (rowCount <= LIST_FOLD_INITIAL) {
+        mount.innerHTML = tableHtml;
+        return { expandAll() {} };
+      }
+      mount.innerHTML =
+        `<div class="list-fold">` +
+          `<div class="list-fold__table">${tableHtml}</div>` +
+        `</div>`;
+      const fold = mount.querySelector('.list-fold');
+      const trs = [...fold.querySelectorAll('tbody tr')];
+      let disclosed = LIST_FOLD_INITIAL;
+      let toggleBtn = null;
+
+      function syncToggle() {
+        if (disclosed >= rowCount) {
+          toggleBtn?.remove();
+          toggleBtn = null;
+          applyListFoldRows(trs, rowCount, rowCount);
+          return;
+        }
+        applyListFoldRows(trs, disclosed, rowCount);
+        if (!toggleBtn) {
+          toggleBtn = document.createElement('button');
+          toggleBtn.type = 'button';
+          toggleBtn.className = 'list-fold__toggle';
+          toggleBtn.textContent = 'show more';
+          fold.appendChild(toggleBtn);
+          toggleBtn.addEventListener('click', () => {
+            disclosed = Math.min(disclosed + LIST_FOLD_STEP, rowCount);
+            syncToggle();
+          });
+        }
+      }
+
+      syncToggle();
+      return {
+        expandAll() {
+          disclosed = rowCount;
+          syncToggle();
+        },
+      };
+    }
+
+    function initListSection(sectionEl, fold) {
+      const btn = sectionEl.querySelector('.section-heading__toggle');
+      btn.addEventListener('click', () => {
+        const collapsed = sectionEl.classList.toggle('is-section-collapsed');
+        btn.textContent = collapsed ? '▾' : '▴';
+        btn.setAttribute('aria-expanded', String(!collapsed));
+        if (!collapsed) fold.expandAll();
+      });
+    }
+
     function placementCell(p) {
-      // Prefer placement_text (TravSport); fall back to numeric placement (ATG-only rows).
-      const t = p.placement_text || (p.placement_num != null ? String(p.placement_num) : '');
-      if (p.disqualified) return `<span class="dq">${esc(t || 'd')}</span>`;
-      if (p.withdrawn)    return `<span class="withdrew">${esc(t || 'utg')}</span>`;
-      const n = p.placement_num;
-      return n === 1 ? `<span class="pos-1">${esc(t)}</span>` : esc(t);
+      if (p.disqualified) {
+        const t = p.placement_text || (p.placement_num != null ? String(p.placement_num) : '');
+        return `<span class="dq">${esc(t || 'd')}</span>`;
+      }
+      if (p.withdrawn) {
+        const t = p.placement_text || '';
+        return `<span class="withdrew">${esc(t || 'utg')}</span>`;
+      }
+      // A gait-breaker that still placed keeps its numeric position (even on
+      // legacy rows whose placement_text is bare 'g') plus a small 'g' marker.
+      const classifiedGalopp = p.galopp && p.placement_num != null;
+      const t = classifiedGalopp
+        ? String(p.placement_num)
+        : (p.placement_text || (p.placement_num != null ? String(p.placement_num) : ''));
+      const galMark = classifiedGalopp
+        ? ` <span class="gal-mark" title="galopp">g</span>` : '';
+      // Gold only for true wins (text='1'); we don't trust the integer
+      // placement on sparse foreign races where p=1 is a v1 ETL default.
+      const isWin = (p.placement_text === '1');
+      return (isWin ? `<span class="pos-1">${esc(t)}</span>` : esc(t)) + galMark;
     }
 
     async function loadHistory() {
@@ -257,6 +526,7 @@
       const mount = document.getElementById('historyMount');
       if (!rows.length) {
         mount.innerHTML = '<div class="empty-section">no races recorded</div>';
+        initListSection(document.getElementById('resultsSection'), { expandAll() {} });
         return;
       }
       const head = `
@@ -269,9 +539,13 @@
             <th class="num">#</th>
             <th>start</th>
             <th class="num">dist</th>
+            <th class="num" title="extra distance ran beyond nominal (xLabs GPS)">+m</th>
+            <th class="num" title="best 100m km-time-equivalent (xLabs GPS)">peak</th>
             <th>odds</th>
             <th>driver</th>
+            <th>trainer</th>
             <th class="num">prize</th>
+            <th title="source(s) that contributed this entry">src</th>
           </tr>
         </thead>`;
       const body = rows.map(r => {
@@ -280,6 +554,22 @@
         const progNum = r.program_number || '';
         // Show time_text when available; otherwise convert time_val (seconds) to display format.
         const timeDisp = r.km_time_text || fmtTimeVal(r.time_val);
+
+        // xLabs GPS sectionals (kmtid). Only present on recent SE races with coverage.
+        // `+m` = actual distance ran beyond the nominal distance (positive = ran wide).
+        // `peak` = best 100m segment expressed as km-time, so it's directly comparable
+        //         to the headline `time` column.
+        let extraStr = '', peakStr = '';
+        if (r.kmtid_actual_m != null && r.distance) {
+          // Only show "+m" for completed runs (positive delta). Negative
+          // values indicate the horse broke or was withdrawn mid-race —
+          // the field has no meaningful interpretation in that case.
+          const delta = r.kmtid_actual_m - r.distance;
+          if (delta > 0) extraStr = '+' + delta;
+        }
+        if (r.kmtid_best_100ms != null) {
+          peakStr = fmtTimeVal(r.kmtid_best_100ms / 1000);
+        }
         // ATG races take precedence as the canonical race id.
         const raceHref = r.atg_id  ? `/race/atg/${encodeURIComponent(r.atg_id)}`
                        : r.race_id ? `/race/${r.race_id}`
@@ -290,23 +580,37 @@
         return `
           <tr${trAttrs}${trData}>
             <td class="muted">${esc(date)}</td>
-            <td>${esc(r.track_label || '')}</td>
+            <td>${r.track_id
+              ? `<a href="/track/${r.track_id}" onclick="event.stopPropagation()">${esc(r.track_label || '')}</a>`
+              : esc(r.track_label || '')}</td>
             <td>${placementCell(r)}</td>
             <td>${esc(timeDisp)}</td>
             <td class="muted num">${esc(progNum)}</td>
             <td class="muted">${esc(startType)}</td>
             <td class="muted num">${esc(r.distance || '')}</td>
+            <td class="gps muted num">${esc(extraStr)}</td>
+            <td class="gps muted num">${esc(peakStr)}</td>
             <td class="muted">${esc(r.odds_text || '')}</td>
             <td class="muted">${r.driver_id
               ? `<a href="/driver/${r.driver_id}">${esc(fmtName(r.driver_name))}</a>`
               : esc(fmtName(r.driver_name))}</td>
+            <td class="muted">${r.trainer_id
+              ? `<a href="/trainer/${r.trainer_id}">${esc(fmtName(r.trainer_name))}</a>`
+              : esc(fmtName(r.trainer_name))}</td>
             <td class="num">${esc(r.prize_kr || '')}</td>
+            <td>${srcPillsList((r.sources || []).map(s => ({key: s})), {size: 'sm'})}</td>
           </tr>`;
       }).join('');
-      mount.innerHTML = `<table class="history">${head}<tbody>${body}</tbody></table>`;
+      const fold = mountFoldedTable(
+        mount,
+        `<table class="history">${head}<tbody>${body}</tbody></table>`,
+        rows.length,
+      );
+      initListSection(document.getElementById('resultsSection'), fold);
       mount.querySelectorAll('tr.clickable').forEach(tr => {
         tr.addEventListener('click', () => { window.location.href = tr.dataset.href; });
       });
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
     }
 
     async function loadOffspring() {
@@ -315,6 +619,7 @@
       const mount = document.getElementById('offspringMount');
       if (!rows.length) {
         mount.innerHTML = '<div class="empty-section">no offspring recorded</div>';
+        initListSection(document.getElementById('offspringSection'), { expandAll() {} });
         return;
       }
       const head = `
@@ -322,25 +627,152 @@
           <tr>
             <th>name</th>
             <th>year</th>
+            <th>with</th>
+            <th>after</th>
             <th>sex</th>
             <th class="num">starts</th>
             <th class="num">wins</th>
+            <th class="num">win%</th>
             <th class="num">earnings</th>
           </tr>
         </thead>`;
-      const body = rows.map(o => `
+      const body = rows.map(o => {
+        const withCell = o.other_parent_id
+          ? `<a href="/horse/${o.other_parent_id}">${flagify(o.other_parent_name)}</a>`
+          : esc(o.other_parent_name || '');
+        const afterCell = o.after_parent_id
+          ? `<a href="/horse/${o.after_parent_id}">${flagify(o.after_parent_name)}</a>`
+          : esc(o.after_parent_name || '');
+        return `
         <tr>
           <td><a href="/horse/${o.horse_id}">${flagify(o.name)}</a></td>
           <td class="muted">${esc(o.year || '')}</td>
+          <td class="muted">${withCell}</td>
+          <td class="muted">${afterCell}</td>
           <td class="muted">${esc(o.gender || '')}</td>
           <td class="muted num">${o.starts || ''}</td>
           <td class="muted num">${o.wins || ''}</td>
+          <td class="muted num">${o.win_rate ? esc(o.win_rate) + '%' : ''}</td>
           <td class="num">${esc(o.earnings || '')}</td>
-        </tr>`).join('');
-      mount.innerHTML = `<table class="offspring">${head}<tbody>${body}</tbody></table>`;
+        </tr>`;
+      }).join('');
+      const fold = mountFoldedTable(
+        mount,
+        `<table class="offspring">${head}<tbody>${body}</tbody></table>`,
+        rows.length,
+      );
+      initListSection(document.getElementById('offspringSection'), fold);
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
+    }
+
+    // Watchlist toggle
+    (async function initWatch() {
+      const btn = document.getElementById('watchToggle');
+      const hid = horse.horse_id;
+
+      function setWatched(watched) {
+        btn.classList.toggle('is-watched', watched);
+        btn.title = watched ? 'Remove from watchlist' : 'Add to watchlist';
+        btn.setAttribute('aria-label', watched ? 'Remove from watchlist' : 'Add to watchlist');
+        btn.setAttribute('aria-pressed', watched ? 'true' : 'false');
+      }
+
+      try {
+        const res = await fetch(`/api/watchlist/${hid}/status`);
+        const data = await res.json();
+        setWatched(data.watched);
+      } catch (_) {}
+
+      btn.addEventListener('click', async () => {
+        const isWatched = btn.classList.contains('is-watched');
+        const method = isWatched ? 'DELETE' : 'PUT';
+        try {
+          await fetch(`/api/watchlist/${hid}`, { method });
+          setWatched(!isWatched);
+        } catch (_) {}
+      });
+    })();
+
+    let siblingRows = [];
+    let perfectOnly = false;
+    let siblingFold = { expandAll() {} };
+
+    function renderSiblings() {
+      const mount = document.getElementById('siblingsMount');
+      const rows = perfectOnly ? siblingRows.filter(s => s.is_full) : siblingRows;
+      if (!rows.length) {
+        mount.innerHTML = `<div class="empty-section">${
+          perfectOnly && siblingRows.length ? 'no full siblings' : 'no siblings recorded'
+        }</div>`;
+        siblingFold = { expandAll() {} };
+        return;
+      }
+      const head = `
+        <thead>
+          <tr>
+            <th>name</th>
+            <th>year</th>
+            <th>relation</th>
+            <th>sire</th>
+            <th>dam</th>
+            <th>sex</th>
+            <th class="num">starts</th>
+            <th class="num">wins</th>
+            <th class="num">win%</th>
+            <th class="num">earnings</th>
+          </tr>
+        </thead>`;
+      const body = rows.map(s => {
+        const sireCell = s.sire_id
+          ? `<a href="/horse/${s.sire_id}">${flagify(s.sire_name)}</a>`
+          : esc(s.sire_name || '');
+        const damCell = s.dam_id
+          ? `<a href="/horse/${s.dam_id}">${flagify(s.dam_name)}</a>`
+          : esc(s.dam_name || '');
+        const relCls = s.rel === 'full' ? 'rel-tag full' : 'rel-tag';
+        return `
+        <tr>
+          <td><a href="/horse/${s.horse_id}">${flagify(s.name)}</a></td>
+          <td class="muted">${esc(s.year || '')}</td>
+          <td><span class="${relCls}">${esc(s.rel)}</span></td>
+          <td class="muted">${sireCell}</td>
+          <td class="muted">${damCell}</td>
+          <td class="muted">${esc(s.gender || '')}</td>
+          <td class="muted num">${s.starts || ''}</td>
+          <td class="muted num">${s.wins || ''}</td>
+          <td class="muted num">${s.win_rate ? esc(s.win_rate) + '%' : ''}</td>
+          <td class="num">${esc(s.earnings || '')}</td>
+        </tr>`;
+      }).join('');
+      siblingFold = mountFoldedTable(
+        mount,
+        `<table class="siblings">${head}<tbody>${body}</tbody></table>`,
+        rows.length,
+      );
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
+    }
+
+    async function loadSiblings() {
+      const res = await fetch(`/api/horse/${horse.horse_id}/siblings`);
+      siblingRows = await res.json();
+      renderSiblings();
+      initListSection(document.getElementById('siblingsSection'), {
+        expandAll() { siblingFold.expandAll(); },
+      });
+
+      // "full only" plasma toggle (green on / white off) — green = perfect siblings.
+      document.getElementById('perfectSibToggle').outerHTML =
+        formBubbleToggleHtml({ variant: 'on-off', hotActive: false, id: 'perfectSibToggle' });
+      initFormBubbleToggle('perfectSibToggle', {
+        onChange(dir) {
+          perfectOnly = (dir === 'hot');
+          renderSiblings();
+        },
+      });
     }
 
     loadHistory();
     loadOffspring();
+    loadSiblings();
   </script>
 {% endblock %}

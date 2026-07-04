@@ -1,0 +1,1367 @@
+{% extends "_layout.html" %}
+
+{% block title %}design — stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .design-page {
+    width: 100%;
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 40px;
+    min-height: calc(100vh - 160px);
+  }
+
+  .design-nav {
+    position: sticky;
+    top: 90px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .design-nav button {
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 7px 12px;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .design-nav button:hover {
+    color: var(--fg);
+    background: var(--hover);
+  }
+  .design-nav button.active {
+    color: var(--accent-glow);
+    font-weight: var(--highlight-weight);
+  }
+
+  .design-stage {
+    padding: 30px 0;
+  }
+
+  .design-stage h2 {
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--fg-muted);
+    margin-bottom: 24px;
+    text-transform: lowercase;
+  }
+
+  .demo-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .demo-label {
+    font-size: 11px;
+    color: var(--fg-muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  .demo-block {
+    padding: 20px 28px;
+  }
+
+  .demo-glass {
+    width: 320px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--fg-muted);
+  }
+  .demo-glass--hybrid {
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  }
+  .demo-glass--hybrid-lg {
+    width: 100%;
+    max-width: 630px;
+    min-height: 56px;
+    justify-content: flex-start;
+    padding: 0 24px 0 16px;
+  }
+  .demo-hybrid-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .race-panels-collapsible .demo-hybrid-stack,
+  .race-panels-collapsible .demo-glass--hybrid-lg {
+    max-width: 760px;
+  }
+
+  .race-panels-collapsible .demo-label + .demo-hybrid-stack {
+    margin-top: 8px;
+  }
+
+  /* Design race panels — bop on hover (production uses game-race-link wrapper) */
+  .race-panels-collapsible .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Race title experiment — layout only; styles live in _layout (.glass-panel--hybrid-race). */
+  .race-title-experiment .demo-hybrid-stack,
+  .race-title-experiment .demo-glass--hybrid-lg {
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .demo-form-panels-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  @media (max-width: 720px) {
+    .demo-form-panels-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Experimental — sandbox-only sizing overrides */
+
+  .demo-headlines-glass-xp {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px dashed rgba(var(--liquid-ink-muted-rgb), 0.35);
+  }
+
+  .demo-headlines-glass {
+    width: 100%;
+    max-width: 760px;
+    padding: 12px 0 4px;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .demo-headlines-glass .upcoming-races__stage {
+    margin-bottom: 0;
+    overflow: visible;
+  }
+
+  .demo-headlines-glass .game-type-row,
+  .demo-headlines-glass .design-game-type-row {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 16px 20px 24px;
+  }
+
+  .game-type-symbol-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px 36px;
+  }
+  .game-type-symbol-item {
+    display: flex;
+    align-items: center;
+  }
+
+  .symbols-section { margin-top: 36px; }
+  .track-name-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px 36px;
+  }
+  .track-name-item {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Nav bubble demo — enlarged inline split nav (sandbox only, never production header) */
+  .nav-bubble-demo {
+    width: 100%;
+    max-width: 720px;
+    padding: 24px 0 8px;
+  }
+
+  .nav-bubble-demo .nav-inline-row {
+    position: static;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    pointer-events: auto;
+  }
+
+  .nav-bubble-demo .nav-inline-row > .nav-inline-segment.topnav {
+    justify-self: end;
+  }
+
+  .nav-bubble-demo .nav-inline-row > .nav-inline-segment.subnav {
+    justify-self: start;
+  }
+
+  .nav-bubble-demo .nav-inline-segment {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    pointer-events: auto !important;
+    z-index: auto !important;
+  }
+
+  .nav-bubble-demo .nav-inline-segment.topnav .nav-bar-inner {
+    justify-content: flex-end;
+  }
+
+  .nav-bubble-demo .nav-inline-segment.subnav .nav-bar-inner {
+    justify-content: flex-start;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner {
+    gap: 0;
+    transition: gap 0.38s ease;
+    position: relative;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:hover,
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:focus-within {
+    gap: 4px;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner a {
+    font-size: 14px !important;
+    letter-spacing: 1px !important;
+    text-transform: none;
+    transition:
+      opacity 0.38s ease,
+      max-width 0.38s ease,
+      padding 0.38s ease,
+      color 0.2s ease;
+  }
+
+  .nav-bubble-demo .nav-inline-segment.subnav .nav-bar-inner a {
+    text-transform: lowercase !important;
+  }
+
+  .nav-bubble-demo .nav-inline-sep {
+    font-size: 16px;
+    color: rgba(var(--liquid-ink-muted-rgb), 0.28);
+    padding: 0 10px;
+    user-select: none;
+    font-weight: 300;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .demo-links a {
+    font-size: 13px;
+    color: var(--fg);
+    margin-right: 20px;
+  }
+
+  .demo-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .demo-pos-row { display: flex; gap: 18px; align-items: center; font-size: 14px; }
+
+  .demo-input-row { display: flex; gap: 12px; align-items: center; }
+
+  @keyframes demo-caret-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .demo-fluid-toggle-demo {
+    align-items: flex-start;
+    overflow: visible;
+    min-height: 56px;
+    padding-bottom: 12px;
+  }
+
+  .demo-fluid-toggle-scale .period-btn {
+    padding: 4px 16px;
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+
+  .demo-fluid-toggle-scale .period-toggle {
+    border-radius: 6px;
+  }
+
+  .demo-fluid-toggle-scale .sort-tabs {
+    margin-bottom: 20px;
+  }
+
+  .demo-fluid-toggle-scale .sort-tab {
+    padding: 8px 20px;
+    font-size: 22px;
+    border-bottom-width: 4px;
+    margin-bottom: -2px;
+  }
+
+  .demo-fluid-toggle-panel {
+    padding: 36px 44px;
+    display: inline-flex;
+  }
+
+  .plasma-toggle-demo {
+    align-items: center;
+    min-height: 72px;
+  }
+
+  .plasma-toggle-demo .form-bubble-toggle {
+    --form-bubble-active-d: 52px;
+    --form-bubble-inactive-d: 31px;
+    --form-bubble-gap: 8px;
+  }
+
+  .demo-caret-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 200px);
+  }
+
+  .demo-caret-demo {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    width: calc(100% + 220px);
+    margin-left: -220px;
+    margin-bottom: 0;
+    padding: 18vh 0 0;
+  }
+
+  .demo-caret-field {
+    --demo-caret-font-size: 24px;
+    --demo-caret-width: 3px;
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .demo-caret-measure {
+    position: absolute;
+    visibility: hidden;
+    white-space: pre;
+    pointer-events: none;
+    font-size: var(--demo-caret-font-size);
+    line-height: 1.2;
+    padding: calc(var(--demo-caret-font-size) * 0.5) 0;
+  }
+
+  .demo-caret-field .fake-caret {
+    position: absolute;
+    top: 50%;
+    font-size: var(--demo-caret-font-size);
+    width: var(--demo-caret-width);
+    height: 1.05em;
+    margin-top: -0.525em;
+    pointer-events: none;
+    background: var(--fg);
+    box-shadow: none;
+    opacity: 0;
+  }
+
+  .demo-caret-field.is-focused .fake-caret {
+    opacity: 1;
+    animation: demo-caret-blink 1.05s step-end infinite;
+  }
+
+  .demo-caret-field input {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    font-size: var(--demo-caret-font-size);
+    line-height: 1.2;
+    padding: calc(var(--demo-caret-font-size) * 0.5) 0;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    caret-color: transparent;
+    color: var(--fg);
+    font-family: inherit;
+  }
+
+  .demo-caret-field input:focus {
+    border: none;
+    outline: none;
+    box-shadow: none;
+  }
+
+  .demo-text-block {
+    max-width: 480px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--fg);
+  }
+  .demo-text-block .muted { color: var(--fg-muted); }
+
+  /* Sphere sandbox layout (base styles in _layout.html) */
+  .sphere-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 48px;
+    flex-wrap: wrap;
+    padding: 52px 44px;
+    border-radius: 20px;
+  }
+
+  .sphere-bubble-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .sphere-bubble-item__label {
+    margin: 0;
+    max-width: 133px;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    line-height: 1.35;
+    text-align: center;
+    color: var(--fg-muted);
+  }
+
+  .sphere-row--plain {
+    padding: 52px 44px 52px 0;
+    border-radius: 0;
+  }
+
+  .sphere-row--plain .sphere-btn__label {
+    color: var(--fg-heading);
+    text-shadow:
+      0 0 1px rgba(255, 255, 255, 0.8),
+      0 0 10px rgba(255, 255, 255, 0.35),
+      0 1px 0 rgba(0, 0, 0, 0.12);
+  }
+
+  .sphere-row--plain .sphere-bubble-item__label {
+    display: none;
+  }
+
+  .sphere-collapsible {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(var(--liquid-ink-soft-rgb), 0.12);
+  }
+
+  .sphere-collapsible:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  .sphere-collapsible__toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+
+  .sphere-collapsible__toggle:hover .sphere-collapsible__chevron,
+  .sphere-collapsible__toggle:hover h2 {
+    color: var(--fg);
+  }
+
+  .sphere-collapsible__toggle h2 {
+    margin: 0;
+    transition: color 0.15s;
+  }
+
+  .sphere-collapsible__chevron {
+    flex: 0 0 auto;
+    width: 14px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--fg-muted);
+    transform: rotate(0deg);
+    transition: transform 0.2s ease, color 0.15s;
+  }
+
+  .sphere-collapsible.is-open .sphere-collapsible__chevron {
+    transform: rotate(90deg);
+  }
+
+  .sphere-collapsible:not(.is-open) .sphere-collapsible__panel {
+    display: none;
+  }
+
+  .sphere-collapsible__panel {
+    padding-top: 16px;
+  }
+
+  .sphere-behavior-row {
+    padding: 28px 0;
+    overflow: visible;
+  }
+
+  .sphere-behavior-demos {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .sphere-behavior-demo .demo-label {
+    margin-bottom: 8px;
+  }
+
+  .sphere-behavior-row--scroll {
+    padding-right: 0;
+  }
+
+  .design-game-type-row {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .sphere-behavior-day .sphere-behavior-cluster {
+    margin-left: 0;
+  }
+
+  .sphere-tracks-row {
+    padding: 12px 0 18px;
+  }
+
+  .sphere-tracks-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .sphere-tracks-glass-panel {
+    padding: 28px 32px;
+    width: 100%;
+  }
+
+  .sphere-tracks-glass-panel .sphere-row--plain {
+    padding: 0;
+  }
+
+  .sphere-tracks-glass-panel .sphere-bubble-item__label {
+    display: block;
+  }
+
+  /* Fills sandbox — isolated pearl surface experiments */
+  .demo-fills {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 560px;
+  }
+
+  .demo-fills .pearl-pill {
+    width: 100%;
+    height: 56px;
+    border-radius: 999px;
+    background: var(--panel-bg);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, var(--pearl-inset, 0.55)),
+      inset 0 -0.5px 0 rgba(0, 0, 0, 0.04),
+      var(--pearl-glow, none);
+  }
+
+  html.liquid .demo-fills .pearl-pill {
+    background: var(--pearl-fill-gradient);
+    border: 1px solid var(--pearl-fill-border);
+    -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
+    backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
+    box-shadow: var(--pearl-fill-shadow);
+  }
+
+{% endblock %}
+
+{% block content %}
+  <div style="display:none">{% include 'partials/stats_ui.html' %}</div>
+  <div class="design-page">
+    <nav class="design-nav" id="designNav"></nav>
+    <div class="design-stage" id="designStage"></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  /* Nav bubble demo — late cascade overrides (scoped, never touches production header) */
+  html.liquid .nav-bubble-demo .fluid-nav-highlight .fluid-bubble__label {
+    color: var(--fluid-toggle-fg) !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 1px;
+    text-shadow: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html.liquid .nav-bubble-demo .subnav .fluid-nav-highlight .fluid-bubble__label {
+    text-transform: lowercase;
+  }
+
+  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target),
+  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target):hover,
+  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a.active:not(.is-bubble-target),
+  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner:not(:hover):not(:focus-within) a:not(.is-bubble-target) {
+    color: rgba(90, 90, 94, 0.34) !important;
+    -webkit-text-fill-color: rgba(90, 90, 94, 0.34) !important;
+    font-weight: 400 !important;
+    font-synthesis: none;
+    text-shadow: none !important;
+    background-image: none !important;
+    animation: none !important;
+    filter: blur(0.45px) !important;
+    opacity: 0.72 !important;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:not(:hover):not(:focus-within) a:not(.active) {
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    flex: 0 0 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    pointer-events: none !important;
+    filter: none !important;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:not(:hover):not(:focus-within) a.active {
+    padding: 8px 18px !important;
+    max-width: 140px !important;
+    opacity: 1 !important;
+  }
+
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:hover a,
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:focus-within a {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    flex: 0 0 auto !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    max-width: 140px !important;
+    padding: 8px 18px !important;
+  }
+
+  .nav-bubble-demo .nav-inline-segment.topnav a,
+  .nav-bubble-demo .nav-inline-segment.subnav a {
+    padding: 8px 18px !important;
+    max-width: 140px !important;
+  }
+
+  html.liquid .nav-bubble-demo .nav-inline-segment.topnav a:hover,
+  html.liquid .nav-bubble-demo .nav-inline-segment.subnav a:hover {
+    padding: 8px 18px !important;
+    font-weight: 400 !important;
+  }
+</style>
+<script>
+
+const COMPONENTS = [
+  {
+    id: 'nav-bubble',
+    label: 'nav bubble',
+    render: () => `
+      <h2>nav bubble</h2>
+      <p class="demo-label">Inline split nav — hover each side to expand · click to set active · "/" stays centered</p>
+      <div class="demo-row nav-bubble-demo">
+        <div class="nav-inline-row nav-inline-row--split" data-nav-inline-row>
+          <nav class="topnav nav-inline-segment" data-fluid-nav>
+            <div class="nav-bar-inner">
+              <a href="javascript:void(0)" data-demo-nav>home</a>
+              <a href="javascript:void(0)" data-demo-nav>stable</a>
+              <a href="javascript:void(0)" data-demo-nav>ml</a>
+              <a href="javascript:void(0)" class="active" data-demo-nav>admin</a>
+            </div>
+          </nav>
+          <span class="nav-inline-sep" aria-hidden="true">/</span>
+          <nav class="subnav nav-inline-segment" data-fluid-nav>
+            <div class="nav-bar-inner">
+              <a href="javascript:void(0)" class="active" data-demo-nav>design</a>
+              <a href="javascript:void(0)" data-demo-nav>matching</a>
+              <a href="javascript:void(0)" data-demo-nav>update</a>
+            </div>
+          </nav>
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'panels',
+    label: 'panels',
+    render: () => `
+      <h2>panels</h2>
+      <p class="demo-label">Pearl fill panels — warm glass surface at 100% intensity.</p>
+      <div class="demo-row">
+        <div class="glass-panel demo-glass">
+          default
+        </div>
+      </div>
+      <p class="demo-label" style="margin-top:16px">Shape</p>
+      <div class="demo-row" style="margin-top:8px">
+        <div class="glass-panel demo-glass" style="width:200px;min-height:80px;border-radius:16px">
+          rounded
+        </div>
+        <div class="glass-panel demo-glass" style="width:200px;min-height:80px;border-radius:4px">
+          sharp
+        </div>
+      </div>
+      ${sphereCollapsibleSection('race-panels', 'race panels', `
+        <div class="race-panels-collapsible">
+          <p class="demo-label">Race layout — production race bars — one per game type (demo text)</p>
+          <div class="demo-hybrid-stack">${hybridPanelStackHtml()}</div>
+          <p class="demo-label" style="margin-top:20px">Race layout — live ATG (V85-2 Boden)</p>
+          <div class="demo-hybrid-stack"><div id="hybridXpV85Stack"></div></div>
+        </div>
+      `)}
+      ${sphereCollapsibleSection('race-title-experiment', 'race title experiment', `
+        <div class="race-title-experiment">
+          <p class="demo-label">Frosted glass fill + game-type plasma outline — shared white glow.</p>
+          <div class="demo-hybrid-stack">${hybridPanelStackHtml(undefined, { raceStyle: true })}</div>
+        </div>
+      `)}
+      ${sphereCollapsibleSection('form-panels', 'form panels', `
+        <p class="demo-label">Frosted pearl fill — sign-based green/red deltas.</p>
+        <div class="demo-form-panels-grid">
+          ${formPanelDemoHtml({ variant: 'hot', frosted: true, experiment: true })}
+          ${formPanelDemoHtml({ variant: 'cold', frosted: true, experiment: true })}
+        </div>
+      `)}
+    `
+  },
+  {
+    id: 'game-type-symbols',
+    label: 'symbols',
+    render: () => `
+      <h2>game type symbols</h2>
+      <p class="demo-label">SVG logos shared with sphere buttons and hybrid panels.</p>
+      ${gameTypeSymbolsDemoHtml()}
+      <div class="symbols-section">
+        <h2>track names</h2>
+        <p class="demo-label">ATGRubrik — seven tracks from the database, chosen to show a–z, å, ä, ö and hyphen at least once.</p>
+        ${trackNameSymbolsDemoHtml()}
+      </div>
+    `
+  },
+  {
+    id: 'link-hover',
+    label: 'link hover',
+    render: () => `
+      <h2>link hover</h2>
+      <p class="demo-label">Plain anchor hover — accent grey.</p>
+      <div class="demo-row demo-links">
+        <a href="javascript:void(0)">Aubrion du Gers</a>
+        <a href="javascript:void(0)">Bold Eagle</a>
+        <a href="javascript:void(0)">Calgary Games</a>
+        <a href="javascript:void(0)">Donato Hanover</a>
+        <a href="javascript:void(0)">Ettonant</a>
+        <a href="javascript:void(0)">Face Time Bourbon</a>
+        <a href="javascript:void(0)">Ganymede</a>
+      </div>
+      <p class="demo-label" style="margin-top:18px">Fluid clickable (.fluid-highlight) — same as plain anchor hover.</p>
+      <div class="demo-row demo-links">
+        <a href="javascript:void(0)" class="fluid-highlight">Alessandro Gocciadoro</a>
+        <a href="javascript:void(0)" class="fluid-highlight">Carl Johan Jepson</a>
+        <a href="javascript:void(0)" class="fluid-highlight">Jos Verbeek</a>
+        <a href="javascript:void(0)" class="fluid-highlight">Örjan Kihlström</a>
+        <a href="javascript:void(0)" class="fluid-highlight">Romain Derieux</a>
+      </div>
+    `
+  },
+  {
+    id: 'fluid-toggle',
+    label: 'fluid toggle',
+    render: () => `
+      <h2>fluid toggle</h2>
+      <p class="demo-label">Segmented pill toggle — glass thumb glides between options. Same component used on the home dashboard.</p>
+      <div class="demo-row demo-fluid-toggle-demo">
+        <div class="demo-fluid-toggle-scale">
+          <div class="period-toggle fluid-toggle fluid-toggle--segmented" data-demo-toggle-group>
+            <button class="period-btn fluid-toggle__btn active" data-demo-toggle>7d</button>
+            <button class="period-btn fluid-toggle__btn" data-demo-toggle>30d</button>
+            <button class="period-btn fluid-toggle__btn" data-demo-toggle>90d</button>
+            <button class="period-btn fluid-toggle__btn" data-demo-toggle>1y</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="demo-label" style="margin-top:20px">Two-option variant</p>
+      <div class="demo-row demo-fluid-toggle-demo">
+        <div class="demo-fluid-toggle-scale">
+          <div class="period-toggle fluid-toggle fluid-toggle--segmented" data-demo-toggle-group>
+            <button class="period-btn fluid-toggle__btn active" data-demo-toggle>in form</button>
+            <button class="period-btn fluid-toggle__btn" data-demo-toggle>out of form</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="demo-label" style="margin-top:28px">Plasma toggles</p>
+      <p class="demo-label">Hot / cold — warm in-form plasma vs icy out-of-form. Stretch, snap, and drag.</p>
+      <div class="demo-row plasma-toggle-demo">
+        ${formBubbleToggleHtml({ variant: 'hot-cold' })}
+      </div>
+      <div class="demo-row plasma-toggle-demo" style="margin-top:16px">
+        <div class="glass-panel demo-fluid-toggle-panel">
+          ${formBubbleToggleHtml({ variant: 'hot-cold' })}
+        </div>
+      </div>
+
+      <p class="demo-label" style="margin-top:28px">On / off</p>
+      <p class="demo-label">Bright green on vs white off.</p>
+      <div class="demo-row plasma-toggle-demo">
+        ${formBubbleToggleHtml({ variant: 'on-off' })}
+      </div>
+      <div class="demo-row plasma-toggle-demo" style="margin-top:16px">
+        <div class="glass-panel demo-fluid-toggle-panel">
+          ${formBubbleToggleHtml({ variant: 'on-off' })}
+        </div>
+      </div>
+
+      <p class="demo-label" style="margin-top:20px">On a glass panel (real dashboard context)</p>
+      <div class="demo-row demo-fluid-toggle-demo">
+        <div class="glass-panel demo-fluid-toggle-panel">
+          <div class="demo-fluid-toggle-scale">
+            <div class="period-toggle fluid-toggle fluid-toggle--segmented" data-demo-toggle-group>
+              <button class="period-btn fluid-toggle__btn active" data-demo-toggle>10</button>
+              <button class="period-btn fluid-toggle__btn" data-demo-toggle>20</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="demo-label" style="margin-top:20px">Tabs variant (underline row)</p>
+      <div class="demo-row demo-fluid-toggle-demo">
+        <div class="demo-fluid-toggle-scale">
+          <div class="sort-tabs fluid-toggle fluid-toggle--tabs" data-demo-toggle-group>
+            <button class="sort-tab fluid-toggle__btn active" data-demo-toggle>earnings</button>
+            <button class="sort-tab fluid-toggle__btn" data-demo-toggle>time</button>
+            <button class="sort-tab fluid-toggle__btn" data-demo-toggle>win%</button>
+          </div>
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'source-pills',
+    label: 'source pills',
+    render: () => `
+      <h2>source pills</h2>
+      <p class="demo-label">Colored pills per data source — inline or standalone</p>
+      <div class="demo-row demo-pills">
+        <span class="src-pill st">ST</span>
+        <span class="src-pill atg">ATG</span>
+        <span class="src-pill letrot">LeTrot</span>
+        <span class="src-pill kmtid">xLabs</span>
+      </div>
+      <div class="demo-row demo-pills" style="margin-top:8px">
+        <span class="src-pill sm st">ST</span>
+        <span class="src-pill sm atg">ATG</span>
+        <span class="src-pill sm letrot">LeTrot</span>
+        <span class="src-pill sm kmtid">xLabs</span>
+      </div>
+      <div class="demo-row demo-pills" style="margin-top:8px">
+        <span class="src-pill dot st"></span>
+        <span class="src-pill dot atg"></span>
+        <span class="src-pill dot letrot"></span>
+        <span class="src-pill dot kmtid"></span>
+      </div>
+    `
+  },
+  {
+    id: 'position-gold',
+    label: '1st place gold',
+    render: () => `
+      <h2>1st place gold</h2>
+      <p class="demo-label">Win placement gets accent-first color + glow shadow</p>
+      <div class="demo-row demo-pos-row">
+        <span class="pos-1">1</span>
+        <span>2</span>
+        <span>3</span>
+        <span class="muted">4</span>
+        <span class="muted">5</span>
+      </div>
+    `
+  },
+  {
+    id: 'sliders',
+    label: 'sliders',
+    render: () => `
+      <h2>sliders</h2>
+      <p class="demo-label">Ink-tinted slider fill on pearl panels — drag the bar edge (same as production stats filters).</p>
+      <div class="glass-panel" style="padding:20px 22px 24px;max-width:560px">
+      <div class="demo-row" style="flex-direction:column;align-items:stretch;gap:32px">
+        <div>
+          <p class="demo-label">Single (min-threshold)</p>
+          <div id="demoSliderSingle"></div>
+        </div>
+        <div>
+          <p class="demo-label">Dual (range) <span class="val" id="demoSliderDualVal" style="float:right;color:var(--fg);font-size:11px;text-transform:none;letter-spacing:0"></span></p>
+          <div id="demoSliderDual"></div>
+        </div>
+        <div>
+          <p class="demo-label">Log scale (earnings) <span class="val" id="demoSliderLogVal" style="float:right;color:var(--fg);font-size:11px;text-transform:none;letter-spacing:0"></span></p>
+          <div id="demoSliderLog"></div>
+        </div>
+      </div>
+      </div>
+    `
+  },
+  {
+    id: 'fills',
+    label: 'fills',
+    render: () => `
+      <h2>fills</h2>
+      <p class="demo-label">Pearl intensity sandbox — panels use 100% by default; drag to preview softer variants.</p>
+      <div class="demo-fills">
+        <div class="pearl-pill" id="demoPearlPill" aria-hidden="true"></div>
+        <div>
+          <p class="demo-label">intensity <span class="val" id="demoFillIntensityVal" style="float:right;color:var(--fg);font-size:11px;text-transform:none;letter-spacing:0">0</span></p>
+          <div id="demoFillIntensity"></div>
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'inputs',
+    label: 'inputs & buttons',
+    render: () => `
+      <h2>inputs &amp; buttons</h2>
+      <p class="demo-label">Ghost buttons and text inputs</p>
+      <div class="demo-row demo-input-row">
+        <button class="ghost">run update</button>
+        <button class="ghost" disabled>disabled</button>
+      </div>
+      <div class="demo-row demo-input-row" style="margin-top:12px">
+        <input type="text" placeholder="search horse..." style="width:200px">
+        <input type="date" value="2026-06-04">
+      </div>
+    `
+  },
+  {
+    id: 'typography',
+    label: 'typography',
+    render: () => `
+      <h2>typography</h2>
+      <p class="demo-label">Font: Source Code Pro — monospace throughout</p>
+      <div class="demo-text-block" style="margin-bottom:20px">
+        <div style="font-size:28px;font-weight:600;color:var(--fg-heading);margin-bottom:8px">Heading (28px/600)</div>
+        <div style="font-size:14px;margin-bottom:4px">Body text — default 14px/400</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">Body bold — 14px/600</div>
+        <div class="muted" style="font-size:12px;margin-bottom:4px">Muted small — 12px fg-muted</div>
+        <div style="font-size:11px;letter-spacing:1px;color:var(--fg-muted)">LABEL — 11px tracking 1px</div>
+      </div>
+    `
+  },
+  {
+    id: 'caret',
+    label: 'blinking caret',
+    render: () => `
+      <div class="demo-caret-layout">
+        <h2>blinking caret</h2>
+        <p class="demo-label">Search-page caret enlarged for sandbox — type to try it (no results).</p>
+        <div class="demo-row demo-caret-demo">
+          <div class="demo-caret-field" id="demoCaretField">
+            <span class="demo-caret-measure" id="demoCaretMeasure" aria-hidden="true"></span>
+            <span class="fake-caret" id="demoFakeCaret" aria-hidden="true"></span>
+            <input type="text" id="demoCaretInput" autocomplete="off" spellcheck="false" aria-label="Caret demo input">
+          </div>
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'colors',
+    label: 'color palette',
+    render: () => `
+      <h2>color palette</h2>
+      <p class="demo-label">CSS custom properties</p>
+      <div class="demo-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+        ${[
+          ['--fg-heading', 'fg-heading'],
+          ['--fg', 'fg'],
+          ['--fg-muted', 'fg-muted'],
+          ['--accent-first', 'accent-first'],
+          ['--accent-hot', 'accent-hot'],
+          ['--accent-cold', 'accent-cold'],
+          ['--accent-glow', 'accent-glow'],
+          ['--border', 'border'],
+          ['--panel-bg', 'panel-bg'],
+          ['--src-st', 'src-st'],
+          ['--src-atg', 'src-atg'],
+          ['--src-letrot', 'src-letrot'],
+          ['--src-kmtid', 'src-kmtid'],
+        ].map(([v,l]) => `
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:28px;height:18px;border-radius:4px;background:var(${v});border:1px solid var(--border);display:inline-block"></span>
+            <span style="font-size:12px;color:var(--fg-muted)">${l}</span>
+          </div>
+        `).join('')}
+      </div>
+    `
+  },
+  {
+    id: 'sphere-button',
+    label: 'sphere button',
+    render: () => `
+      ${sphereCollapsibleSection('game-types', 'sphere button', `
+        <p class="demo-label">Round fluid-bubble button — same glass recipe as the nav indicator. Nearly transparent; background shows through.</p>
+        <div class="sphere-row sphere-row--plain">${sphereBubblesHtml()}</div>
+      `, { open: true })}
+      ${sphereCollapsibleSection('tracks', 'sphere button (tracks)', `
+        <p class="demo-label">Track bubbles on glass — standard · jackpot (gold replaces cyan).</p>
+        <div class="sphere-tracks-compare">
+          ${sphereTrackCompareRowsHtml([
+            trackComparePair('Solvalla', 'v85'),
+            trackComparePair('Åby', 'v64'),
+            trackComparePair('Bjerke', 'v65'),
+            trackComparePair('Bergsåker', 'v86'),
+            trackComparePair('Tingsryd', 'gs75'),
+          ])}
+        </div>
+      `)}
+      ${sphereCollapsibleSection('behavior', 'sphere behavior', `
+        <div class="sphere-behavior-demos">
+          <div class="sphere-behavior-demo">
+            <p class="demo-label">Färjestad — V64 headline + cyan pools · home size (87px)</p>
+            <div class="game-type-row design-game-type-row">
+              ${sphereBehaviorClusterHtml({
+                trackName: 'Färjestad',
+                gameTypeId: 'v64',
+                satelliteIds: ['v64', 'vinnare', 'dd', 'v4', 'plats'],
+                sphereSize: 87,
+              })}
+            </div>
+          </div>
+          <div class="sphere-behavior-demo">
+            <p class="demo-label">Solvalla — max length · V85 headline + 13 cyan pools · home size (87px)</p>
+            <div class="game-type-row design-game-type-row">
+              ${sphereBehaviorClusterHtml({
+                trackName: 'Solvalla',
+                gameTypeId: 'v85',
+                satelliteIds: sphereBehaviorMaxDemoIds('v85'),
+                sphereSize: 87,
+              })}
+            </div>
+          </div>
+          <div class="sphere-behavior-demo">
+            <p class="demo-label">Boden — V85 jackpot · track blue+gold · headline V85 blue+gold · cyan satellites (vinnare, dd …) · home size (87px)</p>
+            <div class="game-type-row design-game-type-row">
+              ${sphereBehaviorClusterHtml({
+                trackName: 'Boden',
+                gameTypeId: 'v85',
+                satelliteIds: ['v85', 'vinnare', 'dd', 'v4', 'plats'],
+                sphereSize: 87,
+                jackpot: true,
+              })}
+            </div>
+          </div>
+        </div>
+      `)}
+      ${sphereCollapsibleSection('behavior-day', 'multiple headlines', `
+        <p class="demo-label">Home page row — wired ATG layout at 87px. Collapsed anchors sit tight; expand one to reflow. Inactive tracks fade.</p>
+        <div class="upcoming-races__stage">
+          <div class="game-type-row design-game-type-row">
+            ${homeTrackBehaviorDayHtml()}
+          </div>
+        </div>
+        <div class="demo-headlines-glass-xp">
+          <p class="demo-label">Experimental — same row on frosted glass (five tracks, 87px)</p>
+          <div class="glass-panel demo-headlines-glass">
+            <div class="upcoming-races__stage">
+              <div class="game-type-row design-game-type-row">
+                ${designHeadlinesGlassDayHtml()}
+              </div>
+            </div>
+          </div>
+        </div>
+      `, { open: true })}
+    `
+  },
+];
+
+const nav = document.getElementById('designNav');
+const stage = document.getElementById('designStage');
+
+const SPHERE_COLLAPSIBLE_STORAGE = 'design-sphere-collapsible';
+
+function sphereCollapsibleSection(id, title, bodyHtml, { open = false } = {}) {
+  return `
+    <section class="sphere-collapsible${open ? ' is-open' : ''}" data-sphere-collapsible="${id}">
+      <button type="button" class="sphere-collapsible__toggle" aria-expanded="${open ? 'true' : 'false'}">
+        <span class="sphere-collapsible__chevron" aria-hidden="true">›</span>
+        <h2>${title}</h2>
+      </button>
+      <div class="sphere-collapsible__panel">
+        ${bodyHtml}
+      </div>
+    </section>`;
+}
+
+function setSphereCollapsibleOpen(section, open, { persist = false } = {}) {
+  section.classList.toggle('is-open', open);
+  const toggle = section.querySelector('.sphere-collapsible__toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (persist) {
+    sessionStorage.setItem(`${SPHERE_COLLAPSIBLE_STORAGE}:${section.dataset.sphereCollapsible}`, open ? '1' : '0');
+  }
+}
+
+function initSphereCollapsibles(root) {
+  root.querySelectorAll('[data-sphere-collapsible]').forEach(section => {
+    const id = section.dataset.sphereCollapsible;
+    const stored = sessionStorage.getItem(`${SPHERE_COLLAPSIBLE_STORAGE}:${id}`);
+    if (stored !== null) {
+      setSphereCollapsibleOpen(section, stored === '1');
+    }
+
+    section.querySelector('.sphere-collapsible__toggle')?.addEventListener('click', () => {
+      setSphereCollapsibleOpen(section, !section.classList.contains('is-open'), { persist: true });
+    });
+  });
+}
+
+COMPONENTS.forEach((c, i) => {
+  const btn = document.createElement('button');
+  btn.textContent = c.label;
+  btn.dataset.idx = i;
+  if (i === 0) btn.classList.add('active');
+  btn.addEventListener('click', () => selectComponent(i));
+  nav.appendChild(btn);
+});
+
+function selectComponent(idx) {
+  nav.querySelectorAll('button').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  stage.innerHTML = COMPONENTS[idx].render();
+  afterRender(COMPONENTS[idx].id);
+}
+
+function afterRender(id) {
+  if (typeof initFluidToggles === 'function') initFluidToggles(stage);
+  if (typeof initFluidHighlights === 'function') initFluidHighlights(stage);
+  // Wire the glass bubble into the demo nav(s), same path the live header uses.
+  if (typeof initFluidNav === 'function') initFluidNav(stage);
+
+  if (id === 'nav-bubble') {
+    stage.querySelectorAll('[data-demo-nav]').forEach(a => {
+      a.addEventListener('click', () => {
+        const navInner = a.closest('.nav-bar-inner');
+        navInner.querySelectorAll('[data-demo-nav]').forEach(x => x.classList.remove('active'));
+        a.classList.add('active');
+        if (typeof syncFluidNav === 'function') syncFluidNav(navInner, true);
+      });
+    });
+  }
+
+  if (id === 'fluid-toggle') {
+    // Scope active-state to each toggle group so they move independently.
+    stage.querySelectorAll('[data-demo-toggle-group]').forEach(group => {
+      group.querySelectorAll('[data-demo-toggle]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('[data-demo-toggle]').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+    stage.querySelectorAll('[data-form-bubble-toggle]').forEach(group => {
+      if (typeof initFormBubbleToggle === 'function') initFormBubbleToggle(group);
+    });
+  }
+
+  if (id === 'sphere-button') {
+    initSphereCollapsibles(stage);
+    if (typeof initSphereBehaviorCluster === 'function') initSphereBehaviorCluster(stage);
+    if (typeof initSphereBehaviorDay === 'function') initSphereBehaviorDay(stage);
+    if (typeof initSphereClickFlash === 'function') initSphereClickFlash(stage);
+  }
+
+  if (id === 'panels') {
+    initSphereCollapsibles(stage);
+    loadHybridXpV85Panels(stage);
+  }
+
+  if (id === 'sliders') {
+    initDemoSliders(stage);
+  }
+
+  if (id === 'fills') {
+    initDemoFills(stage);
+  }
+
+  if (id === 'caret') {
+    initDemoCaret(stage);
+  }
+
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function lerpChannel(from, to, t) {
+  return Math.round(lerp(from, to, t));
+}
+
+function applyPearlIntensity(el, intensity, opts = {}) {
+  const t = Math.max(0, Math.min(100, intensity)) / 100;
+  const liquid = document.documentElement.classList.contains('liquid');
+  const slider = !!opts.slider;
+
+  if (!liquid) {
+    el.style.background = '';
+    el.style.removeProperty('--pearl-blur');
+    el.style.removeProperty('--pearl-saturate');
+    el.style.removeProperty('--pearl-inset');
+    el.style.removeProperty('--pearl-glow');
+    return;
+  }
+
+  const alpha = lerp(0.52, 0.88, t);
+  const blur = lerp(12, 6, t);
+  const sat = lerp(1.6, 3, t);
+  const inset = lerp(0.7, 0.95, t);
+  const glowSpread = lerp(6, 22, t);
+  const glowCore = lerp(0.18, 0.42, t);
+  const warmGlow = lerp(0, 0.22, t);
+
+  // Lerp each gradient stop from neutral white → warm pearl (no blue).
+  const stops = [
+    { pos: '0%', r: 255, g: 253, b: 255, a: alpha },
+    { pos: '50%', r: 255, g: 248, b: 252, a: alpha * 0.94 },
+    { pos: '100%', r: 255, g: 255, b: 255, a: alpha * 0.9 },
+  ].map(s => {
+    const r = lerpChannel(255, s.r, t);
+    const g = lerpChannel(255, s.g, t);
+    const b = lerpChannel(255, s.b, t);
+    const a = lerp(0.52, s.a, t);
+    return `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)}) ${s.pos}`;
+  });
+
+  el.style.background = `linear-gradient(135deg, ${stops.join(', ')})`;
+  el.style.setProperty('--pearl-blur', `${blur.toFixed(1)}px`);
+  el.style.setProperty('--pearl-saturate', sat.toFixed(2));
+  el.style.setProperty('--pearl-inset', inset.toFixed(2));
+  el.style.setProperty('--pearl-glow', slider ? 'none' : [
+    `0 0 ${glowSpread.toFixed(0)}px rgba(255, 255, 255, ${glowCore.toFixed(2)})`,
+    `0 0 ${(glowSpread * 0.85).toFixed(0)}px rgba(255, 220, 235, ${warmGlow.toFixed(2)})`,
+  ].join(', '));
+}
+
+function initDemoSliders(root) {
+  if (typeof STAT === 'undefined' || !STAT.makeSlider) return;
+
+  STAT.makeSlider(root.querySelector('#demoSliderSingle'), { min: 0, max: 100, dual: false });
+  STAT.makeSlider(root.querySelector('#demoSliderDual'), { min: 0, max: 500, dual: true, valEl: root.querySelector('#demoSliderDualVal') });
+  STAT.makeSlider(root.querySelector('#demoSliderLog'), { min: 0, max: 50000000, dual: false, scale: 'log', valEl: root.querySelector('#demoSliderLogVal'), fmt: v => STAT.krShort(v) });
+}
+
+function initDemoFills(root) {
+  const pill = root.querySelector('#demoPearlPill');
+  const mount = root.querySelector('#demoFillIntensity');
+  const valEl = root.querySelector('#demoFillIntensityVal');
+  if (!pill || !mount || typeof STAT === 'undefined' || !STAT.makeSlider) return;
+
+  STAT.makeSlider(mount, { min: 0, max: 100, dual: false });
+  const hi = mount.querySelector('.hi');
+  if (!hi) return;
+
+  hi.value = 1000;
+
+  function sync() {
+    const intensity = (+hi.value / 1000) * 100;
+    if (valEl) valEl.textContent = String(Math.round(intensity));
+    applyPearlIntensity(pill, intensity);
+  }
+
+  hi.addEventListener('input', sync);
+  sync();
+}
+
+function initDemoCaret(root) {
+  const input = root.querySelector('#demoCaretInput');
+  const field = root.querySelector('#demoCaretField');
+  const measure = root.querySelector('#demoCaretMeasure');
+  const fakeCaret = root.querySelector('#demoFakeCaret');
+  if (!input || !field || !measure || !fakeCaret) return;
+
+  function positionFakeCaret() {
+    measure.textContent = input.value;
+    const textWidth = measure.getBoundingClientRect().width;
+    const fieldWidth = field.getBoundingClientRect().width;
+    const caretWidth = fakeCaret.getBoundingClientRect().width;
+    const left = (fieldWidth - textWidth - caretWidth) / 2 + textWidth;
+    fakeCaret.style.left = `${left}px`;
+  }
+
+  function syncFakeCaret() {
+    field.classList.toggle('is-focused', document.activeElement === input);
+    positionFakeCaret();
+  }
+
+  input.addEventListener('focus', syncFakeCaret);
+  input.addEventListener('blur', syncFakeCaret);
+  input.addEventListener('input', positionFakeCaret);
+  input.addEventListener('keyup', positionFakeCaret);
+  input.addEventListener('click', positionFakeCaret);
+
+  if (initDemoCaret._onResize) {
+    window.removeEventListener('resize', initDemoCaret._onResize);
+  }
+  initDemoCaret._onResize = positionFakeCaret;
+  window.addEventListener('resize', initDemoCaret._onResize);
+
+  input.focus();
+  syncFakeCaret();
+}
+
+async function loadHybridXpV85PanelInto(root, mountSelector) {
+  const mount = root.querySelector(mountSelector);
+  if (!mount || typeof buildHybridXpGamePanelsHtml !== 'function') return;
+  const gameId = window.HYBRID_XP_V85_DEMO_GAME_ID || 'V85_2026-06-13_11_5';
+  try {
+    const res = await fetch(`/api/atg/game/${encodeURIComponent(gameId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const races = (data.races || []).filter(r => r.raceNumber === 2);
+    mount.innerHTML = buildHybridXpGamePanelsHtml(data.gameType || 'v85', races);
+  } catch (_) { /* keep empty on failure */ }
+}
+
+async function loadHybridXpV85Panels(root) {
+  await loadHybridXpV85PanelInto(root, '#hybridXpV85Stack');
+}
+
+selectComponent(0);
+</script>
+{% endblock %}

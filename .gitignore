@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 .env
 venv/
+.venv-ml/
+web/ml_artifacts/
 *.swp
 .DS_Store
 logs/*.log
@@ -11,3 +13,10 @@ logs/*.js
 logs/*.cookies
 # fx_cache.json is regenerated on demand from Riksbank API
 logs/fx_cache.json
+logs/
+
+# One-off analysis / merge review outputs (large, regenerable)
+out/
+
+# Local IDE
+.cursor/

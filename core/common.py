@@ -179,6 +179,41 @@ def derive_start_method_from_time(km_time_text: Optional[str]) -> Optional[str]:
     return 'V'
 
 
+def classify_letrot_placement(code: Optional[str]) -> dict:
+    """Map a LeTrot ARRIVÉE *rang* code to canonical result flags.
+
+    French trot has no "broke gait but kept its place" concept the way Swedish
+    trot does — breaking gait (allure irrégulière) is an automatic *distancement*
+    (disqualification). So in the French data the distancé family IS the galopp
+    signal, and we set ``galopp`` together with ``disqualified``.
+
+    Returns the subset of ``{'galopp','disqualified','withdrawn'}`` that should
+    be True for this code. An empty dict means "normal finisher / unknown" —
+    leave the flags at their defaults (we deliberately skip ambiguous codes
+    like CV / FM / G* / H* / R* rather than guess).
+
+        'DA'  -> distancé attelé      (gait-break DQ)  -> galopp + disqualified
+        'D','D0'..'D9','DM','DAI'     (distancé family) -> galopp + disqualified
+        'NP'  -> non partant          (did not start)   -> withdrawn
+        'A'   -> arrêté (pulled up)   (DNF)             -> disqualified
+        'T'   -> tombé (fell)         (DNF)             -> disqualified
+        '1'..'9', '0', '<n>D/H/R'     finisher/unplaced -> {}  (no flags)
+    """
+    c = (code or "").strip().upper()
+    if not c:
+        return {}
+    if c == "NP":
+        return {"withdrawn": True}
+    if c in ("A", "T"):
+        return {"disqualified": True}
+    # Distancé family: 'D', 'DA', 'DM', 'DAI', 'D0'..'D9'. NOT '<digit>D' (a
+    # finisher like '4D') — those start with a digit, so the leading-D guard
+    # keeps them out.
+    if c in ("DA", "DM", "DAI") or re.fullmatch(r"D[0-9]?", c):
+        return {"galopp": True, "disqualified": True}
+    return {}
+
+
 def normalize_country(code: Optional[str]) -> Optional[str]:
     if not code:
         return None

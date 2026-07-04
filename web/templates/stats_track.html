@@ -1,0 +1,257 @@
+{% extends "_layout.html" %}
+{% block title %}track stats - stable{% endblock %}
+
+{% block extra_style %}
+  .postviz { padding: 20px 22px 24px; margin-bottom: 26px; }
+  .postviz__head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .postviz__title { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--fg-muted); }
+  .postviz__head .fspacer { flex: 1; }
+  .track-select {
+    font-family: inherit; font-size: 13px; color: var(--fg); background: var(--panel-bg);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px; cursor: pointer;
+    max-width: 260px;
+  }
+  .postviz__legend { font-size: 10px; color: var(--fg-muted); letter-spacing: 0.4px; display: flex; align-items: center; gap: 6px; }
+
+  .bars { display: flex; flex-direction: column; gap: 7px; }
+  .bar-row { display: grid; grid-template-columns: 34px 1fr 52px; align-items: center; gap: 12px; }
+  .bar-post {
+    font-family: ATGRubrik, sans-serif; font-size: 20px; line-height: 1; text-align: center;
+    color: var(--fg-heading);
+  }
+  .bar-lane { position: relative; height: 18px; border-radius: 5px; background: rgba(127,127,127,0.08); overflow: visible; }
+  .bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%; border-radius: 5px;
+    transition: width 0.45s cubic-bezier(0.4,1,0.5,1), background 0.3s;
+  }
+  .bar-avg-mark {
+    position: absolute; top: -1px; bottom: -1px; width: 1.5px;
+    background: var(--fg-muted); opacity: 0.55; border-radius: 1px;
+    transition: left 0.45s cubic-bezier(0.4,1,0.5,1);
+  }
+  .bar-val { font-size: 12px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .bar-val.dim { color: var(--fg-muted); }
+  .bar-row.empty .bar-lane { opacity: 0.4; }
+{% endblock %}
+
+{% block content %}
+<div class="stats-page">
+  {% include 'partials/stats_ui.html' %}
+
+  <div class="stats-head">
+    <h1>tracks</h1>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="glass-panel postviz" id="postviz">
+    <div class="postviz__head">
+      <span class="postviz__title">post positions</span>
+      <select class="track-select" id="trackSelect"></select>
+      <div class="seg" id="segMetric">
+        <button data-v="win" class="active">win%</button>
+        <button data-v="gal">gal%</button>
+      </div>
+      <div class="seg" id="segMethod">
+        <button data-v="auto" class="active">auto</button>
+        <button data-v="volt">volt</button>
+      </div>
+      <span class="fspacer"></span>
+      <span class="postviz__legend"><span style="width:1.5px;height:14px;border-radius:1px;background:var(--fg-muted);opacity:0.55;display:inline-block"></span> avg</span>
+    </div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="filters__head">
+      <span class="ftitle">filters</span>
+      <span class="fspacer"></span>
+      <span class="filters__chev">▾</span>
+    </div>
+    <div class="filters__body">
+      <div class="filter-grid">
+        <div class="fld">
+          <label>method</label>
+          <div class="seg" id="segTblMethod">
+            <button data-v="any" class="active">any</button>
+            <button data-v="auto">auto</button>
+            <button data-v="volt">volt</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>surface</label>
+          <div class="seg" id="segSurface">
+            <button data-v="" class="active">any</button>
+            <button data-v="sand">sand</button>
+            <button data-v="grass">grass</button>
+          </div>
+        </div>
+        <div class="fld"><label>races <span class="val" id="vRaces"></span></label><div id="sRaces"></div></div>
+        <div class="fld"><label>gal% <span class="val" id="vGal"></span></label><div id="sGal"></div></div>
+        <div class="fld"><label>length (m) <span class="val" id="vLen"></span></label><div id="sLen"></div></div>
+        <div class="fld"><label>avg winner odds <span class="val" id="vOdds"></span></label><div id="sOdds"></div></div>
+      </div>
+      <div class="filters__actions">
+        <button class="btn" id="applyBtn">apply</button>
+        <button class="btn btn--ghost" id="resetBtn">reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="stbl">
+      <thead id="thead">
+        <tr>
+          <th class="l">#</th>
+          <th class="l" data-sort="name" data-defdir="asc">name</th>
+          <th class="l">country</th>
+          <th data-sort="length">length</th>
+          <th data-sort="width">width</th>
+          <th class="l">surface</th>
+          <th data-sort="races">races</th>
+          <th data-sort="galrate" data-defdir="asc">gal%</th>
+          <th>gal% (a)</th>
+          <th>gal% (v)</th>
+          <th data-sort="avg_winner_odds">avg odds</th>
+          <th>top post</th>
+          <th>top post (rel)</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="foot"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const S = STAT;
+  S.bindPanel(document.getElementById('filters'));
+
+  // ---------- post-position visualisation ----------
+  let vizTrack = null;
+  const segMetric = S.seg(document.getElementById('segMetric'), loadViz);
+  const segMethod = S.seg(document.getElementById('segMethod'), loadViz);
+  const barsEl = document.getElementById('bars');
+
+  function barColor(value, avg, metric) {
+    if (value == null || avg == null || avg === 0) return 'var(--fg-muted)';
+    let rel = (value - avg) / avg;            // +ve = above average
+    if (metric === 'gal') rel = -rel;         // high gal% is bad → flip
+    const c = Math.max(-1, Math.min(1, rel / 0.4));
+    const hue = 8 + (c + 1) / 2 * (142 - 8);  // 8=red … 142=green
+    return `hsl(${hue.toFixed(0)}, 52%, 46%)`;
+  }
+
+  async function loadViz() {
+    if (vizTrack == null) return;
+    const metric = segMetric.value(), method = segMethod.value();
+    const res = await fetch(`/api/stats/track-posts?track_id=${vizTrack}&method=${method}&metric=${metric}`);
+    const data = await res.json();
+    const posts = data.posts;
+    // Scale: each post's bar goes to 100% at the global max for that position.
+    barsEl.innerHTML = posts.map(p => {
+      const has = p.value != null;
+      const scale = p.max || 1;
+      const w = has ? Math.min((p.value / scale) * 100, 100) : 0;
+      const avgPos = p.avg != null ? Math.min((p.avg / scale) * 100, 100) : null;
+      const col = barColor(p.value, p.avg, metric);
+      const avgMark = avgPos != null
+        ? `<div class="bar-avg-mark" style="left:${avgPos.toFixed(1)}%"></div>` : '';
+      return `<div class="bar-row${has ? '' : ' empty'}">
+        <div class="bar-post">${p.post}</div>
+        <div class="bar-lane">
+          <div class="bar-fill" style="width:${w.toFixed(1)}%;background:${col}"></div>
+          ${avgMark}
+        </div>
+        <div class="bar-val${has ? '' : ' dim'}">${has ? p.value.toFixed(1) : '–'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  async function initViz() {
+    const res = await fetch('/api/stats/track-options');
+    const opts = await res.json();
+    const sel = document.getElementById('trackSelect');
+    sel.innerHTML = opts.map(o => `<option value="${o.track_id}">${esc(o.name)}</option>`).join('');
+    if (opts.length) { vizTrack = opts[0].track_id; loadViz(); }
+    sel.addEventListener('change', () => { vizTrack = +sel.value; loadViz(); });
+  }
+  initViz();
+
+  // ---------- track table ----------
+  const segTblMethod = S.seg(document.getElementById('segTblMethod'), () => { if (state.applied) load(); });
+  const segSurface = S.seg(document.getElementById('segSurface'));
+  const sl = {
+    races: S.makeSlider(document.getElementById('sRaces'), { min: 0, max: 35000, dual: true, valEl: vRaces }),
+    gal:   S.makeSlider(document.getElementById('sGal'),   { min: 0, max: 50, dual: true, valEl: vGal, fmt: v => v + '%' }),
+    len:   S.makeSlider(document.getElementById('sLen'),   { min: 600, max: 1200, step: 10, dual: true, valEl: vLen }),
+    odds:  S.makeSlider(document.getElementById('sOdds'),  { min: 0, max: 20, step: 0.5, dual: true, valEl: vOdds }),
+  };
+
+  const state = { sort: 'races', dir: 'desc', applied: false };
+
+  function buildParams() {
+    const p = { method: segTblMethod.value(), sort: state.sort, dir: state.dir };
+    if (segSurface.value()) p.surface = segSurface.value();
+    S.addBounds(p, 'races', sl.races.bounds());
+    S.addBounds(p, 'galrate', sl.gal.bounds());
+    S.addBounds(p, 'length', sl.len.bounds());
+    S.addBounds(p, 'odds', sl.odds.bounds());
+    return p;
+  }
+
+  const tbody = document.getElementById('tbody');
+  const foot = document.getElementById('foot');
+  const countEl = document.getElementById('count');
+
+  function row(r, i) {
+    return `<tr class="clickable" data-href="/track/${r.track_id}">
+      <td class="l rank">${i}</td>
+      <td class="l"><a href="/track/${r.track_id}">${esc(r.name)} ${countryFlag(r.country)}</a></td>
+      <td class="l muted">${esc(r.country || '')}</td>
+      <td>${r.length != null ? r.length : ''}</td>
+      <td>${r.width != null ? r.width : ''}</td>
+      <td class="l muted">${esc(r.surface || '')}</td>
+      <td>${S.nf(r.races)}</td>
+      <td>${S.pct(r.galrate)}</td>
+      <td class="muted">${S.pct(r.galrate_auto)}</td>
+      <td class="muted">${S.pct(r.galrate_volt)}</td>
+      <td>${r.avg_winner_odds != null ? r.avg_winner_odds.toFixed(1) : '–'}</td>
+      <td>${r.top_post != null ? r.top_post : '–'}</td>
+      <td>${r.top_post_rel != null ? r.top_post_rel : '–'}</td>
+    </tr>`;
+  }
+
+  async function load() {
+    state.applied = true;
+    foot.innerHTML = '<div class="loading">loading…</div>';
+    const res = await fetch('/api/stats/tracks?' + S.qs(buildParams()));
+    const data = await res.json();
+    if (!data.rows.length) {
+      tbody.innerHTML = '';
+      foot.innerHTML = '<div class="empty-state">no tracks match these filters</div>';
+      countEl.textContent = '0 tracks';
+      return;
+    }
+    tbody.innerHTML = data.rows.map((r, k) => row(r, k + 1)).join('');
+    countEl.textContent = `${data.rows.length} tracks`;
+    foot.innerHTML = '';
+    tbody.querySelectorAll('tr.clickable').forEach(tr =>
+      tr.addEventListener('click', e => { if (!e.target.closest('a')) window.location.href = tr.dataset.href; }));
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(tbody);
+  }
+
+  S.bindSort(document.getElementById('thead'), state, () => { if (state.applied) load(); });
+  document.getElementById('applyBtn').addEventListener('click', load);
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.values(sl).forEach(s => s.reset());
+    segTblMethod.set('any'); segSurface.set('');
+    tbody.innerHTML = ''; countEl.textContent = ''; state.applied = false;
+    foot.innerHTML = '<div class="empty-state">set filters and press apply</div>';
+  });
+
+  // tracks are few — show them immediately so the page isn't empty.
+  load();
+</script>
+{% endblock %}

@@ -40,6 +40,20 @@ log = logging.getLogger(__name__)
 # already covered by per-race entries.
 _RE_RACES = re.compile(r"\bconst\s+races\s*=\s*", re.MULTILINE)
 
+# Homepage URL — contains a hand-curated list of every available raceday.
+# We use this for *historical* backfill because date-based probing only
+# works for the trailing ~30 days; the homepage list goes back much further
+# (~17 months as of 2026) and also includes multi-day event bundles like
+# `elitloppet` whose race-days are NOT individually addressable.
+KMTID_INDEX_URL = "https://kmtid.atgx.se/"
+
+# Pattern matching `{name: "...", url: "..."}` entries in the homepage JS.
+_RE_INDEX_ENTRY = re.compile(
+    r'\{\s*name:\s*"([^"]*)"\s*,\s*url:\s*"([^"]*)"\s*\}'
+)
+# Block-comments hide RETIRED entries — those URLs 404 server-side.
+_RE_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+
 
 # ---------------------------------------------------------------------------
 # Bracket-balanced JSON slice
@@ -147,6 +161,77 @@ def scrape_window(
             yield d, races
             if races:
                 log.info("kmtid %s: %d races", d.isoformat(), len(races))
+            time.sleep(REQUEST_DELAY)
+
+
+# ---------------------------------------------------------------------------
+# Index-driven historical backfill
+# ---------------------------------------------------------------------------
+
+def fetch_index_slugs(client: httpx.Client | None = None) -> list[tuple[str, str]]:
+    """Return [(label, url_slug), ...] from the live entries on kmtid.atgx.se.
+
+    Skips:
+      * commented-out (retired) entries — their slugs 404 server-side
+      * entries with empty `url` (the "inga tider" / no-data placeholders)
+    """
+    own = client is None
+    if own:
+        client = httpx.Client()
+    try:
+        r = client.get(KMTID_INDEX_URL, headers=KMTID_HEADERS, timeout=20.0)
+        r.raise_for_status()
+        html = r.text
+    finally:
+        if own:
+            client.close()
+
+    live = _RE_BLOCK_COMMENT.sub("", html)
+    out: list[tuple[str, str]] = []
+    for name, slug in _RE_INDEX_ENTRY.findall(live):
+        slug = slug.strip()
+        if not slug:
+            continue
+        out.append((name, slug))
+    return out
+
+
+def scrape_slug(slug: str, client: httpx.Client | None = None) -> list[dict]:
+    """Fetch + parse one slug from kmtid (date string OR named bundle like
+    'elitloppet'). Returns [] when the URL is missing or empty."""
+    own = client is None
+    if own:
+        client = httpx.Client()
+    try:
+        url = KMTID_RACES_URL.format(yymmdd=slug)
+        r = client.get(url, headers=KMTID_HEADERS, timeout=30.0)
+        if r.status_code == 404:
+            return []
+        if r.status_code != 200:
+            log.warning("kmtid slug %s -> HTTP %s", slug, r.status_code)
+            return []
+        return parse_races_js(r.text)
+    finally:
+        if own:
+            client.close()
+
+
+def scrape_all_listed() -> Iterator[tuple[str, str, list[dict]]]:
+    """Yield (slug, label, races) for every live entry on the kmtid index.
+
+    Use this for historical backfill — covers everything the homepage still
+    publishes, which goes back ~17 months as of 2026 (vs. the ~30 days of
+    date-based probing in `scrape_window`)."""
+    with httpx.Client() as client:
+        index = fetch_index_slugs(client=client)
+        log.info("kmtid index: %d live slugs", len(index))
+        for label, slug in index:
+            races = scrape_slug(slug, client=client)
+            yield slug, label, races
+            if races:
+                log.info("kmtid %-18s %3d races  (%s)", slug, len(races), label[:60])
+            else:
+                log.warning("kmtid %-18s 0 races (%s)", slug, label[:60])
             time.sleep(REQUEST_DELAY)
 
 

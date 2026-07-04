@@ -1,0 +1,412 @@
+{% extends "_layout.html" %}
+{% block title %}horse stats - stable{% endblock %}
+
+{% block extra_style %}
+  /* parent (sire/dam/after) autocomplete filter */
+  .pfilter { position: relative; }
+  .pfilter__input {
+    width: 100%; box-sizing: border-box;
+    background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 26px 7px 10px; font-family: inherit; font-size: 12.5px; color: var(--fg);
+    outline: none; transition: border-color 0.15s;
+  }
+  .pfilter__input::placeholder { color: var(--fg-muted); opacity: 0.7; }
+  .pfilter__input:focus { border-color: var(--fg-muted); }
+  .pfilter.is-picked .pfilter__input { color: var(--accent-glow); }
+  .pfilter__clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; line-height: 14px; text-align: center;
+    border: none; background: none; color: var(--fg-muted); cursor: pointer;
+    font-size: 14px; padding: 0; display: none;
+  }
+  .pfilter.is-picked .pfilter__clear,
+  .pfilter.has-text .pfilter__clear { display: block; }
+  .pfilter__clear:hover { color: var(--fg); }
+  .pfilter__menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+    max-height: 260px; overflow-y: auto;
+    background: var(--panel-bg); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.28); display: none;
+  }
+  html.liquid .pfilter__menu {
+    -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+    backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+  }
+  .pfilter.is-open .pfilter__menu { display: block; }
+  .pfilter__opt {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 7px 10px; cursor: pointer; font-size: 12.5px;
+  }
+  .pfilter__opt:hover, .pfilter__opt.active { background: var(--hover); }
+  .pfilter__opt .pf-name { color: var(--fg); }
+  .pfilter__opt .pf-meta { color: var(--fg-muted); font-size: 11px; flex-shrink: 0; }
+  .pfilter__empty { padding: 8px 10px; color: var(--fg-muted); font-size: 12px; }
+{% endblock %}
+
+{% block content %}
+<div class="stats-page">
+  {% include 'partials/stats_ui.html' %}
+
+  <div class="stats-head">
+    <h1>horses</h1>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="filters__head">
+      <span class="ftitle">filters</span>
+      <span class="fspacer"></span>
+      <span class="filters__chev">▾</span>
+    </div>
+    <div class="filters__body">
+      <div class="filter-grid">
+        <div class="fld">
+          <label>breed</label>
+          <div class="seg" id="segBreed">
+            <button data-v="" class="active">any</button>
+            <button data-v="V">standardbred</button>
+            <button data-v="K">coldblood</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>status</label>
+          <div class="seg" id="segStatus">
+            <button data-v="" class="active">any</button>
+            <button data-v="active">active</button>
+            <button data-v="inactive">inactive</button>
+            <button data-v="deceased">deceased</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>breeding</label>
+          <div class="seg" id="segBreeding">
+            <button data-v="" class="active">any</button>
+            <button data-v="active">active</button>
+            <button data-v="inactive">inactive</button>
+            <button data-v="deceased">deceased</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>sex</label>
+          <div class="seg" id="segSex">
+            <button data-v="" class="active">any</button>
+            <button data-v="H">stallion</button>
+            <button data-v="V">gelding</button>
+            <button data-v="S">mare</button>
+          </div>
+        </div>
+
+        <div class="fld">
+          <label>sire</label>
+          <div class="pfilter" id="pfSire">
+            <input type="text" class="pfilter__input" placeholder="any sire" autocomplete="off" spellcheck="false">
+            <button type="button" class="pfilter__clear" aria-label="clear">×</button>
+            <div class="pfilter__menu"></div>
+          </div>
+        </div>
+        <div class="fld">
+          <label>dam</label>
+          <div class="pfilter" id="pfDam">
+            <input type="text" class="pfilter__input" placeholder="any dam" autocomplete="off" spellcheck="false">
+            <button type="button" class="pfilter__clear" aria-label="clear">×</button>
+            <div class="pfilter__menu"></div>
+          </div>
+        </div>
+        <div class="fld">
+          <label>after (dam's sire)</label>
+          <div class="pfilter" id="pfAfter">
+            <input type="text" class="pfilter__input" placeholder="any maternal grandsire" autocomplete="off" spellcheck="false">
+            <button type="button" class="pfilter__clear" aria-label="clear">×</button>
+            <div class="pfilter__menu"></div>
+          </div>
+        </div>
+
+        <div class="fld"><label>starts <span class="val" id="vStarts"></span></label><div id="sStarts"></div></div>
+        <div class="fld"><label>wins <span class="val" id="vWins"></span></label><div id="sWins"></div></div>
+        <div class="fld"><label>win% <span class="val" id="vWin"></span></label><div id="sWin"></div></div>
+        <div class="fld"><label>top3% <span class="val" id="vTop3"></span></label><div id="sTop3"></div></div>
+        <div class="fld"><label>gal% <span class="val" id="vGal"></span></label><div id="sGal"></div></div>
+        <div class="fld"><label>earnings <span class="val" id="vEarn"></span></label><div id="sEarn"></div></div>
+        <div class="fld"><label>offspring <span class="val" id="vOff"></span></label><div id="sOff"></div></div>
+        <div class="fld"><label>offspring (sek) <span class="val" id="vOffSek"></span></label><div id="sOffSek"></div></div>
+        <div class="fld"><label>avg offspring (sek) <span class="val" id="vAvgOff"></span></label><div id="sAvgOff"></div></div>
+        <div class="fld">
+          <label>record <span class="val" id="vRec"></span></label>
+          <div id="sRec"></div>
+          <label class="rng__inline-toggle"><input type="checkbox" id="recInclNull" checked> include horses without a record</label>
+        </div>
+      </div>
+      <div class="filters__actions">
+        <button class="btn" id="applyBtn">apply</button>
+        <button class="btn btn--ghost" id="resetBtn">reset</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table class="stbl">
+      <thead id="thead">
+        <tr>
+          <th class="l">#</th>
+          <th class="l" data-sort="name" data-defdir="asc">name</th>
+          <th class="l" data-sort="breed" data-defdir="asc">breed</th>
+          <th data-sort="year" data-defdir="desc">year</th>
+          <th class="l" data-sort="sex" data-defdir="asc">sex</th>
+          <th class="l">sire</th>
+          <th class="l">dam</th>
+          <th class="l">after</th>
+          <th class="l">trainer</th>
+          <th data-sort="starts">starts</th>
+          <th data-sort="wins">wins</th>
+          <th data-sort="winrate">win%</th>
+          <th data-sort="top3rate">top3%</th>
+          <th data-sort="earnings">earnings</th>
+          <th data-sort="offspring">offspr</th>
+          <th data-sort="offspring_sek">offspr (sek)</th>
+          <th data-sort="avg_offspring">avg offspr</th>
+          <th data-sort="galrate">gal%</th>
+          <th data-sort="record" data-defdir="asc">record</th>
+          <th class="l">status</th>
+          <th class="l">breeding</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="foot"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const S = STAT;
+  S.bindPanel(document.getElementById('filters'));
+
+  function stripCountry(name) {
+    if (!name) return '';
+    return name.replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '');
+  }
+
+  const segBreed    = S.seg(document.getElementById('segBreed'));
+  const segStatus   = S.seg(document.getElementById('segStatus'));
+  const segBreeding = S.seg(document.getElementById('segBreeding'));
+  const segSex      = S.seg(document.getElementById('segSex'));
+
+  // Parent (sire/dam/after) autocomplete. Reuses the global horse search API
+  // and stores the chosen canonical horse id; value() returns it or null.
+  function makeParentFilter(rootId) {
+    const root = document.getElementById(rootId);
+    const input = root.querySelector('.pfilter__input');
+    const menu = root.querySelector('.pfilter__menu');
+    const clearBtn = root.querySelector('.pfilter__clear');
+    let pickedId = null;
+    let timer = null;
+    let items = [];
+    let active = -1;
+    let seq = 0;
+
+    function close() { root.classList.remove('is-open'); active = -1; }
+    function syncTextState() { root.classList.toggle('has-text', input.value.trim().length > 0); }
+
+    function clearPick() {
+      pickedId = null;
+      root.classList.remove('is-picked');
+    }
+
+    function reset() {
+      input.value = '';
+      clearPick();
+      syncTextState();
+      menu.innerHTML = '';
+      close();
+    }
+
+    function pick(it) {
+      pickedId = it.horse_id;
+      input.value = stripCountry(it.name);
+      root.classList.add('is-picked');
+      syncTextState();
+      close();
+    }
+
+    function render() {
+      if (!items.length) {
+        menu.innerHTML = '<div class="pfilter__empty">no matches</div>';
+        root.classList.add('is-open');
+        return;
+      }
+      menu.innerHTML = items.map((it, i) => {
+        const yr = it.date_of_birth ? it.date_of_birth.substring(0, 4) : '';
+        const meta = [yr, it.earnings || ''].filter(Boolean).join(' · ');
+        return `<div class="pfilter__opt${i === active ? ' active' : ''}" data-i="${i}">
+          <span class="pf-name">${flagify(it.name)}</span>
+          <span class="pf-meta">${esc(meta)}</span>
+        </div>`;
+      }).join('');
+      root.classList.add('is-open');
+    }
+
+    async function search() {
+      const q = input.value.trim();
+      if (q.length < 2) { items = []; menu.innerHTML = ''; close(); return; }
+      const mySeq = ++seq;
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&kind=horse`);
+        const data = await res.json();
+        if (mySeq !== seq) return; // stale response
+        items = data.slice(0, 30);
+        active = -1;
+        render();
+      } catch (_) { /* ignore */ }
+    }
+
+    input.addEventListener('input', () => {
+      clearPick();
+      syncTextState();
+      clearTimeout(timer);
+      timer = setTimeout(search, 220);
+    });
+    input.addEventListener('focus', () => { if (items.length && !pickedId) root.classList.add('is-open'); });
+    input.addEventListener('keydown', (e) => {
+      if (!root.classList.contains('is-open')) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); active = Math.min(active + 1, items.length - 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(active - 1, 0); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && items[active]) pick(items[active]); }
+      else if (e.key === 'Escape') { close(); }
+    });
+    menu.addEventListener('mousedown', (e) => {
+      const opt = e.target.closest('.pfilter__opt');
+      if (!opt) return;
+      e.preventDefault();
+      pick(items[+opt.dataset.i]);
+    });
+    clearBtn.addEventListener('click', () => { reset(); input.focus(); });
+    document.addEventListener('click', (e) => { if (!root.contains(e.target)) close(); });
+
+    return { value: () => pickedId, reset };
+  }
+
+  const pfSire  = makeParentFilter('pfSire');
+  const pfDam   = makeParentFilter('pfDam');
+  const pfAfter = makeParentFilter('pfAfter');
+
+  const sl = {
+    starts:  S.makeSlider(document.getElementById('sStarts'),  { min: 0, max: 500, dual: true,  valEl: vStarts }),
+    wins:    S.makeSlider(document.getElementById('sWins'),    { min: 0, max: 250, dual: true,  valEl: vWins }),
+    winrate: S.makeSlider(document.getElementById('sWin'),     { min: 0, max: 100, dual: false, valEl: vWin, fmt: v => v + '%' }),
+    top3:    S.makeSlider(document.getElementById('sTop3'),    { min: 0, max: 100, dual: false, valEl: vTop3, fmt: v => v + '%' }),
+    galrate: S.makeSlider(document.getElementById('sGal'),     { min: 0, max: 100, dual: true,  valEl: vGal, fmt: v => v + '%' }),
+    earnings:S.makeSlider(document.getElementById('sEarn'),    { min: 0, max: 60000000, dual: false, scale: 'log', valEl: vEarn, fmt: v => S.krShort(v) }),
+    offspring:S.makeSlider(document.getElementById('sOff'),    { min: 0, max: 1000, dual: false, valEl: vOff }),
+    offspring_sek: S.makeSlider(document.getElementById('sOffSek'), { min: 0, max: 500000000, dual: false, scale: 'log', valEl: vOffSek, fmt: v => S.krShort(v) }),
+    avg_offspring: S.makeSlider(document.getElementById('sAvgOff'), { min: 0, max: 3000000, dual: false, scale: 'log', valEl: vAvgOff, fmt: v => S.krShort(v) }),
+    record:  S.makeSlider(document.getElementById('sRec'),     { min: 64, max: 130, step: 0.5, dual: true, valEl: vRec, fmt: v => S.kmtime(v) }),
+  };
+
+  const state = { sort: 'earnings', dir: 'desc', offset: 0, total: 0, applied: false };
+  const LIMIT = 50;
+
+  function buildParams() {
+    const p = { sort: state.sort, dir: state.dir, limit: LIMIT, offset: state.offset };
+    if (segBreed.value())    p.breed = segBreed.value();
+    if (segStatus.value())   p.status = segStatus.value();
+    if (segBreeding.value()) p.breeding = segBreeding.value();
+    if (segSex.value())      p.sex = segSex.value();
+    if (pfSire.value())  p.sire_id = pfSire.value();
+    if (pfDam.value())   p.dam_id = pfDam.value();
+    if (pfAfter.value()) p.after_id = pfAfter.value();
+    S.addBounds(p, 'starts', sl.starts.bounds());
+    S.addBounds(p, 'wins', sl.wins.bounds());
+    S.addBounds(p, 'winrate', sl.winrate.bounds());
+    S.addBounds(p, 'top3', sl.top3.bounds());
+    S.addBounds(p, 'galrate', sl.galrate.bounds());
+    S.addBounds(p, 'earnings', sl.earnings.bounds());
+    S.addBounds(p, 'offspring', sl.offspring.bounds());
+    S.addBounds(p, 'offspring_sek', sl.offspring_sek.bounds());
+    S.addBounds(p, 'avg_offspring', sl.avg_offspring.bounds());
+    const rec = sl.record.bounds();
+    S.addBounds(p, 'record', rec);
+    if (!document.getElementById('recInclNull').checked && (rec.min != null || rec.max != null)) p.record_exclude_null = 1;
+    return p;
+  }
+
+  const BREED = { V: 'standardbred', K: 'coldblood' };
+  const SEX = { h: 'stallion', v: 'gelding', s: 'mare' };
+
+  function link(id, name, kind) {
+    if (!name) return '<span class="muted">–</span>';
+    const label = kind === 'horse' ? flagify(name) : esc(name);
+    return id ? `<a href="/${kind}/${id}">${label}</a>` : `<span>${label}</span>`;
+  }
+  function pillStatus(v) { return v ? `<span class="pill ${v}">${esc(v)}</span>` : '<span class="muted">–</span>'; }
+
+  function row(r, i) {
+    return `<tr class="clickable" data-href="/horse/${r.horse_id}">
+      <td class="l rank">${i}</td>
+      <td class="l"><a href="/horse/${r.horse_id}">${flagify(r.name)}</a></td>
+      <td class="l muted">${BREED[r.breed] || ''}</td>
+      <td class="muted">${r.year || ''}</td>
+      <td class="l muted">${SEX[r.sex] || r.sex || ''}</td>
+      <td class="l">${link(r.sire_id, r.sire_name, 'horse')}</td>
+      <td class="l">${link(r.dam_id, r.dam_name, 'horse')}</td>
+      <td class="l">${link(r.mgs_id, r.mgs_name, 'horse')}</td>
+      <td class="l">${link(r.trainer_id, r.trainer_name ? fmtName(r.trainer_name) : null, 'trainer')}</td>
+      <td>${S.nf(r.starts)}</td>
+      <td>${S.nf(r.wins)}</td>
+      <td>${S.pct(r.winrate)}</td>
+      <td>${S.pct(r.top3rate)}</td>
+      <td>${S.nf(r.earnings)}</td>
+      <td>${r.offspring || ''}</td>
+      <td>${r.offspring_sek ? S.nf(r.offspring_sek) : ''}</td>
+      <td>${r.avg_offspring != null ? S.nf(r.avg_offspring) : ''}</td>
+      <td>${S.pct(r.galrate)}</td>
+      <td>${r.record != null ? S.kmtime(r.record) : ''}</td>
+      <td class="l">${pillStatus(r.status)}</td>
+      <td class="l">${r.breeding ? pillStatus(r.breeding) : '<span class="muted">–</span>'}</td>
+    </tr>`;
+  }
+
+  const tbody = document.getElementById('tbody');
+  const foot = document.getElementById('foot');
+  const countEl = document.getElementById('count');
+
+  async function load(reset) {
+    if (reset) { state.offset = 0; tbody.innerHTML = ''; }
+    state.applied = true;
+    foot.innerHTML = '<div class="loading">loading…</div>';
+    const res = await fetch('/api/stats/horses?' + S.qs(buildParams()));
+    const data = await res.json();
+    state.total = data.total;
+    const startIdx = state.offset;
+    if (reset && data.rows.length === 0) {
+      tbody.innerHTML = '';
+      foot.innerHTML = '<div class="empty-state">no horses match these filters</div>';
+      countEl.textContent = '0 horses';
+      return;
+    }
+    tbody.insertAdjacentHTML('beforeend', data.rows.map((r, k) => row(r, startIdx + k + 1)).join(''));
+    state.offset += data.rows.length;
+    countEl.textContent = `${S.nf(state.total)} horses`;
+    foot.innerHTML = state.offset < state.total
+      ? `<button class="load-more" id="moreBtn">show more (${S.nf(state.total - state.offset)} left)</button>` : '';
+    const more = document.getElementById('moreBtn');
+    if (more) more.addEventListener('click', () => load(false));
+    tbody.querySelectorAll('tr.clickable').forEach(tr =>
+      tr.addEventListener('click', e => { if (!e.target.closest('a')) window.location.href = tr.dataset.href; }));
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(tbody);
+  }
+
+  S.bindSort(document.getElementById('thead'), state, () => { if (state.applied) load(true); });
+  document.getElementById('applyBtn').addEventListener('click', () => load(true));
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    Object.values(sl).forEach(s => s.reset());
+    segBreed.set(''); segStatus.set(''); segBreeding.set(''); segSex.set('');
+    pfSire.reset(); pfDam.reset(); pfAfter.reset();
+    document.getElementById('recInclNull').checked = true;
+    tbody.innerHTML = ''; foot.innerHTML = ''; countEl.textContent = ''; state.applied = false;
+    foot.innerHTML = '<div class="empty-state">set filters and press apply</div>';
+  });
+
+  foot.innerHTML = '<div class="empty-state">set filters and press apply</div>';
+</script>
+{% endblock %}

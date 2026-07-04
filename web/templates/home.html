@@ -21,19 +21,6 @@
     text-transform: lowercase;
   }
 
-  .upcoming-card {
-    border: 1px solid var(--border);
-    background: var(--hover);
-    padding: 28px 18px;
-    margin-bottom: 8px;
-    text-align: center;
-  }
-  .upcoming-placeholder {
-    color: var(--fg-muted);
-    font-size: 12px;
-    opacity: 0.5;
-  }
-
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -44,8 +31,6 @@
   }
 
   .card {
-    border: 1px solid var(--border);
-    background: var(--hover);
     padding: 14px 16px;
   }
   .card-title {
@@ -55,51 +40,17 @@
     text-transform: lowercase;
     margin-bottom: 10px;
   }
-
-  .period-toggle {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .period-btn {
-    padding: 2px 8px;
-    font-size: 10px;
-    color: var(--fg-muted);
-    cursor: pointer;
-    border: none;
-    background: none;
-    letter-spacing: 1px;
-  }
-  .period-btn:not(:last-child) { border-right: 1px solid var(--border); }
-  .period-btn:hover { color: var(--fg); }
-  .period-btn.active {
-    color: var(--fg);
-    background: var(--border);
-  }
-
-  .sort-tabs {
+  .card-head {
     display: flex;
-    gap: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 10px;
-    border-bottom: 1px solid var(--border);
   }
-  .sort-tab {
-    padding: 4px 10px;
-    font-size: 11px;
-    color: var(--fg-muted);
-    cursor: pointer;
-    border: none;
-    background: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    white-space: nowrap;
-  }
-  .sort-tab:hover { color: var(--fg); }
-  .sort-tab.active {
-    color: var(--fg);
-    border-bottom-color: var(--fg);
-  }
+  .card-head .card-title { margin-bottom: 0; }
+
+  /* .period-toggle / .period-btn / .sort-tabs / .sort-tab now live in
+     _layout.html as shared components (reusable + preview in /admin/design). */
 
   table.top-list {
     width: 100%;
@@ -113,17 +64,34 @@
     padding: 3px 5px;
     font-size: 11px;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
   table.top-list td {
     padding: 3px 5px;
-    border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
   table.top-list .num {
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  table.top-list .rank-col,
+  table.top-list .rank {
+    width: 18px;
+    min-width: 18px;
+    padding-right: 8px;
+    text-align: right;
+  }
+  table.top-list th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+  table.top-list th.sortable:hover,
+  table.top-list th.sortable.active {
+    color: var(--fg);
+  }
+  table.top-list th.sortable.active::after {
+    content: " ↓";
+    color: var(--fg-muted);
   }
   table.top-list .muted { color: var(--fg-muted); }
   table.top-list a { }
@@ -133,6 +101,36 @@
   .delta-cold { color: var(--accent-cold); }
   .rank { color: var(--fg-muted); font-size: 10px; }
 
+  /* upcoming-races date navigation */
+  .date-nav {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-left: auto;
+  }
+  .date-nav__arrow {
+    background: none; border: none; cursor: pointer;
+    color: var(--fg-muted); font-family: inherit; font-size: 18px; line-height: 1;
+    padding: 2px 6px; border-radius: 6px;
+    transition: color 0.15s, background 0.15s, opacity 0.15s;
+  }
+  .date-nav__arrow:hover { color: var(--fg); background: var(--hover); }
+  .date-nav__arrow.is-hidden { visibility: hidden; pointer-events: none; }
+  .date-nav__arrow.is-disabled { opacity: 0.25; pointer-events: none; }
+  .date-nav__label {
+    color: var(--fg); font-size: 12px; letter-spacing: 1px;
+    min-width: 132px; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .date-nav__label .date-rel { color: var(--fg-muted); }
+
+  /* unposted day: same plasma/text but drained of colour + non-interactive */
+  .sphere-behavior-cluster.is-unposted {
+    filter: grayscale(1) brightness(0.95) opacity(0.62);
+    pointer-events: none;
+  }
+  .upcoming-empty {
+    color: var(--fg-muted); font-size: 12px; letter-spacing: 0.5px;
+    padding: 28px 4px; text-align: center; width: 100%;
+  }
+
 {% endblock %}
 
 {% block content %}
@@ -140,33 +138,87 @@
 
     <div class="section-header">
       <div class="section-title">upcoming races</div>
+      <div class="date-nav" id="dateNav">
+        <button class="date-nav__arrow" id="datePrev" type="button" aria-label="previous day">‹</button>
+        <span class="date-nav__label" id="dateLabel"></span>
+        <button class="date-nav__arrow" id="dateNext" type="button" aria-label="next day">›</button>
+      </div>
     </div>
-    <div class="upcoming-card">
-      <div class="upcoming-placeholder">—</div>
+    <div class="glass-panel home-headlines-glass">
+      <div class="upcoming-races__stage">
+        <div class="game-type-row" id="gameTypeRow" aria-label="Upcoming race tracks"></div>
+      </div>
     </div>
 
     <div class="section-header">
-      <div class="section-title">form — last 7 days</div>
+      <div class="section-title">form</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="formWindowToggle">
+          <button class="period-btn fluid-toggle__btn"        data-days="7">7d</button>
+          <button class="period-btn fluid-toggle__btn active" data-days="30">30d</button>
+          <button class="period-btn fluid-toggle__btn"        data-days="90">90d</button>
+        </div>
+        <div id="formDirToggle"></div>
+      </div>
     </div>
-    <div class="grid-2" id="formGrid">
-      <div class="card"><div class="card-title">loading...</div></div>
-    </div>
+    <div class="grid-2" id="formGrid"></div>
 
     <div class="section-header">
       <div class="section-title">leaderboard</div>
-      <div class="period-toggle" id="periodToggle">
-        <button class="period-btn active" data-period="ytd">ytd</button>
-        <button class="period-btn" data-period="all">all time</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="limitToggle">
+          <button class="period-btn fluid-toggle__btn active" data-limit="10">10</button>
+          <button class="period-btn fluid-toggle__btn" data-limit="20">20</button>
+        </div>
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="periodToggle">
+          <button class="period-btn fluid-toggle__btn active" data-period="ytd">ytd</button>
+          <button class="period-btn fluid-toggle__btn" data-period="all">all time</button>
+        </div>
       </div>
     </div>
-    <div class="card" id="horseBoard">
-      <div class="card-title">horses</div>
-      <div class="sort-tabs" data-target="horseBoard" data-endpoint="/api/home/top-horses">
-        <button class="sort-tab active" data-sort="earnings">earnings</button>
-        <button class="sort-tab" data-sort="wins">wins</button>
-        <button class="sort-tab" data-sort="win_rate">win%</button>
+    <div class="card glass-panel" id="horseBoard">
+      <div class="card-head">
+        <div class="card-title">horses</div>
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="breedToggle">
+          <button class="period-btn fluid-toggle__btn active" data-breed="standardbred">standardbred</button>
+          <button class="period-btn fluid-toggle__btn" data-breed="coldblood">coldblood</button>
+        </div>
       </div>
-      <div class="board-body">loading...</div>
+      <div class="sort-tabs fluid-toggle fluid-toggle--tabs" data-target="horseBoard" data-endpoint="/api/home/top-horses">
+        <button class="sort-tab fluid-toggle__btn active" data-sort="earnings">earnings</button>
+        <button class="sort-tab fluid-toggle__btn" data-sort="time">time</button>
+        <button class="sort-tab fluid-toggle__btn" data-sort="win_rate">win%</button>
+      </div>
+      <div class="board-body"></div>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">offspring</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="offspringLimitToggle">
+          <button class="period-btn fluid-toggle__btn active" data-limit="10">10</button>
+          <button class="period-btn fluid-toggle__btn" data-limit="20">20</button>
+        </div>
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="offspringPeriodToggle">
+          <button class="period-btn fluid-toggle__btn active" data-period="ytd">ytd</button>
+          <button class="period-btn fluid-toggle__btn" data-period="all">all time</button>
+        </div>
+      </div>
+    </div>
+    <div class="card glass-panel" id="offspringBoard">
+      <div class="card-head">
+        <div class="card-title">sires / dams</div>
+        <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="offspringBreedToggle">
+          <button class="period-btn fluid-toggle__btn active" data-breed="standardbred">standardbred</button>
+          <button class="period-btn fluid-toggle__btn" data-breed="coldblood">coldblood</button>
+        </div>
+      </div>
+      <div class="sort-tabs fluid-toggle fluid-toggle--tabs" id="offspringSortTabs">
+        <button class="sort-tab fluid-toggle__btn active" data-sort="earnings">earnings</button>
+        <button class="sort-tab fluid-toggle__btn" data-sort="avg_earnings">avg.earnings</button>
+        <button class="sort-tab fluid-toggle__btn" data-sort="win_rate">win%</button>
+      </div>
+      <div class="grid-2" id="offspringGrid"></div>
     </div>
   </div>
 {% endblock %}
@@ -174,6 +226,12 @@
 {% block scripts %}
   <script>
     let currentPeriod = 'ytd';
+    let currentLimit = 10;
+    let currentBreed = 'standardbred';
+    let offspringPeriod = 'ytd';
+    let offspringLimit = 10;
+    let offspringBreed = 'standardbred';
+    let offspringSort = 'earnings';
 
     function fmtDelta(d) {
       const v = d / 10;
@@ -186,6 +244,10 @@
       return v != null ? `${(v / 10).toFixed(0)}%` : '';
     }
 
+    function fmtPerf(v) {
+      return v != null ? `${(v / 10).toFixed(1)}` : '';
+    }
+
     function fmtEarn(n) {
       if (n == null) return '';
       return n.toLocaleString('sv-SE');
@@ -195,41 +257,110 @@
     function buildFormTable(title, rows, role) {
       if (!rows.length) return '';
       const urlBase = role === 'trainer' ? '/trainer/' : '/driver/';
-      const head = `<thead><tr>
+      const active = key => formSort === key ? ' active' : '';
+      const headHtml = `<tr>
         <th></th><th>name</th>
-        <th class="num">career</th><th class="num">30d</th>
-        <th class="num">Δ</th><th class="num">odds Δ</th>
-      </tr></thead>`;
-      const body = rows.map((r, i) => `<tr>
+        <th class="num">career</th>
+        <th class="num sortable${active('form')}" data-form-sort="form">${formWindow}d</th>
+        <th class="num sortable${active('delta')}" data-form-sort="delta">Δ</th>
+        <th class="num sortable${active('form_perf')}" data-form-sort="form_perf" title="form — avg finishing percentile of a stable's recent runners (100 = always wins, 0 = always last; galopp/DQ count as last). Actual recent form: rewards winning favourites and predicts winning, unlike mkt±.">form</th>
+        <th class="num sortable${active('form_odds')}" data-form-sort="form_odds" title="market± — avg positions a stable's recent runners finish ahead of their odds rank. >0 = market underrates them. NB: this is NOT recent form / win-rate — cold longshot stables can score high, hot favourite-laden stables can score negative.">mkt±</th>
+      </tr>`;
+      const bodyHtml = rows.map((r, i) => `<tr>
         <td class="rank">${i + 1}</td>
         <td><a href="${urlBase}${r.id}">${esc(r.name)}</a></td>
         <td class="num muted">${fmtWr(r.wr)}</td>
         <td class="num muted">${fmtWr(r.form)}</td>
         <td class="num">${fmtDelta(r.delta)}</td>
+        <td class="num">${fmtPerf(r.form_perf)}</td>
         <td class="num">${r.form_odds != null ? fmtDelta(r.form_odds) : ''}</td>
       </tr>`).join('');
-      return `<div class="card">
-        <div class="card-title">${title}</div>
-        <table class="top-list">${head}<tbody>${body}</tbody></table>
-      </div>`;
+      return formPanelHtml({
+        variant: formDirection,
+        title,
+        headHtml,
+        bodyHtml,
+        frosted: true,
+      });
     }
+
+    let formWindow = 30;        // 7 | 30 | 90
+    let formDirection = 'hot';  // 'hot' | 'cold'
+    let formSort = 'delta';     // 'form' | 'delta' | 'form_odds'
 
     async function loadForm() {
-      const res = await fetch('/api/home/form-leaders');
+      const res = await fetch(`/api/home/form-leaders?days=${formWindow}&sort=${formSort}`);
       if (!res.ok) return;
       const d = await res.json();
+      const trainerRows = formDirection === 'hot' ? d.trainer_hot : d.trainer_cold;
+      const driverRows  = formDirection === 'hot' ? d.driver_hot  : d.driver_cold;
       document.getElementById('formGrid').innerHTML = [
-        buildFormTable('trainers — in form', d.trainer_hot || [], 'trainer'),
-        buildFormTable('trainers — out of form', d.trainer_cold || [], 'trainer'),
-        buildFormTable('drivers — in form', d.driver_hot || [], 'driver'),
-        buildFormTable('drivers — out of form', d.driver_cold || [], 'driver'),
-      ].join('');
+        buildFormTable('trainers', trainerRows || [], 'trainer'),
+        buildFormTable('drivers',  driverRows  || [], 'driver'),
+      ].join('') || '<div class="card glass-panel"><div class="card-title">no qualifiers in this window</div></div>';
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(document.getElementById('formGrid'));
     }
 
+    document.getElementById('formDirToggle').outerHTML = formBubbleToggleHtml({ hotActive: true, id: 'formDirToggle' });
+    initFormBubbleToggle('formDirToggle', {
+      onChange(dir) {
+        formDirection = dir;
+        loadForm();
+      },
+    });
+
+    // Toggle wiring — form window.
+    document.getElementById('formWindowToggle').addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button[data-days]');
+      if (!btn || btn.classList.contains('active')) return;
+      document.querySelectorAll('#formWindowToggle .period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      formWindow = parseInt(btn.dataset.days, 10);
+      loadForm();
+    });
+
+    document.getElementById('formGrid').addEventListener('click', (ev) => {
+      const th = ev.target.closest('th[data-form-sort]');
+      if (!th) return;
+      formSort = th.dataset.formSort;
+      loadForm();
+    });
+
     /* ---- leaderboard tables ---- */
-    function renderHorseBoard(rows) {
+    function fmtDist(v) {
+      return v != null ? `${v}` : '';
+    }
+
+    function fmtTime(row) {
+      if (row.time_text) return row.time_text;
+      if (row.time_seconds == null) return '';
+      return Number(row.time_seconds).toFixed(1).replace('.', ',');
+    }
+
+    function fmtDate(v) {
+      return v || '';
+    }
+
+    function renderHorseBoard(rows, sort) {
+      if (sort === 'time') {
+        const head = `<thead><tr>
+          <th class="rank-col"></th><th>name</th><th>track</th>
+          <th>date</th>
+          <th class="num">dist</th><th class="num">time</th>
+        </tr></thead>`;
+        const body = rows.map((r, i) => `<tr>
+          <td class="rank">${i + 1}</td>
+          <td><a href="/horse/${r.horse_id}">${flagify(r.name)}</a></td>
+          <td class="muted">${r.track_id ? `<a href="/track/${r.track_id}">${esc(r.track || '')}</a>` : esc(r.track || '')}</td>
+          <td class="muted">${fmtDate(r.race_date)}</td>
+          <td class="num muted">${fmtDist(r.distance)}</td>
+          <td class="num">${fmtTime(r)}</td>
+        </tr>`).join('');
+        return `<table class="top-list">${head}<tbody>${body}</tbody></table>`;
+      }
+
       const head = `<thead><tr>
-        <th></th><th>name</th>
+        <th class="rank-col"></th><th>name</th>
         <th class="num">starts</th><th class="num">wins</th>
         <th class="num">win%</th><th class="num">earnings</th>
       </tr></thead>`;
@@ -244,6 +375,24 @@
       return `<table class="top-list">${head}<tbody>${body}</tbody></table>`;
     }
 
+    function renderOffspringTable(title, rows) {
+      const head = `<thead><tr>
+        <th class="rank-col"></th><th>${title}</th>
+        <th class="num">offspr.</th><th class="num">starts</th>
+        <th class="num">avg/foal</th><th class="num">win%</th><th class="num">earnings</th>
+      </tr></thead>`;
+      const body = rows.map((r, i) => `<tr>
+        <td class="rank">${i + 1}</td>
+        <td><a href="/horse/${r.horse_id}">${flagify(r.name)}</a></td>
+        <td class="num muted">${r.offspring_count}</td>
+        <td class="num muted">${r.starts}</td>
+        <td class="num">${fmtEarn(r.avg_earnings)}</td>
+        <td class="num muted">${fmtWr(r.win_rate)}</td>
+        <td class="num">${fmtEarn(r.earnings)}</td>
+      </tr>`).join('');
+      return `<div><table class="top-list">${head}<tbody>${body}</tbody></table></div>`;
+    }
+
     async function loadBoard(cardId) {
       const card = document.getElementById(cardId);
       const tabs = card.querySelector('.sort-tabs');
@@ -251,17 +400,34 @@
       const endpoint = tabs.dataset.endpoint;
       const sort = tabs.querySelector('.sort-tab.active').dataset.sort;
       const sep = endpoint.includes('?') ? '&' : '?';
-      const res = await fetch(`${endpoint}${sep}sort=${sort}&period=${currentPeriod}`);
+      const res = await fetch(`${endpoint}${sep}sort=${sort}&period=${currentPeriod}&limit=${currentLimit}&breed=${currentBreed}`);
       if (!res.ok) { body.textContent = 'error'; return; }
       const rows = await res.json();
-      body.innerHTML = renderHorseBoard(rows);
+      body.innerHTML = renderHorseBoard(rows, sort);
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(body);
     }
 
     function loadAllBoards() {
       loadBoard('horseBoard');
     }
 
-    document.querySelectorAll('.sort-tabs').forEach(tabs => {
+    async function loadOffspring() {
+      const grid = document.getElementById('offspringGrid');
+      const params = `sort=${offspringSort}&period=${offspringPeriod}&limit=${offspringLimit}&breed=${offspringBreed}`;
+      const res = await fetch(`/api/home/top-offspring?role=all&${params}`);
+      if (!res.ok) {
+        grid.innerHTML = '<div class="muted">error</div>';
+        return;
+      }
+      const data = await res.json();
+      grid.innerHTML = [
+        renderOffspringTable('sires', data.sires || []),
+        renderOffspringTable('dams', data.dams || []),
+      ].join('');
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(grid);
+    }
+
+    document.querySelectorAll('.sort-tabs[data-target]').forEach(tabs => {
       tabs.querySelectorAll('.sort-tab').forEach(btn => {
         btn.addEventListener('click', () => {
           tabs.querySelectorAll('.sort-tab').forEach(b => b.classList.remove('active'));
@@ -271,16 +437,180 @@
       });
     });
 
+    document.getElementById('offspringSortTabs').querySelectorAll('.sort-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('offspringSortTabs').querySelectorAll('.sort-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        offspringSort = btn.dataset.sort;
+        loadOffspring();
+      });
+    });
+
     document.getElementById('periodToggle').querySelectorAll('.period-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('periodToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentPeriod = btn.dataset.period;
         loadAllBoards();
       });
     });
 
+    document.getElementById('limitToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('limitToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLimit = parseInt(btn.dataset.limit);
+        loadAllBoards();
+      });
+    });
+
+    document.getElementById('breedToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('breedToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentBreed = btn.dataset.breed;
+        loadAllBoards();
+      });
+    });
+
+    document.getElementById('offspringPeriodToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('offspringPeriodToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        offspringPeriod = btn.dataset.period;
+        loadOffspring();
+      });
+    });
+
+    document.getElementById('offspringLimitToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('offspringLimitToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        offspringLimit = parseInt(btn.dataset.limit);
+        loadOffspring();
+      });
+    });
+
+    document.getElementById('offspringBreedToggle').querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('offspringBreedToggle').querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        offspringBreed = btn.dataset.breed;
+        loadOffspring();
+      });
+    });
+
+    const gameTypeRow = document.getElementById('gameTypeRow');
+
+    /* ---- upcoming races with forward date navigation ---- */
+    const UPCOMING_MAX_DAYS = 7;          // how far ahead ATG reliably publishes
+    const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+    function isoDate(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    const upcomingToday = new Date();
+    upcomingToday.setHours(0, 0, 0, 0);
+    const upcomingMax = new Date(upcomingToday);
+    upcomingMax.setDate(upcomingMax.getDate() + UPCOMING_MAX_DAYS);
+    let upcomingSel = new Date(upcomingToday);
+
+    function dayOffset() {
+      return Math.round((upcomingSel - upcomingToday) / 86400000);
+    }
+
+    function renderDateNav() {
+      const off = dayOffset();
+      const rel = off === 0 ? 'today' : off === 1 ? 'tomorrow' : '';
+      const label = `${WEEKDAYS[upcomingSel.getDay()]} · ${isoDate(upcomingSel)}`;
+      document.getElementById('dateLabel').innerHTML =
+        rel ? `<span class="date-rel">${rel}</span> · ${label}` : label;
+      // No backward navigation before today: hide the left arrow on today.
+      document.getElementById('datePrev').classList.toggle('is-hidden', upcomingSel <= upcomingToday);
+      document.getElementById('dateNext').classList.toggle('is-disabled', upcomingSel >= upcomingMax);
+    }
+
+    async function loadUpcoming() {
+      if (!gameTypeRow) return;
+      renderDateNav();
+      try {
+        const res = await fetch('/api/home/upcoming?date=' + isoDate(upcomingSel));
+        if (!res.ok) throw new Error('fetch failed');
+        const tracks = await res.json();
+        if (!tracks.length) {
+          gameTypeRow.innerHTML = '<div class="upcoming-empty">no race day published for this date</div>';
+          return;
+        }
+
+        const cyanOrder = window.HOME_CYAN_SATELLITE_IDS || ['vinnare', 'dd', 'ld', 'v5', 'v4', 'plats'];
+
+        const entries = tracks.map(t => {
+          const headlineId = t.headline;
+          // Map each game-type id → its ATG game id so every bubble can deep-link.
+          const gameIdById = {};
+          if (headlineId && t.headlineGameId) gameIdById[headlineId] = t.headlineGameId;
+          for (const s of t.satellites) {
+            if (s.gameId) gameIdById[s.id] = s.gameId;
+          }
+          const satelliteIds = [];
+          if (headlineId) satelliteIds.push(headlineId);
+          for (const id of cyanOrder) {
+            if (t.satellites.some(s => s.id === id)) {
+              satelliteIds.push(id);
+            }
+          }
+          return {
+            trackName: t.trackName,
+            gameTypeId: headlineId || (satelliteIds[0] || 'v4'),
+            satelliteIds,
+            // Per-satellite deep links, aligned to satelliteIds. Unposted
+            // games have no game id yet → null (not navigable).
+            satelliteHrefs: satelliteIds.map(id => gameIdById[id] ? `/game/${gameIdById[id]}` : null),
+            sphereSize: window.HOME_SPHERE_SIZE || 87,
+            // Unposted days have no game id yet → not navigable.
+            headlineHref: t.headlineGameId ? `/game/${t.headlineGameId}` : null,
+            jackpot: !!t.jackpot,
+            unposted: !t.posted,
+          };
+        });
+
+        const dayHtml = sphereBehaviorDayHtml(entries);
+        gameTypeRow.innerHTML = dayHtml;
+
+        // Grey out + freeze clusters whose start lists aren't published yet.
+        // sphereBehaviorDayHtml renders clusters in entry order.
+        const clusters = gameTypeRow.querySelectorAll('[data-sphere-behavior-cluster]');
+        clusters.forEach((cl, i) => {
+          if (entries[i] && entries[i].unposted) cl.classList.add('is-unposted');
+        });
+
+        const mount = gameTypeRow.closest('.home-headlines-glass') || gameTypeRow;
+        if (typeof initSphereBehaviorCluster === 'function') initSphereBehaviorCluster(mount);
+        if (typeof initSphereBehaviorDay === 'function') initSphereBehaviorDay(mount);
+        if (typeof initSphereClickFlash === 'function') initSphereClickFlash(mount);
+      } catch (e) {
+        gameTypeRow.innerHTML = '';
+      }
+    }
+
+    document.getElementById('datePrev').addEventListener('click', () => {
+      if (upcomingSel <= upcomingToday) return;
+      upcomingSel.setDate(upcomingSel.getDate() - 1);
+      loadUpcoming();
+    });
+    document.getElementById('dateNext').addEventListener('click', () => {
+      if (upcomingSel >= upcomingMax) return;
+      upcomingSel.setDate(upcomingSel.getDate() + 1);
+      loadUpcoming();
+    });
+
+    loadUpcoming();
+
     loadForm();
     loadAllBoards();
+    loadOffspring();
   </script>
 {% endblock %}

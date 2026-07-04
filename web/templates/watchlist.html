@@ -1,0 +1,164 @@
+{% extends "_layout.html" %}
+
+{% block title %}watchlist{% endblock %}
+
+{% block extra_style %}
+  .watchlist-wrap {
+    width: 100%;
+    max-width: 880px;
+  }
+  .wl-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .wl-tabs button {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 4px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .wl-tabs button.active {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+  .wl-count {
+    color: var(--fg-muted);
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  .wl-empty {
+    color: var(--fg-muted);
+    margin-top: 20px;
+    text-align: center;
+  }
+  table.watchlist {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.watchlist th {
+    text-align: left;
+    color: var(--fg-muted);
+    font-weight: 400;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  table.watchlist td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.watchlist tr:hover {
+    background: var(--hover);
+  }
+  table.watchlist td.num,
+  table.watchlist th.num {
+    text-align: right;
+  }
+  table.watchlist td.muted {
+    color: var(--fg-muted);
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="watchlist-wrap">
+    <div class="wl-tabs">
+      <button id="tabActive" class="active" type="button">active</button>
+      <button id="tabInactive" type="button">inactive</button>
+    </div>
+    <div class="wl-count" id="wlCount"></div>
+    <div id="wlTableMount"></div>
+    <div class="wl-empty" id="wlEmpty"></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const tabActive   = document.getElementById('tabActive');
+  const tabInactive = document.getElementById('tabInactive');
+  const mountEl     = document.getElementById('wlTableMount');
+  const countEl     = document.getElementById('wlCount');
+  const emptyEl     = document.getElementById('wlEmpty');
+
+  let allHorses = [];
+  let showActive = true;
+
+  tabActive.addEventListener('click', () => { showActive = true; render(); updateTabs(); });
+  tabInactive.addEventListener('click', () => { showActive = false; render(); updateTabs(); });
+
+  function updateTabs() {
+    tabActive.classList.toggle('active', showActive);
+    tabInactive.classList.toggle('active', !showActive);
+  }
+
+  function renderRow(h) {
+    const sireCell = h.sire_id
+      ? `<a href="/horse/${h.sire_id}">${flagify(h.sire_name)}</a>`
+      : esc(h.sire_name || '');
+    return `
+      <tr>
+        <td><a href="/horse/${h.horse_id}">${flagify(h.name)}</a></td>
+        <td class="muted">${esc(h.year || '')}</td>
+        <td class="muted">${sireCell}</td>
+        <td class="muted">${esc(h.gender || '')}</td>
+        <td class="muted num">${h.starts || ''}</td>
+        <td class="muted num">${h.wins || ''}</td>
+        <td class="muted num">${h.win_rate ? esc(h.win_rate) + '%' : ''}</td>
+        <td class="num">${esc(h.earnings || '')}</td>
+      </tr>`;
+  }
+
+  function render() {
+    const filtered = allHorses
+      .filter(h => h.active === showActive)
+      .sort((a, b) => (b.earnings_raw || 0) - (a.earnings_raw || 0));
+    countEl.textContent = `${filtered.length} horse${filtered.length !== 1 ? 's' : ''}`;
+    if (filtered.length === 0) {
+      mountEl.innerHTML = '';
+      emptyEl.textContent = showActive
+        ? 'no active horses on watchlist'
+        : 'no inactive horses on watchlist';
+      return;
+    }
+    emptyEl.textContent = '';
+    const head = `
+      <thead>
+        <tr>
+          <th>name</th>
+          <th>year</th>
+          <th>sire</th>
+          <th>sex</th>
+          <th class="num">starts</th>
+          <th class="num">wins</th>
+          <th class="num">win%</th>
+          <th class="num">earnings</th>
+        </tr>
+      </thead>`;
+    const body = filtered.map(renderRow).join('');
+    mountEl.innerHTML = `<table class="watchlist">${head}<tbody>${body}</tbody></table>`;
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(mountEl);
+  }
+
+  async function load() {
+    try {
+      const res = await fetch('/api/watchlist');
+      allHorses = await res.json();
+      render();
+    } catch (e) {
+      emptyEl.textContent = 'failed to load watchlist';
+    }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

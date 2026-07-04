@@ -3,11 +3,13 @@
 {% block title %}admin - stable{% endblock %}
 
 {% block extra_style %}
-  body { padding: 80px 20px 60px; }
+  body { padding: 110px 20px 60px; }
 
   .admin-page {
     width: 100%;
     max-width: 720px;
+    --admin-cyan: #6ecff6;
+    --admin-cyan-soft: rgba(110, 207, 246, 0.28);
   }
 
   h1 {
@@ -19,29 +21,42 @@
     text-align: center;
   }
 
-  .run-row {
+  .sources {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .source-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+  }
+  .source-row.muted { opacity: 0.45; }
+  .source-row .src-label {
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+  .source-row .src-meta {
+    font-size: 11px;
+    color: var(--fg-muted);
+    letter-spacing: 1px;
+  }
+  .source-row .src-meta .date { color: var(--fg); }
+  .active-run {
     display: flex;
     align-items: center;
     gap: 18px;
-    margin-bottom: 24px;
-  }
-  .run-btn {
-    padding: 10px 28px;
-    font-size: 13px;
-    letter-spacing: 2px;
-  }
-  .st-btn {
-    padding: 10px 18px;
-    font-size: 11px;
-    color: var(--fg-muted);
-  }
-  .run-btn:disabled, .st-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    margin: 18px 0;
   }
   .cancel-btn {
-    padding: 10px 18px;
-    font-size: 12px;
+    padding: 7px 14px;
+    font-size: 11px;
     letter-spacing: 2px;
     border-color: var(--accent-cold);
     color: var(--accent-cold);
@@ -61,7 +76,7 @@
     font-size: 10px;
     margin-right: 8px;
   }
-  .tag.running  { color: var(--accent-win); border-color: var(--accent-win); }
+  .tag.running  { color: var(--accent-first); border-color: var(--accent-first); }
   .tag.success  { color: var(--accent-hot); border-color: var(--accent-hot); }
   .tag.failed   { color: var(--accent-cold); border-color: var(--accent-cold); }
 
@@ -69,6 +84,55 @@
     margin-top: 4px;
     color: var(--fg);
     font-size: 13px;
+  }
+
+  /* Update progress bar — sits above the collapsible log. */
+  .progress-wrap { margin: 14px 0 4px; }
+  .progress-wrap[hidden] { display: none; }
+  .progress-track {
+    position: relative;
+    height: 8px;
+    border: 1px solid var(--panel-border, var(--border));
+    background: var(--panel-bg, transparent);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 100%;
+    background: var(--admin-cyan);
+    border-radius: 6px;
+    transition: width .4s ease, background-color .3s ease;
+  }
+  /* While running we don't know an exact %, so animate an indeterminate
+     sweep over a partially-filled bar. */
+  .progress-wrap.running .progress-fill {
+    width: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--admin-cyan-soft) 0%,
+      var(--admin-cyan) 50%,
+      var(--admin-cyan-soft) 100%);
+    background-size: 200% 100%;
+    animation: progressSweep 1.4s linear infinite;
+  }
+  .progress-wrap.success .progress-fill { width: 100%; background: var(--admin-cyan); }
+  .progress-wrap.failed  .progress-fill { width: 100%; background: var(--accent-cold); }
+  @keyframes progressSweep {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .progress-wrap.running .progress-fill { animation: none; }
+  }
+  .progress-phase {
+    margin-top: 6px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--fg-muted);
+    text-transform: lowercase;
+    min-height: 14px;
   }
 
   details.log-wrap {
@@ -100,13 +164,36 @@
     word-break: break-word;
   }
 
-  h2.section {
-    font-size: 11px;
+  .runs-section { margin-top: 32px; }
+
+  .section-heading {
+    display: inline-flex;
+    align-items: baseline;
+    margin: 0 0 14px;
+    font-size: 13px;
     font-weight: 400;
     letter-spacing: 3px;
     text-transform: lowercase;
     color: var(--fg-muted);
-    margin: 32px 0 8px;
+  }
+  .section-heading__toggle {
+    flex-shrink: 0;
+    margin: 0;
+    padding: 2px 0 2px 8px;
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    opacity: 0.5;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .section-heading__toggle:hover { opacity: 0.78; }
+  .runs-section.is-section-collapsed .runs-section__body {
+    display: none;
   }
 
   table.runs {
@@ -123,15 +210,49 @@
   }
   table.runs tr:hover { background: var(--hover); cursor: pointer; }
   table.runs td.summary-cell { color: var(--fg); }
+
+  .all-row,
+  .cleanup-row {
+    padding: 14px 16px;
+    margin-bottom: 18px;
+  }
+  .action-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .action-label {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+  }
 {% endblock %}
 
 {% block content %}
   <div class="admin-page">
     <h1>admin</h1>
 
-    <div class="run-row">
-      <button class="ghost run-btn" id="runBtn">update races</button>
-      <button class="ghost run-btn st-btn" id="stBtn">scan st horses</button>
+    <div class="all-row glass-panel">
+      <div class="action-head">
+        <div class="action-label">update all</div>
+        <button class="ghost" id="updateAllBtn">run</button>
+      </div>
+    </div>
+
+    <div class="sources" id="sources">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="cleanup-row glass-panel">
+      <div class="action-head">
+        <div class="action-label">cleanup only</div>
+        <button class="ghost" id="cleanupOnlyBtn">cleanup</button>
+      </div>
+    </div>
+
+    <div class="active-run">
       <button class="ghost cancel-btn" id="cancelBtn" hidden>cancel</button>
       <div class="run-status">
         <div id="statusLine">no run yet</div>
@@ -139,18 +260,30 @@
       </div>
     </div>
 
+    <div class="progress-wrap" id="progressWrap" hidden>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-phase" id="progressPhase"></div>
+    </div>
+
     <details class="log-wrap">
       <summary>log</summary>
       <pre class="log" id="log"></pre>
     </details>
 
-    <h2 class="section">previous runs</h2>
-    <table class="runs">
-      <thead><tr>
-        <th>id</th><th>type</th><th>started</th><th>elapsed</th><th>status</th><th>summary</th>
-      </tr></thead>
-      <tbody id="runsTable"></tbody>
-    </table>
+    <section class="runs-section" id="previousRunsSection">
+      <h2 class="section-heading">
+        <span class="section-heading__label">previous runs</span>
+        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse previous runs">▴</button>
+      </h2>
+      <div class="runs-section__body">
+        <table class="runs">
+          <thead><tr>
+            <th>id</th><th>type</th><th>started</th><th>elapsed</th><th>status</th><th>summary</th>
+          </tr></thead>
+          <tbody id="runsTable"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 {% endblock %}
 
@@ -159,13 +292,42 @@
     let activeRunId = null;
     let pollTimer = null;
 
-    const runBtn      = document.getElementById('runBtn');
-    const stBtn       = document.getElementById('stBtn');
+    const sourcesEl   = document.getElementById('sources');
     const cancelBtn   = document.getElementById('cancelBtn');
     const logEl       = document.getElementById('log');
     const statusEl    = document.getElementById('statusLine');
     const summaryEl   = document.getElementById('summaryLine');
+    const progressWrap  = document.getElementById('progressWrap');
+    const progressPhase = document.getElementById('progressPhase');
+
+    function updateProgress(r) {
+      if (!progressWrap) return;
+      // Show the bar for the active run; reflect status via class, and the
+      // current phase label underneath.
+      progressWrap.hidden = false;
+      progressWrap.classList.remove('running', 'success', 'failed');
+      if (r.status === 'running') progressWrap.classList.add('running');
+      else if (r.status === 'success') progressWrap.classList.add('success');
+      else if (r.status === 'failed' || r.status === 'cancelled') progressWrap.classList.add('failed');
+      const phase = r.phase || (r.status === 'running' ? 'starting…' : r.status);
+      progressPhase.textContent = phase;
+    }
     const runsTab     = document.getElementById('runsTable');
+    const updateAllBtn  = document.getElementById('updateAllBtn');
+    const cleanupOnlyBtn = document.getElementById('cleanupOnlyBtn');
+
+    function fmtRelDate(iso) {
+      if (!iso) return 'never';
+      const d = new Date(iso);
+      if (isNaN(d)) return iso;
+      const days = Math.round((Date.now() - d.getTime()) / 86400000);
+      if (days < 1)   return `today (${iso})`;
+      if (days === 1) return `yesterday (${iso})`;
+      if (days < 30)  return `${days}d ago (${iso})`;
+      const months = Math.round(days / 30);
+      if (months < 12) return `${months}mo ago (${iso})`;
+      return `${Math.round(days/365)}y ago (${iso})`;
+    }
 
     function fmtTs(s) {
       if (!s) return '';
@@ -191,13 +353,42 @@
       return parts.join('   \u00b7   ');
     }
 
-    function setButtonsDisabled(v) { runBtn.disabled = v; stBtn.disabled = v; }
+    function setButtonsDisabled(v) {
+      if (updateAllBtn)  updateAllBtn.disabled  = v;
+      if (cleanupOnlyBtn) cleanupOnlyBtn.disabled = v;
+    }
 
-    async function startRun(mode) {
+    async function loadSources() {
+      try {
+        const res = await fetch('/api/admin/sources');
+        const list = await res.json();
+        sourcesEl.innerHTML = list.map(s => `
+          <div class="source-row${s.runnable ? '' : ' muted'}">
+            <div class="src-label">${esc(s.label)}</div>
+            <div class="src-meta">
+              <span>last scrape: <span class="date">${esc(fmtRelDate(s.last_date))}</span>
+                    \u00b7 ${s.count.toLocaleString('en-US')} races</span>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        sourcesEl.innerHTML = '<div class="empty-section">failed to load sources</div>';
+      }
+    }
+
+    async function startRun(srcId) {
+      // Map UI source-id to the existing /api/admin/run mode aliases.
+      // ATG routes through the st-bridge in v1 which refreshes both ATG
+      // and ST race data; 'all' runs every source ingest + dedup cleanup;
+      // 'cleanup' runs only the post-ingest dedup pipeline.
+      const mode = srcId === 'atg' ? 'atg' : srcId;
+      const label = srcId === 'all' ? 'update all'
+                  : srcId === 'cleanup' ? 'cleanup' : srcId;
       setButtonsDisabled(true);
       logEl.textContent = '';
       summaryEl.textContent = '';
-      statusEl.innerHTML = `<span class="tag running">starting ${mode}</span>`;
+      statusEl.innerHTML = `<span class="tag running">starting ${esc(label)}</span>`;
+      updateProgress({status: 'running', phase: `starting ${label}…`});
       try {
         const res = await fetch('/api/admin/run', {
           method: 'POST',
@@ -215,6 +406,16 @@
         setButtonsDisabled(false);
         statusEl.innerHTML = `<span class="tag failed">error</span>could not start`;
       }
+    }
+
+    if (updateAllBtn) {
+      updateAllBtn.addEventListener('click', () => {
+        if (!confirm('Run full pipeline: every source ingest + post-ingest dedup cleanup?\n\nTypically 2–15 min. You can cancel mid-run.')) return;
+        startRun('all');
+      });
+    }
+    if (cleanupOnlyBtn) {
+      cleanupOnlyBtn.addEventListener('click', () => startRun('cleanup'));
     }
 
     function startPolling() {
@@ -236,6 +437,7 @@
         statusEl.innerHTML =
           `<span class="tag ${r.status}">${r.status}</span>` +
           `run #${r.job_run_id} \u00b7 started ${fmtTs(r.started_at)} \u00b7 ${dur}`;
+        updateProgress(r);
         summaryEl.textContent = summarizeRun(r.summary);
         logEl.textContent = r.log || '';
         logEl.scrollTop = logEl.scrollHeight;
@@ -245,6 +447,7 @@
           stopPolling();
           setButtonsDisabled(false);
           loadRuns();
+          loadSources();   // refresh per-source last-scrape dates / counts
         }
       } catch (e) { /* keep polling */ }
     }
@@ -271,7 +474,12 @@
       runsTab.innerHTML = runs.map(r => {
         const dur = fmtDur(r.started_at, r.finished_at);
         const sum = summarizeRun(r.summary);
-        const label = r.job_name === 'update_st' ? 'st' : 'atg';
+        const label = r.job_name === 'update_st'      ? 'st'
+                    : r.job_name === 'update_kmtid'   ? 'xlabs'
+                    : r.job_name === 'update_letrot'  ? 'letrot'
+                    : r.job_name === 'update_cleanup' ? 'cleanup'
+                    : r.job_name === 'update_all'     ? 'all'
+                    : 'atg';
         return `
           <tr data-id="${r.job_run_id}">
             <td>${r.job_run_id}</td>
@@ -290,9 +498,19 @@
       });
     }
 
-    runBtn.addEventListener('click', () => startRun('atg'));
-    stBtn.addEventListener('click', () => startRun('st'));
     cancelBtn.addEventListener('click', cancelRun);
+
+    (function initPreviousRunsSection() {
+      const section = document.getElementById('previousRunsSection');
+      const btn = section.querySelector('.section-heading__toggle');
+      btn.addEventListener('click', () => {
+        const collapsed = section.classList.toggle('is-section-collapsed');
+        btn.textContent = collapsed ? '▾' : '▴';
+        btn.setAttribute('aria-expanded', String(!collapsed));
+      });
+    })();
+
+    loadSources();
     loadRuns();
   </script>
 {% endblock %}

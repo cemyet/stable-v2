@@ -21,8 +21,6 @@
   }
 
   .chart-card {
-    border: 1px solid var(--border);
-    background: var(--hover);
     padding: 20px 18px 14px;
   }
   .chart-title {
@@ -37,12 +35,12 @@
     font-size: 11px;
     line-height: 1.5;
     margin-bottom: 14px;
-    opacity: 0.7;
+    opacity: 0.6;
   }
   .chart-wrap {
     position: relative;
     width: 100%;
-    height: 280px;
+    height: 240px;
   }
   svg.form-chart {
     width: 100%;
@@ -50,25 +48,27 @@
     display: block;
     overflow: visible;
   }
-  .grid-line { stroke: var(--border); stroke-width: 1; }
-  .axis-text { fill: var(--fg-muted); font-size: 10px; letter-spacing: 1px; }
+  .grid-line { stroke: var(--border); stroke-width: 1; stroke-dasharray: none; }
+  .axis-text { fill: var(--fg-muted); font-size: 10px; letter-spacing: 0.5px; }
   .zero-line {
-    stroke: var(--border-focus);
+    stroke: var(--fg-muted);
     stroke-width: 1;
-    stroke-dasharray: 2 4;
+    stroke-dasharray: 3 5;
+    opacity: 0.4;
   }
-
-  .form-line { fill: none; stroke-width: 1.6;
-               stroke-linejoin: round; stroke-linecap: round; }
+  .form-path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .form-area { opacity: 0.06; }
   .form-dot  { stroke: none; }
-  .form-dot.thin { opacity: 0.35; }
+  .form-dot.thin { opacity: 0.25; }
 
-  .form-line.df      { stroke: var(--chart-form); }
-  .form-dot.df       { stroke: none; fill: var(--chart-form); }
-  .form-line.df-odds { stroke: var(--chart-odds); }
-  .form-dot.df-odds  { stroke: none; fill: var(--chart-odds); }
-  .form-line.d-wr    { stroke: var(--chart-wr); }
-  .form-dot.d-wr     { stroke: none; fill: var(--chart-wr); }
+  .form-path.df      { stroke: var(--chart-form); }
+  .form-area.df      { fill: var(--chart-form); }
+  .form-dot.df       { fill: var(--chart-form); }
+  .form-path.df-odds { stroke: var(--chart-odds); }
+  .form-area.df-odds { fill: var(--chart-odds); }
+  .form-dot.df-odds  { fill: var(--chart-odds); }
+  .form-path.d-wr    { stroke: var(--chart-wr); stroke-width: 1.4; stroke-dasharray: 5 4; opacity: 0.7; }
+  .form-dot.d-wr     { fill: var(--chart-wr); }
 
   .chart-legend {
     display: flex;
@@ -156,38 +156,39 @@
   }
   table.recent tr.dq td { opacity: 0.5; }
   table.recent a { }
-  table.recent a:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
   .shoe-icon { width: 14px; height: 14px; vertical-align: middle; }
   .shoe-changed { color: var(--accent-warn); }
   .sulky-changed { color: var(--accent-warn); }
-  .pos-1 { color: var(--accent-win); }
   .dq, .withdrew { color: var(--fg-muted); }
   .sex-age { color: var(--fg-muted); font-size: 11px; }
   .short-name { text-decoration: none; cursor: pointer; }
-  .short-name:hover { color: var(--fg); border-bottom-color: var(--border-focus); }
+  .short-name:hover {
+    color: var(--accent-glow);
+    text-shadow: var(--glow-shadow);
+    font-weight: var(--highlight-weight);
+  }
   .sform-hot { color: var(--accent-hot); }
   .sform-cold { color: var(--accent-cold); }
 {% endblock %}
 
 {% block content %}
   <div class="driver-page">
+    <a class="page-back" href="/home" aria-label="Back"></a>
     <h1 class="driver-name" id="driverName">driver</h1>
     <div class="driver-sub" id="driverSub"></div>
 
-    <div class="chart-card">
-      <div class="chart-title">driver form — last 3 years (weekly)</div>
+    <div class="chart-card glass-panel">
+      <div class="chart-title">driver win rate — last 3 years (monthly)</div>
       <div class="chart-help">
-        df = 30d win rate. df± = how much driver over/underperforms vs market odds.
-        click labels to toggle.
+        3-month rolling win rate. dashed line = career win%. click labels to toggle.
       </div>
       <div class="chart-wrap">
         <svg class="form-chart" id="chart" preserveAspectRatio="none"></svg>
         <div class="tooltip" id="tip"></div>
       </div>
       <div class="chart-legend" id="legend">
-        <label data-key="df"><span class="swatch" style="background:var(--chart-form)"></span>df (30d win%)</label>
-        <label data-key="df-odds"><span class="swatch" style="background:var(--chart-odds)"></span>df± (vs odds)</label>
-        <label data-key="d-wr"><span class="swatch" style="background:var(--chart-wr)"></span>d_wr (career win%)</label>
+        <label data-key="df"><span class="swatch" style="background:var(--chart-form)"></span>win% (3-month rolling)</label>
+        <label data-key="d-wr"><span class="swatch" style="background:var(--chart-wr)"></span>career win%</label>
       </div>
     </div>
 
@@ -203,22 +204,41 @@
     const SERIES = [
       {
         key: 'df', medianKey: 'median_df', scoredKey: 'scored',
-        label: 'df', group: 'pct', dots: true,
+        label: 'df', group: 'pct', dots: true, area: true,
         fmt: v => `${(v/10).toFixed(1)}%`,
       },
       {
-        key: 'df-odds', medianKey: 'median_df_odds', scoredKey: 'scored_odds',
-        label: 'df±', group: 'dlt', dots: true,
-        fmt: v => `${v >= 0 ? '+' : ''}${(v/10).toFixed(1)}pp`,
-      },
-      {
         key: 'd-wr', medianKey: 'median_d_wr', scoredKey: 'scored_wr',
-        label: 'd_wr', group: 'pct', dots: false,
+        label: 'd_wr (career)', group: 'pct', dots: false, area: false,
         fmt: v => `${(v/10).toFixed(1)}%`,
       },
     ];
 
-    const visible = { df: true, 'df-odds': true, 'd-wr': true };
+    const visible = { df: true, 'd-wr': true };
+
+    function smoothPath(pts) {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i];
+        const cp = (p1.x - p0.x) * 0.45;
+        d += ` C ${p0.x + cp},${p0.y} ${p1.x - cp},${p1.y} ${p1.x},${p1.y}`;
+      }
+      return d;
+    }
+
+    function areaPath(pts, yBottom) {
+      if (pts.length < 2) return '';
+      let d = `M ${pts[0].x},${yBottom}`;
+      d += ` L ${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const p0 = pts[i - 1], p1 = pts[i];
+        const cp = (p1.x - p0.x) * 0.45;
+        d += ` C ${p0.x + cp},${p0.y} ${p1.x - cp},${p1.y} ${p1.x},${p1.y}`;
+      }
+      d += ` L ${pts[pts.length - 1].x},${yBottom} Z`;
+      return d;
+    }
 
     function drawChart(series) {
       const svg = document.getElementById('chart');
@@ -244,33 +264,32 @@
         return;
       }
 
-      const W = 760, H = 280;
-      const M = { top: 16, right: 12, bottom: 26, left: 40 };
+      const W = 720, H = 240;
+      const M = { top: 14, right: 16, bottom: 28, left: 38 };
       const innerW = W - M.left - M.right;
       const innerH = H - M.top - M.bottom;
       svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
       const scales = {};
-
       const pctSeries = SERIES.filter(s => s.group === 'pct' && visible[s.key]);
       if (pctSeries.length) {
         const vals = pctSeries.flatMap(s => seriesPoints[s.key].map(p => p.value));
         if (vals.length) {
-          const lo = Math.max(0, Math.min(...vals) - 30);
-          const hi = Math.min(600, Math.max(...vals) + 30);
+          const lo = Math.max(0, Math.min(...vals) - 20);
+          const hi = Math.min(700, Math.max(...vals) + 20);
           scales.pct = { min: lo, max: hi };
         }
       }
-      if (visible['df-odds']) {
+      if (visible['df-odds'] && seriesPoints['df-odds'].length) {
         const vals = seriesPoints['df-odds'].map(p => p.value);
-        const absMax = Math.max(30, Math.max(...vals.map(v => Math.abs(v))));
-        scales.dlt = { min: -(absMax + 15), max: absMax + 15 };
+        const absMax = Math.max(20, Math.max(...vals.map(v => Math.abs(v))));
+        scales.dlt = { min: -(absMax + 10), max: absMax + 10 };
       }
 
-      const bothVisible = pctSeries.length > 0 && visible['df-odds'];
-
+      const bothVisible = pctSeries.length > 0 && visible['df-odds'] && scales.dlt;
       const yOf = (v, group) => {
         const sc = scales[group];
+        if (!sc) return M.top + innerH / 2;
         return M.top + (1 - (v - sc.min) / (sc.max - sc.min)) * innerH;
       };
 
@@ -283,31 +302,35 @@
       const xOf = m => M.left + ((new Date(m).getTime() - t0) / tSpan) * innerW;
 
       let gridHtml = '';
+      const yBottom = M.top + innerH;
 
       if (pctSeries.length && scales.pct) {
         const sc = scales.pct;
-        for (let t = 0; t <= 600; t += 50) {
+        const range = sc.max - sc.min;
+        const step = range > 300 ? 100 : range > 150 ? 50 : 25;
+        for (let t = 0; t <= 700; t += step) {
           if (t < sc.min || t > sc.max) continue;
           const y = yOf(t, 'pct');
           gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
-          gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${(t/10).toFixed(0)}%</text>`;
+          gridHtml += `<text x="${M.left - 5}" y="${y + 3.5}" class="axis-text" text-anchor="end">${(t/10).toFixed(0)}%</text>`;
         }
       }
 
       if (visible['df-odds'] && scales.dlt) {
         const sc = scales.dlt;
-        const step = (sc.max - sc.min) > 150 ? 50 : 20;
+        const step = (sc.max - sc.min) > 100 ? 50 : 20;
         for (let t = -500; t <= 500; t += step) {
           if (t < sc.min || t > sc.max) continue;
           const y = yOf(t, 'dlt');
           if (t === 0) {
             gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="zero-line"/>`;
           }
+          const label = `${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}`;
           if (bothVisible) {
-            gridHtml += `<text x="${W - M.right + 6}" y="${y + 3}" class="axis-text" text-anchor="start">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+            gridHtml += `<text x="${W - M.right + 5}" y="${y + 3.5}" class="axis-text" text-anchor="start">${label}</text>`;
           } else {
             gridHtml += `<line x1="${M.left}" x2="${W - M.right}" y1="${y}" y2="${y}" class="grid-line"/>`;
-            gridHtml += `<text x="${M.left - 6}" y="${y + 3}" class="axis-text" text-anchor="end">${t >= 0 ? '+' : ''}${(t/10).toFixed(0)}</text>`;
+            gridHtml += `<text x="${M.left - 5}" y="${y + 3.5}" class="axis-text" text-anchor="end">${label}</text>`;
           }
         }
       }
@@ -323,26 +346,27 @@
         `<text x="${t.x}" y="${H - 8}" class="axis-text" text-anchor="middle">${t.label}</text>`
       ).join('');
 
-      let linesHtml = '', dotsHtml = '';
+      let areasHtml = '', pathsHtml = '', dotsHtml = '';
       SERIES.filter(s => visible[s.key]).forEach(s => {
-        const pts = seriesPoints[s.key];
+        const pts = seriesPoints[s.key].map(p => ({ x: xOf(p.month), y: yOf(p.value, s.group), ...p }));
         if (pts.length >= 2) {
-          const points = pts.map(p => `${xOf(p.month)},${yOf(p.value, s.group)}`).join(' ');
-          linesHtml += `<polyline class="form-line ${s.key}" points="${points}"/>`;
+          if (s.area !== false) {
+            areasHtml += `<path class="form-area ${s.key}" d="${areaPath(pts, yBottom)}"/>`;
+          }
+          pathsHtml += `<path class="form-path ${s.key}" d="${smoothPath(pts)}"/>`;
         }
         if (s.dots) {
           pts.forEach(p => {
-            const cls = `form-dot ${s.key}` + (p.scored < 3 ? ' thin' : '');
-            dotsHtml += `<circle class="${cls}"
-                          cx="${xOf(p.month)}" cy="${yOf(p.value, s.group)}" r="2"
-                          data-series="${s.label}" data-month="${p.month}"
-                          data-value="${p.value}" data-scored="${p.scored}"
-                          data-starts="${p.starts}" data-fmt="${s.key}"/>`;
+            const cls = `form-dot ${s.key}` + (p.scored < 2 ? ' thin' : '');
+            dotsHtml += `<circle class="${cls}" cx="${p.x}" cy="${p.y}" r="2.5"
+              data-series="${s.label}" data-month="${p.month}"
+              data-value="${p.value}" data-scored="${p.scored}"
+              data-starts="${p.starts}" data-fmt="${s.key}"/>`;
           });
         }
       });
 
-      svg.innerHTML = gridHtml + xAxisHtml + linesHtml + dotsHtml;
+      svg.innerHTML = gridHtml + xAxisHtml + areasHtml + pathsHtml + dotsHtml;
 
       const wrap = svg.parentElement;
       const fmtMap = {};
@@ -355,10 +379,7 @@
           const scored = c.dataset.scored;
           const starts = c.dataset.starts;
           const display = fmtMap[c.dataset.fmt](val);
-          tip.innerHTML =
-            `<strong>${month}</strong><br>` +
-            `${sLabel} ${display}<br>` +
-            `${scored}/${starts} scored`;
+          tip.innerHTML = `<strong>${month}</strong><br>${sLabel} ${display}<br>${scored}/${starts} starts`;
           const wrapRect = wrap.getBoundingClientRect();
           const dotRect  = c.getBoundingClientRect();
           tip.style.left = (dotRect.left - wrapRect.left + dotRect.width / 2) + 'px';
@@ -409,7 +430,7 @@
     }
 
     function sexAge(e) {
-      const s = (e.sex || '').toLowerCase();
+      const s = swedishSex(e.sex);
       const a = e.age != null ? e.age : '';
       if (!s && !a) return '';
       return `${s}${a}`;
@@ -458,6 +479,15 @@
                : n > 3  ? 'sform sform-hot'
                          : 'sform';
       return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
+    }
+
+    function tfPerfCell(v) {
+      if (v == null) return '';
+      const n = v / 10;
+      const cls = n >= 65 ? 'sform sform-hot'
+               : n <= 40 ? 'sform sform-cold'
+                         : 'sform';
+      return `<span class="${cls}">${n.toFixed(1)}</span>`;
     }
 
     function sulkyCell(e) {
@@ -529,14 +559,17 @@
         <th>trainer</th>
         <th class="winrate">t_wr</th>
         <th class="sform">tΔ</th>
-        <th class="sform">tf±</th>
+        <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
+        <th class="sform" title="trainer market± — avg positions the trainer's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">t mkt</th>
         <th class="winrate">d_wr</th>
         <th class="sform">dΔ</th>
-        <th class="sform">df±</th>
+        <th class="sform" title="driver form — avg finishing percentile of the driver's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">d form</th>
+        <th class="sform" title="driver market± — avg positions the driver's last-30d runners finish ahead of their odds rank. >0 = market underrates them (not a win-rate / recent-form signal).">d mkt</th>
         <th class="num">odds</th>
         <th class="num">sulky</th>
         <th class="center">shoes</th>
         <th>time</th>
+        <th title="source(s) that contributed this entry">src</th>
       </tr></thead>`;
       const rows = entries.map(e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
@@ -550,25 +583,29 @@
         const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
         return `<tr${cls}>
           <td class="muted">${dateCell}</td>
-          <td class="muted">${esc(e.track || '')}</td>
+          <td class="muted">${e.track_id ? `<a href="/track/${e.track_id}">${esc(e.track || '')}</a>` : esc(e.track || '')}</td>
           <td>${posDisplay(e)}</td>
           <td class="num muted">${e.number || ''}</td>
           <td>${horseCell(e)}</td>
           <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
           <td class="winrate">${wrCell(e.t_wr)}</td>
           <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
+          <td class="sform">${tfPerfCell(e.tf_perf)}</td>
           <td class="sform">${tfOddsCell(e.tf_odds)}</td>
           <td class="winrate">${wrCell(e.d_wr)}</td>
           <td class="sform">${deltaCell(e.df, e.d_wr)}</td>
+          <td class="sform">${tfPerfCell(e.df_perf)}</td>
           <td class="sform">${tfOddsCell(e.df_odds)}</td>
           <td class="num muted">${e.odds != null ? e.odds : ''}</td>
           <td class="num muted">${sulkyCell(e)}</td>
           <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
           <td class="muted">${esc(time)}</td>
+          <td>${srcPillsList((e.contributors || []).map(s => ({key: s})), {size: 'sm'})}</td>
         </tr>`;
       }).join('');
       document.getElementById('recentEntries').innerHTML =
         `<table class="recent">${head}<tbody>${rows}</tbody></table>`;
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(document.getElementById('recentEntries'));
     }
 
     init();

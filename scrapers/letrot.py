@@ -41,20 +41,114 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def make_client() -> httpx.Client:
+    # Disable keep-alive: LeTrot closes connections aggressively and stale
+    # CLOSE_WAIT sockets in the pool cause select() to hang indefinitely
+    # on macOS/Python 3.9. Fresh connection per request avoids this.
+    limits = httpx.Limits(max_keepalive_connections=0)
     return httpx.Client(
         headers=LETROT_HEADERS,
         follow_redirects=True,
-        timeout=30.0,
+        timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
+        limits=limits,
     )
 
 
-def _get(client: httpx.Client, path: str) -> str | None:
+# Optional callback for a long-running backfill to observe every HTTP
+# response (status code + elapsed seconds). The backfill watchdog uses
+# this to detect rate-limit storms, error spikes, and silent throttling
+# without us having to thread anything through the call sites.
+_response_observer = None
+
+
+def set_response_observer(fn) -> None:
+    """Install a `fn(status_code: int, elapsed: float, url: str)` hook.
+
+    Call with None to clear. Errors raised inside the observer are
+    propagated so that a watchdog can short-circuit the whole run by
+    raising RuntimeError from inside the hook.
+    """
+    global _response_observer
+    _response_observer = fn
+
+
+class _HardTimeout(Exception):
+    """Raised by SIGALRM when an HTTP request exceeds the hard deadline."""
+
+
+_HARD_TIMEOUT_S = 45  # must exceed httpx read timeout (30 s) + SSL overhead
+
+
+def _get(client: httpx.Client, path: str, *, _retries: int = 2) -> str | None:
     url = LETROT_BASE + path
-    r = client.get(url)
-    if r.status_code != 200:
-        log.warning("letrot %s -> HTTP %s", url, r.status_code)
-        return None
-    return r.text
+    import signal as _sig
+    import threading as _thr
+    import time as _t
+
+    # SIGALRM can only be armed from the main thread. The pedigree scraper
+    # runs this off worker threads (`scripts.scrape_letrot_pedigree`), where
+    # signal.signal() raises ValueError — so the hard-timeout guard is only
+    # used on the main thread. Worker threads rely on httpx's own
+    # connect/read timeouts instead.
+    _use_alarm = _thr.current_thread() is _thr.main_thread()
+
+    def _alarm_handler(signum, frame):
+        raise _HardTimeout(url)
+
+    for attempt in range(_retries + 1):
+        t0 = _t.monotonic()
+        # SIGALRM hard-kills the request if the SSL layer ignores the
+        # socket timeout (observed on macOS ARM64 + Python 3.9).
+        prev_handler = None
+        if _use_alarm:
+            prev_handler = _sig.signal(_sig.SIGALRM, _alarm_handler)
+            _sig.alarm(_HARD_TIMEOUT_S)
+        try:
+            r = client.get(url)
+        except _HardTimeout:
+            elapsed = _t.monotonic() - t0
+            if _response_observer is not None:
+                _response_observer(0, elapsed, url)
+            log.warning("letrot %s -> hard timeout after %.1fs  "
+                        "(retry %d/%d)", url, elapsed,
+                        attempt + 1, _retries)
+            if attempt < _retries:
+                _t.sleep(2 ** attempt)
+                continue
+            return None
+        except (httpx.TimeoutException, httpx.ConnectError) as exc:
+            if _use_alarm:
+                _sig.alarm(0)
+            elapsed = _t.monotonic() - t0
+            if _response_observer is not None:
+                _response_observer(0, elapsed, url)
+            if attempt < _retries:
+                wait = 2 ** attempt
+                log.warning("letrot %s -> %r  (retry %d/%d in %ds)",
+                            url, exc, attempt + 1, _retries, wait)
+                _t.sleep(wait)
+                continue
+            log.warning("letrot %s -> %r  (exhausted retries)", url, exc)
+            raise
+        except Exception as exc:
+            if _use_alarm:
+                _sig.alarm(0)
+            if _response_observer is not None:
+                _response_observer(0, _t.monotonic() - t0, url)
+            log.warning("letrot %s -> exception %r", url, exc)
+            raise
+        finally:
+            if _use_alarm:
+                _sig.alarm(0)
+                _sig.signal(_sig.SIGALRM, prev_handler)
+
+        elapsed = _t.monotonic() - t0
+        if _response_observer is not None:
+            _response_observer(r.status_code, elapsed, url)
+        if r.status_code != 200:
+            log.warning("letrot %s -> HTTP %s", url, r.status_code)
+            return None
+        return r.text
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +282,8 @@ def parse_course(html: str) -> dict:
 
     h1 = soup.find("h1")
     if h1:
-        h1_text = h1.get_text(" ", strip=True)
+        # Normalise whitespace — LeTrot pads <h1> with tabs and newlines.
+        h1_text = " ".join(h1.get_text(" ", strip=True).split())
         # h1 looks like "C5 PRIX DU GATINAIS"
         m = _RE_RACE_NUMBER.match(h1_text)
         if m:
@@ -408,7 +503,15 @@ def fetch_horse_identity(client: httpx.Client, letrot_id: str, slug: str = "x") 
 
 
 def list_today(client: httpx.Client, when: str = "aujourd-hui") -> list[dict]:
-    """List courses on a given day. `when` is one of: aujourd-hui, hier, demain.
+    """List courses on a given day.
+
+    `when` accepts any of:
+      * 'aujourd-hui' / 'hier' / 'demain'   (relative shortcuts)
+      * 'YYYY-MM-DD'                        (any historic ISO date)
+
+    Le Trot serves `/courses/<when>` with all of that day's courses
+    listed as <a> links to `/courses/<YYYY-MM-DD>/<reunion>/<course>`.
+    Historical coverage goes back to at least 2010-01-01.
 
     Returns rows {race_date, reunion_id, course_number, href}."""
     html = _get(client, f"/courses/{when}")
@@ -416,7 +519,7 @@ def list_today(client: httpx.Client, when: str = "aujourd-hui") -> list[dict]:
         return []
     soup = BeautifulSoup(html, "lxml")
     out: list[dict] = []
-    for a in soup.select('a[href^="/courses/2"]'):
+    for a in soup.select('a[href^="/courses/"]'):
         href = a.get("href")
         m = re.match(r"^/courses/(\d{4}-\d{2}-\d{2})/(\d+)/(\d+)$", href)
         if not m:
@@ -437,6 +540,13 @@ def list_today(client: httpx.Client, when: str = "aujourd-hui") -> list[dict]:
         seen.add(key)
         dedup.append(r)
     return dedup
+
+
+def list_date(client: httpx.Client, race_date: Date | str) -> list[dict]:
+    """Explicit wrapper for historical-date lookups (alias for list_today)."""
+    if isinstance(race_date, Date):
+        race_date = race_date.isoformat()
+    return list_today(client, race_date)
 
 
 # ---------------------------------------------------------------------------
