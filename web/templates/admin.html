@@ -211,8 +211,7 @@
   table.runs tr:hover { background: var(--hover); cursor: pointer; }
   table.runs td.summary-cell { color: var(--fg); }
 
-  .all-row,
-  .cleanup-row {
+  .all-row {
     padding: 14px 16px;
     margin-bottom: 18px;
   }
@@ -243,13 +242,6 @@
 
     <div class="sources" id="sources">
       <!-- populated by JS -->
-    </div>
-
-    <div class="cleanup-row glass-panel">
-      <div class="action-head">
-        <div class="action-label">cleanup only</div>
-        <button class="ghost" id="cleanupOnlyBtn">cleanup</button>
-      </div>
     </div>
 
     <div class="active-run">
@@ -314,7 +306,6 @@
     }
     const runsTab     = document.getElementById('runsTable');
     const updateAllBtn  = document.getElementById('updateAllBtn');
-    const cleanupOnlyBtn = document.getElementById('cleanupOnlyBtn');
 
     function fmtRelDate(iso) {
       if (!iso) return 'never';
@@ -355,7 +346,6 @@
 
     function setButtonsDisabled(v) {
       if (updateAllBtn)  updateAllBtn.disabled  = v;
-      if (cleanupOnlyBtn) cleanupOnlyBtn.disabled = v;
     }
 
     async function loadSources() {
@@ -414,10 +404,6 @@
         startRun('all');
       });
     }
-    if (cleanupOnlyBtn) {
-      cleanupOnlyBtn.addEventListener('click', () => startRun('cleanup'));
-    }
-
     function startPolling() {
       stopPolling();
       pollTimer = setInterval(pollOnce, 1500);

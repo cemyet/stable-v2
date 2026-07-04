@@ -360,6 +360,22 @@ CREATE INDEX IF NOT EXISTS entry_trainer_date_idx
     ON entry (trainer_id, race_date DESC NULLS LAST, entry_id DESC) WHERE trainer_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS entry_horse_date_idx
     ON entry (horse_id, race_date DESC NULLS LAST, entry_id DESC);
+-- Covering indexes for the trainer/driver history aggregates. The composite
+-- indexes above locate a person's rows quickly but the aggregate columns still
+-- live in the heap, so the monthly-series (3 yr), top-horses (career) and
+-- 30-day rolling-form scans each did thousands of random heap fetches per page
+-- load (≈500 ms cold on Supabase). INCLUDE-ing those columns makes all three
+-- index-only, cutting the cold cost 5-7×. entry_id is included so the
+-- outperf/perf joins stay index-only on the entry side too.
+CREATE INDEX IF NOT EXISTS entry_trainer_cover_idx
+    ON entry (trainer_id, race_date)
+    INCLUDE (entry_id, withdrawn, placement_text, disqualified, prize_kr, horse_id)
+    WHERE trainer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS entry_driver_cover_idx
+    ON entry (driver_id, race_date)
+    INCLUDE (entry_id, withdrawn, placement_text, disqualified)
+    WHERE driver_id IS NOT NULL;
+
 -- Recent-window leaderboard slice (all entries in the last N days).
 CREATE INDEX IF NOT EXISTS entry_race_date_idx   ON entry (race_date);
 CREATE INDEX IF NOT EXISTS entry_horse_winner_idx ON entry (horse_id)   WHERE placement = 1;

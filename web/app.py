@@ -1279,40 +1279,80 @@ def _batch_person_form_at_date(conn, person_ids: list[int], role: str,
 
 def _batch_person_form_multi(conn, person_ids: list[int], role: str,
                              as_ofs: list) -> dict[tuple[int, object], dict[str, int | None]]:
-    """Same as above but keyed on (person_id, as_of_date) for history rows."""
+    """Same as `_batch_person_form_at_date` but keyed on (person_id, as_of)
+    for the per-row history cells on the trainer/driver pages.
+
+    The obvious SQL (a correlated join that recomputes each 30-day window from
+    scratch) rescans the same rows dozens of times — for a busy trainer that's
+    ~10k redundant row visits and ~80k buffer touches, each with an
+    outperf/perf pkey lookup. Instead we pull every candidate row for the
+    target persons across the *union* span [min(as_of)-30d, max(as_of)) in a
+    single index-only scan, then roll up the individual windows in Python.
+    Semantics are identical to the SQL FILTER version.
+    """
+    import datetime as _dt
+    from collections import defaultdict
+
     if not person_ids or not as_ofs or len(person_ids) != len(as_ofs):
         return {}
+    valid_dates = [d for d in as_ofs if d is not None]
+    uniq_pids = list({p for p in person_ids if p is not None})
+    if not valid_dates or not uniq_pids:
+        return {}
+
+    span_lo = min(valid_dates) - _dt.timedelta(days=30)
+    span_hi = max(valid_dates)
     id_col = 'driver_id' if role == 'driver' else 'trainer_id'
+
     with conn.cursor() as cur:
         cur.execute(f"""
-            WITH targets AS (
-                SELECT * FROM unnest(%s::int[], %s::date[]) AS t(pid, as_of)
-            )
-            SELECT t.pid, t.as_of,
-                   COUNT(*) FILTER (
-                       WHERE NOT COALESCE(e.withdrawn, false) AND {_NOT_QUALIFIER}
-                   ) AS starts,
-                   COUNT(*) FILTER (WHERE {_IS_WIN}) AS wins,
-                   COUNT(eo.market_outperf)            AS n_of,
-                   COALESCE(SUM(eo.market_outperf), 0) AS sum_of,
-                   COUNT(ep.perf)                       AS n_pf,
-                   COALESCE(SUM(ep.perf), 0)            AS sum_pf
-            FROM targets t
-            JOIN entry e ON e.{id_col} = t.pid
-             AND e.race_date >= t.as_of - INTERVAL '30 days'
-             AND e.race_date < t.as_of
+            SELECT e.{id_col}                                          AS pid,
+                   e.race_date                                         AS rd,
+                   (NOT COALESCE(e.withdrawn, false) AND {_NOT_QUALIFIER}) AS is_start,
+                   ({_IS_WIN})                                         AS is_win,
+                   eo.market_outperf                                   AS of_val,
+                   ep.perf                                             AS pf_val
+            FROM entry e
             LEFT JOIN entry_outperf eo ON eo.entry_id = e.entry_id
             LEFT JOIN entry_perf    ep ON ep.entry_id = e.entry_id
-            GROUP BY t.pid, t.as_of
-        """, (person_ids, as_ofs))
-        out: dict[tuple[int, object], dict[str, int | None]] = {}
-        for pid, as_of, starts, wins, n_of, sum_of, n_pf, sum_pf in cur.fetchall():
-            out[(pid, as_of)] = {
-                'form': _permille_form(starts, wins),
-                'form_odds': _permille_s_form(n_of, sum_of),
-                'form_perf': _permille_perf(n_pf, sum_pf),
-            }
-        return out
+            WHERE e.{id_col} = ANY(%s)
+              AND e.race_date >= %s
+              AND e.race_date <  %s
+        """, (uniq_pids, span_lo, span_hi))
+        rows = cur.fetchall()
+
+    # Bucket each person's rows so a window is a simple linear pass.
+    by_pid: dict[int, list] = defaultdict(list)
+    for pid, rd, is_start, is_win, of_val, pf_val in rows:
+        if rd is not None:
+            by_pid[pid].append((rd, is_start, is_win, of_val, pf_val))
+
+    out: dict[tuple[int, object], dict[str, int | None]] = {}
+    for pid, as_of in zip(person_ids, as_ofs):
+        if pid is None or as_of is None or (pid, as_of) in out:
+            continue
+        lo = as_of - _dt.timedelta(days=30)
+        starts = wins = n_of = n_pf = 0
+        sum_of = sum_pf = 0.0
+        for rd, is_start, is_win, of_val, pf_val in by_pid.get(pid, ()):
+            if rd < lo or rd >= as_of:
+                continue
+            if is_start:
+                starts += 1
+            if is_win:
+                wins += 1
+            if of_val is not None:
+                n_of += 1
+                sum_of += float(of_val)
+            if pf_val is not None:
+                n_pf += 1
+                sum_pf += float(pf_val)
+        out[(pid, as_of)] = {
+            'form': _permille_form(starts, wins),
+            'form_odds': _permille_s_form(n_of, sum_of),
+            'form_perf': _permille_perf(n_pf, sum_pf),
+        }
+    return out
 
 
 # Min-starts thresholds scale with window length so a small-sample 7d list
@@ -3843,28 +3883,55 @@ def _person_form_series(conn, person_id: int, id_col: str) -> list:
     return result
 
 
+# Trainer/driver page payloads only change when new races are ingested
+# (nightly at 01:00 CET), so an in-process cache turns every repeat visit —
+# and every visit to a popular person after the first — into an instant hit.
+# The TTL just bounds staleness after a mid-day catch-up ingest.
+_person_cache: dict[str, tuple[float, dict]] = {}
+_PERSON_CACHE_TTL = 1800  # 30 min
+
+
+def _person_cached(key: str, build):
+    import time as _t
+    now = _t.time()
+    hit = _person_cache.get(key)
+    if hit and now - hit[0] < _PERSON_CACHE_TTL:
+        return hit[1]
+    val = build()
+    # Don't cache 404s / errors (tuples), only successful dict payloads.
+    if isinstance(val, dict):
+        _person_cache[key] = (now, val)
+    return val
+
+
 @app.route('/api/driver/<int:driver_id>')
 def driver_api(driver_id):
     """Driver header + monthly form-series + recent entries."""
-    conn = get_db()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT person_id, name, short_name FROM person WHERE person_id = %s",
-                        (driver_id,))
-            head = cur.fetchone()
-            if not head:
-                return jsonify({'error': 'not found'}), 404
-        series = _person_form_series(conn, driver_id, 'driver_id')
-        recent = _person_recent_entries(conn, driver_id, 'driver')
-    finally:
-        conn.close()
-    return jsonify({
-        'driver_id': head['person_id'],
-        'name':      fmtName(head['name'] or ''),
-        'short':     head['short_name'],
-        'series':    series,
-        'recent':    recent,
-    })
+    def build():
+        conn = get_db()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT person_id, name, short_name FROM person WHERE person_id = %s",
+                            (driver_id,))
+                head = cur.fetchone()
+                if not head:
+                    return None
+            series = _person_form_series(conn, driver_id, 'driver_id')
+            recent = _person_recent_entries(conn, driver_id, 'driver')
+        finally:
+            conn.close()
+        return {
+            'driver_id': head['person_id'],
+            'name':      fmtName(head['name'] or ''),
+            'short':     head['short_name'],
+            'series':    series,
+            'recent':    recent,
+        }
+
+    payload = _person_cached(f'driver:{driver_id}', build)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
 
 
 def _trainer_top_horses(conn, trainer_id: int, limit: int = 5) -> list:
@@ -3919,27 +3986,33 @@ def _trainer_top_horses(conn, trainer_id: int, limit: int = 5) -> list:
 @app.route('/api/trainer/<int:trainer_id>')
 def trainer_api(trainer_id):
     """Trainer header + monthly form-series + recent entries + top horses."""
-    conn = get_db()
-    try:
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("SELECT person_id, name, short_name FROM person WHERE person_id = %s",
-                        (trainer_id,))
-            head = cur.fetchone()
-            if not head:
-                return jsonify({'error': 'not found'}), 404
-        series      = _person_form_series(conn, trainer_id, 'trainer_id')
-        recent      = _person_recent_entries(conn, trainer_id, 'trainer')
-        top_horses  = _trainer_top_horses(conn, trainer_id)
-    finally:
-        conn.close()
-    return jsonify({
-        'trainer_id': head['person_id'],
-        'name':       fmtName(head['name'] or ''),
-        'short':      head['short_name'],
-        'series':     series,
-        'recent':     recent,
-        'top_horses': top_horses,
-    })
+    def build():
+        conn = get_db()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("SELECT person_id, name, short_name FROM person WHERE person_id = %s",
+                            (trainer_id,))
+                head = cur.fetchone()
+                if not head:
+                    return None
+            series      = _person_form_series(conn, trainer_id, 'trainer_id')
+            recent      = _person_recent_entries(conn, trainer_id, 'trainer')
+            top_horses  = _trainer_top_horses(conn, trainer_id)
+        finally:
+            conn.close()
+        return {
+            'trainer_id': head['person_id'],
+            'name':       fmtName(head['name'] or ''),
+            'short':      head['short_name'],
+            'series':     series,
+            'recent':     recent,
+            'top_horses': top_horses,
+        }
+
+    payload = _person_cached(f'trainer:{trainer_id}', build)
+    if payload is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(payload)
 
 
 # =====================================================================
