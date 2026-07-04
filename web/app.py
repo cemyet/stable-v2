@@ -32,12 +32,16 @@ if str(_STABLE_V2_ROOT) not in sys.path:
     sys.path.insert(0, str(_STABLE_V2_ROOT))
 
 import re as _re_mod
+import threading as _threading
 
 import psycopg2
 import psycopg2.extras
+import psycopg2.extensions
+from psycopg2.pool import ThreadedConnectionPool
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from core.config import WEB_PORT
+import core.config as _config
 import unicodedata as _unicodedata
 
 from core.db import get_connection
@@ -45,6 +49,69 @@ from core.db import get_connection
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
+
+# ---------------------------------------------------------------------------
+# Connection pool — reuse TLS connections to Supabase across requests.
+# Each gunicorn worker gets its own pool (processes don't share memory).
+# Pool size = threads per worker + 2 buffer to avoid exhaustion.
+# ---------------------------------------------------------------------------
+_pool: "ThreadedConnectionPool | None" = None
+_pool_lock = _threading.Lock()
+_POOL_MIN, _POOL_MAX = 2, 8
+
+
+class _PooledConn:
+    """Thin proxy that returns the connection to the pool on close()."""
+
+    def __init__(self, conn: "psycopg2.extensions.connection",
+                 pool: ThreadedConnectionPool) -> None:
+        self.__dict__['_conn'] = conn
+        self.__dict__['_pool'] = pool
+        self.__dict__['_returned'] = False
+
+    def close(self) -> None:
+        if self.__dict__['_returned']:
+            return
+        self.__dict__['_returned'] = True
+        conn = self.__dict__['_conn']
+        pool = self.__dict__['_pool']
+        try:
+            if not conn.closed and conn.status not in (
+                psycopg2.extensions.STATUS_READY,
+            ):
+                conn.rollback()
+        except Exception:
+            pass
+        pool.putconn(conn)
+
+    def cursor(self, *args, **kwargs):
+        return self.__dict__['_conn'].cursor(*args, **kwargs)
+
+    def commit(self):
+        return self.__dict__['_conn'].commit()
+
+    def rollback(self):
+        return self.__dict__['_conn'].rollback()
+
+    def __getattr__(self, name):
+        return getattr(self.__dict__['_conn'], name)
+
+    def __setattr__(self, name, value):
+        if name in ('_conn', '_pool', '_returned'):
+            self.__dict__[name] = value
+        else:
+            setattr(self.__dict__['_conn'], name, value)
+
+
+def _get_pool() -> ThreadedConnectionPool:
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = ThreadedConnectionPool(
+                    _POOL_MIN, _POOL_MAX, _config.DATABASE_URL
+                )
+    return _pool
 
 
 # ---------------------------------------------------------------------------
@@ -254,8 +321,9 @@ def shortName(name: str) -> str:
     return f"{last} {first_short}"
 
 
-def get_db():
-    return get_connection()
+def get_db() -> _PooledConn:
+    """Return a pooled connection. Caller must call .close() to return it."""
+    return _PooledConn(_get_pool().getconn(), _get_pool())
 
 
 def _kr(value) -> str:
@@ -983,6 +1051,43 @@ def _cached(key, fn):
     return val
 
 
+def _prewarm_cache() -> None:
+    """Pre-populate the leaderboard cache at startup so the first visitor
+    never waits 10-17 seconds for cold Postgres pages to load.
+
+    Called once in a daemon thread when the app boots.  Each inner import is
+    intentionally deferred so this thread starts after all routes are defined.
+    """
+    import time as _time
+    _time.sleep(5)  # let gunicorn workers finish initialising
+    try:
+        with app.test_request_context():
+            from flask import request as _req  # noqa: F401 — satisfies request context
+            # Trigger the four heaviest home-page widgets with default params.
+            # They all call _cached(), so the results land in _leaderboard_cache.
+            for _fn, _kwargs in (
+                # form-leaders: two roles × three sort keys
+                ("home_form_leaders",   [{'days': '30', 'sort': 'delta'}]),
+                # top-horses: two periods × two breeds
+                ("home_top_horses",     [{'sort': 'earnings', 'period': 'ytd', 'breed': 'standardbred'},
+                                          {'sort': 'earnings', 'period': 'all', 'breed': 'standardbred'}]),
+                # top-offspring: two roles
+                ("home_top_offspring",  [{'sort': 'earnings', 'role': 'sire', 'period': 'ytd', 'breed': 'standardbred'},
+                                          {'sort': 'earnings', 'role': 'dam',  'period': 'ytd', 'breed': 'standardbred'}]),
+            ):
+                for _params in _kwargs:
+                    try:
+                        with app.test_request_context(f'/?{"&".join(f"{k}={v}" for k,v in _params.items())}'):
+                            app.view_functions[_fn]()
+                    except Exception:
+                        pass  # non-fatal — real requests will populate cache lazily
+    except Exception:
+        pass
+
+
+_threading.Thread(target=_prewarm_cache, daemon=True).start()
+
+
 _QUALIFIER_RE = r"^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$"
 _NOT_QUALIFIER = f"COALESCE(e.placement_text,'') !~ '{_QUALIFIER_RE}'"
 _IS_WIN   = f"e.placement_text = '1' AND NOT COALESCE(e.disqualified, false) AND {_NOT_QUALIFIER}"
@@ -1322,31 +1427,26 @@ def home_top_horses():
                         LIMIT {limit}
                     """, (breed_code, sort, sort))
                 elif sort != 'time':
+                    # YTD: use horse_year_stats matview — avoids a full entry
+                    # table scan (7 M rows) on every cache miss.
                     cur.execute(f"""
-                        SELECT e.horse_id,
-                               h.name                                                        AS horse_name,
-                               SUM(CASE WHEN NOT COALESCE(e.withdrawn,false) THEN 1 ELSE 0 END) AS starts,
-                               SUM(CASE WHEN {_IS_WIN} THEN 1 ELSE 0 END)                    AS wins,
-                               SUM(COALESCE(e.prize_kr, 0))                                  AS earnings
-                        FROM entry e
-                        JOIN horse h ON h.horse_id = e.horse_id
-                        JOIN race  r ON r.race_id  = e.race_id
-                        WHERE r.race_date >= date_trunc('year', CURRENT_DATE)
-                          AND NOT COALESCE(e.withdrawn, false)
-                          AND {_NOT_QUALIFIER}
-                          AND h.breed_code = %s
-                        GROUP BY e.horse_id, h.name
+                        SELECT h.horse_id,
+                               h.name                AS horse_name,
+                               ys.starts,
+                               ys.wins,
+                               ys.prize_money_kr     AS earnings
+                        FROM horse_year_stats ys
+                        JOIN horse h ON h.horse_id = ys.horse_id
+                        WHERE h.breed_code = %s
+                          AND ys.race_year = EXTRACT(YEAR FROM CURRENT_DATE)::int
+                          AND ys.starts > 0
                         ORDER BY
-                          CASE %s
-                            WHEN 'earnings'  THEN SUM(COALESCE(e.prize_kr, 0))
-                            ELSE 0
-                          END DESC,
+                          CASE %s WHEN 'earnings' THEN ys.prize_money_kr ELSE 0 END DESC,
                           CASE WHEN %s = 'win_rate'
-                            THEN SUM(CASE WHEN {_IS_WIN} THEN 1 ELSE 0 END)::numeric
-                                 / NULLIF(SUM(CASE WHEN NOT COALESCE(e.withdrawn,false) THEN 1 ELSE 0 END), 0)
+                            THEN ys.wins::numeric / NULLIF(ys.starts, 0)
                             ELSE 0
                           END DESC,
-                          SUM(COALESCE(e.prize_kr, 0)) DESC
+                          ys.prize_money_kr DESC
                         LIMIT {limit}
                     """, (breed_code, sort, sort))
                 rows = cur.fetchall()
@@ -3082,7 +3182,21 @@ def race_live_by_atg(atg_race_id):
     return jsonify(data)
 
 
+_race_cache: dict[str, tuple[float, dict]] = {}
+_RACE_CACHE_TTL_UPCOMING = 45    # seconds — live odds update every ~30s
+_RACE_CACHE_TTL_PAST     = 3600  # 1 hour for finished races
+
+
 def _race_entries(*, race_id=None, atg_race_id=None):
+    import time as _time_mod
+    _cache_key = f'race:{race_id or atg_race_id}'
+    _now = _time_mod.time()
+    if _cache_key in _race_cache:
+        _ts, _cached_data = _race_cache[_cache_key]
+        _ttl = _RACE_CACHE_TTL_PAST if not _cached_data.get('is_upcoming') else _RACE_CACHE_TTL_UPCOMING
+        if _now - _ts < _ttl:
+            return jsonify(_cached_data)
+
     conn = get_db()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -3366,7 +3480,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
     if head.get('kmtid_id'):
         source_pills.append({'key': 'kmtid',  'source_id': head.get('kmtid_id'),
                              'url': None})
-    return jsonify({
+    _result = {
         'race_date': race_date.isoformat() if hasattr(race_date, 'isoformat') else race_date,
         'track': (head.get('track_name') or '').strip().title(),
         'track_id': head.get('track_id'),
@@ -3384,7 +3498,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
         'contributors': contributors,
         'source_pills': source_pills,
         'results': rows,
-    })
+    }
+    _race_cache[_cache_key] = (_now, _result)
+    return jsonify(_result)
 
 
 # =====================================================================
