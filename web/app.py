@@ -38,7 +38,8 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 from psycopg2.pool import ThreadedConnectionPool
-from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask import (Flask, jsonify, redirect, render_template,
+                   render_template_string, request, session, url_for)
 
 from core.config import WEB_PORT
 import core.config as _config
@@ -49,6 +50,91 @@ from core.db import get_connection
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 24 * 30  # 30 days
+
+# ---------------------------------------------------------------------------
+# Access-code authentication
+# Set SITE_PASSWORD + SECRET_KEY in Railway env vars to lock the site.
+# If SITE_PASSWORD is empty the gate is open (local dev default).
+# ---------------------------------------------------------------------------
+import os as _os
+_SITE_PASSWORD = _os.environ.get('SITE_PASSWORD', '').strip()
+app.secret_key = _os.environ.get('SECRET_KEY', 'dev-only-insecure-key-change-in-prod')
+
+_LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>harrybot — access</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+         background:#0d0f14;font-family:'Helvetica Neue',Arial,sans-serif}
+    .card{background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;
+          padding:40px 48px;width:360px;max-width:92vw}
+    h1{color:#fff;font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
+    p{color:#6b7280;font-size:14px;margin-bottom:28px}
+    input[type=password]{width:100%;padding:12px 16px;background:#0d0f14;
+      border:1px solid #2a2d38;border-radius:8px;color:#fff;font-size:16px;
+      outline:none;margin-bottom:16px;letter-spacing:2px}
+    input[type=password]:focus{border-color:#4f6ef2}
+    button{width:100%;padding:12px;background:#4f6ef2;color:#fff;border:none;
+           border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+    button:hover{background:#3b5af0}
+    .err{color:#f87171;font-size:13px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>harrybot</h1>
+    <p>Enter your access code to continue.</p>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post">
+      <input type="password" name="code" placeholder="Access code"
+             autofocus autocomplete="current-password">
+      <button type="submit">Continue</button>
+    </form>
+  </div>
+</body>
+</html>"""
+
+
+@app.before_request
+def _gate():
+    """Block all routes unless authenticated, when SITE_PASSWORD is set."""
+    if not _SITE_PASSWORD:
+        return  # no password configured — open access (local dev)
+    exempt = request.path in ('/login', '/logout') or \
+             request.path.startswith('/static/')
+    if exempt:
+        return
+    if session.get('_auth') == _SITE_PASSWORD:
+        return  # valid session
+    # Preserve the original destination so login can redirect back.
+    return redirect(url_for('login', next=request.path))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        if code and code == _SITE_PASSWORD:
+            session.permanent = True
+            session['_auth'] = _SITE_PASSWORD
+            dest = request.args.get('next') or '/'
+            # Basic open-redirect guard: only allow relative paths.
+            if not dest.startswith('/') or dest.startswith('//'):
+                dest = '/'
+            return redirect(dest)
+        return render_template_string(_LOGIN_HTML, error='Wrong access code.')
+    return render_template_string(_LOGIN_HTML, error='')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 # ---------------------------------------------------------------------------
 # Connection pool — reuse TLS connections to Supabase across requests.
