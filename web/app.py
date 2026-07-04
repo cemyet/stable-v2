@@ -84,7 +84,6 @@ _LOGIN_HTML = """<!DOCTYPE html>
       width:100%;max-width:480px;padding:20px;
       display:flex;flex-direction:column;align-items:center;
     }
-    /* mirrors .kind-toggle button */
     .label{
       font-size:16px;
       font-weight:600;
@@ -93,50 +92,19 @@ _LOGIN_HTML = """<!DOCTYPE html>
       margin-right:-8px;
       color:#2c2c2e;
       opacity:0.85;
-      margin-bottom:32px;
+      margin-bottom:64px;
       user-select:none;
     }
-    /* mirrors .search-field — input must be a direct child */
     .field{
-      position:relative;
       width:100%;
     }
-    /* hidden span used to measure text width at the correct font size */
-    .measure{
-      position:absolute;
-      visibility:hidden;
-      white-space:pre;
-      pointer-events:none;
-      font-size:16px;
-      font-family:inherit;
-      line-height:1.2;
-      top:0;left:0;
-    }
-    /* mirrors .fake-caret */
-    .caret{
-      position:absolute;
-      top:50%;
-      width:2px;height:1.05em;
-      margin-top:-0.525em;
-      pointer-events:none;
-      background:#2c2c2e;
-      opacity:0;
-    }
-    .field.focused .caret{
-      opacity:1;
-      animation:blink 1.05s step-end infinite;
-    }
-    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-    /* mirrors .search-box input */
     input[type=password]{
-      position:relative;z-index:1;
       width:100%;
       font-size:16px;font-family:inherit;
       line-height:1.2;padding:8px 0;
       text-align:center;
       background:transparent;
       border:none;border-radius:0;outline:none;box-shadow:none;
-      caret-color:transparent;
       color:#2c2c2e;
     }
     input[type=password]:focus{border:none;outline:none;box-shadow:none}
@@ -152,10 +120,8 @@ _LOGIN_HTML = """<!DOCTYPE html>
   <form method="post" style="width:100%;display:flex;justify-content:center">
     <div class="wrap">
       <span class="label">access code</span>
-      <div class="field" id="field">
-        <span class="measure" id="meas" aria-hidden="true"></span>
-        <span class="caret"  id="caret" aria-hidden="true"></span>
-        <input type="password" id="code" name="code"
+      <div class="field">
+        <input type="password" name="code"
                autofocus autocomplete="current-password"
                spellcheck="false">
       </div>
@@ -163,46 +129,6 @@ _LOGIN_HTML = """<!DOCTYPE html>
     </div>
     <button type="submit" style="position:absolute;left:-9999px" tabindex="-1"></button>
   </form>
-  <script>
-    const inp   = document.getElementById('code');
-    const field = document.getElementById('field');
-    const meas  = document.getElementById('meas');
-    const caret = document.getElementById('caret');
-
-    // charW: width of one monospace character at font-size 16px.
-    // Measured after fonts load so Source Code Pro is used, not a fallback.
-    let charW = 0;
-    function measureChar() {
-      meas.textContent = 'x';
-      charW = meas.getBoundingClientRect().width;
-      meas.textContent = '';
-    }
-
-    function pos() {
-      if (!charW) return;
-      const n  = inp.value.length;
-      const tw = charW * n;
-      const fw = field.getBoundingClientRect().width;
-      // center of field + half of text width = right edge of text
-      caret.style.left = (fw / 2 + tw / 2) + 'px';
-    }
-    function sync() {
-      field.classList.toggle('focused', document.activeElement === inp);
-      pos();
-    }
-
-    inp.addEventListener('focus',  sync);
-    inp.addEventListener('blur',   sync);
-    inp.addEventListener('input',  () => { pos(); });
-    inp.addEventListener('keyup',  pos);
-    window.addEventListener('resize', () => { measureChar(); pos(); });
-
-    // Wait for Source Code Pro to load before taking any measurements.
-    (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
-      measureChar();
-      sync();
-    });
-  </script>
 </body>
 </html>"""
 
