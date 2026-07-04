@@ -66,36 +66,130 @@ _LOGIN_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>harrybot — access</title>
+  <title>harrybot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{min-height:100vh;display:flex;align-items:center;justify-content:center;
-         background:#0d0f14;font-family:'Helvetica Neue',Arial,sans-serif}
-    .card{background:#1a1d25;border:1px solid #2a2d38;border-radius:12px;
-          padding:40px 48px;width:360px;max-width:92vw}
-    h1{color:#fff;font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:-.3px}
-    p{color:#6b7280;font-size:14px;margin-bottom:28px}
-    input[type=password]{width:100%;padding:12px 16px;background:#0d0f14;
-      border:1px solid #2a2d38;border-radius:8px;color:#fff;font-size:16px;
-      outline:none;margin-bottom:16px;letter-spacing:2px}
-    input[type=password]:focus{border-color:#4f6ef2}
-    button{width:100%;padding:12px;background:#4f6ef2;color:#fff;border:none;
-           border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
-    button:hover{background:#3b5af0}
-    .err{color:#f87171;font-size:13px;margin-bottom:12px}
+    body{
+      min-height:100vh;
+      display:flex;align-items:center;justify-content:center;
+      background:rgb(248,241,248);
+      font-family:"Source Code Pro","SF Mono","Menlo","Consolas",monospace;
+      font-size:14px;
+      color:#2c2c2e;
+    }
+    .wrap{
+      width:100%;max-width:480px;padding:20px;
+      display:flex;flex-direction:column;align-items:center;
+      gap:0;
+    }
+    /* mirrors .kind-toggle button from index.html */
+    .label{
+      font-size:16px;
+      font-weight:600;
+      letter-spacing:8px;
+      text-transform:uppercase;
+      margin-right:-8px;
+      color:#2c2c2e;
+      opacity:0.85;
+      margin-bottom:-4px;
+      user-select:none;
+    }
+    /* mirrors .search-field */
+    .field{
+      position:relative;
+      width:100%;max-width:480px;
+    }
+    .measure{
+      position:absolute;
+      visibility:hidden;
+      white-space:pre;
+      pointer-events:none;
+      font-size:16px;
+      font-family:inherit;
+      line-height:1.2;
+      padding:8px 0;
+    }
+    /* mirrors .fake-caret */
+    .caret{
+      position:absolute;
+      top:50%;
+      width:2px;height:1.05em;
+      margin-top:-0.525em;
+      pointer-events:none;
+      background:#2c2c2e;
+      opacity:0;
+    }
+    .field.focused .caret{
+      opacity:1;
+      animation:blink 1.05s step-end infinite;
+    }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    /* mirrors .search-box input */
+    input[type=password]{
+      position:relative;z-index:1;
+      width:100%;
+      font-size:16px;font-family:inherit;
+      line-height:1.2;padding:8px 0;
+      text-align:center;
+      background:transparent;
+      border:none;border-radius:0;outline:none;box-shadow:none;
+      caret-color:transparent;
+      color:#2c2c2e;
+    }
+    input[type=password]:focus{border:none;outline:none;box-shadow:none}
+    .err{
+      margin-top:18px;
+      color:rgba(70,70,74,0.72);
+      font-size:12px;
+      letter-spacing:1px;
+      text-transform:lowercase;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>harrybot</h1>
-    <p>Enter your access code to continue.</p>
+  <div class="wrap">
+    <span class="label">access code</span>
+    <div class="field" id="field">
+      <span class="measure" id="meas" aria-hidden="true"></span>
+      <span class="caret"  id="caret" aria-hidden="true"></span>
+      <form method="post">
+        <input type="password" id="code" name="code"
+               autofocus autocomplete="current-password"
+               spellcheck="false">
+        <button type="submit" style="position:absolute;left:-9999px" tabindex="-1"></button>
+      </form>
+    </div>
     {% if error %}<div class="err">{{ error }}</div>{% endif %}
-    <form method="post">
-      <input type="password" name="code" placeholder="Access code"
-             autofocus autocomplete="current-password">
-      <button type="submit">Continue</button>
-    </form>
   </div>
+  <script>
+    const inp   = document.getElementById('code');
+    const field = document.getElementById('field');
+    const meas  = document.getElementById('meas');
+    const caret = document.getElementById('caret');
+
+    function pos() {
+      // Monospace: all chars same width — measure n 'x' chars for n typed chars.
+      meas.textContent = 'x'.repeat(inp.value.length);
+      const tw = meas.getBoundingClientRect().width;
+      const fw = field.getBoundingClientRect().width;
+      const cw = caret.getBoundingClientRect().width;
+      caret.style.left = ((fw - tw - cw) / 2 + tw) + 'px';
+    }
+    function sync() {
+      field.classList.toggle('focused', document.activeElement === inp);
+      pos();
+    }
+
+    inp.addEventListener('focus',  sync);
+    inp.addEventListener('blur',   sync);
+    inp.addEventListener('input',  pos);
+    inp.addEventListener('keyup',  pos);
+    window.addEventListener('resize', pos);
+    sync();
+  </script>
 </body>
 </html>"""
 
