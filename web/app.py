@@ -75,7 +75,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
     body{
       min-height:100vh;
       display:flex;align-items:center;justify-content:center;
-      background:rgb(248,241,248);
+      background:#ffffff;
       font-family:"Source Code Pro","SF Mono","Menlo","Consolas",monospace;
       font-size:14px;
       color:#2c2c2e;
@@ -83,9 +83,8 @@ _LOGIN_HTML = """<!DOCTYPE html>
     .wrap{
       width:100%;max-width:480px;padding:20px;
       display:flex;flex-direction:column;align-items:center;
-      gap:0;
     }
-    /* mirrors .kind-toggle button from index.html */
+    /* mirrors .kind-toggle button */
     .label{
       font-size:16px;
       font-weight:600;
@@ -94,14 +93,15 @@ _LOGIN_HTML = """<!DOCTYPE html>
       margin-right:-8px;
       color:#2c2c2e;
       opacity:0.85;
-      margin-bottom:-4px;
+      margin-bottom:32px;
       user-select:none;
     }
-    /* mirrors .search-field */
+    /* mirrors .search-field — input must be a direct child */
     .field{
       position:relative;
-      width:100%;max-width:480px;
+      width:100%;
     }
+    /* hidden span used to measure text width at the correct font size */
     .measure{
       position:absolute;
       visibility:hidden;
@@ -110,7 +110,7 @@ _LOGIN_HTML = """<!DOCTYPE html>
       font-size:16px;
       font-family:inherit;
       line-height:1.2;
-      padding:8px 0;
+      top:0;left:0;
     }
     /* mirrors .fake-caret */
     .caret{
@@ -141,42 +141,50 @@ _LOGIN_HTML = """<!DOCTYPE html>
     }
     input[type=password]:focus{border:none;outline:none;box-shadow:none}
     .err{
-      margin-top:18px;
+      margin-top:24px;
       color:rgba(70,70,74,0.72);
       font-size:12px;
       letter-spacing:1px;
-      text-transform:lowercase;
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <span class="label">access code</span>
-    <div class="field" id="field">
-      <span class="measure" id="meas" aria-hidden="true"></span>
-      <span class="caret"  id="caret" aria-hidden="true"></span>
-      <form method="post">
+  <form method="post" style="width:100%;display:flex;justify-content:center">
+    <div class="wrap">
+      <span class="label">access code</span>
+      <div class="field" id="field">
+        <span class="measure" id="meas" aria-hidden="true"></span>
+        <span class="caret"  id="caret" aria-hidden="true"></span>
         <input type="password" id="code" name="code"
                autofocus autocomplete="current-password"
                spellcheck="false">
-        <button type="submit" style="position:absolute;left:-9999px" tabindex="-1"></button>
-      </form>
+      </div>
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
     </div>
-    {% if error %}<div class="err">{{ error }}</div>{% endif %}
-  </div>
+    <button type="submit" style="position:absolute;left:-9999px" tabindex="-1"></button>
+  </form>
   <script>
     const inp   = document.getElementById('code');
     const field = document.getElementById('field');
     const meas  = document.getElementById('meas');
     const caret = document.getElementById('caret');
 
+    // charW: width of one monospace character at font-size 16px.
+    // Measured after fonts load so Source Code Pro is used, not a fallback.
+    let charW = 0;
+    function measureChar() {
+      meas.textContent = 'x';
+      charW = meas.getBoundingClientRect().width;
+      meas.textContent = '';
+    }
+
     function pos() {
-      // Monospace: all chars same width — measure n 'x' chars for n typed chars.
-      meas.textContent = 'x'.repeat(inp.value.length);
-      const tw = meas.getBoundingClientRect().width;
+      if (!charW) return;
+      const n  = inp.value.length;
+      const tw = charW * n;
       const fw = field.getBoundingClientRect().width;
-      const cw = caret.getBoundingClientRect().width;
-      caret.style.left = ((fw - tw - cw) / 2 + tw) + 'px';
+      // center of field + half of text width = right edge of text
+      caret.style.left = (fw / 2 + tw / 2) + 'px';
     }
     function sync() {
       field.classList.toggle('focused', document.activeElement === inp);
@@ -185,10 +193,15 @@ _LOGIN_HTML = """<!DOCTYPE html>
 
     inp.addEventListener('focus',  sync);
     inp.addEventListener('blur',   sync);
-    inp.addEventListener('input',  pos);
+    inp.addEventListener('input',  () => { pos(); });
     inp.addEventListener('keyup',  pos);
-    window.addEventListener('resize', pos);
-    sync();
+    window.addEventListener('resize', () => { measureChar(); pos(); });
+
+    // Wait for Source Code Pro to load before taking any measurements.
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+      measureChar();
+      sync();
+    });
   </script>
 </body>
 </html>"""
