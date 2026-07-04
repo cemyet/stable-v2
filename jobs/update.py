@@ -45,10 +45,21 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from core.db import get_connection, get_v1_connection  # noqa: E402
+from core import config  # noqa: E402
 from etl import import_st  # noqa: E402
 
 
-V1_PROJECT_ROOT = Path("/Users/jakob/Dev/stable")
+# Filesystem root of the legacy v1 project (env-overridable via config).
+V1_PROJECT_ROOT = Path(config.V1_PROJECT_ROOT)
+
+# Master switch for the legacy v1 dependency. When False (default), the bridge
+# scrapes ATG natively (scrapers.atg) and never shells out to / reads from v1.
+USE_V1_BRIDGE = config.USE_V1_BRIDGE
+
+# Trailing window (days) the native ATG scrape + ingest covers each run. ATG
+# publishes results shortly after each race, so a few days of overlap makes the
+# nightly catch-up robust to late corrections without draining history.
+ATG_SYNC_DAYS = 5
 
 # Cutover switch (Phase 3). When True, the bridge stops shelling out to v1's
 # `--mode st` and instead owns ST ingestion natively via
@@ -150,13 +161,95 @@ def _finish(conn, run_id: int, status: str, summary_patch: dict | None = None) -
 # Bridge mode
 # ---------------------------------------------------------------------------
 
+def run_native_ingest(conn, run_id: int) -> dict:
+    """Standalone v2 ingest with NO v1 dependency.
+
+    Native replacement for the v1 bridge: v2 scrapes ATG itself (scrapers.atg →
+    atg_race_raw → etl.import_atg.load_atg_from_raw), runs the native ST pipeline,
+    enriches with kmtid GPS, then refreshes stats/features/predictions. This is
+    the default path (USE_V1_BRIDGE=False).
+    """
+    from datetime import date, timedelta
+
+    summary = {"mode": "native-ingest"}
+    pre = _v2_counts(conn)
+    summary["pre"] = pre
+    cutoff = date.today() - timedelta(days=ATG_SYNC_DAYS)
+
+    # --- Native ATG: scrape recent results → raw, then ingest into master ---
+    _set_phase(conn, run_id, "Native ATG — scraping recent results")
+    _log(conn, run_id, f"[native] ATG scrape (last {ATG_SYNC_DAYS} days)")
+    t0 = time.time()
+    try:
+        from scrapers import atg as atg_scraper
+        from etl import import_atg
+        scrape = atg_scraper.scrape_window(
+            conn, days_back=ATG_SYNC_DAYS, skip_done=True,
+            log=lambda m: _log(conn, run_id, f"[atg]   {m}"))
+        _set_phase(conn, run_id, "Native ATG — ingesting raw → master")
+        ingest = import_atg.load_atg_from_raw(
+            conn, since=cutoff.isoformat(), batch_size=200, progress_every=9999)
+        summary["atg_scrape"] = scrape
+        summary["atg_ingest"] = ingest
+        _log(conn, run_id,
+             f"[native]   ATG: scraped ok={scrape.get('ok', 0)}, "
+             f"ingested {ingest.get('ingested', 0)} races "
+             f"({ingest.get('entries', 0)} entries)")
+    except Exception as exc:
+        conn.rollback()
+        summary["atg_error"] = repr(exc)
+        _log(conn, run_id, f"[native]   ! ATG failed: {exc!r}\n{traceback.format_exc()}")
+    summary["atg_seconds"] = round(time.time() - t0, 1)
+
+    # --- Native ST: recent racedays + passports for new starters ---
+    _set_phase(conn, run_id, "Native ST — passports + racedays")
+    _log(conn, run_id, "[native] native ST pipeline")
+    t0 = time.time()
+    try:
+        summary["native_st"] = import_st.run_native_st_recent(
+            conn, log=lambda m: _log(conn, run_id, f"[native-st]   {m}"))
+    except Exception as exc:
+        conn.rollback()
+        summary["native_st"] = {"error": repr(exc)}
+        _log(conn, run_id, f"[native]   ! native ST failed: {exc!r}\n{traceback.format_exc()}")
+    summary["native_st_seconds"] = round(time.time() - t0, 1)
+
+    # --- kmtid (xLabs) GPS sectional enrichment (idempotent, runs last) ---
+    _set_phase(conn, run_id, "xLabs (kmtid) — GPS sectionals")
+    _log(conn, run_id, "[native] importing xLabs (kmtid) GPS sectionals...")
+    try:
+        from etl import import_kmtid
+        summary["kmtid"] = import_kmtid.import_from_index(conn)
+    except Exception as exc:
+        conn.rollback()
+        summary["kmtid"] = {"error": repr(exc)}
+        _log(conn, run_id, f"[native]   ! xLabs import failed: {exc!r}")
+
+    # --- Refresh stats + ML feature tables + upcoming-race predictions ---
+    _set_phase(conn, run_id, "Native — refreshing career stats + features")
+    t0 = time.time()
+    _refresh_career_stats(conn)
+    summary["career_stats_refresh_seconds"] = round(time.time() - t0, 1)
+
+    post = _v2_counts(conn)
+    summary["post"] = post
+    summary["delta"] = {k: post[k] - pre[k] for k in pre}
+    return summary
+
+
 def run_bridge(conn, run_id: int) -> dict:
     """Run v1's update job, then mirror only the *recent* v1 changes to v2.
 
     The old approach re-imported ALL v1 rows every time (4M+ entries).
     Now we only pull entries whose race_date falls within the window v1
     just scraped, which is typically 3-10 days of data.
+
+    When USE_V1_BRIDGE is False (default), this delegates to the fully native
+    ingest path (`run_native_ingest`) and never touches v1.
     """
+    if not USE_V1_BRIDGE:
+        return run_native_ingest(conn, run_id)
+
     summary = {"mode": "bridge"}
 
     pre = _v2_counts(conn)
@@ -997,6 +1090,10 @@ def main() -> int:
                     help="Used by --mode all / --mode cleanup: stop the "
                          "pipeline on the first failed phase instead of "
                          "continuing.")
+    ap.add_argument("--publish", action="store_true",
+                    help="After a successful run, publish the serving set to "
+                         "Supabase (requires SUPABASE_DATABASE_URL). Used by the "
+                         "nightly job so the cloud replica stays current.")
     args = ap.parse_args()
 
     # Standalone modes route directly; everything else falls back to bridge.
@@ -1008,6 +1105,19 @@ def main() -> int:
         mode = "native"
 
     conn = get_connection()
+
+    # Global run-lock: a session-scoped Postgres advisory lock so a scheduled
+    # (cron/launchd) run can't overlap a still-running manual/admin run — the web
+    # API's per-job_name guard doesn't cover the CLI path. Held for this process's
+    # connection lifetime and released automatically on exit.
+    _LOCK_KEY = 0x57A_B1E2  # arbitrary constant shared by all update invocations
+    with conn.cursor() as _lk:
+        _lk.execute("SELECT pg_try_advisory_lock(%s)", (_LOCK_KEY,))
+        if not _lk.fetchone()[0]:
+            print("[update] another update run holds the advisory lock; exiting.",
+                  flush=True)
+            conn.close()
+            return 0
     if args.job_run_id is not None:
         run_id = args.job_run_id
         _attach_run(conn, run_id)
@@ -1043,6 +1153,20 @@ def main() -> int:
     _set_phase(conn, run_id, "Done")
     _log(conn, run_id, "[update] done.")
     _finish(conn, run_id, "success", summary)
+
+    # Optional: push the serving set to Supabase so the cloud replica reflects
+    # tonight's new races + predictions. Best-effort — a publish failure does
+    # not fail the (already-successful) local update.
+    if args.publish:
+        try:
+            from jobs.publish import run_publish
+            _log(conn, run_id, "[publish] pushing serving set to Supabase...")
+            res = run_publish(log=lambda m: _log(conn, run_id, f"[publish] {m}"))
+            _log(conn, run_id, f"[publish] done — pushed {res.get('pushed', 0):,} rows")
+        except SystemExit as exc:
+            _log(conn, run_id, f"[publish] skipped: {exc}")
+        except Exception as exc:
+            _log(conn, run_id, f"[publish] FAILED: {exc!r}\n{traceback.format_exc()}")
     return 0
 
 

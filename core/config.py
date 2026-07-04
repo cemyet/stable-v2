@@ -9,21 +9,78 @@ import { config }.URL / config.HEADERS without each one reinventing the wheel.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# .env loading (optional)
+# ---------------------------------------------------------------------------
+# Environment overrides let the same code run locally (Postgres.app) or in the
+# cloud (Railway → Supabase) without editing this file. A `.env` at the repo
+# root is loaded if present; real environment variables always win over it.
+# We parse it with a tiny built-in reader so python-dotenv stays optional.
+
+
+def _load_dotenv() -> None:
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        for raw in env_path.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            # Real env vars take precedence over the .env file.
+            os.environ.setdefault(key, val)
+    except OSError:
+        pass
+
+
+_load_dotenv()
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
 # ---------------------------------------------------------------------------
 # Database + web
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = "postgresql://jakob@localhost:5432/stable_v2"
+# The v2 database. Local default is Postgres.app; set DATABASE_URL in the
+# environment (e.g. the Supabase pooler connection string) for cloud runs.
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://jakob@localhost:5432/stable_v2"
+)
 
-# v1 lives in `jakob`; we read it through postgres_fdw via the v1_raw schema.
+# Supabase / cloud publish target for the local→cloud nightly sync. Only used
+# by the publish step (jobs.publish); the app itself talks to DATABASE_URL.
+SUPABASE_DATABASE_URL = os.environ.get("SUPABASE_DATABASE_URL", "")
+
+# v1 lives in `jakob`; historically read via postgres_fdw / direct psycopg2.
 # Use unix socket (`/tmp`) rather than TCP — Postgres.app's "trust" auth
 # rejects FDW's TCP self-connections without explicit per-app permission.
-V1_DATABASE_NAME = "jakob"
-V1_DATABASE_HOST = "/tmp"
-V1_DATABASE_PORT = 5432
-V1_DATABASE_USER = "jakob"
+V1_DATABASE_NAME = os.environ.get("V1_DATABASE_NAME", "jakob")
+V1_DATABASE_HOST = os.environ.get("V1_DATABASE_HOST", "/tmp")
+V1_DATABASE_PORT = int(os.environ.get("V1_DATABASE_PORT", "5432"))
+V1_DATABASE_USER = os.environ.get("V1_DATABASE_USER", "jakob")
 
-WEB_PORT = 5002
+# Filesystem root of the legacy v1 project (used only by the v1 subprocess
+# bridge in jobs.update). Irrelevant once USE_V1_BRIDGE is off.
+V1_PROJECT_ROOT = os.environ.get("V1_PROJECT_ROOT", "/Users/jakob/Dev/stable")
+
+# Master switch for the legacy v1 dependency. When False, v2 scrapes ATG
+# natively and never shells out to / reads from v1. Defaults to False now that
+# native ATG exists; set USE_V1_BRIDGE=1 to fall back to the old bridge path.
+USE_V1_BRIDGE = _env_bool("USE_V1_BRIDGE", False)
+
+WEB_PORT = int(os.environ.get("WEB_PORT", "5002"))
 
 # ---------------------------------------------------------------------------
 # Generic HTTP knobs

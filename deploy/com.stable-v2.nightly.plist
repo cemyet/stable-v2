@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: run the stable-v2 nightly pipeline at 01:00 local time.
+
+  The Mac's local timezone (Europe/Stockholm) makes 01:00 local == 01:00 CET/CEST.
+
+  Install:
+    cp deploy/com.stable-v2.nightly.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.stable-v2.nightly.plist
+  Reload after edits:
+    launchctl unload ~/Library/LaunchAgents/com.stable-v2.nightly.plist
+    launchctl load   ~/Library/LaunchAgents/com.stable-v2.nightly.plist
+  Run once now (test):
+    launchctl start com.stable-v2.nightly
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.stable-v2.nightly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/jakob/Dev/stable-v2/scripts/nightly.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jakob/Dev/stable-v2</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>1</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- If the Mac was asleep/off at 01:00, run as soon as it wakes. -->
+    <key>StandardOutPath</key>
+    <string>/Users/jakob/Dev/stable-v2/logs/launchd_nightly.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jakob/Dev/stable-v2/logs/launchd_nightly.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

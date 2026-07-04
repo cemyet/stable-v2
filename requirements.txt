@@ -3,3 +3,4 @@ psycopg2-binary>=2.9
 flask>=3.0
 beautifulsoup4>=4.12
 lxml>=5.0
+gunicorn>=21.2

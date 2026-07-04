@@ -550,6 +550,100 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
 # Public: bulk backfill
 # ---------------------------------------------------------------------------
 
+def load_atg_from_raw(v2_conn, *,
+                      since: str | None = None,
+                      until: str | None = None,
+                      limit: int | None = None,
+                      only_foreign: bool = False,
+                      batch_size: int = 200,
+                      progress_every: int = 500,
+                      read_conn=None) -> dict:
+    """Sweep v2-local `atg_race_raw` and ingest each race into v2 master tables.
+
+    This is the v2-native counterpart to `backfill_from_v1_raw`: the raw JSON now
+    lives in v2's own `atg_race_raw` (populated by scrapers.atg), so we no longer
+    need a v1 connection. Reads stream from a dedicated connection (`read_conn`,
+    default a fresh v2 connection) so the per-batch commits on `v2_conn` don't
+    invalidate the server-side read cursor.
+
+    Args mirror `backfill_from_v1_raw`. `since`/`until` filter on `race_date`.
+    """
+    from core.db import get_connection
+
+    where = ["raw_json IS NOT NULL"]
+    params: list = []
+    if since:
+        where.append("race_date >= %s")
+        params.append(since)
+    if until:
+        where.append("race_date <= %s")
+        params.append(until)
+    where_sql = " AND ".join(where)
+    limit_sql = f" LIMIT {int(limit)}" if limit else ""
+    sql = (
+        f"SELECT atg_race_id, raw_json FROM atg_race_raw "
+        f" WHERE {where_sql} ORDER BY race_date, atg_race_id{limit_sql}"
+    )
+
+    totals = {"scanned": 0, "ingested": 0, "skipped": 0,
+              "races": 0, "entries": 0, "horses": 0, "persons": 0,
+              "by_skip": {}}
+
+    own_read = read_conn is None
+    read_conn = read_conn or get_connection()
+    read_conn.set_session(readonly=True)
+    try:
+        with read_conn.cursor(name="atg_local_raw_stream") as src:
+            src.itersize = batch_size
+            src.execute(sql, params)
+            batch_count = 0
+            with v2_conn.cursor() as dst:
+                for atg_race_id, raw in src:
+                    totals["scanned"] += 1
+                    if only_foreign:
+                        country = ((raw or {}).get("track") or {}).get("countryCode")
+                        if country == "SE":
+                            totals["skipped"] += 1
+                            totals["by_skip"]["se_filter"] = totals["by_skip"].get("se_filter", 0) + 1
+                            continue
+                    dst.execute("SAVEPOINT race_sp")
+                    try:
+                        s = ingest_race(dst, atg_race_id, raw)
+                    except Exception as exc:
+                        dst.execute("ROLLBACK TO SAVEPOINT race_sp")
+                        totals["skipped"] += 1
+                        totals["by_skip"]["error"] = totals["by_skip"].get("error", 0) + 1
+                        if totals["by_skip"]["error"] <= 20:
+                            _print(f"  ERR {atg_race_id}: {exc!r}")
+                        continue
+                    else:
+                        dst.execute("RELEASE SAVEPOINT race_sp")
+                    if s.get("skipped_reason"):
+                        totals["skipped"] += 1
+                        k = s["skipped_reason"]
+                        totals["by_skip"][k] = totals["by_skip"].get(k, 0) + 1
+                    else:
+                        totals["ingested"] += 1
+                        for k in ("races", "entries", "horses", "persons"):
+                            totals[k] += s.get(k, 0)
+                    batch_count += 1
+                    if batch_count >= batch_size:
+                        v2_conn.commit()
+                        batch_count = 0
+                    if totals["scanned"] % progress_every == 0:
+                        _print(
+                            f"  [atg] scanned={totals['scanned']:,} "
+                            f"ingested={totals['ingested']:,} "
+                            f"entries={totals['entries']:,} "
+                            f"skipped={totals['skipped']:,}"
+                        )
+                v2_conn.commit()
+    finally:
+        if own_read:
+            read_conn.close()
+    return totals
+
+
 def backfill_from_v1_raw(v1_conn, v2_conn, *,
                          since: str | None = None,
                          until: str | None = None,

@@ -988,6 +988,33 @@ CREATE TABLE IF NOT EXISTS st_raceday_scrape_log (
 """
 
 
+# Durable raw store for the NATIVE ATG scraper (scrapers/atg.py).
+#
+# This replaces v1's `v2_atg_race_raw` table. Once v2 scrapes ATG itself we own
+# the per-race raw JSON here so etl.import_atg.ingest_race can be re-run after a
+# parser change WITHOUT re-scraping. The historical v1 archive can be copied in
+# once (scripts/migrate_atg_raw_from_v1.py) so v1 can be fully retired.
+# This lives LOCAL-only — the cloud/Supabase serving set never includes raw.
+ATG_RAW_DDL = r"""
+CREATE TABLE IF NOT EXISTS atg_race_raw (
+    atg_race_id VARCHAR(64) PRIMARY KEY,
+    raw_json    JSONB,
+    race_date   DATE,
+    scraped_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS atg_race_raw_date_idx    ON atg_race_raw (race_date);
+CREATE INDEX IF NOT EXISTS atg_race_raw_scraped_idx ON atg_race_raw (scraped_at);
+
+CREATE TABLE IF NOT EXISTS atg_race_scrape_log (
+    atg_race_id   VARCHAR(64) PRIMARY KEY,
+    http_status   INTEGER,
+    status        VARCHAR(20),
+    scraped_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    error_message TEXT
+);
+"""
+
+
 NORMALIZE_NAME_FUNC_DDL = r"""
 -- Mirror of core.identity.normalize_name(). Strip diacritics, * / ·,
 -- trailing (XX), trailing ?, collapse whitespace, uppercase.
@@ -1199,6 +1226,7 @@ def create_schema(conn) -> None:
         cur.execute(SCHEMA_DDL)
         cur.execute(BUFFER_DDL)
         cur.execute(ST_RAW_DDL)
+        cur.execute(ATG_RAW_DDL)
         cur.execute(NORMALIZE_NAME_FUNC_DDL)
     conn.commit()
 
@@ -1215,6 +1243,8 @@ def drop_schema(conn) -> None:
             DROP TABLE IF EXISTS st_horse_scrape_log    CASCADE;
             DROP TABLE IF EXISTS st_raceday_raw         CASCADE;
             DROP TABLE IF EXISTS st_raceday_scrape_log  CASCADE;
+            DROP TABLE IF EXISTS atg_race_raw           CASCADE;
+            DROP TABLE IF EXISTS atg_race_scrape_log    CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS horse_stats CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS person_stats CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS track_post_stats CASCADE;

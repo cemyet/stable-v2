@@ -40,7 +40,7 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 from core.config import WEB_PORT
 import unicodedata as _unicodedata
 
-from core.db import get_connection, get_v1_connection
+from core.db import get_connection
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -68,17 +68,19 @@ def _track_slug(name: str) -> str:
 
 
 def _atg_slug_for_race(atg_race_id: str) -> str | None:
-    """Track slug for a race, sourced from per-race raw JSON (`v2_atg_race_raw`)
-    and falling back to the static `atg_track` table. ATG re-uses track ids
-    across physical tracks over time, so the raw row is preferred."""
+    """Track slug for a race, sourced entirely from v2-local data (no v1).
+
+    Prefers the per-race raw JSON in `atg_race_raw` (ATG re-uses track ids across
+    physical tracks over time, so the raw row's track name is most reliable),
+    then falls back to the derived `race`→`track` join."""
     try:
-        v1 = get_v1_connection()
+        conn = get_connection()
     except Exception:
         return None
     try:
-        with v1.cursor() as cur:
+        with conn.cursor() as cur:
             cur.execute(
-                "SELECT raw_json->'track'->>'name' FROM v2_atg_race_raw "
+                "SELECT raw_json->'track'->>'name' FROM atg_race_raw "
                 "WHERE atg_race_id = %s",
                 (atg_race_id,),
             )
@@ -86,10 +88,9 @@ def _atg_slug_for_race(atg_race_id: str) -> str | None:
             track_name = row[0] if row else None
             if not track_name:
                 cur.execute(
-                    "SELECT t.name FROM atg_race ar "
-                    "JOIN atg_race_day rd ON rd.atg_race_day_id = ar.atg_race_day_id "
-                    "JOIN atg_track t ON t.atg_track_id = rd.atg_track_id "
-                    "WHERE ar.atg_race_id = %s",
+                    "SELECT t.name FROM race r "
+                    "JOIN track t ON t.track_id = r.track_id "
+                    "WHERE r.atg_race_id = %s",
                     (atg_race_id,),
                 )
                 row = cur.fetchone()
@@ -100,7 +101,7 @@ def _atg_slug_for_race(atg_race_id: str) -> str | None:
     except Exception:
         return None
     finally:
-        v1.close()
+        conn.close()
 
 
 # Pool priority for resolving "which game does this race headline?" — biggest
