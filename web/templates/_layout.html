@@ -2,13 +2,12 @@
 <html lang="sv">
 <head>
   <script>
+    // "liquid" = styled app (always on). Theme layer on top: pearl (default) or clean.
     document.documentElement.classList.add('liquid');
-    // Restore a user-chosen background colour before first paint (no flash).
     try {
-      var __bg = localStorage.getItem('bgColor');
-      if (__bg) {
-        document.documentElement.style.setProperty('--bg', __bg);
-        document.documentElement.style.setProperty('--liquid-bg', __bg);
+      var __theme = localStorage.getItem('theme');
+      if (__theme === 'clean') {
+        document.documentElement.classList.add('theme-clean');
       }
     } catch (e) {}
   </script>
@@ -21,8 +20,8 @@
   {% block extra_head %}{% endblock %}
   <style>
     :root {
-      --bg: #e2ded0;
-      --liquid-bg: #e2ded0;
+      --bg: #f2effb;
+      --liquid-bg: #f2effb;
       --liquid-ink-rgb: 28, 28, 30;
       --liquid-ink-mid-rgb: 44, 44, 48;
       --liquid-ink-soft-rgb: 90, 90, 94;
@@ -3910,6 +3909,124 @@
     html.liquid .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label {
       text-transform: lowercase;
     }
+
+    /* ============================================================
+       CLEAN THEME — black & white, no frosted glass, no bubbles.
+       Colour is reserved for semantics only: flags, hot/cold values,
+       #1 gold, headline-race colours, and upcoming-races spheres.
+       ============================================================ */
+    html.theme-clean {
+      --bg: #ffffff;
+      --liquid-bg: #ffffff;
+      --liquid-ink-rgb: 0, 0, 0;
+      --liquid-ink-mid-rgb: 0, 0, 0;
+      --liquid-ink-soft-rgb: 60, 60, 60;
+      --liquid-ink-muted-rgb: 90, 90, 90;
+      --fg-heading: #000000;
+      --fg: #000000;
+      --fg-muted: rgba(0, 0, 0, 0.55);
+      --liquid-title-fg: #000000;
+      --track-name-fg: #000000;
+      --fluid-toggle-fg: rgba(0, 0, 0, 0.45);
+      --fluid-toggle-fg-hover: rgba(0, 0, 0, 0.75);
+      --fluid-toggle-fg-active: #000000;
+      --panel-border: rgba(0, 0, 0, 0.16);
+      --border: rgba(0, 0, 0, 0.16);
+      --border-focus: rgba(0, 0, 0, 0.42);
+      --hover: rgba(0, 0, 0, 0.045);
+      --panel-bg: transparent;
+      --panel-shadow: none;
+      --accent-glow: #000000;
+      --accent-glow-rgb: 0, 0, 0;
+      --nav-active: #000000;
+      --highlight-weight: 700;
+    }
+
+    /* Panels — no frosted glass. Transparent fill + thin black outline. */
+    html.liquid.theme-clean .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
+    html.liquid.theme-clean .glass-panel--form.glass-panel--form-frosted,
+    html.liquid.theme-clean .filters,
+    html.liquid.theme-clean .live-banner {
+      background: transparent;
+      border: 1px solid rgba(0, 0, 0, 0.16);
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    /* Generic card panels + home headline surface — flatten to outline. */
+    html.liquid.theme-clean .glass-panel,
+    html.liquid.theme-clean .home-headlines-glass {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    /* ---- Nav: keep collapse/expand behaviour, drop the glass bubble ---- */
+    html.liquid.theme-clean .fluid-nav-highlight > .fluid-bubble {
+      display: none !important;
+    }
+
+    /* Active tab text becomes visible again (bubble no longer paints it). */
+    html.liquid.theme-clean .topnav .fluid-nav-highlight a.is-bubble-target,
+    html.liquid.theme-clean .subnav .fluid-nav-highlight a.is-bubble-target,
+    html.liquid.theme-clean .topnav a.active,
+    html.liquid.theme-clean .subnav a.active {
+      color: var(--nav-active) !important;
+      -webkit-text-fill-color: var(--nav-active) !important;
+      font-weight: var(--highlight-weight) !important;
+      text-decoration: underline;
+      text-underline-offset: 5px;
+      text-decoration-thickness: 1.5px;
+      text-shadow: none !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+
+    /* Inactive/expanded links — crisp muted grey, no blur. */
+    html.liquid.theme-clean .topnav .fluid-nav-highlight a:not(.is-bubble-target),
+    html.liquid.theme-clean .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    html.liquid.theme-clean .subnav .fluid-nav-highlight a:not(.is-bubble-target),
+    html.liquid.theme-clean .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover {
+      color: rgba(0, 0, 0, 0.5) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.5) !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+    html.liquid.theme-clean .topnav a:hover,
+    html.liquid.theme-clean .subnav a:hover {
+      color: #000000 !important;
+      -webkit-text-fill-color: #000000 !important;
+    }
+
+    /* ---- Toggles: drop the glass thumb; show active state as text ---- */
+    html.liquid.theme-clean .fluid-toggle__thumb {
+      display: none !important;
+    }
+    html.liquid.theme-clean .fluid-toggle__btn.active,
+    html.liquid.theme-clean .fluid-toggle .period-btn.active,
+    html.liquid.theme-clean .fluid-toggle .sort-tab.active {
+      color: #000000 !important;
+      font-weight: var(--highlight-weight) !important;
+      text-decoration: underline;
+      text-underline-offset: 5px;
+      text-decoration-thickness: 1.5px;
+    }
+
+    /* ---- Form direction toggle: monochrome knob, no plasma/glass ---- */
+    html.liquid.theme-clean .form-bubble-toggle__track {
+      filter: none;
+    }
+    html.liquid.theme-clean .form-bubble-toggle__glass {
+      background: #000000 !important;
+      border: none !important;
+      box-shadow: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+    html.liquid.theme-clean .form-bubble-toggle__plasma,
+    html.liquid.theme-clean .form-bubble-toggle__lobe {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -3970,83 +4087,75 @@
     {% endif %}
   </div>
 
-  <!-- App-wide background colour picker (left side, persisted in localStorage). -->
-  <div class="bg-picker" id="bgPicker">
-    <label class="bg-picker__swatch" title="background colour">
-      <input type="color" id="bgPickerInput" aria-label="background colour" value="#e2ded0">
-    </label>
-    <button type="button" id="bgPickerReset" title="reset background colour"
-            aria-label="reset background colour">reset</button>
+  <!-- App-wide theme toggle (bottom-left, persisted in localStorage). -->
+  <div class="theme-toggle" id="themeToggle" role="group" aria-label="theme">
+    <button type="button" class="theme-toggle__opt" data-theme="pearl" aria-pressed="true">pearl</button>
+    <span class="theme-toggle__sep" aria-hidden="true">/</span>
+    <button type="button" class="theme-toggle__opt" data-theme="clean" aria-pressed="false">clean</button>
   </div>
   <style>
-    .bg-picker {
+    .theme-toggle {
       position: fixed;
       left: 14px;
       bottom: 14px;
       z-index: 60;
       display: flex;
       align-items: center;
-      gap: 8px;
-      opacity: 0.5;
+      gap: 6px;
+      opacity: 0.55;
       transition: opacity 0.15s ease;
-    }
-    .bg-picker:hover { opacity: 1; }
-    .bg-picker__swatch {
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      overflow: hidden;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      box-shadow: var(--panel-shadow);
-      display: inline-block;
-      position: relative;
-    }
-    .bg-picker__swatch input[type="color"] {
-      position: absolute;
-      top: -6px; left: -6px;
-      width: 40px; height: 40px;
-      border: none; padding: 0; margin: 0;
-      background: none; cursor: pointer;
-    }
-    .bg-picker__swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-    .bg-picker__swatch input[type="color"]::-webkit-color-swatch { border: none; }
-    .bg-picker__swatch input[type="color"]::-moz-color-swatch { border: none; }
-    #bgPickerReset {
       font-family: var(--font-mono);
       font-size: 11px;
+      letter-spacing: 1px;
+    }
+    .theme-toggle:hover { opacity: 1; }
+    .theme-toggle__opt {
+      font-family: inherit;
+      font-size: inherit;
+      letter-spacing: inherit;
+      text-transform: lowercase;
       color: var(--fg-muted);
       background: none;
       border: none;
       cursor: pointer;
-      padding: 2px 4px;
+      padding: 2px 2px;
+      transition: color 0.15s ease;
     }
-    #bgPickerReset:hover { color: var(--fg); }
+    .theme-toggle__opt:hover { color: var(--fg); }
+    .theme-toggle__opt[aria-pressed="true"] {
+      color: var(--fg-heading);
+      font-weight: 700;
+    }
+    .theme-toggle__sep {
+      color: var(--fg-muted);
+      opacity: 0.6;
+      user-select: none;
+    }
   </style>
   <script>
     (function () {
-      var input = document.getElementById('bgPickerInput');
-      var reset = document.getElementById('bgPickerReset');
-      if (!input || !reset) return;
       var root = document.documentElement;
-      var DEFAULT_BG = '#e2ded0';
-      function apply(c) {
-        root.style.setProperty('--bg', c);
-        root.style.setProperty('--liquid-bg', c);
+      var opts = document.querySelectorAll('#themeToggle .theme-toggle__opt');
+      if (!opts.length) return;
+      function current() {
+        return root.classList.contains('theme-clean') ? 'clean' : 'pearl';
       }
-      var saved = null;
-      try { saved = localStorage.getItem('bgColor'); } catch (e) {}
-      input.value = saved || DEFAULT_BG;
-      input.addEventListener('input', function () {
-        apply(input.value);
-        try { localStorage.setItem('bgColor', input.value); } catch (e) {}
+      function sync() {
+        var t = current();
+        opts.forEach(function (b) {
+          b.setAttribute('aria-pressed', b.dataset.theme === t ? 'true' : 'false');
+        });
+      }
+      function apply(theme) {
+        if (theme === 'clean') root.classList.add('theme-clean');
+        else root.classList.remove('theme-clean');
+        try { localStorage.setItem('theme', theme); } catch (e) {}
+        sync();
+      }
+      opts.forEach(function (b) {
+        b.addEventListener('click', function () { apply(b.dataset.theme); });
       });
-      reset.addEventListener('click', function () {
-        try { localStorage.removeItem('bgColor'); } catch (e) {}
-        root.style.removeProperty('--bg');
-        root.style.removeProperty('--liquid-bg');
-        input.value = DEFAULT_BG;
-      });
+      sync();
     })();
   </script>
   {% block content %}{% endblock %}
