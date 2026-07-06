@@ -780,6 +780,90 @@ def refresh_incremental(conn, log=print):
         _drop_staging(conn)
 
 
+def relabel_recent(conn, days: int | None = 90, log=print):
+    """Re-derive the result-dependent columns for feature rows whose race ran in
+    the last `days` days, writing back only the rows that actually changed.
+
+    refresh_incremental() appends a feature row the moment an entry is scraped —
+    for an upcoming race that is BEFORE any result exists, so its labels start
+    out NULL/false. Nothing in the append path ever revisits that row once the
+    race is run, so without this step the freshest (and most valuable) rows stay
+    unlabeled forever. This recomputes every result-derived column straight from
+    `entry`, using the exact same predicates as assemble_phase1 / build_race,
+    guarded by IS DISTINCT FROM so unchanged rows are left untouched — that keeps
+    both the write volume and the downstream publish delta (which rides on
+    `computed_at`) minimal.
+
+    X (as-of) features are intentionally NOT touched: they depend only on history
+    strictly before the race and are already correct from the append. Pass
+    days=None for a one-time full-table backfill.
+
+    Returns {"changed": n}.
+    """
+    where_recent = "" if days is None else "AND ef.race_date >= CURRENT_DATE - %s::int"
+    params: list = [] if days is None else [days]
+    t0 = time.time()
+    with conn.cursor() as cur:
+        _run(cur, "relabel recent entry_features", f"""
+            WITH tgt AS (
+                SELECT ef.entry_id, ef.race_id
+                FROM entry_features ef
+                WHERE TRUE {where_recent}
+            ),
+            race_agg AS (
+                SELECT e.race_id,
+                       COUNT(*)                                               AS n_entries,
+                       COUNT(*) FILTER (WHERE NOT COALESCE(e.withdrawn,false)) AS n_starters,
+                       MAX(e.program_number)                                  AS max_pgm
+                FROM entry e
+                WHERE e.race_id IN (SELECT race_id FROM tgt)
+                GROUP BY e.race_id
+            ),
+            tz AS (
+                SELECT e.entry_id,
+                       CASE WHEN NULLIF(e.time_seconds,0) > 0 THEN
+                           (NULLIF(e.time_seconds,0) - AVG(NULLIF(e.time_seconds,0)) OVER pr)
+                           / NULLIF(STDDEV_SAMP(NULLIF(e.time_seconds,0)) OVER pr, 0)
+                       END AS y_time_z
+                FROM entry e
+                WHERE e.race_id IN (SELECT race_id FROM tgt)
+                WINDOW pr AS (PARTITION BY e.race_id)
+            )
+            UPDATE entry_features ef SET
+                starters      = ra.n_starters,
+                race_complete = (ra.n_starters >= 3 AND (ra.max_pgm IS NULL OR ra.max_pgm <= ra.n_entries)),
+                y_gal         = COALESCE(e.galopp, false),
+                y_win         = (e.placement = 1 AND NOT COALESCE(e.disqualified,false)),
+                y_top3        = (e.placement BETWEEN 1 AND 3 AND NOT COALESCE(e.disqualified,false)),
+                y_placement   = e.placement,
+                y_disq        = COALESCE(e.disqualified, false),
+                y_time_s      = NULLIF(e.time_seconds, 0),
+                y_time_z      = tz.y_time_z::real,
+                computed_at   = NOW()
+            FROM tgt
+            JOIN entry e     ON e.entry_id = tgt.entry_id
+            JOIN race_agg ra ON ra.race_id = e.race_id
+            LEFT JOIN tz     ON tz.entry_id = e.entry_id
+            WHERE ef.entry_id = tgt.entry_id
+              AND (
+                    ef.starters      IS DISTINCT FROM ra.n_starters
+                 OR ef.race_complete IS DISTINCT FROM (ra.n_starters >= 3 AND (ra.max_pgm IS NULL OR ra.max_pgm <= ra.n_entries))
+                 OR ef.y_gal         IS DISTINCT FROM COALESCE(e.galopp, false)
+                 OR ef.y_win         IS DISTINCT FROM (e.placement = 1 AND NOT COALESCE(e.disqualified,false))
+                 OR ef.y_top3        IS DISTINCT FROM (e.placement BETWEEN 1 AND 3 AND NOT COALESCE(e.disqualified,false))
+                 OR ef.y_placement   IS DISTINCT FROM e.placement
+                 OR ef.y_disq        IS DISTINCT FROM COALESCE(e.disqualified, false)
+                 OR ef.y_time_s      IS DISTINCT FROM NULLIF(e.time_seconds, 0)
+                 OR ef.y_time_z      IS DISTINCT FROM tz.y_time_z::real
+              )
+        """, params)
+        changed = cur.rowcount
+    conn.commit()
+    log(f"entry_features: relabeled {changed:,} changed rows "
+        f"(window={'all' if days is None else str(days)+'d'}) in {time.time()-t0:.1f}s")
+    return {"changed": changed}
+
+
 def backfill_galadj_winrate(conn):
     """One-time in-place backfill of horse_winrate_gal_adj / horse_winrate_gal_incl
     for EXISTING rows, without a full phase-1 rebuild (which would TRUNCATE the
@@ -806,14 +890,19 @@ def backfill_galadj_winrate(conn):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--phase", choices=["1", "2", "all", "galadj"], default="1")
+    ap.add_argument("--phase", choices=["1", "2", "all", "galadj", "relabel"], default="1")
+    ap.add_argument("--days", type=int, default=None,
+                    help="relabel window in days (relabel phase only; omit for "
+                         "a full-table backfill)")
     ap.add_argument("--keep-staging", action="store_true",
                     help="don't drop the _ef_* staging tables on exit")
     args = ap.parse_args()
 
     conn = get_connection()
     try:
-        if args.phase == "galadj":
+        if args.phase == "relabel":
+            relabel_recent(conn, days=args.days)
+        elif args.phase == "galadj":
             backfill_galadj_winrate(conn)
         else:
             if args.phase in ("1", "all"):

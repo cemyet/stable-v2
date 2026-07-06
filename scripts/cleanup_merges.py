@@ -106,6 +106,11 @@ PHASES: list[tuple[str, str, list[str]]] = [
      ["--execute"]),
 ]
 
+# Phases whose candidate discovery scans ALL history and therefore accept a
+# `--since-days N` window. The nightly passes a small window (see jobs/update.py)
+# so these never re-fingerprint years of already-resolved data every run.
+_SUPPORTS_SINCE_DAYS = {"match_french_races"}
+
 
 # ---------------------------------------------------------------------------
 # job_run bookkeeping (mirrors jobs/update.py)
@@ -291,6 +296,10 @@ def main() -> int:
                    help="attach to a pre-created job_run row "
                         "(admin endpoint path); otherwise a new row is "
                         "created automatically.")
+    p.add_argument("--since-days", type=int, default=None,
+                   help="window (days) forwarded to history-scanning phases "
+                        f"({', '.join(sorted(_SUPPORTS_SINCE_DAYS))}). Omit for "
+                        "a full historical sweep (manual/occasional).")
     args = p.parse_args()
 
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
@@ -345,6 +354,8 @@ def main() -> int:
                 continue
 
             phase_args = list(extra) if args.execute else []
+            if args.since_days is not None and label in _SUPPORTS_SINCE_DAYS:
+                phase_args += ["--since-days", str(args.since_days)]
             result = _run_phase(conn, run_id, label, module, phase_args,
                                 write_db=write_db)
             overall["phases"].append(result)

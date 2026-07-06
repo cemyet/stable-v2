@@ -60,6 +60,18 @@ USE_V1_BRIDGE = config.USE_V1_BRIDGE
 # publishes results shortly after each race, so a few days of overlap makes the
 # nightly catch-up robust to late corrections without draining history.
 ATG_SYNC_DAYS = 5
+# Window (days) the nightly cleanup passes to history-scanning dedup phases
+# (currently match_french_races). The nightly only needs to dedup races it just
+# ingested; the full historical sweep (263k+ French date/number pairs since 2020)
+# is a manual/occasional job (`python -m scripts.cleanup_merges --execute` with
+# no window). Kept generous so late-arriving cross-source race variants still get
+# caught.
+CLEANUP_SINCE_DAYS = 14
+# Forward window (today + tomorrow) for ATG start lists. These upcoming cards
+# are needed before feature refresh + ML scoring so race pages can show xgal
+# before the races have been run. Result catch-up below re-fetches them later
+# when ATG advances the same race ids to status="results".
+ATG_UPCOMING_DAYS = 2
 
 # Cutover switch (Phase 3). When True, the bridge stops shelling out to v1's
 # `--mode st` and instead owns ST ingestion natively via
@@ -176,7 +188,7 @@ def run_native_ingest(conn, run_id: int) -> dict:
     summary["pre"] = pre
     cutoff = date.today() - timedelta(days=ATG_SYNC_DAYS)
 
-    # --- Native ATG: scrape recent results → raw, then ingest into master ---
+    # --- Native ATG: scrape recent results + upcoming cards → raw, then ingest ---
     _set_phase(conn, run_id, "Native ATG — scraping recent results")
     _log(conn, run_id, f"[native] ATG scrape (last {ATG_SYNC_DAYS} days)")
     t0 = time.time()
@@ -186,10 +198,29 @@ def run_native_ingest(conn, run_id: int) -> dict:
         scrape = atg_scraper.scrape_window(
             conn, days_back=ATG_SYNC_DAYS, skip_done=True,
             log=lambda m: _log(conn, run_id, f"[atg]   {m}"))
+        _set_phase(conn, run_id, "Native ATG — scraping upcoming cards")
+        _log(conn, run_id, f"[native] ATG upcoming scrape (next {ATG_UPCOMING_DAYS} days)")
+        upcoming = {"days": 0, "races_listed": 0, "ok": 0,
+                    "missing": 0, "failed": 0, "skipped": 0, "by_day": []}
+        for i in range(ATG_UPCOMING_DAYS):
+            d = date.today() + timedelta(days=i)
+            c = atg_scraper.scrape_day(
+                conn, d.isoformat(), statuses=atg_scraper.ACTIVE_STATUSES,
+                skip_done=True,
+                log=lambda m: _log(conn, run_id, f"[atg]   {m}"))
+            upcoming["days"] += 1
+            for k in ("races_listed", "ok", "missing", "failed", "skipped"):
+                upcoming[k] += c.get(k, 0)
+            upcoming["by_day"].append(c)
+            _log(conn, run_id,
+                 f"[atg]     [atg-upcoming] {d.isoformat()}: "
+                 f"listed={c['races_listed']} ok={c['ok']} skip={c['skipped']} "
+                 f"miss={c['missing']} fail={c['failed']}")
         _set_phase(conn, run_id, "Native ATG — ingesting raw → master")
         ingest = import_atg.load_atg_from_raw(
             conn, since=cutoff.isoformat(), batch_size=200, progress_every=9999)
         summary["atg_scrape"] = scrape
+        summary["atg_upcoming_scrape"] = upcoming
         summary["atg_ingest"] = ingest
         _log(conn, run_id,
              f"[native]   ATG: scraped ok={scrape.get('ok', 0)}, "
@@ -720,8 +751,14 @@ def _refresh_entry_features(conn) -> None:
     after historical back-fills or identity merges.
     """
     try:
-        from scripts.backfill_entry_features import refresh_incremental
+        from scripts.backfill_entry_features import refresh_incremental, relabel_recent
+        # 1) Append rows for newly-scraped entries (upcoming races get NULL
+        #    labels here — they have no result yet).
         refresh_incremental(conn)
+        # 2) Fill in / correct the result-derived labels for rows whose race has
+        #    since been run. Bounded to a recent window so it stays cheap; only
+        #    genuinely-changed rows are rewritten (and thus re-published).
+        relabel_recent(conn, days=90)
     except Exception as exc:
         conn.rollback()
         print(f"[entry_features] incremental refresh failed: {exc!r}\n"
@@ -968,7 +1005,8 @@ def _run_letrot_pedigree(conn, run_id: int, *, limit: int = 800) -> dict:
 # ---------------------------------------------------------------------------
 
 def run_cleanup(conn, run_id: int, *, execute: bool = True,
-                abort_on_error: bool = False) -> dict:
+                abort_on_error: bool = False,
+                since_days: int | None = None) -> dict:
     cmd = [
         sys.executable, "-u", "-m", "scripts.cleanup_merges",
         "--job-run-id", str(run_id),
@@ -977,6 +1015,8 @@ def run_cleanup(conn, run_id: int, *, execute: bool = True,
         cmd.append("--execute")
     if abort_on_error:
         cmd.append("--abort-on-error")
+    if since_days is not None:
+        cmd += ["--since-days", str(since_days)]
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
@@ -1051,7 +1091,8 @@ def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
     _set_phase(conn, run_id, "3/3 Cleanup (dedup + heal)")
     _log(conn, run_id, "\n[all] === phase 3/3 — cleanup (dedup + heal) ===")
     s_cleanup = run_cleanup(conn, run_id, execute=True,
-                            abort_on_error=abort_on_error)
+                            abort_on_error=abort_on_error,
+                            since_days=CLEANUP_SINCE_DAYS)
     summary["phases"].append({"phase": "cleanup", "result": s_cleanup})
 
     # Waterproofing: surface any phase failure as a failed run. Without this

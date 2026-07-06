@@ -1230,7 +1230,12 @@ WHERE r.track_id IS NOT NULL
   AND e.program_number BETWEEN 1 AND 15
 GROUP BY r.track_id, e.auto, e.program_number;
 
-CREATE INDEX ON track_post_stats (track_id);
+-- (track_id, auto, post) is the natural key (see GROUP BY + the NOT NULL /
+-- BETWEEN guards above) and all three are non-null, so a UNIQUE index is valid.
+-- It is REQUIRED for REFRESH MATERIALIZED VIEW CONCURRENTLY, and its leading
+-- track_id column still serves the track-browse filter (no separate index
+-- needed).
+CREATE UNIQUE INDEX ON track_post_stats (track_id, auto, post);
 """
 
 
@@ -1244,6 +1249,11 @@ def create_schema(conn) -> None:
         cur.execute(ST_RAW_DDL)
         cur.execute(ATG_RAW_DDL)
         cur.execute(NORMALIZE_NAME_FUNC_DDL)
+        # Stats browse matviews. MUST run after SCHEMA_DDL: horse_stats reads
+        # horse_career_stats, which SCHEMA_DDL drops+recreates with CASCADE on
+        # every apply — that cascade also drops horse_stats, so it has to be
+        # rebuilt here or `core.schema apply` would silently leave it missing.
+        cur.execute(STATS_VIEWS_DDL)
     conn.commit()
 
 

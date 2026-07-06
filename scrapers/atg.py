@@ -10,9 +10,10 @@ already parses that shape — works unchanged. With this in place v2 no longer
 shells out to the v1 project for ATG.
 
 Enumeration strategy: the calendar/day endpoint returns `tracks[].races[]` with
-every race's `id`, `number` and `status`. We take races whose status marks a
-finished result (`FINAL_STATUSES`) on non-gallop tracks, then fetch each race's
-full payload from `/races/{id}`.
+every race's `id`, `number` and `status`. Result catch-up uses
+`FINAL_STATUSES`; upcoming-card scraping uses `ACTIVE_STATUSES`. Both exclude
+gallop tracks entirely (v2 is trot-only), then fetch the full payload from
+`/races/{id}`.
 """
 
 from __future__ import annotations
@@ -33,6 +34,10 @@ log = logging.getLogger(__name__)
 # ATG race `status` values that mean "results are published". Anything else
 # ('upcoming', 'ongoing', 'cancelled', ...) is skipped by the results scrape.
 FINAL_STATUSES = frozenset({"results"})
+# Statuses whose payloads contain a usable start list. These power the upcoming
+# ML scoring path; later result scrapes are allowed to re-fetch the same race
+# when its status advances to "results".
+ACTIVE_STATUSES = frozenset({"upcoming", "ongoing", "results"})
 
 
 # ---------------------------------------------------------------------------
@@ -73,11 +78,11 @@ def _race_date_from_id(atg_race_id: str) -> date | None:
         return None
 
 
-def enumerate_race_ids(calendar: dict,
-                       statuses: frozenset[str] = FINAL_STATUSES) -> list[tuple[str, date | None]]:
-    """From a calendar payload, list (atg_race_id, race_date) for finished trot
-    races. Gallop tracks are excluded entirely (v2 is trot-only)."""
-    out: list[tuple[str, date | None]] = []
+def enumerate_race_refs(calendar: dict,
+                        statuses: frozenset[str] = FINAL_STATUSES) -> list[tuple[str, date | None, str | None]]:
+    """From a calendar payload, list (atg_race_id, race_date, calendar_status)
+    for selected trot races. Gallop tracks are excluded entirely."""
+    out: list[tuple[str, date | None, str | None]] = []
     for track in (calendar or {}).get("tracks", []) or []:
         if (track.get("sport") or "trot") == "gallop":
             continue
@@ -85,10 +90,17 @@ def enumerate_race_ids(calendar: dict,
             rid = r.get("id")
             if not rid:
                 continue
-            if statuses and (r.get("status") not in statuses):
+            rstatus = r.get("status")
+            if statuses and (rstatus not in statuses):
                 continue
-            out.append((rid, _race_date_from_id(rid)))
+            out.append((rid, _race_date_from_id(rid), rstatus))
     return out
+
+
+def enumerate_race_ids(calendar: dict,
+                       statuses: frozenset[str] = FINAL_STATUSES) -> list[tuple[str, date | None]]:
+    """Backward-compatible id/date enumerator used by validation scripts."""
+    return [(rid, rdate) for rid, rdate, _status in enumerate_race_refs(calendar, statuses)]
 
 
 # ---------------------------------------------------------------------------
@@ -152,8 +164,8 @@ def scrape_day(conn, date_str: str, *,
                delay: float | None = None,
                client: httpx.Client | None = None,
                log=print) -> dict:
-    """Fetch the calendar for `date_str`, then fetch + store every finished trot
-    race's raw JSON. Returns counts."""
+    """Fetch the calendar for `date_str`, then fetch + store selected trot
+    race payloads. Returns counts."""
     if delay is None:
         delay = config.REQUEST_DELAY
     own_client = client is None
@@ -165,26 +177,27 @@ def scrape_day(conn, date_str: str, *,
         if cstatus != 200 or not isinstance(calendar, dict):
             counts["calendar_status"] = cstatus
             return counts
-        listed = enumerate_race_ids(calendar, statuses)
+        listed = enumerate_race_refs(calendar, statuses)
         counts["races_listed"] = len(listed)
 
-        done: set[str] = set()
+        done: set[tuple[str, str | None]] = set()
         if skip_done and listed:
-            ids = [rid for rid, _ in listed]
+            ids = [rid for rid, _rdate, _rstatus in listed]
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT atg_race_id FROM atg_race_scrape_log "
+                    "SELECT atg_race_id, status FROM atg_race_scrape_log "
                     "WHERE atg_race_id = ANY(%s) AND http_status = 200",
                     (ids,),
                 )
-                done = {r[0] for r in cur.fetchall()}
+                done = {(r[0], r[1]) for r in cur.fetchall()}
 
-        for rid, rdate in listed:
-            if rid in done:
+        for rid, rdate, rstatus in listed:
+            status_label = rstatus or "unknown"
+            if (rid, status_label) in done:
                 counts["skipped"] += 1
                 continue
             status, payload = fetch_race(client, rid)
-            if store_race_raw(conn, rid, rdate, status, payload, status_label="results"):
+            if store_race_raw(conn, rid, rdate, status, payload, status_label=status_label):
                 counts["ok"] += 1
             elif status == 404:
                 counts["missing"] += 1

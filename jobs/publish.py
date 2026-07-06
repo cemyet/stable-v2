@@ -59,7 +59,12 @@ SERVING_TABLES: list[tuple[str, str | None]] = [
     ("entry",                 "last_updated_at"),
     ("horse_owner_history",   None),   # via horse watermark
     ("horse_trainer_history", None),   # via horse watermark
-    ("entry_features",        "race_date"),
+    # computed_at (not race_date): relabel_recent() back-fills result labels onto
+    # rows whose race already ran (often days after their race_date), bumping
+    # computed_at. Watermarking on computed_at guarantees those corrections — and
+    # any future in-place column back-fill — actually reach the cloud, which a
+    # race_date watermark (only ~3 days of overlap) would silently drop.
+    ("entry_features",        "computed_at"),
     ("entry_outperf",         "race_date"),
     ("entry_perf",            "race_date"),
     ("trainer_form_exp",      "race_date"),

@@ -75,15 +75,28 @@ WITH cand AS (
      AND (t_a.country = 'FR' OR t_l.country = 'FR')
 )
 SELECT * FROM cand
+ {where_recent}
  ORDER BY race_date DESC
 """
 
 
-def _fetch_candidates(cur, limit: int | None) -> list[dict]:
-    sql = _CANDIDATE_SQL
+def _fetch_candidates(cur, limit: int | None,
+                      since_days: int | None = None) -> list[dict]:
+    # Nightly runs pass a small `since_days` so we only fingerprint the races
+    # just ingested. The unscoped join spans ALL history (LeTrot's full French
+    # backfill × ATG internationals => ~260k date+race_number pairs since 2020),
+    # each needing two per-race fingerprint queries — hours of pointless work
+    # re-checking pairs that were already resolved (or never matched) long ago.
+    params: list = []
+    if since_days is not None:
+        where_recent = "WHERE race_date >= CURRENT_DATE - %s::int"
+        params.append(int(since_days))
+    else:
+        where_recent = ""
+    sql = _CANDIDATE_SQL.format(where_recent=where_recent)
     if limit:
         sql += f" LIMIT {int(limit)}"
-    cur.execute(sql)
+    cur.execute(sql, params)
     cols = [d.name for d in cur.description]
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -149,6 +162,11 @@ def main() -> int:
                              "required no matter what (default 2). Prevents "
                              "false positives from races that share only "
                              "their program-number set (1..12 etc.)")
+    parser.add_argument("--since-days", type=int, default=None,
+                        help="only consider races run within the last N days "
+                             "(default: all history). The nightly passes a "
+                             "small window so it never rescans years of French "
+                             "history every run.")
     args = parser.parse_args()
     min_score = args.min_score
     min_overlap = args.min_name_overlap
@@ -158,9 +176,9 @@ def main() -> int:
 
     with script_runner("match_french_races", args) as (conn, log, summary):
         log(f"[match_french_races] execute={args.execute} limit={args.limit} "
-            f"min_score={min_score}")
+            f"min_score={min_score} since_days={args.since_days}")
         with conn.cursor() as cur:
-            cands = _fetch_candidates(cur, args.limit)
+            cands = _fetch_candidates(cur, args.limit, since_days=args.since_days)
         summary["candidates"] = len(cands)
         log(f"Found {len(cands)} cross-track candidates to fingerprint.")
 
