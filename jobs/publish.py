@@ -272,6 +272,195 @@ def sync_history(local_read, cloud, table: str, *, full: bool,
     return _stream_upsert(local_read, cloud, table, where_sql, params, cols, pk, log=log)
 
 
+# ---------------------------------------------------------------------------
+# Merge reconciliation — mirror local horse/person merges onto the cloud.
+#
+# merge_horses()/merge_persons() delete the losing row locally, re-home its
+# entries/histories/pedigree onto the keeper, and register an identity_redirect.
+# The publish job only UPSERTS, so without this step the cloud accumulates
+# orphaned loser rows forever: they hog unique ids (e.g. letrot_id), keep old
+# entries pointed at a ghost horse, and double-count in every stat matview.
+# Eventually a restored id (e.g. a manual re-merge) collides with a lingering
+# loser's unique column and the whole horse/entry/entry_features push aborts.
+#
+# We replay each merge on the cloud, driven by the local *_merge_log (source of
+# truth). It is idempotent and self-limiting: once a loser is deleted on the
+# cloud it never appears again. A single pre-pass frees the doomed losers'
+# unique columns so the keeper upsert in the main loop can't collide; the
+# post-pass (after all upserts) re-homes references and deletes the losers.
+# ---------------------------------------------------------------------------
+
+# ref tuple: (table, fk_column, dedup_other_keys)
+#   dedup_other_keys is None  -> plain UPDATE (fk_column is not part of a PK)
+#   dedup_other_keys is a list-> the OTHER PK columns; loser rows that would
+#                                PK-collide with the keeper are deleted first
+#                                (mirrors the delete-and-move in core.identity).
+_MERGE_SPECS: list[dict] = [
+    dict(
+        entity="horse", log="horse_merge_log",
+        from_col="from_horse_id", to_col="to_horse_id",
+        master="horse", pk="horse_id",
+        refs=[
+            ("entry",                 "horse_id", None),
+            ("watchlist",             "horse_id", []),
+            ("horse_owner_history",   "horse_id", ["from_date"]),
+            ("horse_trainer_history", "horse_id", ["from_date"]),
+            ("horse",                 "sire_id",  None),
+            ("horse",                 "dam_id",   None),
+        ],
+    ),
+    dict(
+        entity="person", log="person_merge_log",
+        from_col="from_person_id", to_col="to_person_id",
+        master="person", pk="person_id",
+        refs=[
+            ("entry",                 "driver_id",  None),
+            ("entry",                 "trainer_id", None),
+            ("horse_owner_history",   "owner_id",   None),
+            ("horse_trainer_history", "trainer_id", None),
+        ],
+    ),
+]
+
+
+def _single_col_unique_cols(conn, table: str, pk: list[str]) -> list[str]:
+    """Columns that are the sole key of a UNIQUE index (excluding the PK) — the
+    ones that can trip a single-row unique violation when a keeper adopts a
+    value a lingering loser still holds."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT a.attname
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indrelid
+            JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = i.indkey[0]
+            WHERE c.relname = %s AND i.indisunique AND i.indnkeyatts = 1
+        """, (table,))
+        cols = [r[0] for r in cur.fetchall()]
+    return [c for c in cols if c not in pk]
+
+
+def _build_merge_plan(local_read, cloud, spec: dict) -> list[tuple[int, int]]:
+    """(loser_id, terminal_keeper_id) pairs for losers still lingering on the
+    cloud but already deleted locally. Chains of successive merges are flattened
+    to the terminal keeper."""
+    with local_read.cursor() as cur:
+        cur.execute(
+            f"SELECT {spec['from_col']}, {spec['to_col']} "
+            f"FROM {spec['log']} WHERE rolled_back = false"
+        )
+        nxt = {int(f): int(t) for f, t in cur.fetchall()}
+    if not nxt:
+        return []
+
+    def resolve(start: int) -> int:
+        seen, cur_id = set(), start
+        while cur_id in nxt and cur_id not in seen:
+            seen.add(cur_id)
+            cur_id = nxt[cur_id]
+        return cur_id
+
+    losers = list(nxt.keys())
+    with cloud.cursor() as cc:
+        cc.execute(
+            f"SELECT {spec['pk']} FROM {spec['master']} WHERE {spec['pk']} = ANY(%s)",
+            (losers,),
+        )
+        cloud_losers = [int(r[0]) for r in cc.fetchall()]
+    if not cloud_losers:
+        return []
+    with local_read.cursor() as lc:
+        lc.execute(
+            f"SELECT {spec['pk']} FROM {spec['master']} WHERE {spec['pk']} = ANY(%s)",
+            (cloud_losers,),
+        )
+        still_local = {int(r[0]) for r in lc.fetchall()}
+
+    plan, keepers = [], set()
+    for loser in cloud_losers:
+        if loser in still_local:      # not actually merged away; leave it alone
+            continue
+        keeper = resolve(loser)
+        if keeper == loser:
+            continue
+        plan.append((loser, keeper))
+        keepers.add(keeper)
+    if not plan:
+        return []
+
+    # The terminal keeper must exist locally (it is the surviving row); drop any
+    # pair whose keeper is missing locally rather than risk orphaning entries.
+    with local_read.cursor() as lc:
+        lc.execute(
+            f"SELECT {spec['pk']} FROM {spec['master']} WHERE {spec['pk']} = ANY(%s)",
+            (sorted(keepers),),
+        )
+        keep_ok = {int(r[0]) for r in lc.fetchall()}
+    return [(l, k) for (l, k) in plan if k in keep_ok]
+
+
+def reconcile_free_unique(local_read, cloud, spec: dict,
+                          plan: list[tuple[int, int]], *, log=print) -> None:
+    """Pre-pass: null the doomed losers' single-column unique values so the
+    keeper upsert in the main loop cannot collide with them."""
+    if not plan:
+        return
+    ucols = _single_col_unique_cols(local_read, spec["master"], [spec["pk"]])
+    if not ucols:
+        return
+    losers = [l for l, _ in plan]
+    set_sql = ", ".join(f"{c} = NULL" for c in ucols)
+    with cloud.cursor() as cc:
+        cc.execute(
+            f"UPDATE {spec['master']} SET {set_sql} WHERE {spec['pk']} = ANY(%s)",
+            (losers,),
+        )
+    cloud.commit()
+    log(f"  reconcile[{spec['entity']}]: freed unique cols on "
+        f"{len(losers):,} lingering cloud rows")
+
+
+def reconcile_apply(local_read, cloud, spec: dict, plan: list[tuple[int, int]],
+                    *, log=print) -> None:
+    """Post-pass: ensure keepers exist on the cloud, re-home every reference
+    from loser to keeper, then delete the loser rows."""
+    if not plan:
+        return
+    keepers = sorted({k for _, k in plan})
+    # Guarantee FK targets exist on the cloud (keepers of old merges may pre-date
+    # the incremental window and thus not be re-pushed by the main loop).
+    cols = _columns(local_read, spec["master"])
+    pk = _pk_columns(local_read, spec["master"])
+    _stream_upsert(local_read, cloud, spec["master"],
+                   f"{spec['pk']} = ANY(%s)", [keepers], cols, pk, log=log)
+
+    with cloud.cursor() as cc:
+        cc.execute("CREATE TEMP TABLE _merge_map (loser bigint PRIMARY KEY, "
+                   "keeper bigint) ON COMMIT DROP")
+        execute_values(cc, "INSERT INTO _merge_map (loser, keeper) VALUES %s",
+                       plan, page_size=1000)
+        for table, col, dedup in spec["refs"]:
+            if dedup is not None:
+                cond = " AND ".join(
+                    [f"t2.{col} = m.keeper"] + [f"t2.{k} = t.{k}" for k in dedup]
+                )
+                cc.execute(
+                    f"DELETE FROM {table} t USING _merge_map m "
+                    f"WHERE t.{col} = m.loser "
+                    f"  AND EXISTS (SELECT 1 FROM {table} t2 WHERE {cond})"
+                )
+            cc.execute(
+                f"UPDATE {table} t SET {col} = m.keeper "
+                f"FROM _merge_map m WHERE t.{col} = m.loser"
+            )
+        cc.execute(
+            f"DELETE FROM {spec['master']} "
+            f"WHERE {spec['pk']} IN (SELECT loser FROM _merge_map)"
+        )
+    cloud.commit()
+    log(f"  reconcile[{spec['entity']}]: re-homed refs and deleted "
+        f"{len(plan):,} merged-away rows")
+
+
 def refresh_matviews(cloud, *, log=print) -> None:
     for mv in MATVIEWS:
         t0 = time.time()
@@ -318,6 +507,20 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
     t0 = time.time()
     try:
         _ensure_state(state)
+
+        # Merge reconciliation (pre-pass): free unique columns on cloud rows
+        # that local merges have deleted, so keeper upserts below can't collide.
+        merge_plans: list[tuple[dict, list[tuple[int, int]]]] = []
+        try:
+            for spec in _MERGE_SPECS:
+                plan = _build_merge_plan(local_read, cloud, spec)
+                merge_plans.append((spec, plan))
+                if plan:
+                    reconcile_free_unique(local_read, cloud, spec, plan, log=log)
+        except Exception as exc:
+            cloud.rollback()
+            log(f"  reconcile pre-pass: ERROR {exc!r}")
+
         horse_wm = None if full else _get_watermark(state, "horse")
         for table, wm_col in SERVING_TABLES:
             try:
@@ -333,6 +536,19 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
                 cloud.rollback()
                 log(f"  {table}: ERROR {exc!r}")
                 totals["tables"][table] = f"error: {exc!r}"
+
+        # Merge reconciliation (post-pass): re-home references and delete the
+        # merged-away loser rows now that all keepers/entries are on the cloud.
+        for spec, plan in merge_plans:
+            if not plan:
+                continue
+            try:
+                reconcile_apply(local_read, cloud, spec, plan, log=log)
+                totals[f"reconciled_{spec['entity']}"] = len(plan)
+            except Exception as exc:
+                cloud.rollback()
+                log(f"  reconcile[{spec['entity']}] apply: ERROR {exc!r}")
+
         if do_matviews:
             log("refreshing materialized views on cloud...")
             refresh_matviews(cloud, log=log)
