@@ -996,6 +996,7 @@ def merge_horses(
     method: str,
     merged_by: str = "system",
     dry_run: bool = True,
+    merge_identity: bool = True,
 ) -> dict:
     """Merge `from_horse_id` into `to_horse_id`.
 
@@ -1168,11 +1169,12 @@ def merge_horses(
     cur.execute("UPDATE horse SET dam_id  = %s WHERE dam_id  = %s",
                 (to_horse_id, from_horse_id))
 
-    # Merge per-source IDs and source_data from src into dst for automated
-    # duplicate merges. Manual merges are often used for "move relationships
-    # to this canonical horse" cleanups; in that workflow the losing row may
-    # be a real horse whose own identity should not leak into the keeper.
-    if method != "manual":
+    # Merge per-source IDs and source_data (IDs, DOB, gender, pedigree, etc.)
+    # from src into dst. Controlled by the caller via merge_identity; defaults
+    # to True so that all merge paths carry identity data unless explicitly
+    # opted out (e.g. a pure "re-home entries" cleanup where the loser is
+    # a phantom duplicate that should not pollute the keeper's identity).
+    if merge_identity:
         _merge_horse_identity(cur, src, dst)
 
     # Snapshot + log. The new from_snapshot shape is

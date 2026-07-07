@@ -4179,7 +4179,11 @@ def admin_matching_preview_merge():
 
 @app.route('/api/admin/matching/merge', methods=['POST'])
 def admin_matching_execute_merge():
-    """Execute one horse merge. Body: { from_horse_id, to_horse_id, reason, method? }."""
+    """Execute one horse merge.
+    Body: { from_horse_id, to_horse_id, reason, method?, merge_identity? }
+    merge_identity defaults to True — set False only for pure entry-reparent
+    cleanups where the loser's identity data should NOT flow into the keeper.
+    """
     from core.identity import merge_horses
     payload = request.get_json(silent=True) or {}
     try:
@@ -4187,14 +4191,16 @@ def admin_matching_execute_merge():
         to  = int(payload['to_horse_id'])
     except (KeyError, TypeError, ValueError):
         return jsonify({'error': 'missing from/to'}), 400
-    reason = (payload.get('reason') or 'manual merge').strip()
-    method = (payload.get('method') or 'manual').strip()
+    reason           = (payload.get('reason') or 'manual merge').strip()
+    method           = (payload.get('method') or 'manual').strip()
+    merge_identity   = bool(payload.get('merge_identity', True))
     conn = get_db()
     try:
         with conn.cursor() as cur:
             res = merge_horses(cur, frm, to,
                                reason=reason, method=method,
-                               merged_by='admin', dry_run=False)
+                               merged_by='admin', dry_run=False,
+                               merge_identity=merge_identity)
         conn.commit()
         _MATCHING_HEALTH_CACHE["data"] = None
         return jsonify(res)

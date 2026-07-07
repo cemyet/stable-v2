@@ -401,6 +401,9 @@
         <option value="category_f">category_f</option>
         <option value="category_g">category_g (person)</option>
       </select>
+      <label class="muted small" style="font-size:11px; margin-left:8px;" title="Copy IDs, DOB, gender, pedigree and source data from the loser into the keeper. Uncheck only for pure entry-reparent cleanups.">
+        <input type="checkbox" id="mergeIdentity" checked> merge identity
+      </label>
       <input id="mergeReason" type="text" placeholder="note">
       <button class="ghost" id="previewBtn" disabled>preview</button>
       <button class="ghost danger" id="executeBtn" disabled>execute</button>
@@ -931,7 +934,9 @@
   async function executeMerge() {
     const ent = currentEntity();
     if (!ent) return;
-    const method = document.getElementById('mergeMethod').value;
+    const method          = document.getElementById('mergeMethod').value;
+    const mergeIdentityEl = document.getElementById('mergeIdentity');
+    const merge_identity  = mergeIdentityEl ? mergeIdentityEl.checked : true;
     const reason = document.getElementById('mergeReason').value
                 || `manual via admin (${method})`;
     const from = ent === 'horse' ? slots.src.base.horse_id  : slots.src.base.person_id;
@@ -946,7 +951,7 @@
       ? '/api/admin/matching/merge'
       : '/api/admin/matching/merge-person';
     const body = ent === 'horse'
-      ? { from_horse_id: from, to_horse_id: to,  reason, method }
+      ? { from_horse_id: from, to_horse_id: to,  reason, method, merge_identity }
       : { from_person_id: from, to_person_id: to, reason, method };
     const res = await fetch(url, {
       method: 'POST',
