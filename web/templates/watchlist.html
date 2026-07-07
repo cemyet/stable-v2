@@ -8,30 +8,13 @@
     max-width: 880px;
   }
   .wl-tabs {
-    display: flex;
-    gap: 8px;
     margin-bottom: 16px;
-  }
-  .wl-tabs button {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 4px 14px;
-    font-family: inherit;
-    font-size: 12px;
-    color: var(--fg-muted);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-  }
-  .wl-tabs button.active {
-    background: var(--fg);
-    color: var(--bg);
-    border-color: var(--fg);
   }
   .wl-count {
     color: var(--fg-muted);
     font-size: 11px;
-    margin-bottom: 8px;
+    margin-top: 14px;
+    text-align: center;
   }
   .wl-empty {
     color: var(--fg-muted);
@@ -70,12 +53,12 @@
 
 {% block content %}
   <div class="watchlist-wrap">
-    <div class="wl-tabs">
-      <button id="tabActive" class="active" type="button">active</button>
-      <button id="tabInactive" type="button">inactive</button>
+    <div class="period-toggle fluid-toggle fluid-toggle--segmented wl-tabs">
+      <button id="tabActive" class="period-btn fluid-toggle__btn active" type="button">active</button>
+      <button id="tabInactive" class="period-btn fluid-toggle__btn" type="button">inactive</button>
     </div>
-    <div class="wl-count" id="wlCount"></div>
     <div id="wlTableMount"></div>
+    <div class="wl-count" id="wlCount"></div>
     <div class="wl-empty" id="wlEmpty"></div>
   </div>
 {% endblock %}

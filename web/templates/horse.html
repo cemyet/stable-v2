@@ -209,14 +209,27 @@
   }
   .rel-tag.full { color: var(--accent-hot); border-color: rgba(36,151,64,0.4); }
 
-  /* perfect-siblings (full) plasma toggle control in the heading */
+  /* full-siblings filter in section heading */
   .sib-perfect-ctrl {
     display: inline-flex; align-items: center; gap: 8px;
     margin-left: 14px;
     text-transform: none; letter-spacing: 0;
   }
-  .sib-perfect-ctrl .sib-perfect-label {
-    font-size: 11px; letter-spacing: 1px; color: var(--fg-muted);
+  .sib-perfect-filter {
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--fg-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 0;
+    text-transform: lowercase;
+  }
+  .sib-perfect-filter:hover { color: var(--fg); }
+  .sib-perfect-filter[aria-pressed="true"] {
+    color: var(--fg-heading);
+    font-weight: 600;
   }
   .section-heading.has-ctrl { align-items: center; }
 
@@ -314,8 +327,7 @@
       <h2 class="section-heading has-ctrl">
         <span class="section-heading__label">siblings</span>
         <span class="sib-perfect-ctrl">
-          <span class="sib-perfect-label">full only</span>
-          <span id="perfectSibToggle"></span>
+          <button type="button" class="sib-perfect-filter" id="perfectSibFilter" aria-pressed="false">full only</button>
         </span>
         <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse siblings">▴</button>
       </h2>
@@ -760,15 +772,22 @@
         expandAll() { siblingFold.expandAll(); },
       });
 
-      // "full only" plasma toggle (green on / white off) — green = perfect siblings.
-      document.getElementById('perfectSibToggle').outerHTML =
-        formBubbleToggleHtml({ variant: 'on-off', hotActive: false, id: 'perfectSibToggle' });
-      initFormBubbleToggle('perfectSibToggle', {
-        onChange(dir) {
-          perfectOnly = (dir === 'hot');
-          renderSiblings();
-        },
+      bindPerfectSibFilter();
+    }
+
+    function bindPerfectSibFilter() {
+      const btn = document.getElementById('perfectSibFilter');
+      if (!btn || btn.dataset.bound) return;
+      btn.dataset.bound = '1';
+      const sync = () => {
+        btn.setAttribute('aria-pressed', perfectOnly ? 'true' : 'false');
+      };
+      btn.addEventListener('click', () => {
+        perfectOnly = !perfectOnly;
+        sync();
+        renderSiblings();
       });
+      sync();
     }
 
     loadHistory();

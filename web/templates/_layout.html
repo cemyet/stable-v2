@@ -2,12 +2,16 @@
 <html lang="sv">
 <head>
   <script>
-    // "liquid" = styled app (always on). Theme layer on top: pearl (default) or clean.
+    // "liquid" = styled app (always on). Theme layer on top: pearl (default) or bone.
     document.documentElement.classList.add('liquid');
     try {
       var __theme = localStorage.getItem('theme');
       if (__theme === 'clean') {
-        document.documentElement.classList.add('theme-clean');
+        localStorage.setItem('theme', 'bone');
+        __theme = 'bone';
+      }
+      if (__theme === 'bone') {
+        document.documentElement.classList.add('theme-bone');
       }
     } catch (e) {}
   </script>
@@ -808,6 +812,9 @@
     .glass-panel--form .form-panel__list th.sortable.active::after {
       content: " ↓";
       opacity: 0.72;
+    }
+    .glass-panel--form .form-panel__list th.sortable.active.form-dir-cold::after {
+      content: " ↑";
     }
     .glass-panel--form .form-panel__list td {
       padding: 3px 5px;
@@ -2903,20 +2910,9 @@
       padding: 16px 20px 24px;
     }
 
-    /* Form direction bubble toggle — sliding plasma sphere (fluid stretch + snap) */
+    /* Form direction bubble toggle — removed from UI (hidden). */
     .form-bubble-toggle {
-      display: inline-block;
-      flex-shrink: 0;
-      --form-bubble-flow-ms: 560ms;
-      --form-bubble-flow-ease: cubic-bezier(0.34, 1.08, 0.64, 1);
-      --form-bubble-plasma-in-ms: 340ms;
-      --form-bubble-plasma-out-ms: 110ms;
-      --form-bubble-plasma-in-ratio: 0.14;
-      --form-bubble-active-d: 21px;
-      --form-bubble-inactive-d: 12.6px;
-      --form-bubble-gap: 3.5px;
-      width: calc(var(--form-bubble-active-d) + var(--form-bubble-inactive-d) + var(--form-bubble-gap));
-      height: var(--form-bubble-active-d);
+      display: none !important;
     }
 
     .form-bubble-toggle__track {
@@ -3644,6 +3640,20 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    /* Hover beats active — dim/blur the bubble when pointing at another tab. */
+    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble,
+    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble {
+      opacity: 0.42;
+      filter: blur(0.6px);
+    }
+    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
+    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
+    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
+    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
+      color: rgba(90, 90, 94, 0.34) !important;
+      -webkit-text-fill-color: rgba(90, 90, 94, 0.34) !important;
+    }
+
     html.liquid .fluid-toggle.is-ready .fluid-toggle__thumb {
       display: block;
       opacity: 1;
@@ -3911,121 +3921,369 @@
     }
 
     /* ============================================================
-       CLEAN THEME — black & white, no frosted glass, no bubbles.
+       BONE THEME — black & white, no frosted glass, no bubbles.
        Colour is reserved for semantics only: flags, hot/cold values,
        #1 gold, headline-race colours, and upcoming-races spheres.
        ============================================================ */
-    html.theme-clean {
-      --bg: #ffffff;
-      --liquid-bg: #ffffff;
+    html.theme-bone {
+      --bg: #f5f2eb;
+      --liquid-bg: #f5f2eb;
       --liquid-ink-rgb: 0, 0, 0;
       --liquid-ink-mid-rgb: 0, 0, 0;
       --liquid-ink-soft-rgb: 60, 60, 60;
       --liquid-ink-muted-rgb: 90, 90, 90;
       --fg-heading: #000000;
-      --fg: #000000;
-      --fg-muted: rgba(0, 0, 0, 0.55);
+      --fg: #1c1c1e;
+      --fg-muted: rgba(0, 0, 0, 0.48);
       --liquid-title-fg: #000000;
       --track-name-fg: #000000;
-      --fluid-toggle-fg: rgba(0, 0, 0, 0.45);
-      --fluid-toggle-fg-hover: rgba(0, 0, 0, 0.75);
-      --fluid-toggle-fg-active: #000000;
-      --panel-border: rgba(0, 0, 0, 0.16);
-      --border: rgba(0, 0, 0, 0.16);
-      --border-focus: rgba(0, 0, 0, 0.42);
+      --fluid-toggle-fg: rgba(0, 0, 0, 0.34);
+      --fluid-toggle-fg-hover: rgba(0, 0, 0, 0.88);
+      --fluid-toggle-fg-active: rgba(28, 28, 30, 0.92);
+      --panel-border: rgba(255, 255, 255, 0.92);
+      --list-line: rgba(255, 255, 255, 0.92);
+      --border: rgba(0, 0, 0, 0.58);
+      --border-focus: rgba(0, 0, 0, 0.72);
       --hover: rgba(0, 0, 0, 0.045);
       --panel-bg: transparent;
       --panel-shadow: none;
       --accent-glow: #000000;
       --accent-glow-rgb: 0, 0, 0;
-      --nav-active: #000000;
-      --highlight-weight: 700;
+      --nav-active: rgba(28, 28, 30, 0.92);
+      --highlight-weight: 400;
+      --chart-form: #1c1c1e;
     }
 
-    /* Panels — no frosted glass. Transparent fill + thin black outline. */
-    html.liquid.theme-clean .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
-    html.liquid.theme-clean .glass-panel--form.glass-panel--form-frosted,
-    html.liquid.theme-clean .filters,
-    html.liquid.theme-clean .live-banner {
-      background: transparent;
-      border: 1px solid rgba(0, 0, 0, 0.16);
-      box-shadow: none;
+    /* Sharp panels + darker outlines. */
+    html.liquid.theme-bone .glass-panel,
+    html.liquid.theme-bone .home-headlines-glass,
+    html.liquid.theme-bone .filters,
+    html.liquid.theme-bone .live-banner,
+    html.liquid.theme-bone .card,
+    html.liquid.theme-bone .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
+      border-radius: 0 !important;
+    }
+
+    /* Panels — no fill, white outline. */
+    html.liquid.theme-bone .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
+    html.liquid.theme-bone .glass-panel--form.glass-panel--form-frosted,
+    html.liquid.theme-bone .card.glass-panel,
+    html.liquid.theme-bone .filters,
+    html.liquid.theme-bone .live-banner {
+      background: transparent !important;
+      border: 1px solid #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
 
-    /* Generic card panels + home headline surface — flatten to outline. */
-    html.liquid.theme-clean .glass-panel,
-    html.liquid.theme-clean .home-headlines-glass {
+    html.liquid.theme-bone .glass-panel,
+    html.liquid.theme-bone .home-headlines-glass {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
 
-    /* ---- Nav: keep collapse/expand behaviour, drop the glass bubble ---- */
-    html.liquid.theme-clean .fluid-nav-highlight > .fluid-bubble {
+    /* List row dividers — white lines (not on home page lists). */
+    html.liquid.theme-bone table th,
+    html.liquid.theme-bone table td {
+      border-bottom-color: var(--list-line) !important;
+    }
+    html.liquid.theme-bone .home-page table.top-list th,
+    html.liquid.theme-bone .home-page table.top-list td,
+    html.liquid.theme-bone .home-page table.form-list th,
+    html.liquid.theme-bone .home-page table.form-list td,
+    html.liquid.theme-bone .home-page .form-panel__list th,
+    html.liquid.theme-bone .home-page .form-panel__list td {
+      border-bottom: none !important;
+    }
+    html.liquid.theme-bone table tbody tr:hover,
+    html.liquid.theme-bone table tr:hover {
+      background: rgba(255, 255, 255, 0.38) !important;
+    }
+
+    /* Horse page — passport divider: darker bone, not black. */
+    html.liquid.theme-bone .horse-passport {
+      border-bottom-color: #ddd8cc !important;
+    }
+    html.liquid.theme-bone .source-chip {
+      border-color: #ffffff;
+    }
+
+    /* Trainer/driver charts — white grid, black win% line + fill. */
+    html.liquid.theme-bone .form-chart .grid-line {
+      stroke: rgba(255, 255, 255, 0.92);
+    }
+    html.liquid.theme-bone .form-chart .zero-line {
+      stroke: rgba(255, 255, 255, 0.55);
+    }
+    html.liquid.theme-bone .form-path.tf,
+    html.liquid.theme-bone .form-path.df {
+      stroke: #1c1c1e;
+    }
+    html.liquid.theme-bone .form-area.tf,
+    html.liquid.theme-bone .form-area.df {
+      fill: rgba(28, 28, 30, 0.14);
+    }
+    html.liquid.theme-bone .form-dot.tf,
+    html.liquid.theme-bone .form-dot.df {
+      fill: #1c1c1e;
+    }
+
+    /* ---- Nav: pearl-like blur/mute on inactive; active darker, not bold ---- */
+    html.liquid.theme-bone .fluid-nav-highlight > .fluid-bubble {
       display: none !important;
     }
 
-    /* Active tab text becomes visible again (bubble no longer paints it). */
-    html.liquid.theme-clean .topnav .fluid-nav-highlight a.is-bubble-target,
-    html.liquid.theme-clean .subnav .fluid-nav-highlight a.is-bubble-target,
-    html.liquid.theme-clean .topnav a.active,
-    html.liquid.theme-clean .subnav a.active {
+    html.liquid.theme-bone .topnav .fluid-nav-highlight a:not(.is-bubble-target),
+    html.liquid.theme-bone .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    html.liquid.theme-bone .topnav .fluid-nav-highlight a.active:not(.is-bubble-target),
+    html.liquid.theme-bone .subnav .fluid-nav-highlight a:not(.is-bubble-target),
+    html.liquid.theme-bone .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    html.liquid.theme-bone .subnav .fluid-nav-highlight a.active:not(.is-bubble-target) {
+      color: rgba(0, 0, 0, 0.34) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
+      font-weight: 400 !important;
+      font-synthesis: none;
+      text-shadow: none !important;
+      background-image: none !important;
+      animation: none !important;
+      filter: blur(0.45px);
+      opacity: 0.72;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    html.liquid.theme-bone .topnav .fluid-nav-highlight a.is-bubble-target,
+    html.liquid.theme-bone .subnav .fluid-nav-highlight a.is-bubble-target,
+    html.liquid.theme-bone .topnav a.active,
+    html.liquid.theme-bone .subnav a.active {
       color: var(--nav-active) !important;
       -webkit-text-fill-color: var(--nav-active) !important;
-      font-weight: var(--highlight-weight) !important;
-      text-decoration: underline;
-      text-underline-offset: 5px;
-      text-decoration-thickness: 1.5px;
+      font-weight: 400 !important;
       text-shadow: none !important;
       filter: none !important;
       opacity: 1 !important;
     }
 
-    /* Inactive/expanded links — crisp muted grey, no blur. */
-    html.liquid.theme-clean .topnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid.theme-clean .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
-    html.liquid.theme-clean .subnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid.theme-clean .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover {
-      color: rgba(0, 0, 0, 0.5) !important;
-      -webkit-text-fill-color: rgba(0, 0, 0, 0.5) !important;
+    html.liquid.theme-bone .topnav a:hover,
+    html.liquid.theme-bone .subnav a:hover {
+      color: rgba(0, 0, 0, 0.88) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
+      font-weight: 400 !important;
+    }
+
+    html.liquid.theme-bone .topnav a.active:hover,
+    html.liquid.theme-bone .subnav a.active:hover,
+    html.liquid.theme-bone .topnav .fluid-nav-highlight a.is-bubble-target:hover,
+    html.liquid.theme-bone .subnav .fluid-nav-highlight a.is-bubble-target:hover {
+      color: var(--nav-active) !important;
+      -webkit-text-fill-color: var(--nav-active) !important;
       filter: none !important;
       opacity: 1 !important;
     }
-    html.liquid.theme-clean .topnav a:hover,
-    html.liquid.theme-clean .subnav a:hover {
+
+    /* Hover beats active — pointing at another tab blurs/mutes the current one too. */
+    html.liquid.theme-bone .topnav .nav-bar-inner:has(a:not(.active):hover) a.active,
+    html.liquid.theme-bone .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
+    html.liquid.theme-bone .subnav .nav-bar-inner:has(a:not(.active):hover) a.active,
+    html.liquid.theme-bone .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
+      color: rgba(0, 0, 0, 0.34) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
+      filter: blur(0.45px) !important;
+      opacity: 0.72 !important;
+    }
+
+    html.liquid.theme-bone .topnav .nav-bar-inner a:not(.active):hover,
+    html.liquid.theme-bone .subnav .nav-bar-inner a:not(.active):hover {
+      color: rgba(0, 0, 0, 0.88) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+
+    html.liquid.theme-bone .nav-inline-row .topnav a:hover,
+    html.liquid.theme-bone .nav-inline-row .subnav a:hover,
+    html.liquid.theme-bone .nav-inline-row .topnav a.active,
+    html.liquid.theme-bone .nav-inline-row .subnav a.active {
+      font-weight: 400 !important;
+    }
+
+    /* ---- Clickable hover: darker black, not bold ---- */
+    html.liquid.theme-bone .fluid-highlight:is(:hover, :focus-visible),
+    html.liquid.theme-bone .horse-page a:not(.ext):is(:hover, :focus-visible),
+    html.liquid.theme-bone table.history a:is(:hover, :focus-visible),
+    html.liquid.theme-bone table.offspring a:is(:hover, :focus-visible),
+    html.liquid.theme-bone table.siblings a:is(:hover, :focus-visible),
+    html.liquid.theme-bone table a:is(:hover, :focus-visible),
+    html.liquid.theme-bone .results li a:hover .horse-name,
+    html.liquid.theme-bone a.page-back:hover,
+    html.liquid.theme-bone a.page-back:focus-visible {
       color: #000000 !important;
       -webkit-text-fill-color: #000000 !important;
+      font-weight: inherit !important;
+      filter: none !important;
     }
 
-    /* ---- Toggles: drop the glass thumb; show active state as text ---- */
-    html.liquid.theme-clean .fluid-toggle__thumb {
+    html.liquid.theme-bone .kind-toggle button.flash,
+    html.liquid.theme-bone .tl-row-label:hover {
+      font-weight: 400 !important;
+    }
+
+    /* ---- Toggles: nav-like blur/mute (no pearl scale/thumb) ---- */
+    html.liquid.theme-bone .fluid-toggle__thumb {
       display: none !important;
     }
-    html.liquid.theme-clean .fluid-toggle__btn.active,
-    html.liquid.theme-clean .fluid-toggle .period-btn.active,
-    html.liquid.theme-clean .fluid-toggle .sort-tab.active {
-      color: #000000 !important;
-      font-weight: var(--highlight-weight) !important;
-      text-decoration: underline;
-      text-underline-offset: 5px;
-      text-decoration-thickness: 1.5px;
+    html.liquid.theme-bone .period-toggle.fluid-toggle {
+      border: none !important;
+    }
+    html.liquid.theme-bone .fluid-toggle .period-btn:not(:last-child) {
+      border-right: none !important;
+    }
+    html.liquid.theme-bone .sort-tabs.fluid-toggle {
+      border-bottom: none !important;
+    }
+    html.liquid.theme-bone .fluid-toggle__label {
+      transform: none !important;
+      transition: color 0.12s ease, filter 0.12s ease, opacity 0.12s ease !important;
+    }
+    html.liquid.theme-bone .fluid-toggle__btn.active .fluid-toggle__label {
+      transform: none !important;
+      font-weight: 400 !important;
+    }
+    html.liquid.theme-bone .fluid-toggle__btn:not(.active) {
+      color: rgba(0, 0, 0, 0.34) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
+      filter: blur(0.45px);
+      opacity: 0.72;
+      -webkit-font-smoothing: antialiased;
+    }
+    html.liquid.theme-bone .fluid-toggle__btn.active,
+    html.liquid.theme-bone .fluid-toggle .period-btn.active,
+    html.liquid.theme-bone .fluid-toggle .sort-tab.active,
+    html.liquid.theme-bone .fluid-toggle__btn.active .fluid-toggle__label {
+      color: var(--fluid-toggle-fg-active) !important;
+      -webkit-text-fill-color: var(--fluid-toggle-fg-active) !important;
+      font-weight: 400 !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+    html.liquid.theme-bone .fluid-toggle__btn:not(.active):hover {
+      color: rgba(0, 0, 0, 0.88) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
+      font-weight: 400 !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+    /* Hover beats active within a toggle group. */
+    html.liquid.theme-bone .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active,
+    html.liquid.theme-bone .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active .fluid-toggle__label {
+      color: rgba(0, 0, 0, 0.34) !important;
+      -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
+      filter: blur(0.45px) !important;
+      opacity: 0.72 !important;
     }
 
-    /* ---- Form direction toggle: monochrome knob, no plasma/glass ---- */
-    html.liquid.theme-clean .form-bubble-toggle__track {
+    html.liquid.theme-bone .wl-tabs {
+      margin-bottom: 16px;
+    }
+
+    /* ---- Form leaderboards (home): match bone B/W typography ---- */
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__title {
+      color: var(--fg-heading);
+      text-shadow: none;
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th {
+      color: var(--fg-muted);
+      text-shadow: none;
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th.sortable:hover,
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th.sortable.active {
+      color: var(--fg);
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list td {
+      color: var(--fg);
+      text-shadow: none;
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list .rank {
+      color: var(--fg-muted);
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list .muted {
+      color: var(--fg-muted);
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list a {
+      color: var(--fg);
+      font-weight: 400;
+      text-shadow: none;
+    }
+    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list a:is(:hover, :focus-visible) {
+      color: #000000 !important;
+      font-weight: 400 !important;
+      text-shadow: none;
+      background: none;
+    }
+
+    /* ---- Form direction toggle: hidden ---- */
+    html.liquid.theme-bone .form-bubble-toggle__track {
       filter: none;
     }
-    html.liquid.theme-clean .form-bubble-toggle__glass {
+    html.liquid.theme-bone .form-bubble-toggle__glass {
       background: #000000 !important;
       border: none !important;
       box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
-    html.liquid.theme-clean .form-bubble-toggle__plasma,
-    html.liquid.theme-clean .form-bubble-toggle__lobe {
+    html.liquid.theme-bone .form-bubble-toggle__plasma,
+    html.liquid.theme-bone .form-bubble-toggle__lobe {
       display: none !important;
+    }
+
+    /* Track anchor spheres — inner ring glow (matches pop-out satellites). */
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"] {
+      background: transparent;
+      border-color: var(--pearl-fill-border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: none;
+    }
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]::before {
+      display: block;
+      z-index: 0;
+      background: var(--pearl-fill-gradient);
+      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
+      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
+      box-shadow: var(--pearl-fill-shadow);
+      -webkit-mask-image: radial-gradient(
+        circle at 50% 50%,
+        transparent 50%,
+        rgba(0, 0, 0, 0.45) 58%,
+        #000 70%
+      );
+      mask-image: radial-gradient(
+        circle at 50% 50%,
+        transparent 50%,
+        rgba(0, 0, 0, 0.45) 58%,
+        #000 70%
+      );
+    }
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active {
+      box-shadow: none;
+    }
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover::before,
+    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active::before {
+      box-shadow: var(--pearl-fill-shadow);
     }
   </style>
 </head>
@@ -4091,7 +4349,7 @@
   <div class="theme-toggle" id="themeToggle" role="group" aria-label="theme">
     <button type="button" class="theme-toggle__opt" data-theme="pearl" aria-pressed="true">pearl</button>
     <span class="theme-toggle__sep" aria-hidden="true">/</span>
-    <button type="button" class="theme-toggle__opt" data-theme="clean" aria-pressed="false">clean</button>
+    <button type="button" class="theme-toggle__opt" data-theme="bone" aria-pressed="false">bone</button>
   </div>
   <style>
     .theme-toggle {
@@ -4138,7 +4396,7 @@
       var opts = document.querySelectorAll('#themeToggle .theme-toggle__opt');
       if (!opts.length) return;
       function current() {
-        return root.classList.contains('theme-clean') ? 'clean' : 'pearl';
+        return root.classList.contains('theme-bone') ? 'bone' : 'pearl';
       }
       function sync() {
         var t = current();
@@ -4147,8 +4405,8 @@
         });
       }
       function apply(theme) {
-        if (theme === 'clean') root.classList.add('theme-clean');
-        else root.classList.remove('theme-clean');
+        if (theme === 'bone') root.classList.add('theme-bone');
+        else root.classList.remove('theme-bone');
         try { localStorage.setItem('theme', theme); } catch (e) {}
         sync();
       }
@@ -4835,17 +5093,18 @@ function formPanelFxParticlesHtml(variant) {
   return `<div class="form-panel__fx" aria-hidden="true">${dots.join('')}</div>`;
 }
 
-function formPanelHtml({ variant = 'hot', title = '', headHtml = '', bodyHtml = '', fx = false, bright = false, frosted = false } = {}) {
+function formPanelHtml({ variant = 'hot', title = '', headHtml = '', bodyHtml = '', fx = false, bright = false, frosted = false, extraClass = '' } = {}) {
   const isCold = variant === 'cold';
   const variantClass = isCold ? 'glass-panel--form-cold' : 'glass-panel--form-hot';
   const fxClass = fx && !frosted ? ' glass-panel--form-fx' : '';
   const brightClass = bright && !frosted ? ' glass-panel--form-bright' : '';
   const frostedClass = frosted ? ' glass-panel--form-frosted' : '';
+  const extra = extraClass ? ` ${extraClass}` : '';
   const fxLayer = fx && !frosted ? formPanelFxParticlesHtml(variant) : '';
   const plasmaLayers = frosted ? '' : `<span class="glass-panel__plasma glass-panel__plasma--a" aria-hidden="true"></span>
     <span class="glass-panel__plasma glass-panel__plasma--b" aria-hidden="true"></span>
     <span class="glass-panel__plasma glass-panel__plasma--c" aria-hidden="true"></span>`;
-  return `<div class="glass-panel glass-panel--form ${variantClass}${fxClass}${brightClass}${frostedClass}">
+  return `<div class="glass-panel glass-panel--form ${variantClass}${fxClass}${brightClass}${frostedClass}${extra}">
     ${plasmaLayers}
     ${fxLayer}
     <div class="form-panel__inner">

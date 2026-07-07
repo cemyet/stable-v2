@@ -131,6 +131,12 @@
     padding: 28px 4px; text-align: center; width: 100%;
   }
 
+  /* Clean theme — unify section/card titles with form panel titles. */
+  html.liquid.theme-bone .home-page .section-title,
+  html.liquid.theme-bone .home-page .card-title {
+    color: var(--fg-heading);
+  }
+
 {% endblock %}
 
 {% block content %}
@@ -158,7 +164,6 @@
           <button class="period-btn fluid-toggle__btn active" data-days="30">30d</button>
           <button class="period-btn fluid-toggle__btn"        data-days="90">90d</button>
         </div>
-        <div id="formDirToggle"></div>
       </div>
     </div>
     <div class="grid-2" id="formGrid"></div>
@@ -257,14 +262,18 @@
     function buildFormTable(title, rows, role) {
       if (!rows.length) return '';
       const urlBase = role === 'trainer' ? '/trainer/' : '/driver/';
-      const active = key => formSort === key ? ' active' : '';
+      const sortTh = (key, label, extra = '') => {
+        const isActive = formSort === key;
+        const dirClass = isActive && formDirection === 'cold' ? ' form-dir-cold' : '';
+        return `<th class="num sortable${isActive ? ' active' : ''}${dirClass}" data-form-sort="${key}"${extra}>${label}</th>`;
+      };
       const headHtml = `<tr>
         <th></th><th>name</th>
         <th class="num">career</th>
-        <th class="num sortable${active('form')}" data-form-sort="form">${formWindow}d</th>
-        <th class="num sortable${active('delta')}" data-form-sort="delta">Δ</th>
-        <th class="num sortable${active('form_perf')}" data-form-sort="form_perf" title="form — avg finishing percentile of a stable's recent runners (100 = always wins, 0 = always last; galopp/DQ count as last). Actual recent form: rewards winning favourites and predicts winning, unlike mkt±.">form</th>
-        <th class="num sortable${active('form_odds')}" data-form-sort="form_odds" title="market± — avg positions a stable's recent runners finish ahead of their odds rank. >0 = market underrates them. NB: this is NOT recent form / win-rate — cold longshot stables can score high, hot favourite-laden stables can score negative.">mkt±</th>
+        ${sortTh('form', `${formWindow}d`)}
+        ${sortTh('delta', 'Δ')}
+        ${sortTh('form_perf', 'form', ' title="form — avg finishing percentile of a stable\'s recent runners (100 = always wins, 0 = always last; galopp/DQ count as last). Actual recent form: rewards winning favourites and predicts winning, unlike mkt±."')}
+        ${sortTh('form_odds', 'mkt±', ' title="market± — avg positions a stable\'s recent runners finish ahead of their odds rank. >0 = market underrates them. NB: this is NOT recent form / win-rate — cold longshot stables can score high, hot favourite-laden stables can score negative."')}
       </tr>`;
       const bodyHtml = rows.map((r, i) => `<tr>
         <td class="rank">${i + 1}</td>
@@ -301,14 +310,6 @@
       if (typeof initFluidHighlights === 'function') initFluidHighlights(document.getElementById('formGrid'));
     }
 
-    document.getElementById('formDirToggle').outerHTML = formBubbleToggleHtml({ hotActive: true, id: 'formDirToggle' });
-    initFormBubbleToggle('formDirToggle', {
-      onChange(dir) {
-        formDirection = dir;
-        loadForm();
-      },
-    });
-
     // Toggle wiring — form window.
     document.getElementById('formWindowToggle').addEventListener('click', (ev) => {
       const btn = ev.target.closest('button[data-days]');
@@ -322,7 +323,12 @@
     document.getElementById('formGrid').addEventListener('click', (ev) => {
       const th = ev.target.closest('th[data-form-sort]');
       if (!th) return;
-      formSort = th.dataset.formSort;
+      const key = th.dataset.formSort;
+      if (key === formSort) {
+        formDirection = formDirection === 'hot' ? 'cold' : 'hot';
+      } else {
+        formSort = key;
+      }
       loadForm();
     });
 

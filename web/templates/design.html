@@ -314,17 +314,6 @@
     display: inline-flex;
   }
 
-  .plasma-toggle-demo {
-    align-items: center;
-    min-height: 72px;
-  }
-
-  .plasma-toggle-demo .form-bubble-toggle {
-    --form-bubble-active-d: 52px;
-    --form-bubble-inactive-d: 31px;
-    --form-bubble-gap: 8px;
-  }
-
   .demo-caret-layout {
     display: flex;
     flex-direction: column;
@@ -825,28 +814,6 @@ const COMPONENTS = [
         </div>
       </div>
 
-      <p class="demo-label" style="margin-top:28px">Plasma toggles</p>
-      <p class="demo-label">Hot / cold — warm in-form plasma vs icy out-of-form. Stretch, snap, and drag.</p>
-      <div class="demo-row plasma-toggle-demo">
-        ${formBubbleToggleHtml({ variant: 'hot-cold' })}
-      </div>
-      <div class="demo-row plasma-toggle-demo" style="margin-top:16px">
-        <div class="glass-panel demo-fluid-toggle-panel">
-          ${formBubbleToggleHtml({ variant: 'hot-cold' })}
-        </div>
-      </div>
-
-      <p class="demo-label" style="margin-top:28px">On / off</p>
-      <p class="demo-label">Bright green on vs white off.</p>
-      <div class="demo-row plasma-toggle-demo">
-        ${formBubbleToggleHtml({ variant: 'on-off' })}
-      </div>
-      <div class="demo-row plasma-toggle-demo" style="margin-top:16px">
-        <div class="glass-panel demo-fluid-toggle-panel">
-          ${formBubbleToggleHtml({ variant: 'on-off' })}
-        </div>
-      </div>
-
       <p class="demo-label" style="margin-top:20px">On a glass panel (real dashboard context)</p>
       <div class="demo-row demo-fluid-toggle-demo">
         <div class="glass-panel demo-fluid-toggle-panel">
@@ -995,6 +962,40 @@ const COMPONENTS = [
             <span class="fake-caret" id="demoFakeCaret" aria-hidden="true"></span>
             <input type="text" id="demoCaretInput" autocomplete="off" spellcheck="false" aria-label="Caret demo input">
           </div>
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'harry-boy',
+    label: 'harry boy',
+    render: () => `
+      <h2>harry boy</h2>
+      <p class="demo-label">Variant logo — Westworld clay sculpt · glowing cyan robot eyes</p>
+      <div class="demo-row" style="align-items:flex-start;gap:48px;flex-wrap:wrap">
+        <div>
+          <p class="demo-label">on light</p>
+          <div style="background:var(--panel-bg);border-radius:16px;padding:24px;display:inline-block">
+            <img src="/static/img/harry-boy-westworld.png" alt="Harry Boy variant logo" style="width:320px;height:auto;display:block">
+          </div>
+        </div>
+        <div>
+          <p class="demo-label">on dark</p>
+          <div style="background:#111;border-radius:16px;padding:24px;display:inline-block">
+            <img src="/static/img/harry-boy-westworld.png" alt="Harry Boy variant logo" style="width:320px;height:auto;display:block">
+          </div>
+        </div>
+      </div>
+      <p class="demo-label" style="margin-top:28px">small</p>
+      <div class="demo-row" style="align-items:center;gap:24px">
+        <div style="background:var(--panel-bg);border-radius:10px;padding:12px;display:inline-block">
+          <img src="/static/img/harry-boy-westworld.png" alt="Harry Boy variant logo" style="width:80px;height:auto;display:block">
+        </div>
+        <div style="background:#111;border-radius:10px;padding:12px;display:inline-block">
+          <img src="/static/img/harry-boy-westworld.png" alt="Harry Boy variant logo" style="width:80px;height:auto;display:block">
+        </div>
+        <div style="background:#111;border-radius:10px;padding:12px;display:inline-block">
+          <img src="/static/img/harry-boy-westworld.png" alt="Harry Boy variant logo" style="width:40px;height:auto;display:block">
         </div>
       </div>
     `
@@ -1193,9 +1194,6 @@ function afterRender(id) {
           btn.classList.add('active');
         });
       });
-    });
-    stage.querySelectorAll('[data-form-bubble-toggle]').forEach(group => {
-      if (typeof initFormBubbleToggle === 'function') initFormBubbleToggle(group);
     });
   }
 
