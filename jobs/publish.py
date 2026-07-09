@@ -90,8 +90,23 @@ _DATE_OVERLAP = "INTERVAL '3 days'"
 _BATCH = 5000
 
 
+# TCP keepalives so a connection whose peer vanished mid-operation (e.g. the
+# laptop slept on battery and the socket to Supabase went dead) is detected and
+# raised within ~1 min instead of blocking forever on a recv() that never
+# returns. Without this, an interrupted publish leaves the process hung — and,
+# worse, half-reconciled (pre-pass ran, post-pass didn't). A clean error lets
+# the run fail and the next idempotent publish self-heal.
+_KEEPALIVE_KW = dict(
+    connect_timeout=15,
+    keepalives=1,
+    keepalives_idle=30,
+    keepalives_interval=10,
+    keepalives_count=3,
+)
+
+
 def _connect(url: str, *, readonly: bool = False):
-    conn = psycopg2.connect(url)
+    conn = psycopg2.connect(url, **_KEEPALIVE_KW)
     if readonly:
         conn.set_session(readonly=True)
     return conn
@@ -301,7 +316,12 @@ _MERGE_SPECS: list[dict] = [
         from_col="from_horse_id", to_col="to_horse_id",
         master="horse", pk="horse_id",
         refs=[
-            ("entry",                 "horse_id", None),
+            # dedup on race_id: entry has UNIQUE(race_id, horse_id), so if the
+            # loser and keeper both ran the same race (locally already resolved
+            # to a single keeper entry), re-homing the loser's stale entry would
+            # collide — delete it (its entry_features cascade) and keep the
+            # keeper's, mirroring merge_horses' same-race conflict resolution.
+            ("entry",                 "horse_id", ["race_id"]),
             ("watchlist",             "horse_id", []),
             ("horse_owner_history",   "horse_id", ["from_date"]),
             ("horse_trainer_history", "horse_id", ["from_date"]),
