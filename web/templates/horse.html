@@ -509,6 +509,15 @@
       });
     }
 
+    function horsePlacementNum(p) {
+      if (p.placement_num == null) return null;
+      const pt = p.placement_text || '';
+      if (/^[1-7]$/.test(pt)) return p.placement_num;
+      if (p.galopp && p.placement_num != null) return p.placement_num;
+      if (/^[1-7]/.test(pt)) return p.placement_num;
+      return null;
+    }
+
     function placementCell(p) {
       if (p.disqualified) {
         const t = p.placement_text || (p.placement_num != null ? String(p.placement_num) : '');
@@ -518,18 +527,13 @@
         const t = p.placement_text || '';
         return `<span class="withdrew">${esc(t || 'utg')}</span>`;
       }
-      // A gait-breaker that still placed keeps its numeric position (even on
-      // legacy rows whose placement_text is bare 'g') plus a small 'g' marker.
       const classifiedGalopp = p.galopp && p.placement_num != null;
       const t = classifiedGalopp
         ? String(p.placement_num)
         : (p.placement_text || (p.placement_num != null ? String(p.placement_num) : ''));
       const galMark = classifiedGalopp
         ? ` <span class="gal-mark" title="galopp">g</span>` : '';
-      // Gold only for true wins (text='1'); we don't trust the integer
-      // placement on sparse foreign races where p=1 is a v1 ETL default.
-      const isWin = (p.placement_text === '1');
-      return (isWin ? `<span class="pos-1">${esc(t)}</span>` : esc(t)) + galMark;
+      return placementHtml(t, galMark, horsePlacementNum(p));
     }
 
     async function loadHistory() {

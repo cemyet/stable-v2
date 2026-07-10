@@ -95,8 +95,11 @@
       --src-atg:    #0055a4;
       --src-kmtid:  #ff6bef;
       --font-mono: "Source Code Pro", "SF Mono", "Menlo", "Consolas", monospace;
-      --accent-first: #ca9a04;
-      --accent-first-glow: 0 0 8px rgba(234, 179, 8, 0.5);
+      --accent-first: #f0c020;
+      --accent-first-glow: 0 0 10px rgba(240, 192, 32, 0.58), 0 0 3px rgba(255, 220, 100, 0.4);
+      --accent-second: #c2c6d0;
+      --accent-second-glow: 0 0 8px rgba(190, 196, 210, 0.38);
+      --accent-third: #c8793a;
     }
 
     html.liquid {
@@ -1305,7 +1308,7 @@
     /* Subnav inside inline row: same size as topnav */
     .nav-inline-row .nav-inline-segment.subnav a {
       padding: 6px 14px !important;
-      font-size: 12px !important;
+      font-size: 13px !important;
       max-width: 120px !important;
       letter-spacing: 1px !important;
       text-transform: lowercase;
@@ -1344,6 +1347,17 @@
       transition: gap 0.38s ease;
     }
 
+    /* Invisible hover slack — keeps the bar expanded while moving toward page content. */
+    .nav-bar-inner::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      left: -18px;
+      right: -18px;
+      bottom: -20px;
+      z-index: -1;
+    }
+
     .nav-bar-inner:hover,
     .nav-bar-inner:focus-within {
       gap: 4px;
@@ -1375,7 +1389,7 @@
 
     .topnav a {
       padding: 6px 14px;
-      font-size: 12px;
+      font-size: 13px;
       letter-spacing: 1px;
       max-width: 120px;
     }
@@ -1555,10 +1569,36 @@
     .pos-1 {
       color: var(--accent-first);
       text-shadow: var(--accent-first-glow, none);
+      font-weight: var(--highlight-weight, 600);
+    }
+    .pos-2 {
+      color: var(--accent-second);
+      text-shadow: var(--accent-second-glow, none);
+      font-weight: var(--highlight-weight, 600);
+    }
+    .pos-3 {
+      color: var(--accent-third);
+      font-weight: var(--highlight-weight, 600);
+    }
+    .pos-dark {
+      color: #1c1c1e;
     }
     html.liquid table .pos-1 {
       color: var(--accent-first);
       text-shadow: var(--accent-first-glow);
+      opacity: 1;
+    }
+    html.liquid table .pos-2 {
+      color: var(--accent-second);
+      text-shadow: var(--accent-second-glow);
+      opacity: 1;
+    }
+    html.liquid table .pos-3 {
+      color: var(--accent-third);
+      opacity: 1;
+    }
+    html.liquid table .pos-dark {
+      color: #1c1c1e;
       opacity: 1;
     }
 
@@ -3601,7 +3641,7 @@
     }
 
     html.liquid .topnav .fluid-nav-highlight .fluid-bubble__label {
-      font-size: 12px;
+      font-size: 13px;
       letter-spacing: 1px;
     }
 
@@ -3891,7 +3931,7 @@
     .nav-inline-row .nav-inline-segment.topnav a,
     .nav-inline-row .nav-inline-segment.subnav a {
       padding: 6px 14px !important;
-      font-size: 12px !important;
+      font-size: 13px !important;
       max-width: 120px !important;
       letter-spacing: 1px !important;
     }
@@ -3905,13 +3945,13 @@
     html.liquid .nav-inline-row .topnav a.active,
     html.liquid .nav-inline-row .subnav a.active {
       padding: 6px 14px !important;
-      font-size: 12px !important;
+      font-size: 13px !important;
       max-width: 120px !important;
     }
 
     html.liquid .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label,
     html.liquid .nav-inline-row .topnav .fluid-nav-highlight .fluid-bubble__label {
-      font-size: 12px !important;
+      font-size: 13px !important;
       letter-spacing: 1px;
       font-weight: var(--highlight-weight) !important;
     }
@@ -3996,8 +4036,7 @@
     html.liquid.theme-bone .home-page .form-panel__list td {
       border-bottom: none !important;
     }
-    html.liquid.theme-bone table tbody tr:hover,
-    html.liquid.theme-bone table tr:hover {
+    html.liquid.theme-bone table tbody tr:hover {
       background: rgba(255, 255, 255, 0.38) !important;
     }
 
@@ -4186,6 +4225,40 @@
       margin-bottom: 16px;
     }
 
+    /* ---- Race view list/result toggle ---- */
+    html.liquid.theme-bone .mode-toggle {
+      border-color: #ffffff;
+    }
+    html.liquid.theme-bone .mode-toggle button + button {
+      border-left-color: #ffffff;
+    }
+    html.liquid.theme-bone .mode-toggle button {
+      transition: color 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
+    }
+    html.liquid.theme-bone .mode-toggle button:not(.active) {
+      color: rgba(0, 0, 0, 0.34) !important;
+      background: none !important;
+      filter: blur(0.45px);
+      opacity: 0.72;
+    }
+    html.liquid.theme-bone .mode-toggle button.active {
+      color: var(--fluid-toggle-fg-active) !important;
+      background: none !important;
+      filter: none !important;
+      opacity: 1 !important;
+      font-weight: 400 !important;
+    }
+    html.liquid.theme-bone .mode-toggle button:not(.active):hover {
+      color: rgba(0, 0, 0, 0.88) !important;
+      filter: none !important;
+      opacity: 1 !important;
+    }
+    html.liquid.theme-bone .mode-toggle:has(button:not(.active):hover) button.active {
+      color: rgba(0, 0, 0, 0.34) !important;
+      filter: blur(0.45px) !important;
+      opacity: 0.72 !important;
+    }
+
     /* ---- Form leaderboards (home): match bone B/W typography ---- */
     html.liquid.theme-bone .glass-panel--form-frosted .form-panel__title {
       color: var(--fg-heading);
@@ -4346,74 +4419,45 @@
   </div>
 
   <!-- App-wide theme toggle (bottom-left, persisted in localStorage). -->
-  <div class="theme-toggle" id="themeToggle" role="group" aria-label="theme">
-    <button type="button" class="theme-toggle__opt" data-theme="pearl" aria-pressed="true">pearl</button>
-    <span class="theme-toggle__sep" aria-hidden="true">/</span>
-    <button type="button" class="theme-toggle__opt" data-theme="bone" aria-pressed="false">bone</button>
-  </div>
+  <button type="button" class="theme-toggle" id="themeToggle" aria-label="cycle theme">pearl</button>
   <style>
     .theme-toggle {
       position: fixed;
       left: 14px;
       bottom: 14px;
       z-index: 60;
-      display: flex;
-      align-items: center;
-      gap: 6px;
       opacity: 0.55;
       transition: opacity 0.15s ease;
       font-family: var(--font-mono);
       font-size: 11px;
       letter-spacing: 1px;
-    }
-    .theme-toggle:hover { opacity: 1; }
-    .theme-toggle__opt {
-      font-family: inherit;
-      font-size: inherit;
-      letter-spacing: inherit;
-      text-transform: lowercase;
       color: var(--fg-muted);
       background: none;
       border: none;
       cursor: pointer;
-      padding: 2px 2px;
-      transition: color 0.15s ease;
+      padding: 0;
+      text-transform: lowercase;
     }
-    .theme-toggle__opt:hover { color: var(--fg); }
-    .theme-toggle__opt[aria-pressed="true"] {
-      color: var(--fg-heading);
-      font-weight: 700;
-    }
-    .theme-toggle__sep {
-      color: var(--fg-muted);
-      opacity: 0.6;
-      user-select: none;
-    }
+    .theme-toggle:hover { opacity: 1; color: var(--fg); }
   </style>
   <script>
     (function () {
       var root = document.documentElement;
-      var opts = document.querySelectorAll('#themeToggle .theme-toggle__opt');
-      if (!opts.length) return;
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
       function current() {
         return root.classList.contains('theme-bone') ? 'bone' : 'pearl';
-      }
-      function sync() {
-        var t = current();
-        opts.forEach(function (b) {
-          b.setAttribute('aria-pressed', b.dataset.theme === t ? 'true' : 'false');
-        });
       }
       function apply(theme) {
         if (theme === 'bone') root.classList.add('theme-bone');
         else root.classList.remove('theme-bone');
         try { localStorage.setItem('theme', theme); } catch (e) {}
-        sync();
+        btn.textContent = theme;
       }
-      opts.forEach(function (b) {
-        b.addEventListener('click', function () { apply(b.dataset.theme); });
+      btn.addEventListener('click', function () {
+        apply(current() === 'bone' ? 'pearl' : 'bone');
       });
-      sync();
+      btn.textContent = current();
     })();
   </script>
   {% block content %}{% endblock %}
@@ -4424,6 +4468,43 @@
       const el = document.createElement('span');
       el.textContent = s == null ? '' : String(s);
       return el.innerHTML;
+    }
+
+    function placementRank(label, placementNum = null) {
+      if (placementNum != null && placementNum >= 1 && placementNum <= 7) {
+        return String(placementNum);
+      }
+      const t = String(label ?? '').trim();
+      if (/^[1-7]$/.test(t)) return t;
+      // A leading integer only counts as a 1–7 rank when the ENTIRE number is
+      // 1–7. "1p"/"3D" → 1st/3rd, but "10"/"12g"/"137" must NOT be read as a
+      // leading "1" (that made 10th-place galopp results render as 1st-gold).
+      const m = t.match(/^(\d+)/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n >= 1 && n <= 7) return String(n);
+      }
+      if (t === '0') return '0';
+      return t;
+    }
+
+    function placementClass(label, placementNum = null) {
+      const t = placementRank(label, placementNum);
+      // Only the podium gets medal colours; everything else (4–7, 8+, 10th,
+      // 0, disqualified, non-finish codes) is plain black.
+      if (t === '1') return 'pos-1';
+      if (t === '2') return 'pos-2';
+      if (t === '3') return 'pos-3';
+      return 'pos-dark';
+    }
+
+    function placementHtml(label, galMark = '', placementNum = null) {
+      const t = label == null ? '' : String(label);
+      if (!t) return '<span class="muted">–</span>';
+      const cls = placementClass(t, placementNum);
+      if (cls === 'muted') return `<span class="muted">${esc(t)}</span>${galMark}`;
+      if (cls) return `<span class="${cls}">${esc(t)}</span>${galMark}`;
+      return esc(t) + galMark;
     }
 
     function flagify(name, large) {

@@ -93,6 +93,8 @@
     white-space: nowrap;
   }
   table.entries td.num { text-align: right; }
+  table.entries th.num-prog { text-align: left; }
+  table.entries td.num-prog { text-align: left; font-weight: 600; }
   table.entries td.muted { color: var(--fg-muted); }
   table.entries th.center,
   table.entries td.center { text-align: center; }
@@ -571,7 +573,7 @@
       const sorted = entries.slice().sort((a, b) => (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
       const head = `
         <thead><tr>
-          <th class="num">#</th>
+          <th class="num-prog">#</th>
           <th>horse</th>
           <th class="rowpct" title="share of pool (bet distribution)">row%</th>
           <th>driver</th>
@@ -594,7 +596,7 @@
         const nameCls = (favNum != null && e.number === favNum) ? ' class="fav"' : '';
         return `
           <tr${cls}>
-            <td class="num muted">${e.number || ''}</td>
+            <td class="num-prog">${e.number || ''}</td>
             <td${nameCls}>${horseCell(e)}</td>
             <td class="rowpct">${rowPctCell(s)}</td>
             <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
@@ -643,7 +645,7 @@
       });
       const head = `
         <thead><tr>
-          <th class="num">#</th>
+          <th class="num-prog">#</th>
           <th>horse</th>
           <th>driver</th>
           <th>trainer</th>
@@ -665,7 +667,7 @@
         const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
         return `
           <tr${cls}>
-            <td class="num muted">${e.number || ''}</td>
+            <td class="num-prog">${e.number || ''}</td>
             <td>${horseCell(e)}</td>
             <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
@@ -734,7 +736,7 @@
       const head = `
         <thead><tr>
           <th>pos</th>
-          <th class="num">#</th>
+          <th class="num-prog">#</th>
           <th>horse</th>
           <th>driver</th>
           <th>trainer</th>
@@ -778,7 +780,7 @@
         return `
           <tr${cls}>
             <td>${posCell}</td>
-            <td class="num muted">${e.number || ''}</td>
+            <td class="num-prog">${e.number || ''}</td>
             <td>${horseCell(e)}</td>
             <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref2)}</td>
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
@@ -811,24 +813,16 @@
         return `<span class="withdrew">${esc(t)}</span>`;
       }
       if (isDq(e)) {
-        // Prefer placement_text (e.g. "1g", "gdk") if it's a real code,
-        // otherwise show "g" for gallop or "d" for generic DQ.
-        // Never show an inferred numeric position here — it's not a real finish.
         const raw = e.placement_text || '';
         const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
         return `<span class="dq">${esc(label)}</span>`;
       }
-      // Classified finisher. A gait-breaker that still placed keeps its
-      // numeric position (even on legacy rows whose placement_text is 'g')
-      // and gets a small 'g' marker.
       const galMark = (e.gal && e.placement != null)
         ? ` <span class="gal-mark" title="galopp">g</span>` : '';
       const t = (e.gal && e.placement != null)
         ? String(e.placement)
         : (e.placement_text || (e.placement != null ? String(e.placement) : ''));
-      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>${galMark}`;
-      if (!t)                return `<span class="muted">–</span>`;
-      return esc(t) + galMark;
+      return placementHtml(t, galMark, e.placement);
     }
 
     // Same conversion helper as on the horse page (seconds per km -> '14,4').

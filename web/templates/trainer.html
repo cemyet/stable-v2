@@ -590,7 +590,10 @@
 
     const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
     function isDq(e) {
-      return e.dq || e.gal || (e.placement_text && DQ_RE.test(e.placement_text));
+      if (e.dq) return true;
+      if (e.placement_text && DQ_RE.test(e.placement_text)) return true;
+      if (e.gal && e.placement == null) return true;
+      return false;
     }
 
     function posDisplay(e) {
@@ -603,10 +606,12 @@
         const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
         return `<span class="dq">${esc(label)}</span>`;
       }
-      const t = e.placement_text || (e.placement != null ? String(e.placement) : '');
-      if (e.placement === 1) return `<span class="pos-1">${esc(t)}</span>`;
-      if (!t)                return `<span class="muted">–</span>`;
-      return esc(t);
+      const galMark = (e.gal && e.placement != null)
+        ? ` <span class="gal-mark" title="galopp">g</span>` : '';
+      const t = (e.gal && e.placement != null)
+        ? String(e.placement)
+        : (e.placement_text || (e.placement != null ? String(e.placement) : ''));
+      return placementHtml(t, galMark, e.placement);
     }
 
     function renderRecent(entries) {
