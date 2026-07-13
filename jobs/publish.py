@@ -112,6 +112,28 @@ def _connect(url: str, *, readonly: bool = False):
     return conn
 
 
+class _ConnectionLost(Exception):
+    """The cloud connection died mid-publish (classic cause: the laptop slept
+    on battery, so the socket to Supabase went dead). Raised so run_publish's
+    retry wrapper reconnects and re-runs — every step is idempotent."""
+
+
+def _conn_dead(conn) -> bool:
+    # psycopg2 flips .closed to nonzero once the server connection is gone.
+    return getattr(conn, "closed", 0) != 0
+
+
+def _safe_rollback(conn) -> None:
+    # Rolling back a connection whose socket already died itself raises
+    # InterfaceError ("connection already closed"), burying the real cause
+    # under a noisy secondary traceback. Swallow it — the caller inspects
+    # _conn_dead() to decide whether to retry.
+    try:
+        conn.rollback()
+    except Exception:
+        pass
+
+
 def _ensure_state(local) -> None:
     with local.cursor() as cur:
         cur.execute("""
@@ -488,14 +510,18 @@ def refresh_matviews(cloud, *, log=print) -> None:
             try:
                 cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                 cloud.commit()
-            except Exception:
-                cloud.rollback()
+            except Exception as exc:
+                _safe_rollback(cloud)
+                if _conn_dead(cloud):
+                    raise _ConnectionLost(f"matview {mv}: {exc!r}") from exc
                 try:
                     cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
                     cloud.commit()
-                except Exception as exc:
-                    cloud.rollback()
-                    log(f"  matview {mv}: FAILED {exc!r}")
+                except Exception as exc2:
+                    _safe_rollback(cloud)
+                    if _conn_dead(cloud):
+                        raise _ConnectionLost(f"matview {mv}: {exc2!r}") from exc2
+                    log(f"  matview {mv}: FAILED {exc2!r}")
                     continue
         log(f"  matview {mv}: refreshed in {time.time()-t0:.1f}s")
 
@@ -517,7 +543,7 @@ def init_watermarks(local, *, log=print) -> None:
     log("watermarks initialized.")
 
 
-def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> dict:
+def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print) -> dict:
     if not config.SUPABASE_DATABASE_URL:
         raise SystemExit("SUPABASE_DATABASE_URL is not set (env or .env).")
     local_read = _connect(config.DATABASE_URL, readonly=True)   # streaming reads
@@ -538,7 +564,9 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
                 if plan:
                     reconcile_free_unique(local_read, cloud, spec, plan, log=log)
         except Exception as exc:
-            cloud.rollback()
+            _safe_rollback(cloud)
+            if _conn_dead(cloud):
+                raise _ConnectionLost(f"reconcile pre-pass: {exc!r}") from exc
             log(f"  reconcile pre-pass: ERROR {exc!r}")
 
         horse_wm = None if full else _get_watermark(state, "horse")
@@ -553,7 +581,9 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
                 totals["tables"][table] = n
                 totals["pushed"] += n
             except Exception as exc:
-                cloud.rollback()
+                _safe_rollback(cloud)
+                if _conn_dead(cloud):
+                    raise _ConnectionLost(f"{table}: {exc!r}") from exc
                 log(f"  {table}: ERROR {exc!r}")
                 totals["tables"][table] = f"error: {exc!r}"
 
@@ -566,7 +596,9 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
                 reconcile_apply(local_read, cloud, spec, plan, log=log)
                 totals[f"reconciled_{spec['entity']}"] = len(plan)
             except Exception as exc:
-                cloud.rollback()
+                _safe_rollback(cloud)
+                if _conn_dead(cloud):
+                    raise _ConnectionLost(f"reconcile[{spec['entity']}] apply: {exc!r}") from exc
                 log(f"  reconcile[{spec['entity']}] apply: ERROR {exc!r}")
 
         if do_matviews:
@@ -581,6 +613,37 @@ def run_publish(*, full: bool = False, do_matviews: bool = True, log=print) -> d
     return totals
 
 
+def run_publish(*, full: bool = False, do_matviews: bool = True, log=print,
+                max_attempts: int = 4, retry_delay: float = 15.0) -> dict:
+    """Idempotent Supabase publish with automatic reconnect-and-retry.
+
+    A publish that dies because the cloud socket vanished mid-run — classic
+    cause: the laptop slept on battery, the process froze, then woke to a dead
+    connection — used to need a manual re-run. Every step here is idempotent
+    (PK-keyed upserts, watermark-driven table sync, and a two-pass merge
+    reconcile whose plan is re-derived each run), so we just reconnect and
+    start over up to `max_attempts` times with escalating backoff.
+
+    Only connection death is retried; a genuine logic error is caught
+    per-table inside _run_publish_once and never reaches here, so it won't
+    trigger a pointless retry. After the final attempt the last error is
+    re-raised so the caller/log still sees a hard failure."""
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return _run_publish_once(full=full, do_matviews=do_matviews, log=log)
+        except (_ConnectionLost, psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
+            last_exc = exc
+            if attempt >= max_attempts:
+                break
+            delay = retry_delay * attempt
+            log(f"publish: cloud connection lost ({exc!r}) — attempt "
+                f"{attempt}/{max_attempts} aborted, reconnecting in {delay:.0f}s")
+            time.sleep(delay)
+    log(f"publish: FAILED after {max_attempts} attempts — {last_exc!r}")
+    raise last_exc
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -590,6 +653,12 @@ def main() -> int:
                     help="ignore watermarks; push the entire serving set")
     ap.add_argument("--no-matviews", action="store_true",
                     help="skip refreshing materialized views on the cloud")
+    ap.add_argument("--max-attempts", type=int, default=4,
+                    help="reconnect-and-retry attempts on cloud connection death "
+                         "(default 4; set 1 to disable retry)")
+    ap.add_argument("--retry-delay", type=float, default=15.0,
+                    help="base backoff seconds between retries; grows per attempt "
+                         "(default 15 → 15s, 30s, 45s)")
     args = ap.parse_args()
 
     if args.init:
@@ -600,7 +669,8 @@ def main() -> int:
             conn.close()
         return 0
 
-    run_publish(full=args.full, do_matviews=not args.no_matviews)
+    run_publish(full=args.full, do_matviews=not args.no_matviews,
+                max_attempts=args.max_attempts, retry_delay=args.retry_delay)
     return 0
 
 
