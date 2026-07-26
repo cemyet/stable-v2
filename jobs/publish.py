@@ -362,7 +362,29 @@ _MERGE_SPECS: list[dict] = [
             ("horse_trainer_history", "trainer_id", None),
         ],
     ),
+    dict(
+        entity="race", log="race_merge_log",
+        from_col="from_race_id", to_col="to_race_id",
+        master="race", pk="race_id",
+        refs=[
+            # dedup on horse_id: entry has UNIQUE(race_id, horse_id), so when a
+            # duplicate race copy is folded into the real one, both may hold an
+            # entry for the same horse. Locally that is already resolved to a
+            # single entry — re-homing the loser's copy would collide, so drop
+            # it (entry_features cascades), mirroring the horse spec above.
+            ("entry", "race_id", ["horse_id"]),
+        ],
+    ),
 ]
+
+# Tables where local surgery can move a single-column unique value between two
+# surviving rows without any merge: re-pointing ATG's rotating track slots, or
+# detaching a wrongly-attached synthetic id from one horse and giving it to the
+# horse that really owns it. Neither leaves a merge-log entry, so the reconcile
+# above cannot see them. Compared wholesale — keep this to tables where that is
+# cheap (horse is ~78k non-null atg_ids and takes a few seconds); anything
+# larger should be scoped to the push window instead.
+_MOVED_UNIQUE_TABLES = ["track", "horse"]
 
 
 def _single_col_unique_cols(conn, table: str, pk: list[str]) -> list[str]:
@@ -394,12 +416,20 @@ def _build_merge_plan(local_read, cloud, spec: dict) -> list[tuple[int, int]]:
     if not nxt:
         return []
 
-    def resolve(start: int) -> int:
-        seen, cur_id = set(), start
+    def resolve(start: int) -> tuple[int, list[int]]:
+        """Terminal keeper plus every id visited on the way there.
+
+        The chain can close back on itself: a horse split off into a new row
+        and later merged back into the original produces from->to edges in both
+        directions. Returning the visited set lets the caller settle those
+        against local existence instead of silently dropping the pair.
+        """
+        seen: list[int] = []
+        cur_id = start
         while cur_id in nxt and cur_id not in seen:
-            seen.add(cur_id)
+            seen.append(cur_id)
             cur_id = nxt[cur_id]
-        return cur_id
+        return cur_id, seen
 
     losers = list(nxt.keys())
     with cloud.cursor() as cc:
@@ -418,14 +448,36 @@ def _build_merge_plan(local_read, cloud, spec: dict) -> list[tuple[int, int]]:
         still_local = {int(r[0]) for r in lc.fetchall()}
 
     plan, keepers = [], set()
+    cyclic: list[tuple[int, list[int]]] = []
     for loser in cloud_losers:
         if loser in still_local:      # not actually merged away; leave it alone
             continue
-        keeper = resolve(loser)
+        keeper, chain = resolve(loser)
         if keeper == loser:
+            cyclic.append((loser, chain))
             continue
         plan.append((loser, keeper))
         keepers.add(keeper)
+
+    # Settle cyclic chains: exactly one member of the cycle survives locally,
+    # and that is the real keeper. Without this the pair is dropped and the
+    # loser lingers on the cloud forever, blocking every later push of whatever
+    # unique value it still holds.
+    if cyclic:
+        members = sorted({m for _, chain in cyclic for m in chain})
+        with local_read.cursor() as lc:
+            lc.execute(
+                f"SELECT {spec['pk']} FROM {spec['master']} "
+                f"WHERE {spec['pk']} = ANY(%s)",
+                (members,),
+            )
+            alive = {int(r[0]) for r in lc.fetchall()}
+        for loser, chain in cyclic:
+            survivors = [m for m in chain if m in alive]
+            if len(survivors) == 1:
+                plan.append((loser, survivors[0]))
+                keepers.add(survivors[0])
+
     if not plan:
         return []
 
@@ -459,6 +511,203 @@ def reconcile_free_unique(local_read, cloud, spec: dict,
     cloud.commit()
     log(f"  reconcile[{spec['entity']}]: freed unique cols on "
         f"{len(losers):,} lingering cloud rows")
+
+
+def reconcile_moved_unique(local_read, cloud, table: str, *, log=print) -> int:
+    """Free cloud unique values that local has since moved to a different row.
+
+    The incremental push is keyed on the primary key, so when a unique value
+    migrates between two rows that both still exist — an ATG track slot
+    re-pointed from the venue that used to hold it to the one that really owns
+    it — the cloud still has the old holder and the new owner's upsert trips
+    the unique constraint. Nulling the stale copy lets the push through; the
+    old holder receives its own corrected value in the same run.
+    """
+    pks = _pk_columns(local_read, table)
+    if len(pks) != 1:
+        return 0
+    pk = pks[0]
+    freed = 0
+    for col in _single_col_unique_cols(local_read, table, [pk]):
+        with local_read.cursor() as lc:
+            lc.execute(f"SELECT {col}, {pk} FROM {table} WHERE {col} IS NOT NULL")
+            local_owner = {v: k for v, k in lc.fetchall()}
+        with cloud.cursor() as cc:
+            cc.execute(f"SELECT {col}, {pk} FROM {table} WHERE {col} IS NOT NULL")
+            stale = [k for v, k in cc.fetchall()
+                     if v in local_owner and local_owner[v] != k]
+            if not stale:
+                continue
+            cc.execute(f"UPDATE {table} SET {col} = NULL WHERE {pk} = ANY(%s)",
+                       (stale,))
+        cloud.commit()
+        freed += len(stale)
+    if freed:
+        log(f"  reconcile[{table}]: freed {freed:,} moved unique values")
+    return freed
+
+
+def reconcile_moved_entry_keys(local_read, state, cloud, *, full: bool,
+                               log=print) -> int:
+    """Drop cloud entries whose (race_id, horse_id) local now holds elsewhere.
+
+    `entry` is keyed on entry_id but carries UNIQUE(race_id, horse_id). When a
+    merge rebuilds an entry against the keeper race it gets a fresh entry_id,
+    so the cloud still holds that pair under the old id and the incoming upsert
+    trips the unique constraint. Only rows this run is about to push can
+    collide, so the comparison is scoped to the watermark window rather than
+    all 7.6M entries. A full push rewrites everything and needs no pre-pass.
+    """
+    wm = None if full else _get_watermark(state, "entry")
+    if wm is None:
+        return 0
+    with local_read.cursor() as lc:
+        lc.execute(
+            "SELECT entry_id, race_id, horse_id FROM entry "
+            f"WHERE last_updated_at > %s::timestamp - {_TS_OVERLAP}",
+            (wm,),
+        )
+        rows = lc.fetchall()
+    if not rows:
+        return 0
+    want = {(int(r), int(h)): int(e) for e, r, h in rows}
+    races = [r for _, r, _ in rows]
+    horses = [h for _, _, h in rows]
+    with cloud.cursor() as cc:
+        cc.execute(
+            "SELECT e.entry_id, e.race_id, e.horse_id FROM entry e "
+            "JOIN unnest(%s::bigint[], %s::bigint[]) AS p(race_id, horse_id) "
+            "  ON p.race_id = e.race_id AND p.horse_id = e.horse_id",
+            (races, horses),
+        )
+        stale = [int(e) for e, r, h in cc.fetchall()
+                 if want.get((int(r), int(h))) != int(e)]
+        if stale:
+            cc.execute("DELETE FROM entry WHERE entry_id = ANY(%s)", (stale,))
+    cloud.commit()
+    if stale:
+        log(f"  reconcile[entry]: dropped {len(stale):,} cloud rows whose "
+            f"(race_id, horse_id) moved to a new entry_id")
+    return len(stale)
+
+
+# Children before parents so an orphan sweep never trips a foreign key.
+_ORPHAN_SWEEP_TABLES = ["entry", "race", "horse", "person", "track"]
+
+# A sweep should only ever remove the tail of a cleanup. If a table's cloud
+# copy diverges by more than this, something is wrong (wrong database, a
+# half-restored local, an interrupted merge) and mass-deleting the difference
+# would be far worse than leaving it — so warn and skip instead.
+_ORPHAN_SWEEP_MAX_FRACTION = 0.02
+
+
+def _fk_referrers(conn, table: str, pk: str) -> list[tuple[str, str]]:
+    """(child_table, child_column) pairs with a foreign key onto table.pk."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT tc.table_name, kcu.column_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage kcu
+                ON kcu.constraint_name = tc.constraint_name
+              JOIN information_schema.constraint_column_usage ccu
+                ON ccu.constraint_name = tc.constraint_name
+             WHERE tc.constraint_type = 'FOREIGN KEY'
+               AND ccu.table_name = %s AND ccu.column_name = %s
+        """, (table, pk))
+        return [(r[0], r[1]) for r in cur.fetchall()]
+
+
+def _rehome_refs_from_local(local_read, cloud, table: str, pk: str,
+                            orphans: list[int], *, log=print) -> None:
+    """Repoint cloud rows still referencing soon-to-be-deleted orphan parents.
+
+    A track folded into another locally leaves its races pointing at the keeper
+    here, but the cloud copies of those races may pre-date the merge and still
+    reference the loser. Local is authoritative, so each stale reference is
+    refreshed from whatever local now holds for that same child row.
+    """
+    for child, col in _fk_referrers(local_read, table, pk):
+        child_pks = _pk_columns(local_read, child)
+        if len(child_pks) != 1:
+            continue
+        cpk = child_pks[0]
+        with cloud.cursor() as cc:
+            cc.execute(f"SELECT {cpk} FROM {child} WHERE {col} = ANY(%s)",
+                       (orphans,))
+            ids = [int(r[0]) for r in cc.fetchall()]
+        if not ids:
+            continue
+        with local_read.cursor() as lc:
+            lc.execute(f"SELECT {cpk}, {col} FROM {child} WHERE {cpk} = ANY(%s)",
+                       (ids,))
+            pairs = [(int(a), b) for a, b in lc.fetchall() if b is not None]
+        if not pairs:
+            continue
+        with cloud.cursor() as cc:
+            execute_values(
+                cc,
+                f"UPDATE {child} SET {col} = v.newval FROM (VALUES %s) "
+                f"AS v(id, newval) WHERE {child}.{cpk} = v.id",
+                pairs, page_size=1000,
+            )
+        cloud.commit()
+        log(f"  orphan-sweep[{table}]: re-homed {len(pairs):,} "
+            f"{child}.{col} refs off orphan rows")
+
+
+def reconcile_orphans(local_read, cloud, *, log=print) -> dict:
+    """Delete cloud rows whose primary key no longer exists locally.
+
+    The merge-log reconcile only knows about rows folded into a keeper. Plain
+    deletions — a duplicate race dropped by hand, entries removed when a
+    wrongly-attached synthetic id was detached — leave no audit trail, so the
+    cloud keeps serving rows the local database has long since removed.
+
+    Counts are compared first because they are cheap server-side; the primary
+    key diff (which streams every id of a 7.6M-row table) only runs for tables
+    that actually diverge, so the usual no-drift case costs five counts.
+    """
+    out: dict[str, int] = {}
+    for table in _ORPHAN_SWEEP_TABLES:
+        pks = _pk_columns(local_read, table)
+        if len(pks) != 1:
+            continue
+        pk = pks[0]
+        with local_read.cursor() as lc:
+            lc.execute(f"SELECT COUNT(*) FROM {table}")
+            n_local = lc.fetchone()[0]
+        with cloud.cursor() as cc:
+            cc.execute(f"SELECT COUNT(*) FROM {table}")
+            n_cloud = cc.fetchone()[0]
+        if n_cloud <= n_local:
+            continue
+
+        with cloud.cursor(name=f"orph_{table}") as cc:
+            cc.itersize = _BATCH
+            cc.execute(f"SELECT {pk} FROM {table}")
+            cloud_ids = {int(r[0]) for r in cc}
+        with local_read.cursor(name=f"orphl_{table}") as lc:
+            lc.itersize = _BATCH
+            lc.execute(f"SELECT {pk} FROM {table}")
+            local_ids = {int(r[0]) for r in lc}
+        orphans = sorted(cloud_ids - local_ids)
+        if not orphans:
+            continue
+        if n_local and len(orphans) / n_local > _ORPHAN_SWEEP_MAX_FRACTION:
+            log(f"  orphan-sweep[{table}]: SKIPPED — {len(orphans):,} orphans "
+                f"is over {_ORPHAN_SWEEP_MAX_FRACTION:.0%} of {n_local:,} local "
+                f"rows; refusing to mass-delete, investigate first")
+            continue
+        _rehome_refs_from_local(local_read, cloud, table, pk, orphans, log=log)
+        with cloud.cursor() as cc:
+            for i in range(0, len(orphans), _BATCH):
+                cc.execute(f"DELETE FROM {table} WHERE {pk} = ANY(%s)",
+                           (orphans[i:i + _BATCH],))
+                cloud.commit()
+        out[table] = len(orphans)
+        log(f"  orphan-sweep[{table}]: deleted {len(orphans):,} cloud rows "
+            f"absent locally")
+    return out
 
 
 def reconcile_apply(local_read, cloud, spec: dict, plan: list[tuple[int, int]],
@@ -569,6 +818,25 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
                 raise _ConnectionLost(f"reconcile pre-pass: {exc!r}") from exc
             log(f"  reconcile pre-pass: ERROR {exc!r}")
 
+        for _tbl in _MOVED_UNIQUE_TABLES:
+            try:
+                reconcile_moved_unique(local_read, cloud, _tbl, log=log)
+            except Exception as exc:
+                _safe_rollback(cloud)
+                if _conn_dead(cloud):
+                    raise _ConnectionLost(
+                        f"reconcile_moved_unique[{_tbl}]: {exc!r}") from exc
+                log(f"  reconcile_moved_unique[{_tbl}]: ERROR {exc!r}")
+
+        try:
+            reconcile_moved_entry_keys(local_read, state, cloud,
+                                       full=full, log=log)
+        except Exception as exc:
+            _safe_rollback(cloud)
+            if _conn_dead(cloud):
+                raise _ConnectionLost(f"reconcile_moved_entry_keys: {exc!r}") from exc
+            log(f"  reconcile_moved_entry_keys: ERROR {exc!r}")
+
         horse_wm = None if full else _get_watermark(state, "horse")
         for table, wm_col in SERVING_TABLES:
             try:
@@ -600,6 +868,17 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
                 if _conn_dead(cloud):
                     raise _ConnectionLost(f"reconcile[{spec['entity']}] apply: {exc!r}") from exc
                 log(f"  reconcile[{spec['entity']}] apply: ERROR {exc!r}")
+
+        # Last, once every keeper and freshly-pushed row is on the cloud: drop
+        # rows deleted locally with no merge-log trail. Runs after the merge
+        # post-pass so re-homed references are already pointing at keepers.
+        try:
+            totals["orphans_swept"] = reconcile_orphans(local_read, cloud, log=log)
+        except Exception as exc:
+            _safe_rollback(cloud)
+            if _conn_dead(cloud):
+                raise _ConnectionLost(f"orphan sweep: {exc!r}") from exc
+            log(f"  orphan sweep: ERROR {exc!r}")
 
         if do_matviews:
             log("refreshing materialized views on cloud...")
