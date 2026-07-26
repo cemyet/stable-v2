@@ -1325,7 +1325,20 @@ def load_st_racedays_for_ids(conn, race_day_ids: list[int],
 # ---------------------------------------------------------------------------
 
 def discover_raceday_ids_from_horse_raw(conn, *, since=None) -> list[int]:
-    """raceDayIds referenced by st_horse_raw race-results but not yet scraped."""
+    """raceDayIds referenced by st_horse_raw race-results whose races we lack.
+
+    Two exclusions, and the second one matters more than it looks. Racedays
+    mirrored from v1 have their race rows but no native scrape, so
+    st_raceday_scrape_log knows nothing about them and they would be reported
+    as unscraped forever — 95% of this backlog was that, almost all Swedish
+    racedays we already hold in full. Re-fetching them costs hours and yields
+    no new rows, so a raceday that already has race rows is treated as done.
+
+    The tradeoff: a raceday whose races were only partially imported will not
+    be revisited here. That is deliberate — the point of this discovery is to
+    find foreign racedays absent from the database entirely, which is what the
+    chain-walk (Swedish tracks only) structurally cannot reach.
+    """
     with conn.cursor() as cur:
         sql = """
             SELECT DISTINCT (elem->'raceInformation'->>'raceDayId')::int AS rdid
@@ -1340,8 +1353,16 @@ def discover_raceday_ids_from_horse_raw(conn, *, since=None) -> list[int]:
             params.append(since)
         cur.execute(sql, params)
         candidate = {r[0] for r in cur.fetchall() if r[0] is not None}
+        if not candidate:
+            return []
         cur.execute("SELECT race_day_id FROM st_raceday_scrape_log WHERE http_status = 200")
         done = {r[0] for r in cur.fetchall()}
+        cur.execute(
+            "SELECT DISTINCT st_race_day_id FROM race "
+            "WHERE st_race_day_id = ANY(%s)",
+            (sorted(candidate - done),),
+        )
+        done.update(r[0] for r in cur.fetchall() if r[0] is not None)
     return sorted(candidate - done)
 
 

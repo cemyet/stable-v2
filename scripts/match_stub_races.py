@@ -70,6 +70,26 @@ _FAKE_COUNTRY_TRACKS = (
     "Holland", "USA",
 )
 
+# The placeholder name IS the country, so a stub may only ever fold into a race
+# actually held there. Co-occurrence alone does not imply the same race: a horse
+# can legitimately have a Finnish start recorded by ST and a Swedish start on
+# the same date, and without this guard the matcher folds the Finnish result
+# into the Swedish race — inventing exactly the cross-country pollution this
+# project exists to remove. The placeholder track row cannot supply this;
+# several of them carry a NULL country.
+_PLACEHOLDER_COUNTRY = {
+    "Frankrike":  "FR",
+    "Italien":    "IT",
+    "Tyskland":   "DE",
+    "Norge":      "NO",
+    "Belgien":    "BE",
+    "Danmark":    "DK",
+    "Finland":    "FI",
+    "Australien": "AU",
+    "Holland":    "NL",
+    "USA":        "US",
+}
+
 
 _CANDIDATES_SQL = """
 WITH stub AS (
@@ -251,10 +271,15 @@ def main() -> int:
         accepted: list[tuple[dict, dict]] = []  # (stub_pair, real_pair) tuples
         rejected_multi = 0
         rejected_fail  = 0
+        rejected_country = 0
 
         for stub_race_id, group in by_stub.items():
             survivors: list[dict] = []
             for c in group:
+                want = _PLACEHOLDER_COUNTRY.get(c["stub_track"])
+                if want is not None and c["real_country"] != want:
+                    rejected_country += 1
+                    continue
                 with conn.cursor() as cur:
                     stub_e = _entry_summary(cur, c["stub_race_id"], c["h_id"])
                     real_e = _entry_summary(cur, c["real_race_id"], c["h_id"])
@@ -278,9 +303,11 @@ def main() -> int:
         summary["accepted"]   = len(accepted)
         summary["rejected_multi_real"] = rejected_multi
         summary["rejected_failed_checks"] = rejected_fail
+        summary["rejected_country_mismatch"] = rejected_country
         log(f"{len(by_stub)} stub races, {len(accepted)} accepted, "
             f"{rejected_multi} rejected (multiple real candidates), "
-            f"{rejected_fail} rejected (confidence checks failed).")
+            f"{rejected_fail} rejected (confidence checks failed), "
+            f"{rejected_country} pre-pairs rejected (wrong country).")
 
         # Show preview
         for p in accepted[:25]:
