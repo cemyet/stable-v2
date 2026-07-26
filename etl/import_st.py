@@ -1463,24 +1463,39 @@ def discover_new_starter_ids_for_racedays(conn, race_day_ids) -> list[int]:
 
 def discover_shallow_st_horse_ids(conn, *, lookback_days: int = 120,
                                   limit: int | None = None) -> list[int]:
-    """ST ids of recently-active horses that carry a SHALLOW passport — a row
-    exists (so they raced) but `sire_name` is NULL. These are normally brand-new
-    horses the raceday ETL created on the fly; healing scrapes (if needed) +
-    re-ETLs them so none stay stuck without pedigree. We do NOT exclude
-    already-scraped ids: a horse can be scraped but not yet ETLed, and the heal
-    step is cheap (ETL reads existing raw; scrape skips ids already fetched)."""
+    """ST ids of recently-active horses whose passport needs (re)scraping:
+
+      * SHALLOW rows — `sire_name` IS NULL. Normally brand-new horses the
+        raceday ETL created on the fly.
+      * PASSPORT-MISSING rows — st_id set but no `horse-basic-information`
+        blob in st_horse_raw. Typically foreign guest horses first seen via
+        ATG startlists: ATG supplies a pedigree (so they don't look shallow)
+        but only an age-derived Jan-1 DOB and no reg/UELN/owner history.
+        Without this clause they'd never get their real ST passport.
+
+    Ordered true-shallow first, then by most recent activity, so the caller's
+    `limit` bound heals the most relevant horses first (a legacy backlog
+    drains across successive nightly runs instead of blowing up one run).
+    We do NOT exclude already-scraped ids: a horse can be scraped but not yet
+    ETLed, and the heal step is cheap (ETL reads existing raw; scrape skips
+    ids already fetched)."""
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT DISTINCT h.st_id
+            SELECT h.st_id
               FROM horse h
+              JOIN entry e ON e.horse_id = h.horse_id
+              JOIN race  r ON r.race_id  = e.race_id
              WHERE h.st_id IS NOT NULL
-               AND h.sire_name IS NULL
-               AND EXISTS (SELECT 1 FROM entry e
-                             JOIN race r ON r.race_id = e.race_id
-                            WHERE e.horse_id = h.horse_id
-                              AND r.race_date >= CURRENT_DATE - %s)
-             ORDER BY 1
+               AND r.race_date >= CURRENT_DATE - %s
+               AND (
+                    h.sire_name IS NULL
+                 OR NOT EXISTS (SELECT 1 FROM st_horse_raw sr
+                                 WHERE sr.horse_id = h.st_id
+                                   AND sr.data_type = 'horse-basic-information')
+               )
+             GROUP BY h.st_id
+             ORDER BY BOOL_OR(h.sire_name IS NULL) DESC, MAX(r.race_date) DESC
             """,
             (lookback_days,),
         )
@@ -1488,9 +1503,19 @@ def discover_shallow_st_horse_ids(conn, *, lookback_days: int = 120,
     return ids[:limit] if limit is not None else ids
 
 
+# Nightly passport-heal budget. Passport scrapes are ~9s/horse (5 API calls,
+# no keep-alive), so 200/run ≈ 30 min keeps the nightly under budget while a
+# legacy backlog (~10k as of 2026-07) drains across successive runs. Use
+# `python -m etl.import_st shallow-heal --limit N` for a faster supervised drain.
+DEFAULT_SHALLOW_HEAL_LIMIT = 200
+
+
 def run_native_st_recent(conn, *, do_gap_fill: bool = True,
                          max_steps_per_chain: int = 80,
-                         max_new_horses: int = 4000, log=_print) -> dict:
+                         max_new_horses: int = 4000,
+                         max_foreign_racedays: int = 20,
+                         max_shallow_heal: int = DEFAULT_SHALLOW_HEAL_LIMIT,
+                         log=_print) -> dict:
     """Recent-scoped native ST pipeline — the cutover-safe daily runner.
 
     Unlike `run_native_st` (which drains every raceday reachable from already-
@@ -1502,15 +1527,30 @@ def run_native_st_recent(conn, *, do_gap_fill: bool = True,
       2. chain-walk forward → scrape only the newly-published racedays
       3. ETL just those racedays
       4. scrape + ETL the new starters those racedays reveal (no st passport yet)
+      5. scrape + ETL FOREIGN racedays (bounded by `max_foreign_racedays`)
 
     We deliberately do NOT re-scrape existing horses' passports: race results
     arrive via the ATG bridge, and passports (pedigree/UELN/career) rarely
     change, so new horses (gap-fill + new starters) are the only passport work.
-    Everything is idempotent and bounded.
+
+    Step 5 closes a real gap: the per-track `nextRaceDayId` chain in step 2
+    only reaches SWEDISH racedays (foreign racedays carry null links — see
+    `st_raceday.walk_forward_racedays`). A foreign guest horse's OWN history
+    (e.g. an Italian horse's Italian starts) only ever surfaces in its
+    horse-level `race-results` blob. Step 5 prefers racedays referenced by
+    this run's horse scrapes, then fills any remaining quota from the global
+    unscraped backlog (~20k). Keep the cap modest (default 20): ATG's foreign
+    track ids are rotating slots, and misfiled historical ATG races still
+    exist for some countries (AU placeholder drain is separate). The nightly
+    `merge_duplicate_races` + `match_cross_track_races` phases fold any
+    same-event collisions that slip through.
     """
     from scrapers import st_horse, st_raceday
 
     summary: dict = {}
+    with conn.cursor() as cur:
+        cur.execute("SELECT NOW()")
+        run_started_at = cur.fetchone()[0]
     track_map = _build_st_track_code_map(conn)
     log(f"track-code map: {len(track_map):,} race_day_ids")
 
@@ -1518,13 +1558,18 @@ def run_native_st_recent(conn, *, do_gap_fill: bool = True,
         log("step 1 — gap-fill blind-spot horses")
         summary["gap_fill"] = gap_fill_st_horses(conn, log=log)
 
-    # Heal any recently-active horses left with a shallow passport (no sire)
-    # by an earlier raceday-ETL that ran before their passport was scraped.
-    # Normally empty; bounded so a backlog can't blow up the daily run.
-    shallow = discover_shallow_st_horse_ids(conn, limit=max_new_horses)
+    # Heal recently-active horses whose passport is shallow (no sire) or was
+    # never scraped natively (see discover_shallow_st_horse_ids). Capped at
+    # max_shallow_heal (default 200 ≈ 30 min) so the nightly stays short; use
+    # the `shallow-heal` CLI for a supervised faster drain of the backlog.
+    heal_cap = max_shallow_heal
+    if max_new_horses is not None:
+        heal_cap = min(heal_cap, max_new_horses)
+    shallow = discover_shallow_st_horse_ids(conn, limit=heal_cap)
     summary["shallow_heal_candidates"] = len(shallow)
     if shallow:
-        log(f"step 1b — healing {len(shallow)} shallow-passport horses")
+        log(f"step 1b — healing {len(shallow)} shallow-passport horses "
+            f"(cap={heal_cap})")
         st_horse.scrape_horse_ids(conn, shallow, skip_done=True)
         summary["shallow_heal_etled"] = load_st_horses_for_ids(conn, shallow)
 
@@ -1569,7 +1614,75 @@ def run_native_st_recent(conn, *, do_gap_fill: bool = True,
             summary["starter_etl"] = load_st_horses_for_ids(conn, new_horses)
         summary["starters_total"] = len(starters)
         summary["starters_new"] = len(new_horses)
+
+    if max_foreign_racedays > 0:
+        log("step 5 — foreign racedays (this-run refs first, then backlog)")
+        from_run = discover_raceday_ids_from_horse_raw(conn, since=run_started_at)
+        backlog = discover_raceday_ids_from_horse_raw(conn)
+        # Prefer this-run refs; fill remaining quota from global backlog.
+        seen: set[int] = set()
+        ordered: list[int] = []
+        for rdid in list(from_run) + list(backlog):
+            if rdid in seen:
+                continue
+            seen.add(rdid)
+            ordered.append(rdid)
+            if len(ordered) >= max_foreign_racedays:
+                break
+        summary["foreign_raceday_candidates"] = len(from_run)
+        summary["foreign_raceday_backlog"] = len(backlog)
+        if ordered:
+            log(f"  scraping {len(ordered)} foreign racedays "
+                f"(this-run={len(from_run)}, backlog={len(backlog)}, "
+                f"cap={max_foreign_racedays})")
+            st_raceday.scrape_raceday_ids(conn, ordered, skip_done=True)
+            summary["foreign_raceday_etl"] = load_st_racedays_for_ids(
+                conn, ordered, track_map, log=log)
+        else:
+            log("  no unscraped foreign racedays")
     return summary
+
+
+def run_shallow_heal(conn, *, limit: int = 500, lookback_days: int = 365,
+                     log=_print) -> dict:
+    """Supervised passport-heal drain (outside the nightly budget).
+
+    Scrapes + ETLs up to `limit` shallow / passport-missing horses ordered by
+    true-shallow first, then most recent activity. Idempotent.
+    """
+    from scrapers import st_horse
+
+    ids = discover_shallow_st_horse_ids(
+        conn, lookback_days=lookback_days, limit=limit,
+    )
+    log(f"shallow-heal — {len(ids)} candidates (limit={limit}, "
+        f"lookback_days={lookback_days})")
+    if not ids:
+        return {"candidates": 0, "scraped": None, "etled": 0}
+    scraped = st_horse.scrape_horse_ids(conn, ids, skip_done=True)
+    etled = load_st_horses_for_ids(conn, ids)
+    return {"candidates": len(ids), "scraped": scraped, "etled": etled}
+
+
+def run_foreign_raceday_drain(conn, *, limit: int = 500, log=_print) -> dict:
+    """Supervised drain of unscraped foreign racedays referenced by horse raw.
+
+    Idempotent (`skip_done=True`). Safe to stop mid-run and resume — the next
+    call picks whatever is still missing from `st_raceday_scrape_log`.
+    """
+    from scrapers import st_raceday
+
+    backlog = discover_raceday_ids_from_horse_raw(conn)
+    ids = backlog[:limit]
+    log(f"foreign-drain — scraping {len(ids)} of {len(backlog)} unscraped "
+        f"foreign racedays (limit={limit})")
+    if not ids:
+        return {"backlog": 0, "scraped": None, "etl": None}
+    track_map = _build_st_track_code_map(conn)
+    scraped = st_raceday.scrape_raceday_ids(conn, ids, skip_done=True)
+    etl = load_st_racedays_for_ids(conn, ids, track_map, log=log)
+    return {"backlog_before": len(backlog), "requested": len(ids),
+            "scraped": scraped, "etl": etl}
 
 
 # ---------------------------------------------------------------------------
@@ -1585,16 +1698,20 @@ if __name__ == "__main__":
     ap.add_argument(
         "command", nargs="?", default="backfill",
         choices=("backfill", "gap-fill", "load-horses", "load-racedays",
-                 "native", "native-recent"),
+                 "native", "native-recent", "shallow-heal", "foreign-drain"),
         help="backfill = full v1->v2 mirror; gap-fill = native scrape+ETL of "
              "SE horses missing st_id; load-horses / load-racedays = ETL existing "
              "raw; native = full bounded native ST pipeline (drains history); "
-             "native-recent = recent-scoped chain-walk pipeline (daily runner)",
+             "native-recent = recent-scoped chain-walk pipeline (daily runner); "
+             "shallow-heal = supervised passport backlog drain; "
+             "foreign-drain = supervised foreign raceday backlog drain",
     )
     ap.add_argument("--dry-run", action="store_true",
                     help="gap-fill: only report discovered ids")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--max-racedays", type=int, default=1500)
+    ap.add_argument("--lookback-days", type=int, default=365,
+                    help="shallow-heal: activity window (default 365)")
     args = ap.parse_args()
 
     if args.command == "backfill":
@@ -1633,6 +1750,24 @@ if __name__ == "__main__":
         v2 = get_connection()
         try:
             res = run_native_st_recent(v2)
+            _print(f"DONE: {res}")
+        finally:
+            v2.close()
+    elif args.command == "shallow-heal":
+        v2 = get_connection()
+        try:
+            res = run_shallow_heal(
+                v2,
+                limit=args.limit or 500,
+                lookback_days=args.lookback_days,
+            )
+            _print(f"DONE: {res}")
+        finally:
+            v2.close()
+    elif args.command == "foreign-drain":
+        v2 = get_connection()
+        try:
+            res = run_foreign_raceday_drain(v2, limit=args.limit or 500)
             _print(f"DONE: {res}")
         finally:
             v2.close()

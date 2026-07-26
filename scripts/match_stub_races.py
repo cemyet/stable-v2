@@ -151,33 +151,56 @@ def _entry_summary(cur, race_id: int, horse_id: int) -> dict | None:
 def _looks_like_same_race(stub_entry: dict, real_entry: dict,
                           stub_dist: int | None, real_dist: int | None,
                           ) -> tuple[bool, str]:
-    """Return (ok, reason) — confidence checks before merging."""
+    """Return (ok, reason) — confidence checks before merging.
+
+    ATG often files foreign races onto a Swedish betting-slot track with a
+    remapped distance (e.g. Italien@1600 vs Eskilstuna@2140) while placement,
+    km-time and prize still agree. Distance is therefore a soft check: it
+    only rejects when entry-level evidence is weak.
+    """
     # Placement match (when both known)
     sp = stub_entry.get("placement")
     rp = real_entry.get("placement")
-    if sp is not None and rp is not None and sp != rp:
-        return False, f"placement mismatch {sp}!={rp}"
+    placement_agree = False
+    if sp is not None and rp is not None:
+        if sp != rp:
+            return False, f"placement mismatch {sp}!={rp}"
+        placement_agree = True
 
     # Time within ±0.5s (km-time)
     st_t = stub_entry.get("time_seconds")
     rt_t = real_entry.get("time_seconds")
+    time_agree = False
     if st_t is not None and rt_t is not None:
         if abs(float(st_t) - float(rt_t)) > 0.5:
             return False, f"time diff {st_t}!={rt_t}"
-
-    # Distance within 100m (different sources round differently)
-    if stub_dist is not None and real_dist is not None:
-        if abs(int(stub_dist) - int(real_dist)) > 100:
-            return False, f"distance diff {stub_dist}!={real_dist}"
+        time_agree = True
 
     # Prize ratio sanity (FX/rounding allowed): if both present, must be
     # within 0.4x..2.5x of each other.
     sp_kr = stub_entry.get("prize_kr")
     rp_kr = real_entry.get("prize_kr")
+    prize_agree = False
     if sp_kr and rp_kr:
         ratio = float(sp_kr) / float(rp_kr)
         if not (0.4 <= ratio <= 2.5):
             return False, f"prize ratio {ratio:.2f} out of range"
+        prize_agree = True
+
+    # Strong entry evidence (any 2 of placement/time/prize) waives distance.
+    strong_signals = sum((placement_agree, time_agree, prize_agree))
+    if stub_dist is not None and real_dist is not None:
+        if abs(int(stub_dist) - int(real_dist)) > 100 and strong_signals < 2:
+            return False, f"distance diff {stub_dist}!={real_dist}"
+
+    # Sparse stubs with no agreeing signals and no distance check are too
+    # weak — require at least one positive agreement or matching distance.
+    dist_agree = (
+        stub_dist is not None and real_dist is not None
+        and abs(int(stub_dist) - int(real_dist)) <= 100
+    )
+    if strong_signals == 0 and not dist_agree:
+        return False, "no positive identity signals"
 
     return True, "ok"
 

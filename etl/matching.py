@@ -240,6 +240,43 @@ def _do_insert(
 # Public: upsert helpers per concept
 # ---------------------------------------------------------------------------
 
+def find_horse_by_strong_ids(
+    cur,
+    source: str,
+    source_id: Any,
+    *,
+    registration_number: str | None = None,
+    ueln_number: str | None = None,
+) -> dict | None:
+    """Strong-ID horse lookup shared by upsert_horse and resolve_horse.
+
+    Tries, in order: the source's own id column, registration_number,
+    ueln_number, and the SE id-equivalence fallbacks (ATG horse.id ==
+    TravSport st_id for SE-registered horses, in both directions).
+    Returns the full horse row dict or None.
+    """
+    source_id_col = f"{source}_id"
+    lookup_source_id = str(source_id) if source_id_col in {
+        "atg_id", "usta_id", "letrot_id", "kmtid_id", "hvt_id", "breedly_id"
+    } else source_id
+    candidates: list[tuple[str, Any]] = [(source_id_col, lookup_source_id)]
+    if registration_number:
+        candidates.append(("registration_number", registration_number))
+    if ueln_number:
+        candidates.append(("ueln_number", ueln_number))
+    if source == "atg" and isinstance(source_id, int) and source_id > 0:
+        candidates.append(("st_id", source_id))
+    # Symmetric to the above: the NATIVE ST scraper upserts with the TravSport
+    # id as `st_id`, but SE horses were usually created first from ATG and only
+    # carry `atg_id` (== the same integer, as a string). Without this fallback,
+    # resolve_horse(source="st", source_id=815348) on a horse that has
+    # atg_id='815348' but st_id IS NULL would INSERT a duplicate instead of
+    # attaching st_id to the existing row (this is exactly the Giovaz case).
+    if source == "st" and isinstance(source_id, int) and source_id > 0:
+        candidates.append(("atg_id", str(source_id)))
+    return _fetch_row_first_match(cur, "horse", candidates)
+
+
 def upsert_horse(
     cur,
     source: str,
@@ -265,23 +302,12 @@ def upsert_horse(
     lookup_source_id = str(source_id) if source_id_col in {
         "atg_id", "usta_id", "letrot_id", "kmtid_id", "hvt_id", "breedly_id"
     } else source_id
-    candidates: list[tuple[str, Any]] = [(source_id_col, lookup_source_id)]
-    if registration_number:
-        candidates.append(("registration_number", registration_number))
-    if ueln_number:
-        candidates.append(("ueln_number", ueln_number))
-    if source == "atg" and isinstance(source_id, int) and source_id > 0:
-        candidates.append(("st_id", source_id))
-    # Symmetric to the above: the NATIVE ST scraper upserts with the TravSport
-    # id as `st_id`, but SE horses were usually created first from ATG and only
-    # carry `atg_id` (== the same integer, as a string). Without this fallback,
-    # resolve_horse(source="st", source_id=815348) on a horse that has
-    # atg_id='815348' but st_id IS NULL would INSERT a duplicate instead of
-    # attaching st_id to the existing row (this is exactly the Giovaz case).
-    if source == "st" and isinstance(source_id, int) and source_id > 0:
-        candidates.append(("atg_id", str(source_id)))
 
-    existing = _fetch_row_first_match(cur, "horse", candidates)
+    existing = find_horse_by_strong_ids(
+        cur, source, source_id,
+        registration_number=registration_number,
+        ueln_number=ueln_number,
+    )
 
     # Merge redirect: route a merged-away source id to its canonical keeper.
     via_redirect = False
@@ -428,6 +454,32 @@ def _normalize_track_name(name: str | None) -> str | None:
     return s
 
 
+def _squash_track_name(name: str | None) -> str:
+    """Lowercase and strip everything but letters/digits so punctuation and
+    spacing variants compare equal ('Cagnes-Sur-Mer' == 'Cagnes Sur Mer')."""
+    import re as _re
+
+    return _re.sub(r"[^0-9a-zåäöæøüéèêàç]", "", (name or "").lower())
+
+
+def _track_names_agree(a: str | None, b: str | None) -> bool:
+    """Loose same-venue check: squashed-equal or one contains the other
+    ('Orkla' vs 'Orkla Arena'). Missing names count as agreement (nothing
+    to contradict)."""
+    sa, sb = _squash_track_name(a), _squash_track_name(b)
+    if not sa or not sb:
+        return True
+    return sa == sb or sa in sb or sb in sa
+
+
+# Sources whose numeric track ids are NOT stable venue identifiers. ATG
+# reuses a per-country pool of ids for guest/foreign tracks: id 54 was
+# Odense on 2026-05-08 and Århus on 2026-06-20 (verified against ATG's own
+# API). An id match therefore only counts if the payload's track NAME also
+# agrees with the matched row.
+UNSTABLE_TRACK_ID_SOURCES = {"atg"}
+
+
 def upsert_track(
     cur,
     source: str,
@@ -441,9 +493,12 @@ def upsert_track(
 
     Match order:
       1. (source, source_id) — same source seeing a track it already wrote.
+         For UNSTABLE_TRACK_ID_SOURCES (ATG's rotating foreign slots) the
+         match is only accepted when the track name also agrees.
       2. (lower(name), country) — different source / different source_id but
          the same physical track. Attaches the new source_id to the canonical
-         row so future imports converge on it.
+         row so future imports converge on it. Falls back to a squashed-name
+         comparison so punctuation variants don't fork rows.
       3. New row.
 
     When the existing row already has a *different* source_id from this same
@@ -463,12 +518,23 @@ def upsert_track(
     if fields.get("name"):
         fields["name"] = _normalize_track_name(fields["name"])
 
-    # 1. Lookup by source id.
-    existing = _fetch_row(cur, "track", source_id_column, source_id)
-
-    # 2. Cross-source fallback: same name + same country = same physical track.
     name = fields.get("name")
     country = fields.get("country")
+
+    # 1. Lookup by source id.
+    existing = _fetch_row(cur, "track", source_id_column, source_id)
+    id_match_rejected = False
+    if (
+        existing
+        and source in UNSTABLE_TRACK_ID_SOURCES
+        and not _track_names_agree(existing.get("name"), name)
+    ):
+        # Rotating slot id currently parked on a different venue — the name
+        # is the truth. Resolve by name+country below instead.
+        existing = None
+        id_match_rejected = True
+
+    # 2. Cross-source fallback: same name + same country = same physical track.
     if not existing and name:
         if country:
             # Strict: exact country match.
@@ -501,6 +567,32 @@ def upsert_track(
                 (name,),
             )
             row = cur.fetchone()
+        # Squashed fallback: punctuation/spacing variants of the same venue
+        # ('Cagnes-Sur-Mer' vs 'Cagnes Sur Mer') must not fork a new row.
+        if not row:
+            squash_sql = (
+                "lower(regexp_replace(name, '[^0-9A-Za-z"
+                "\u00e5\u00e4\u00f6\u00c5\u00c4\u00d6\u00e6\u00c6\u00f8\u00d8"
+                "\u00fc\u00dc\u00e9\u00c9\u00e8\u00c8\u00ea\u00ca\u00e7\u00c7]', '', 'g'))"
+            )
+            squashed = _squash_track_name(name)
+            if squashed:
+                if country:
+                    cur.execute(
+                        f"SELECT * FROM track "
+                        f" WHERE (country = %s OR country IS NULL) "
+                        f"   AND {squash_sql} = %s "
+                        f" ORDER BY (country IS NULL), track_id LIMIT 1",
+                        (country, squashed),
+                    )
+                else:
+                    cur.execute(
+                        f"SELECT * FROM track "
+                        f" WHERE {squash_sql} = %s "
+                        f" ORDER BY country NULLS LAST, track_id LIMIT 1",
+                        (squashed,),
+                    )
+                row = cur.fetchone()
         if row:
             cols = [d.name for d in cur.description]
             existing = dict(zip(cols, row))
@@ -525,11 +617,29 @@ def upsert_track(
         ):
             upd["name"] = in_name
 
-        # Attach this source_id to the canonical row.
+        # Attach this source_id to the canonical row. Never stamp an id that
+        # is still parked on another row (unique index) or that we just
+        # rejected as a rotating slot — stash those as aliases instead.
         cur_val = existing.get(source_id_column)
-        if cur_val is None:
+        id_taken_elsewhere = False
+        if cur_val is None and source_id is not None and not id_match_rejected:
+            cur.execute(
+                f"SELECT 1 FROM track WHERE {source_id_column} = %s "
+                f"  AND track_id != %s LIMIT 1",
+                (source_id, existing["track_id"]),
+            )
+            id_taken_elsewhere = cur.fetchone() is not None
+        if cur_val is None and source_id is not None and not id_match_rejected \
+                and not id_taken_elsewhere:
             upd[source_id_column] = source_id
-        elif cur_val != source_id:
+        elif cur_val is None and source_id is not None:
+            src_block = dict(new_source_data.get(source) or {})
+            aliases = list(src_block.get("aliases") or [])
+            if source_id not in aliases:
+                aliases.append(source_id)
+            src_block["aliases"] = aliases
+            new_source_data[source] = src_block
+        elif cur_val is not None and cur_val != source_id:
             # Same source, multiple ids for the same physical track.
             # Stash the extra id under source_data.<source>.aliases so we
             # don't lose the cross-link for future imports.
@@ -551,11 +661,22 @@ def upsert_track(
         )
         return existing["track_id"]
 
-    # 3. New row.
-    fields[source_id_column] = source_id
+    # 3. New row. A rejected rotating-slot id is still held by another track
+    # row, so it must go into source_data aliases rather than the unique
+    # id column.
+    source_data = _merge_source_data(None, source, raw_payload)
+    if id_match_rejected:
+        src_block = dict(source_data.get(source) or {})
+        aliases = list(src_block.get("aliases") or [])
+        if source_id not in aliases:
+            aliases.append(source_id)
+        src_block["aliases"] = aliases
+        source_data[source] = src_block
+    else:
+        fields[source_id_column] = source_id
     return _do_insert(
         cur, "track", "track_id", fields, source,
-        _merge_source_data(None, source, raw_payload),
+        source_data,
     )
 
 

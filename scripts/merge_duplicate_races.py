@@ -179,6 +179,14 @@ def merge_two_races_columnwise(cur, *, keeper_id: int, loser_id: int,
     row = cur.fetchone()
     is_french = bool(row and row[0] == "FR")
 
+    # Snapshot the loser's entry rows BEFORE the merge mutates them, so
+    # race_merge_log can support a real restore.
+    cur.execute("SELECT * FROM entry WHERE race_id = %s", (loser_id,))
+    entry_cols = [d.name for d in cur.description]
+    loser_entries = [
+        _race_row_jsonable(dict(zip(entry_cols, r))) for r in cur.fetchall()
+    ]
+
     moved, conflicts, audits = _merge_entries(
         cur, loser_id, keeper_id, is_french_race=is_french,
     )
@@ -200,6 +208,24 @@ def merge_two_races_columnwise(cur, *, keeper_id: int, loser_id: int,
     cur.execute("UPDATE race SET source_data=%s WHERE race_id=%s",
                 (Json(sd), keeper_id))
     cur.execute("DELETE FROM race WHERE race_id = %s", (loser_id,))
+    cur.execute(
+        """
+        INSERT INTO race_merge_log
+            (from_race_id, to_race_id, reason, method, entries_moved,
+             from_snapshot, merged_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            loser_id, keeper_id,
+            f"duplicate race merged ({method})", method, moved,
+            Json({
+                "race": _race_row_jsonable(src),
+                "entries": loser_entries,
+                "entry_audits": audits,
+            }),
+            method,
+        ),
+    )
     return {"moved": moved, "conflicts": conflicts, "keeper": keeper_id,
             "loser": loser_id}
 

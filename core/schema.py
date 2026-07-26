@@ -504,6 +504,53 @@ CREATE TABLE IF NOT EXISTS person_merge_log (
 CREATE INDEX IF NOT EXISTS person_merge_log_to_idx   ON person_merge_log (to_person_id);
 CREATE INDEX IF NOT EXISTS person_merge_log_from_idx ON person_merge_log (from_person_id);
 
+-- Race merges previously only stashed JSON under race.source_data._merges,
+-- which made them unauditable and effectively irreversible. Every scripted
+-- race merge/repair now also writes one row here. `from_snapshot` holds the
+-- deleted race row + its entry rows so a rollback can re-insert them.
+CREATE TABLE IF NOT EXISTS race_merge_log (
+    merge_id      SERIAL PRIMARY KEY,
+    from_race_id  INTEGER NOT NULL,
+    to_race_id    INTEGER NOT NULL,
+    reason        TEXT    NOT NULL,
+    method        VARCHAR(40) NOT NULL,           -- 'duplicate_key' / 'cross_track' / 'stub_fold' / ...
+    entries_moved INTEGER NOT NULL DEFAULT 0,
+    from_snapshot JSONB   NOT NULL,               -- {race: {...}, entries: [...]}
+    merged_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    merged_by     VARCHAR(80),
+    rolled_back   BOOLEAN NOT NULL DEFAULT FALSE,
+    rolled_back_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS race_merge_log_to_idx   ON race_merge_log (to_race_id);
+CREATE INDEX IF NOT EXISTS race_merge_log_from_idx ON race_merge_log (from_race_id);
+
+-- Track identity changes (atg_track_id corrections, race repointing between
+-- tracks, track row merges) were previously silent. One row per change.
+CREATE TABLE IF NOT EXISTS track_change_log (
+    change_id   SERIAL PRIMARY KEY,
+    track_id    INTEGER,                          -- track whose row changed (NULL for pure race moves)
+    race_id     INTEGER,                          -- race repointed (NULL for track-row changes)
+    change_type VARCHAR(40) NOT NULL,             -- 'atg_id_cleared' / 'race_repointed' / 'track_merged' / ...
+    old_value   JSONB,
+    new_value   JSONB,
+    reason      TEXT,
+    changed_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    changed_by  VARCHAR(80)
+);
+CREATE INDEX IF NOT EXISTS track_change_log_track_idx ON track_change_log (track_id);
+CREATE INDEX IF NOT EXISTS track_change_log_race_idx  ON track_change_log (race_id);
+
+-- Data-quality sentinel metrics: one row per (metric, snapshot). The nightly
+-- job appends after cleanup; regressions show up as a rising series.
+CREATE TABLE IF NOT EXISTS dq_metric (
+    metric_id   SERIAL PRIMARY KEY,
+    metric      VARCHAR(60) NOT NULL,
+    value       BIGINT      NOT NULL,
+    detail      JSONB,
+    measured_at TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS dq_metric_series_idx ON dq_metric (metric, measured_at DESC);
+
 -- =====================================================================
 -- IDENTITY REDIRECTS — make manual/scripted merges PERMANENT.
 -- A merge moves FKs and deletes the losing row, but its source ids and
@@ -937,6 +984,29 @@ CREATE TABLE IF NOT EXISTS watchlist (
     added_at    TIMESTAMP NOT NULL DEFAULT NOW(),
     note        TEXT
 );
+
+-- =====================================================================
+-- COUPON — saved betting coupons built in stable/play (single-user).
+-- Races are referenced by ATG ids (upcoming races may not be in `race`
+-- yet), selections keep the ordered legs as JSON:
+--   [{"leg": 1, "raceId": "2026-07-21_15_4", "numbers": [4, 5, 6]}, ...]
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS coupon (
+    coupon_id   SERIAL PRIMARY KEY,
+    name        TEXT,
+    game_type   VARCHAR(12)   NOT NULL,        -- V86, V64, GS75, ...
+    atg_game_id VARCHAR(64)   NOT NULL,        -- e.g. V64_2026-07-21_15_4
+    track_name  TEXT,
+    game_date   DATE,
+    selections  JSONB         NOT NULL,
+    line_price  NUMERIC(6,2)  NOT NULL,        -- radpris (SEK per line)
+    num_lines   INTEGER       NOT NULL,
+    cost        NUMERIC(12,2) NOT NULL,
+    payout      NUMERIC(12,2),
+    status      VARCHAR(12)   NOT NULL DEFAULT 'saved',  -- saved|played|won|lost
+    created_at  TIMESTAMP     NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_coupon_created ON coupon (created_at DESC);
 """
 
 # Per-source rolling buffer DDL is generated from KNOWN_SOURCES so we don't

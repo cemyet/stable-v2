@@ -81,7 +81,7 @@ from typing import Any
 
 from psycopg2.extras import Json
 
-from etl.matching import upsert_horse, upsert_person
+from etl.matching import find_horse_by_strong_ids, upsert_horse, upsert_person
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +350,11 @@ def resolve_horse(
 
     Matching order:
       1. Strong IDs (source_id, registration_number, ueln_number) — delegated
-         to `etl.matching.upsert_horse`.
+         to `etl.matching.upsert_horse`. When a strong id is present but
+         matches NO existing row, race-context and pedigree triangulation
+         are consulted before INSERT so a brand-new id (e.g. a foreign
+         guest horse's fresh ST registration) attaches to its existing
+         synthetic/other-source row instead of minting a duplicate.
       2. Race-context — same race_id + program_number reuses existing horse.
       3. Pedigree triangulation — name + birth_year + sire_name + dam_name.
       4. Synthetic key reuse — `x:CC:NAME` for foreign horses.
@@ -367,16 +371,64 @@ def resolve_horse(
 
     # 0. Redirect: this (source, source_id) may have been merged away into a
     #    canonical keeper. Honour the redirect so we never re-mint the dup.
+    #    Attach first (fills NULL ids/reg/ueln, stashes conflicts as aliases),
+    #    then fall through to upsert_horse so the keeper ALSO gets the normal
+    #    priority-based canonical refresh — an attach-only return would leave
+    #    the keeper's fields (DOB, pedigree, stats…) stale forever.
     if source_id is not None and source_id != "" and not _is_synth_id(source_id):
         rid = _resolve_redirect(cur, "horse", source, source_id)
         if rid is not None:
             _attach_source_to_horse(cur, rid, source, source_id, canonical_fields,
                                     raw_payload, registration_number, ueln_number)
-            return rid
+            return upsert_horse(
+                cur, source, source_id, canonical_fields,
+                raw_payload=raw_payload,
+                registration_number=registration_number,
+                ueln_number=ueln_number,
+            )
 
     # 1. Strong-ID path: delegate to matching.upsert_horse which already
     #    handles source_id, reg_number, UELN, and the SE id-equivalence quirk.
     if source_id is not None and source_id != "" and not _is_synth_id(source_id):
+        # 1a. When the strong ids match NOTHING (brand-new id from this
+        #     source), don't INSERT straight away: the horse may already
+        #     exist as a synthetic/other-source row. Try race-context and
+        #     pedigree triangulation first and, on a unique hit, attach the
+        #     new strong id to that row instead of minting a duplicate.
+        #     This is the "foreign guest horse gets an ST registration"
+        #     case (e.g. Gabrioz ts815343 vs its x:IT:GABRIOZ ATG row).
+        if find_horse_by_strong_ids(
+            cur, source, source_id,
+            registration_number=registration_number,
+            ueln_number=ueln_number,
+        ) is None:
+            fb_id = find_horse_by_race_context(cur, race_id, program_number)
+            if fb_id is None:
+                fb_id = find_horse_by_pedigree(
+                    cur, name,
+                    _birth_year_from(dob, canonical_fields.get("age"), None),
+                    sire_name or canonical_fields.get("sire_name"),
+                    dam_name or canonical_fields.get("dam_name"),
+                    country=country,
+                )
+            if fb_id is not None:
+                _attach_source_to_horse(
+                    cur, fb_id, source, source_id, canonical_fields,
+                    raw_payload, registration_number, ueln_number,
+                )
+                # If the id landed on the row (it was free), re-run the
+                # strong-ID upsert so canonical fields get the normal
+                # priority-based refresh. If the row already had a
+                # different id from this source (stashed as alias),
+                # return the matched row as-is.
+                cur.execute(
+                    f"SELECT 1 FROM horse WHERE horse_id = %s AND {source}_id = %s",
+                    (fb_id, str(source_id) if source in (
+                        "atg", "usta", "letrot", "kmtid", "hvt", "breedly"
+                    ) else source_id),
+                )
+                if cur.fetchone() is None:
+                    return fb_id
         return upsert_horse(
             cur, source, source_id, canonical_fields,
             raw_payload=raw_payload,
@@ -453,12 +505,15 @@ def resolve_person(
       3. INSERT.
 
     Persons don't have UELN/reg numbers, and pedigree isn't applicable.
+
+    Redirects always fall through to `upsert_person` so the keeper gets a
+    priority-based canonical refresh + role-flag OR-merge — an early return
+    would leave the keeper's fields stale forever (same pattern as
+    `resolve_horse`).
     """
     name = canonical_fields.get("name") or canonical_fields.get("short_name")
     if source_id is not None and source_id != "" and not _is_synth_id(source_id):
-        rid = _resolve_redirect(cur, "person", source, source_id)
-        if rid is not None:
-            return rid
+        # upsert_person already honours identity_redirect and refreshes fields.
         return upsert_person(
             cur, source, source_id, canonical_fields,
             raw_payload=raw_payload, role_flags=role_flags,
@@ -468,18 +523,6 @@ def resolve_person(
     sid = synth_id(country, name)
     if sid is None:
         return None
-    rid = _resolve_redirect(cur, "person", source, sid)
-    if rid is not None:
-        return rid
-    col = f"{source}_id"
-    cur.execute(f"SELECT person_id FROM person WHERE {col} = %s LIMIT 1", (sid,))
-    row = cur.fetchone()
-    if row:
-        # Still UPDATE flags/source_data via upsert_person.
-        return upsert_person(
-            cur, source, sid, canonical_fields,
-            raw_payload=raw_payload, role_flags=role_flags,
-        )
     return upsert_person(
         cur, source, sid, canonical_fields,
         raw_payload=raw_payload, role_flags=role_flags,

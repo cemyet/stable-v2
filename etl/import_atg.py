@@ -188,6 +188,26 @@ def _upsert_track_from_raw(cur, raw: dict) -> int | None:
     sport = raw.get("sport") or "trot"
     if sport == "gallop":
         return None
+
+    # ATG's sportSystemCode is the ST track code (S=Solvalla, Aa=Århus, ...).
+    # Codes starting with 'X' mark virtual betting markets ("Vem Vinner
+    # Elitloppet" under sportSystemCode XE) — not real races, never import.
+    sys_code = (track.get("sportSystemCode") or "").strip()
+    if sys_code.upper().startswith("X"):
+        return None
+
+    # Strongest key first: st_code is stable per physical venue, unlike
+    # ATG's numeric track ids which rotate between foreign guest tracks.
+    if sys_code:
+        cur.execute(
+            "SELECT track_id FROM track WHERE lower(st_code) = lower(%s) "
+            " LIMIT 1",
+            (sys_code,),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0]
+
     fields = {
         "name": name,
         "country": country,

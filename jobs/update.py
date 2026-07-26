@@ -245,6 +245,23 @@ def run_native_ingest(conn, run_id: int) -> dict:
         _log(conn, run_id, f"[native]   ! native ST failed: {exc!r}\n{traceback.format_exc()}")
     summary["native_st_seconds"] = round(time.time() - t0, 1)
 
+    # --- HVT (German federation): bounded discover for unmatched foreign horses ---
+    _set_phase(conn, run_id, "HVT — German horse discover")
+    t0 = time.time()
+    try:
+        from etl import import_hvt
+        # Soft + additive; skips ambiguous name+year matches. Cap keeps the
+        # nightly short (HVT is session-cookie PHP, ~1–2s/horse).
+        summary["hvt"] = import_hvt.discover_for_unmatched_horses(
+            conn, limit=50, only_foreign=True, prefer_de=True,
+        )
+        _log(conn, run_id, f"[native]   HVT discover: {summary['hvt']}")
+    except Exception as exc:
+        conn.rollback()
+        summary["hvt"] = {"error": repr(exc)}
+        _log(conn, run_id, f"[native]   ! HVT discover failed: {exc!r}")
+    summary["hvt_seconds"] = round(time.time() - t0, 1)
+
     # --- kmtid (xLabs) GPS sectional enrichment (idempotent, runs last) ---
     _set_phase(conn, run_id, "xLabs (kmtid) — GPS sectionals")
     _log(conn, run_id, "[native] importing xLabs (kmtid) GPS sectionals...")
@@ -1059,6 +1076,11 @@ def run_cleanup(conn, run_id: int, *, execute: bool = True,
 
 def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
     summary = {"mode": "all", "phases": []}
+    with conn.cursor() as cur:
+        cur.execute("SELECT started_at FROM job_run WHERE job_run_id = %s",
+                    (run_id,))
+        row = cur.fetchone()
+        run_started_at = row[0] if row else None
 
     _set_phase(conn, run_id, "1/3 Bridge (v1 + ST/ATG + kmtid)")
     _log(conn, run_id, "\n[all] === phase 1/3 — bridge (v1 + ST/ATG + kmtid) ===")
@@ -1094,6 +1116,38 @@ def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
                             abort_on_error=abort_on_error,
                             since_days=CLEANUP_SINCE_DAYS)
     summary["phases"].append({"phase": "cleanup", "result": s_cleanup})
+
+    # --- DQ sentinel: snapshot + regression warnings + tonight's invariants ---
+    _set_phase(conn, run_id, "DQ sentinel")
+    _log(conn, run_id, "\n[all] === DQ sentinel ===")
+    try:
+        from etl import dq_sentinel
+        metrics = dq_sentinel.snapshot(conn, measured_by=f"nightly:{run_id}")
+        warnings = dq_sentinel.compare_with_previous(conn, metrics)
+        incr = []
+        if run_started_at is not None:
+            incr = dq_sentinel.incremental_check(conn, run_started_at)
+        summary["dq"] = {
+            "metrics": metrics,
+            "warnings": warnings,
+            "incremental_violations": len(incr),
+            "incremental_sample": incr[:10],
+        }
+        for w in warnings:
+            _log(conn, run_id, f"[dq] !! {w}")
+        if incr:
+            _log(conn, run_id,
+                 f"[dq] !! {len(incr)} horse+date multi-track violations "
+                 f"on races touched this run (sample: {incr[:3]})")
+        else:
+            _log(conn, run_id,
+                 f"[dq] ok — impossible={metrics.get('impossible_horse_date_pairs')} "
+                 f"dup_races={metrics.get('dup_race_groups')} "
+                 f"placeholders={metrics.get('placeholder_track_races')}")
+    except Exception as exc:
+        conn.rollback()
+        summary["dq"] = {"error": repr(exc)}
+        _log(conn, run_id, f"[dq] sentinel failed: {exc!r}")
 
     # Waterproofing: surface any phase failure as a failed run. Without this
     # the run completes and main() marks it 'success' even though e.g. the

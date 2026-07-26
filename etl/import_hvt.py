@@ -230,19 +230,26 @@ def _import_one_race(conn, horse_id: int, gd: dict, race: dict) -> bool:
         if not track_id:
             return False
 
-        # Synthesise an HVT race id since HVT doesn't expose one. Use the
-        # natural key (date + track + program_number-bucket). When the same
-        # day has multiple races we collide on this key — but the entry
-        # UNIQUE(race_id, horse_id) still saves us; we'd just attach
-        # multiple entries to the same race row. Acceptable for now.
-        synth_race_id = f"{race['race_date'].isoformat()}_{track_id}"
+        # Synthesise an HVT race id since HVT doesn't expose a stable one.
+        # Include distance + start_method so same-day multi-race cards at one
+        # track don't all collapse onto a single race row (the old date_track
+        # key did that). race_number stays NULL — HVT's "program_number" is
+        # the horse's start number, not the card's race number, so we must
+        # not misuse it for (track, date, number) cross-source matching.
+        dist = race.get("distance")
+        sm = (race.get("start_method") or "").strip()
+        sm_key = sm[:1].upper() if sm else "x"
+        synth_race_id = (
+            f"{race['race_date'].isoformat()}_{track_id}"
+            f"_{dist or 'x'}_{sm_key}"
+        )
 
         race_canonical = {
             "race_date":    race["race_date"],
             "track_id":     track_id,
-            "race_number":  None,  # HVT doesn't publish race-number
-            "distance":     race.get("distance"),
-            "start_method": race.get("start_method")[:1] if race.get("start_method") else None,
+            "race_number":  None,
+            "distance":     dist,
+            "start_method": sm_key if sm_key != "x" else None,
             "status":       "results",
         }
         race_payload = {
@@ -307,25 +314,41 @@ def discover_for_unmatched_horses(
     limit: int = 100,
     *,
     only_foreign: bool = True,
+    prefer_de: bool = True,
     client: httpx.Client | None = None,
 ) -> dict:
     """Walk a batch of v2 horses without an hvt_id and try to find them on HVT.
 
     `only_foreign=True` restricts to horses whose registration_country isn't SE
     (those are the ones HVT is most likely to know about beyond what TravSport
-    captured).
+    captured). `prefer_de=True` ranks German-registered / Tyskland-raced
+    horses first — highest yield for the nightly bounded step.
     """
     own_client = client is None
     if own_client:
         client = make_client()
 
-    where = ["hvt_id IS NULL", "name IS NOT NULL", "date_of_birth IS NOT NULL"]
+    where = ["h.hvt_id IS NULL", "h.name IS NOT NULL", "h.date_of_birth IS NOT NULL"]
     if only_foreign:
-        where.append("(registration_country IS NULL OR registration_country <> 'SE')")
+        where.append(
+            "(h.registration_country IS NULL OR h.registration_country <> 'SE')"
+        )
+    order = "h.scraped_prize_money_kr DESC NULLS LAST"
+    if prefer_de:
+        order = (
+            "(COALESCE(h.registration_country, h.birth_country) = 'DE') DESC, "
+            "EXISTS ("
+            "  SELECT 1 FROM entry e JOIN race r ON r.race_id = e.race_id "
+            "  JOIN track t ON t.track_id = r.track_id "
+            "  WHERE e.horse_id = h.horse_id "
+            "    AND (t.country = 'DE' OR lower(t.name) = 'tyskland')"
+            ") DESC, "
+            + order
+        )
     sql = (
-        f"SELECT horse_id, name, date_of_birth, registration_country "
-        f"  FROM horse WHERE {' AND '.join(where)} "
-        f"  ORDER BY scraped_prize_money_kr DESC NULLS LAST "
+        f"SELECT h.horse_id, h.name, h.date_of_birth, h.registration_country "
+        f"  FROM horse h WHERE {' AND '.join(where)} "
+        f"  ORDER BY {order} "
         f"  LIMIT {int(limit)}"
     )
 

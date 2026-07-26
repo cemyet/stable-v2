@@ -61,8 +61,19 @@ def _normalize_name(name: str | None) -> str | None:
     return s
 
 
+def _squash_name(name: str | None) -> str:
+    """Lowercase and strip everything but letters/digits so punctuation and
+    spacing variants group together ('Cagnes-Sur-Mer' == 'Cagnes Sur Mer')."""
+    import re
+
+    return re.sub(r"[^0-9a-zåäöæøüéèêàç]", "", (name or "").lower())
+
+
 def _group_dupes(tracks: list[dict]) -> dict[tuple, list[dict]]:
-    """Group by (lower(name), country). Returns groups with >1 row.
+    """Group by (squashed name, country). Returns groups with >1 row.
+
+    Squashed = lowercase, letters/digits only, so punctuation/spacing
+    variants of the same venue land in one group.
 
     Also folds NULL-country rows into the same-name group when there's
     exactly one known country for that name. Two NULL+NULL rows with the
@@ -73,7 +84,9 @@ def _group_dupes(tracks: list[dict]) -> dict[tuple, list[dict]]:
     for t in tracks:
         if not t["name"]:
             continue
-        by_name[t["name"].strip().lower()].append(t)
+        key = _squash_name(t["name"])
+        if key:
+            by_name[key].append(t)
 
     groups: dict[tuple, list[dict]] = {}
     for nm, rows in by_name.items():
@@ -268,10 +281,39 @@ def main() -> int:
                 # Lift any per-source id the canonical is missing onto it
                 # (e.g. canonical is the ST row, dup is the HVT row → keep
                 #  st_code on canonical AND adopt hvt_id from the dup).
+                # The dup must release the id first or the partial unique
+                # index on the id column rejects the canonical update.
+                lifted_cols = []
                 for col in _SOURCE_FOR_COL:
                     val = _coalesce_source_id(canonical, dups, col)
                     if val is not None and canonical.get(col) is None:
                         upd[col] = val
+                        lifted_cols.append(col)
+                if lifted_cols:
+                    cur.execute(
+                        f"UPDATE track SET "
+                        f"{', '.join(f'{c} = NULL' for c in lifted_cols)} "
+                        f"WHERE track_id = ANY(%s)",
+                        (dup_ids,),
+                    )
+
+                # Audit: one row per merged duplicate.
+                for d in dups:
+                    cur.execute(
+                        """
+                        INSERT INTO track_change_log
+                            (track_id, change_type, old_value, new_value,
+                             reason, changed_by)
+                        VALUES (%s, 'track_merged', %s, %s, %s, %s)
+                        """,
+                        (
+                            canonical["track_id"],
+                            json.dumps(d, default=str),
+                            json.dumps({"kept_track_id": canonical["track_id"]}),
+                            f"dedupe group {plan['key']}",
+                            "scripts.dedupe_tracks",
+                        ),
+                    )
 
                 # Prefer a non-uppercase name if one of the dups has it.
                 cur_name = canonical.get("name") or ""

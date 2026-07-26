@@ -77,6 +77,9 @@ PHASES: list[tuple[str, str, list[str]]] = [
     ("merge_duplicate_races",
      "scripts.merge_duplicate_races",
      ["--execute", "--commit-every", "200"]),
+    ("match_cross_track_races",
+     "scripts.match_cross_track_races",
+     ["--execute", "--commit-every", "100"]),
     ("match_french_races",
      "scripts.match_french_races",
      ["--execute", "--commit-every", "100"]),
@@ -92,6 +95,9 @@ PHASES: list[tuple[str, str, list[str]]] = [
     ("merge_synth_pairs",
      "scripts.merge_synth_pairs",
      ["--execute", "--commit-every", "200"]),
+    ("merge_synth_by_evidence",
+     "scripts.merge_synth_by_evidence",
+     ["--execute", "--commit-every", "100"]),
     ("match_persons_by_cooccurrence",
      "scripts.match_persons_by_cooccurrence",
      ["--execute", "--commit-every", "100"]),
@@ -109,7 +115,7 @@ PHASES: list[tuple[str, str, list[str]]] = [
 # Phases whose candidate discovery scans ALL history and therefore accept a
 # `--since-days N` window. The nightly passes a small window (see jobs/update.py)
 # so these never re-fingerprint years of already-resolved data every run.
-_SUPPORTS_SINCE_DAYS = {"match_french_races"}
+_SUPPORTS_SINCE_DAYS = {"match_french_races", "match_cross_track_races"}
 
 
 # ---------------------------------------------------------------------------
