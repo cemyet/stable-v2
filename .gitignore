@@ -20,3 +20,4 @@ out/
 
 # Local IDE
 .cursor/
+backups/

@@ -605,6 +605,8 @@ def import_date_range(
     *,
     progress_every: int = 7,
     skip_if_present: bool = True,
+    skip_scope: str = "day",
+    only_dates: "set[Date] | None" = None,
     watchdog: BackfillWatchdog | None = None,
     heartbeat_path: str | None = None,
     reverse: bool = False,
@@ -621,9 +623,22 @@ def import_date_range(
             date is already in the DB with `letrot_race_id IS NOT NULL`.
             This makes the backfill resumable — re-running it picks up
             where the last run left off without re-scraping.
+        skip_scope:
+            'day' (default) applies `skip_if_present` as described. 'course'
+            keeps the day and drops only the individual courses already held.
+            Whole-day skipping is right for extending coverage into untouched
+            history, but useless for filling gaps inside days we partly hold —
+            a day carrying 113 of its 124 courses looks finished and the 11
+            that are actually missing never get fetched.
+        only_dates:
+            Restrict work to these dates, still walking the range in order.
+            Targeted gap-filling would otherwise pay a listing request for
+            every intervening day it has no interest in.
 
     Returns aggregate counters across the whole range.
     """
+    if skip_scope not in ("day", "course"):
+        raise ValueError(f"skip_scope must be 'day' or 'course', got {skip_scope!r}")
     if isinstance(start_date, str):
         start_date = Date.fromisoformat(start_date)
     if isinstance(end_date, str):
@@ -733,6 +748,10 @@ def import_date_range(
             day_no += 1
             iso = cur_date.isoformat()
 
+            if only_dates is not None and cur_date not in only_dates:
+                cur_date += step
+                continue
+
             # Pre-warm Riksbank FX cache for an entire year in one API call
             # the first time we touch that year. Without this, every runner
             # would call Riksbank individually and we'd blow past the 5/min
@@ -749,7 +768,7 @@ def import_date_range(
                 fx_warmed_year = cur_date.year
 
             already_have = False
-            if skip_if_present:
+            if skip_if_present and skip_scope == "day":
                 with conn.cursor() as cur:
                     cur.execute(
                         "SELECT 1 FROM race WHERE letrot_race_id IS NOT NULL "
@@ -769,6 +788,19 @@ def import_date_range(
             except Exception as exc:
                 log.warning("letrot list_date %s failed: %r", iso, exc)
                 rows = []
+            if skip_if_present and skip_scope == "course" and rows:
+                ids = [f"{r['race_date']}_{r['reunion_id']}_{r['course_number']}"
+                       for r in rows]
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT letrot_race_id FROM race "
+                        " WHERE letrot_race_id = ANY(%s)", (ids,))
+                    held = {r[0] for r in cur.fetchall()}
+                if held:
+                    before = len(rows)
+                    rows = [r for r, i in zip(rows, ids) if i not in held]
+                    summary["skipped_present"] = (
+                        summary.get("skipped_present", 0) + before - len(rows))
             for row in rows:
                 summary["scraped"] += 1
                 try:

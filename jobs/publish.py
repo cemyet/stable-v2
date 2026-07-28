@@ -513,7 +513,15 @@ def reconcile_free_unique(local_read, cloud, spec: dict,
         f"{len(losers):,} lingering cloud rows")
 
 
-def reconcile_moved_unique(local_read, cloud, table: str, *, log=print) -> int:
+#: Candidate values sent to the cloud per round trip. Bounded because the
+#: comparison used to pull the whole column down instead, and `horse.atg_id`
+#: alone is ~78k rows — a single fetch big enough to blow the SSL read timeout
+#: and take the entire publish with it.
+_MOVED_UNIQUE_CHUNK = 5_000
+
+
+def reconcile_moved_unique(local_read, state, cloud, table: str, *,
+                           full: bool, log=print) -> int:
     """Free cloud unique values that local has since moved to a different row.
 
     The incremental push is keyed on the primary key, so when a unique value
@@ -522,22 +530,51 @@ def reconcile_moved_unique(local_read, cloud, table: str, *, log=print) -> int:
     it — the cloud still has the old holder and the new owner's upsert trips
     the unique constraint. Nulling the stale copy lets the push through; the
     old holder receives its own corrected value in the same run.
+
+    Only rows this run will actually push can collide, so candidates come from
+    the watermark window and the match is evaluated server-side: local sends
+    (value, owner) pairs up and the cloud returns just the rows holding a value
+    under the wrong key. The window is not a weaker guarantee than scanning
+    everything — a move that never bumped `last_updated_at` would not be pushed
+    either, so there would be no upsert to collide with.
     """
     pks = _pk_columns(local_read, table)
     if len(pks) != 1:
         return 0
     pk = pks[0]
+    wm = None if full else _get_watermark(state, table)
     freed = 0
     for col in _single_col_unique_cols(local_read, table, [pk]):
         with local_read.cursor() as lc:
-            lc.execute(f"SELECT {col}, {pk} FROM {table} WHERE {col} IS NOT NULL")
-            local_owner = {v: k for v, k in lc.fetchall()}
+            if wm is None:
+                lc.execute(
+                    f"SELECT {col}::text, {pk} FROM {table} "
+                    f" WHERE {col} IS NOT NULL")
+            else:
+                lc.execute(
+                    f"SELECT {col}::text, {pk} FROM {table} "
+                    f" WHERE {col} IS NOT NULL "
+                    f"   AND last_updated_at > %s::timestamp - {_TS_OVERLAP}",
+                    (wm,),
+                )
+            pairs = lc.fetchall()
+        if not pairs:
+            continue
+        stale: list[int] = []
+        for i in range(0, len(pairs), _MOVED_UNIQUE_CHUNK):
+            batch = pairs[i: i + _MOVED_UNIQUE_CHUNK]
+            with cloud.cursor() as cc:
+                cc.execute(
+                    f"SELECT t.{pk} FROM {table} t "
+                    f"  JOIN unnest(%s::text[], %s::bigint[]) AS p(val, owner) "
+                    f"    ON t.{col}::text = p.val "
+                    f" WHERE t.{pk} <> p.owner",
+                    ([v for v, _ in batch], [k for _, k in batch]),
+                )
+                stale.extend(r[0] for r in cc.fetchall())
+        if not stale:
+            continue
         with cloud.cursor() as cc:
-            cc.execute(f"SELECT {col}, {pk} FROM {table} WHERE {col} IS NOT NULL")
-            stale = [k for v, k in cc.fetchall()
-                     if v in local_owner and local_owner[v] != k]
-            if not stale:
-                continue
             cc.execute(f"UPDATE {table} SET {col} = NULL WHERE {pk} = ANY(%s)",
                        (stale,))
         cloud.commit()
@@ -820,7 +857,8 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
 
         for _tbl in _MOVED_UNIQUE_TABLES:
             try:
-                reconcile_moved_unique(local_read, cloud, _tbl, log=log)
+                reconcile_moved_unique(local_read, state, cloud, _tbl,
+                                       full=full, log=log)
             except Exception as exc:
                 _safe_rollback(cloud)
                 if _conn_dead(cloud):

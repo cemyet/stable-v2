@@ -78,6 +78,8 @@ import queue
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -365,12 +367,29 @@ def _apply_identity(cur, horse_id: int, ident: dict, *, now_iso: str) -> dict:
 _FetchResult = tuple  # (horse_id, letrot_id, slug, ident_dict_or_None, error_str_or_None)
 
 
+#: Wall-clock ceiling for one horse. `scrapers.letrot._get` allows three
+#: attempts at a 30 s read timeout plus backoff, so a legitimately slow fetch
+#: needs ~95 s; anything past this is the macOS SSL hang.
+_ITEM_DEADLINE_S = 120
+
+
 def _worker(in_q: "queue.Queue[tuple[int, str, str] | None]",
             out_q: "queue.Queue[_FetchResult]",
             client_lock: threading.Lock) -> None:
     # Each worker gets its own httpx.Client — connection pool, kept alive
     # across requests.
+    #
+    # The fetch runs one level deeper, on a single-slot executor, purely so this
+    # loop can walk away from it. `scrapers.letrot._get` guards against reads
+    # that outlive their timeout with SIGALRM, but signals only arm on the main
+    # thread, so here there is no ceiling at all: a hung TLS read was observed
+    # holding one worker for 61 minutes against a 30 s configured timeout, which
+    # is most of why the nightly ran 18 hours. A blocked SSL read cannot be
+    # interrupted from outside, so on deadline the thread and its client are
+    # abandoned rather than awaited, and the worker continues on fresh ones.
+    # Cost is one leaked thread per hang, which is bounded by how rare they are.
     client = make_client()
+    pool = ThreadPoolExecutor(max_workers=1)
     try:
         while True:
             item = in_q.get()
@@ -379,17 +398,33 @@ def _worker(in_q: "queue.Queue[tuple[int, str, str] | None]",
                 break
             horse_id, letrot_id, slug = item
             try:
-                ident = fetch_horse_identity(client, letrot_id, slug)
+                fut = pool.submit(fetch_horse_identity, client, letrot_id, slug)
+                ident = fut.result(timeout=_ITEM_DEADLINE_S)
                 err = None
                 if ident is None:
                     err = "identity page returned None"
+            except FuturesTimeout:
+                ident = None
+                err = f"abandoned after {_ITEM_DEADLINE_S}s hard deadline"
+                log.warning("letrot pedigree %s -> %s", letrot_id, err)
+                pool.shutdown(wait=False)
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                pool = ThreadPoolExecutor(max_workers=1)
+                client = make_client()
             except Exception as exc:
                 ident = None
                 err = repr(exc)[:200]
             out_q.put((horse_id, letrot_id, slug, ident, err))
             in_q.task_done()
     finally:
-        client.close()
+        pool.shutdown(wait=False)
+        try:
+            client.close()
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
