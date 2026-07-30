@@ -1,0 +1,172 @@
+{% extends "_layout.html" %}
+
+{% block title %}coupons - play - stable{% endblock %}
+
+{% block extra_style %}
+  .coupons-wrap {
+    width: 100%;
+    max-width: 880px;
+  }
+  .coupons-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0;
+    font-weight: 600;
+    text-transform: lowercase;
+    margin-bottom: 12px;
+  }
+  table.coupons {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.coupons th {
+    text-align: left;
+    color: var(--fg-muted);
+    font-weight: 400;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  table.coupons td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.coupons tbody tr { cursor: pointer; }
+  table.coupons tbody tr:hover { background: var(--hover); }
+  table.coupons td.num,
+  table.coupons th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.coupons td.muted { color: var(--fg-muted); }
+  .coupon-status {
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: lowercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+  }
+  .coupon-status--won  { color: #3c8420; border-color: #3c8420; }
+  .coupon-status--lost { color: #b00010; border-color: #b00010; }
+  .coupon-delete {
+    background: none; border: none; cursor: pointer;
+    color: var(--fg-muted); font-family: inherit; font-size: 13px;
+    padding: 2px 6px; border-radius: 6px; line-height: 1;
+    transition: color 0.15s, background 0.15s;
+  }
+  .coupon-delete:hover { color: #b00010; background: var(--hover); }
+  .coupons-empty {
+    color: var(--fg-muted);
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .coupons-count {
+    color: var(--fg-muted);
+    font-size: 11px;
+    margin-top: 14px;
+    text-align: center;
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="coupons-wrap">
+    <div class="coupons-title">saved coupons</div>
+    <div id="couponsMount"></div>
+    <div class="coupons-count" id="couponsCount"></div>
+    <div class="coupons-empty" id="couponsEmpty"></div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const mountEl = document.getElementById('couponsMount');
+  const countEl = document.getElementById('couponsCount');
+  const emptyEl = document.getElementById('couponsEmpty');
+
+  let coupons = [];
+
+  function statusHtml(s) {
+    const cls = s === 'won' ? ' coupon-status--won'
+              : s === 'lost' ? ' coupon-status--lost' : '';
+    return `<span class="coupon-status${cls}">${esc(s || 'saved')}</span>`;
+  }
+
+  function renderRow(c) {
+    return `
+      <tr data-coupon-id="${c.id}">
+        <td class="muted num">${c.id}</td>
+        <td>${esc(c.name || '')}</td>
+        <td class="muted">${esc(c.gameType)}${c.trackName ? ' · ' + esc(c.trackName) : ''}${c.gameDate ? ' · ' + esc(c.gameDate) : ''}</td>
+        <td class="num">${couponKr(c.cost)}</td>
+        <td class="num muted">${c.payout != null ? couponKr(c.payout) : '–'}</td>
+        <td>${statusHtml(c.status)}</td>
+        <td><button class="coupon-delete" data-delete="${c.id}" aria-label="delete coupon" title="delete">×</button></td>
+      </tr>`;
+  }
+
+  function render() {
+    if (!coupons.length) {
+      mountEl.innerHTML = '';
+      countEl.textContent = '';
+      emptyEl.innerHTML = 'no saved coupons yet — pick horses on an upcoming race in <a href="/play">play</a>';
+      return;
+    }
+    emptyEl.textContent = '';
+    countEl.textContent = `${coupons.length} coupon${coupons.length !== 1 ? 's' : ''}`;
+    const head = `
+      <thead>
+        <tr>
+          <th class="num">id</th>
+          <th>name</th>
+          <th>game</th>
+          <th class="num">cost</th>
+          <th class="num">payout</th>
+          <th>status</th>
+          <th></th>
+        </tr>
+      </thead>`;
+    const body = coupons.map(renderRow).join('');
+    mountEl.innerHTML = `<table class="coupons">${head}<tbody>${body}</tbody></table>`;
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(mountEl);
+  }
+
+  mountEl.addEventListener('click', async (ev) => {
+    const del = ev.target.closest('[data-delete]');
+    if (del) {
+      ev.stopPropagation();
+      const id = parseInt(del.dataset.delete, 10);
+      if (!confirm(`delete coupon #${id}?`)) return;
+      const res = await fetch(`/api/coupons/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        coupons = coupons.filter(c => c.id !== id);
+        render();
+      }
+      return;
+    }
+    const row = ev.target.closest('tr[data-coupon-id]');
+    if (!row) return;
+    const c = coupons.find(x => x.id === parseInt(row.dataset.couponId, 10));
+    if (c && window.Coupon) Coupon.showOverlay({ coupon: c });
+  });
+
+  async function load() {
+    try {
+      const res = await fetch('/api/coupons');
+      coupons = await res.json();
+      render();
+    } catch (e) {
+      emptyEl.textContent = 'failed to load coupons';
+    }
+  }
+
+  load();
+})();
+</script>
+{% endblock %}

@@ -82,8 +82,8 @@
 
   .imp-row { display: grid; grid-template-columns: 130px 1fr 44px; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; }
   .imp-row .nm { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .imp-bar { height: 7px; border-radius: 3px; background: var(--border); overflow: hidden; }
-  .imp-bar > span { display: block; height: 100%; background: var(--accent-cold, #6ea8fe); }
+  .imp-bar { height: 7px; border-radius: 999px; }
+  .imp-bar > span { border-radius: inherit; }
   .imp-row .val { text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
 
   .cal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -167,7 +167,7 @@
       return top.map(d => {
         const w = Math.max(0, d.importance / max * 100);
         return `<div class="imp-row"><span class="nm">${esc(d.feature)}</span>`
-             + `<span class="imp-bar"><span style="width:${w.toFixed(0)}%"></span></span>`
+             + `<span class="imp-bar bar-track"><span class="bar-fill" style="width:${w.toFixed(0)}%"></span></span>`
              + `<span class="val">${d.importance.toFixed(3)}</span></div>`;
       }).join('');
     }

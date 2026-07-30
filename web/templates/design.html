@@ -144,7 +144,7 @@
   .demo-headlines-glass-xp {
     margin-top: 28px;
     padding-top: 24px;
-    border-top: 1px dashed rgba(var(--liquid-ink-muted-rgb), 0.35);
+    border-top: 1px dashed rgba(var(--ink-muted-rgb), 0.35);
   }
 
   .demo-headlines-glass {
@@ -256,7 +256,7 @@
 
   .nav-bubble-demo .nav-inline-sep {
     font-size: 16px;
-    color: rgba(var(--liquid-ink-muted-rgb), 0.28);
+    color: rgba(var(--ink-muted-rgb), 0.28);
     padding: 0 10px;
     user-select: none;
     font-weight: 300;
@@ -483,7 +483,7 @@
   .sphere-collapsible {
     margin-top: 32px;
     padding-top: 24px;
-    border-top: 1px solid rgba(var(--liquid-ink-soft-rgb), 0.12);
+    border-top: 1px solid rgba(var(--ink-soft-rgb), 0.12);
   }
 
   .sphere-collapsible:first-child {
@@ -594,6 +594,22 @@
     display: block;
   }
 
+  /* Pearl fill — retired app-wide, kept only here as a design sandbox. */
+  :root {
+    --pearl-fill-gradient: linear-gradient(
+      135deg,
+      rgba(255, 253, 255, 0.88) 0%,
+      rgba(255, 248, 252, 0.83) 50%,
+      rgba(255, 255, 255, 0.8) 100%
+    );
+    --pearl-fill-blur: 6px;
+    --pearl-fill-saturate: 3;
+    --pearl-fill-border: rgba(255, 255, 255, 0.42);
+    --pearl-fill-shadow:
+      inset 0 1.5px 1px rgba(255, 255, 255, 0.95),
+      inset 0 -0.5px 0 rgba(255, 255, 255, 0.22);
+  }
+
   /* Fills sandbox — isolated pearl surface experiments */
   .demo-fills {
     display: flex;
@@ -613,12 +629,699 @@
       var(--pearl-glow, none);
   }
 
-  html.liquid .demo-fills .pearl-pill {
+  .demo-fills .pearl-pill {
     background: var(--pearl-fill-gradient);
     border: 1px solid var(--pearl-fill-border);
     -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
     backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
     box-shadow: var(--pearl-fill-shadow);
+  }
+
+  .demo-fill-token-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+    width: 100%;
+    max-width: 560px;
+  }
+  .demo-fill-token {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .demo-fill-token__swatch {
+    height: 52px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .demo-fill-token__swatch--logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--coupon-fill);
+  }
+  .demo-fill-token__swatch--logo .game-type-symbol--panel {
+    filter: none;
+  }
+  .demo-fill-token__meta {
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    color: var(--fg-muted);
+    line-height: 1.45;
+  }
+  .demo-fill-token__meta code {
+    color: var(--fg);
+    font-size: 10px;
+  }
+
+  /* play sandbox — coupon sphere + receipt demos */
+  .demo-play-subpanel { display: none; }
+  .demo-play-subpanel.is-active { display: block; }
+
+  .demo-coupon-sphere-wrap {
+    padding: 28px 8px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .demo-coupon-sphere {
+    position: static !important;
+    width: 70px; height: 70px;
+    flex-shrink: 0;
+  }
+  .demo-coupon-receipt {
+    position: static !important;
+    max-height: none;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  }
+  .demo-coupon-receipt.coupon-receipt--pearl {
+    background: var(--glass-fill-gradient);
+    border: 1px solid var(--glass-fill-border);
+    box-shadow: var(--glass-fill-shadow);
+  }
+  .demo-coupon-receipt.coupon-receipt--pearl {
+    -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+    backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+  }
+  .demo-play-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 480px;
+  }
+
+  /* Ink demo — suminagashi-inspired swirl inside a sphere */
+  .demo-ink {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    max-width: 640px;
+  }
+
+  .demo-ink-subtabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+
+  .demo-ink-subtabs button {
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .demo-ink-subtabs button:hover {
+    color: var(--fg);
+    background: var(--hover);
+  }
+  .demo-ink-subtabs button.active {
+    color: var(--accent-glow);
+    font-weight: var(--highlight-weight);
+  }
+
+  .demo-ink-subpanel { display: none; }
+  .demo-ink-subpanel.is-active { display: block; }
+
+  .demo-ink-subpanel .demo-ink {
+    max-width: none;
+  }
+
+  .demo-ink-sphere {
+    position: relative;
+    width: 480px;
+    max-width: 100%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    overflow: hidden;
+    align-self: center;
+    cursor: crosshair;
+    box-shadow:
+      inset 0 2px 14px rgba(26, 26, 31, 0.10),
+      inset 0 -8px 26px rgba(26, 26, 31, 0.07),
+      0 22px 44px -20px rgba(26, 26, 31, 0.40);
+  }
+
+  .demo-ink-sphere--pill {
+    width: 640px;
+    aspect-ratio: 32 / 15;
+    border-radius: 999px;
+  }
+
+  .demo-ink-sphere--box {
+    border-radius: 0;
+  }
+
+  .demo-ink-sphere canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .demo-ink-gloss {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 40%),
+      radial-gradient(circle at 68% 88%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 32%);
+  }
+
+  .demo-ink-seg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .demo-ink-seg__label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--fg-muted);
+    margin-right: 4px;
+  }
+
+  .demo-ink-seg button {
+    background: none;
+    border: 1px solid rgba(26, 26, 31, 0.15);
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--fg-muted);
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .demo-ink-seg button:hover { color: var(--fg); }
+  .demo-ink-seg button.active {
+    color: var(--accent-glow);
+    border-color: rgba(26, 26, 31, 0.4);
+    font-weight: 600;
+  }
+
+  .demo-ink-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .demo-ink-swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--fg-muted);
+  }
+
+  .demo-ink-swatch input[type="color"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(26, 26, 31, 0.18);
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+  .demo-ink-swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .demo-ink-swatch input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+  /* row ink presets sit beside the free-form color picker */
+  .ink-row-presets {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ink-row-preset {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(26, 26, 31, 0.18);
+    border-radius: 50%;
+    background: var(--ink-preset, #000);
+    cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .ink-row-preset:hover { transform: scale(1.06); }
+  .ink-row-preset.is-active {
+    box-shadow: 0 0 0 2px var(--panel-bg), 0 0 0 3px var(--fg-muted);
+  }
+
+  /* number sphere — start-number badge: ink fills the circle behind the
+     digit (not layered over it). Paper is forced to true white regardless
+     of theme, since the subtractive dye model can't produce "white ink";
+     the inactive state is really "no ink, plain white circle showing". */
+  .demo-ink-numsphere-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+  }
+  .demo-ink-numsphere,
+  .demo-ink-numbadge {
+    position: relative;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    background: #fff;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 26, 31, 0.1),
+      0 1px 2px rgba(26, 26, 31, 0.06);
+    transition: transform 0.18s cubic-bezier(.2,.9,.3,1.1), box-shadow 0.18s;
+  }
+  .demo-ink-numsphere:hover,
+  .demo-ink-numbadge:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 26, 31, 0.14),
+      0 6px 16px -8px rgba(26, 26, 31, 0.4);
+  }
+  .demo-ink-numsphere canvas,
+  .demo-ink-numbadge canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  }
+  .demo-ink-numsphere__num,
+  .demo-ink-numbadge__num {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .demo-ink-numsphere { width: 120px; height: 120px; }
+  .demo-ink-numsphere__num--base { color: #17171a; }
+  .demo-ink-numsphere__num--ink  { color: #fff; }
+  .demo-ink-numsphere__num--base,
+  .demo-ink-numsphere__num--ink { font-size: 46px; }
+
+  .demo-ink-numrow-label {
+    font-size: 11px; letter-spacing: 0.5px; color: var(--fg-muted);
+    text-align: center; margin-bottom: -8px;
+  }
+  .demo-ink-numrow { display: flex; gap: 10px; align-items: center; justify-content: center; }
+  .demo-ink-numbadge { width: 26px; height: 26px; }
+  .demo-ink-numbadge__num--base { color: #17171a; }
+  .demo-ink-numbadge__num--ink  { color: #fff; }
+  .demo-ink-numbadge__num--base,
+  .demo-ink-numbadge__num--ink { font-size: 13px; }
+
+  /* the ink layer is revealed with a radial wipe (mask-image) that grows
+     from the badge's centre — the number-sphere equivalent of the row
+     demo's left-to-right linear wipe. */
+  .demo-ink-numsphere__num--ink,
+  .demo-ink-numbadge__num--ink { -webkit-mask-image: none; mask-image: none; }
+
+  /* simplified badge used inside race rows: a real fluid swirl per-badge
+     doesn't hold up at 26px (reads as mush) and a GPU context per row
+     doesn't scale, so this is a plain, fast colour crossfade instead —
+     white circle/dark digit ↔ ink colour/white digit. */
+  .demo-ink-numbadge--simple {
+    transition: background-color 0.28s ease, box-shadow 0.18s;
+    box-shadow: inset 0 0 0 1px #fff;
+  }
+  .demo-ink-numbadge--simple.is-active {
+    background: var(--badge-ink, #4c9e29);
+  }
+  .demo-ink-numbadge__digit {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: #17171a;
+    pointer-events: none;
+    transition: color 0.2s ease;
+  }
+  .demo-ink-numbadge--simple.is-active .demo-ink-numbadge__digit { color: #fff; }
+
+  .demo-ink-sliders {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 28px;
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .demo-ink-sliders input[type="range"] {
+    width: 100%;
+    accent-color: var(--fg);
+  }
+
+  @media (max-width: 720px) {
+    .demo-ink-sliders { grid-template-columns: 1fr; }
+  }
+
+  /* ── ink rows demo — list rows that fill with ink on click ── */
+  .demo-ink-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .ink-row {
+    position: relative;
+    height: 50px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    background: #ffffff;
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 26, 31, 0.08),
+      0 1px 2px rgba(26, 26, 31, 0.06);
+    transition: transform 0.18s cubic-bezier(.2,.9,.3,1.1), box-shadow 0.18s;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  .ink-row:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 26, 31, 0.12),
+      0 6px 16px -8px rgba(26, 26, 31, 0.4);
+  }
+
+  .ink-row__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* content layers sit above the fluid canvas; only glyphs/borders paint,
+     never opaque fills, so the ink shows through everywhere */
+  .ink-row__content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    pointer-events: none;
+  }
+
+  .ink-row__num {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1.5px solid currentColor;
+  }
+
+  .ink-row__main {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+  }
+  .ink-row__name {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ink-row__sub {
+    font-size: 11px;
+    opacity: 0.72;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ink-row__stat {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+    text-align: right;
+  }
+  .ink-row__odds {
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .ink-row__odds-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
+  /* base (un-inked) text color and the white overlay revealed by the ink */
+  .ink-row__content--base { color: var(--fg-heading); }
+  .ink-row__content--ink {
+    color: #ffffff;
+    -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 0%);
+    mask-image: linear-gradient(to right, #000 0%, transparent 0%);
+  }
+
+  /* original (pre-thinning) row size, used for the demo row + race list */
+  .ink-row--lg { height: 76px; border-radius: 14px; }
+  .ink-row--lg .ink-row__content { gap: 16px; padding: 0 22px; }
+  .ink-row--lg .ink-row__num { width: 30px; height: 30px; font-size: 14px; }
+  .ink-row--lg .ink-row__name { font-size: 16px; }
+  .ink-row--lg .ink-row__sub { font-size: 12px; }
+  .ink-row--lg .ink-row__odds { font-size: 17px; }
+
+  .ink-row--scratched { opacity: 0.45; cursor: default; }
+  .ink-row--scratched:hover {
+    transform: none;
+    box-shadow:
+      inset 0 0 0 1px rgba(26, 26, 31, 0.08),
+      0 1px 2px rgba(26, 26, 31, 0.06);
+  }
+  .ink-row--scratched .ink-row__name { text-decoration: line-through; }
+
+  /* upcoming-race list below the sandbox demo row */
+  .ink-race { margin-top: 30px; width: 100%; max-width: 860px; }
+  .ink-race + .ink-race { margin-top: 22px; }
+
+  /* dense, line-separated race list — mirrors the real race table:
+     sharp corners, same border treatment as regular app panels, thin
+     rows divided by hairlines, lots of columns. */
+  .ink-racelist {
+    border-radius: 0;
+    overflow: hidden;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+  }
+  .ink-row--race {
+    height: 40px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .ink-row--race:hover { transform: none; box-shadow: none; }
+  .ink-row--race + .ink-row--race { border-top: 1px solid var(--list-line, var(--border)); }
+
+  .ink-row--race .ink-row__content { gap: 12px; padding: 0 16px; font-size: 12px; }
+  .ink-row--race .rr-num {
+    flex: none; width: 26px; height: 26px;
+  }
+  /* start-number badge sits above the row ink canvas + text layers */
+  .ink-row--race .ink-row__num-badge {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 26px;
+    height: 26px;
+    pointer-events: none;
+  }
+  .ink-row--race .ink-row__num-badge .demo-ink-numbadge {
+    width: 100%;
+    height: 100%;
+    cursor: inherit;
+    box-shadow: inset 0 0 0 1px #fff;
+  }
+  .ink-row--race .ink-row__num-badge .demo-ink-numbadge:hover {
+    transform: none;
+    box-shadow: inset 0 0 0 1px #fff;
+  }
+  /* scratched rows keep a plain centred number, no badge */
+  .ink-row--race.ink-row--scratched .rr-num {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 26px;
+  }
+  .ink-row--race .rr-horse {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600;
+  }
+  .ink-row--race .rr-sa {
+    color: var(--fg-muted); font-size: 10px; letter-spacing: 0.5px; margin-left: 4px;
+  }
+  /* driver + trainer grouped tightly together, set apart from the horse
+     name with extra breathing room on their left. */
+  .ink-row--race .rr-people {
+    flex: 0 0 auto; display: inline-flex; gap: 8px; margin-left: 12px;
+  }
+  .ink-row--race .rr-drv,
+  .ink-row--race .rr-trn {
+    flex: 0 0 96px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--fg-muted);
+  }
+  .ink-row--race .rr-gal,
+  .ink-row--race .rr-winpct,
+  .ink-row--race .rr-cleanpct {
+    flex: 0 0 38px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg-muted);
+  }
+  .ink-row--race .gal-risk { font-variant-numeric: tabular-nums; }
+  .ink-row--race .gal-empty { color: var(--fg-muted); }
+  .ink-row--race .gal-lo  { color: var(--fg-muted); }
+  .ink-row--race .gal-mid { color: var(--chart-odds, #d97706); }
+  .ink-row--race .gal-hi  { color: var(--accent-cold, #b00010); }
+  .ink-row--race .rr-pct {
+    flex: 0 0 52px; text-align: right;
+    font-variant-numeric: tabular-nums; font-weight: 600;
+  }
+  .ink-row--race .rr-odds {
+    flex: 0 0 42px; text-align: right;
+    font-weight: 400; color: var(--fg-muted); font-variant-numeric: tabular-nums;
+  }
+  .ink-row--race .rr-tr { font-size: 9px; margin-right: 2px; }
+  .ink-row--race .rr-tr.up { color: var(--accent-hot, #ff5a5a); }
+  .ink-row--race .rr-tr.dn { color: var(--accent-cold, #5aa6ff); }
+
+  /* equipment: shoes (front/back) + sulky type. muted/small, red when changed
+     since the last race — same semantics as the regular entries table. */
+  /* fixed width + min-width:0 so the shoe/sulky content can't blow past the
+     flex-basis (flex items default to min-width:auto and would otherwise grow
+     to fit, shifting the driver/trainer block out of line with the header). */
+  .ink-row--race .rr-eq {
+    flex: 0 0 64px; min-width: 0;
+    display: inline-flex; align-items: center; justify-content: flex-end;
+    gap: 10px; color: var(--fg-muted);
+  }
+  .ink-row--race .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .ink-row--race .shoe-icon { width: 15px; height: 15px; color: currentColor; display: inline-block; }
+  .ink-row--race .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .ink-row--race .rr-sulky { font-size: 11px; letter-spacing: 0.2px; }
+  .ink-row--race .rr-sulky.sulky-changed { color: var(--accent-warn); }
+
+  /* ink (revealed) layer: muted columns inherit the flipped text color
+     (white over dark ink, dark over light ink) and just read softer. */
+  .ink-row--race .ink-row__content--ink .rr-sa,
+  .ink-row--race .ink-row__content--ink .rr-drv,
+  .ink-row--race .ink-row__content--ink .rr-trn,
+  .ink-row--race .ink-row__content--ink .rr-gal,
+  .ink-row--race .ink-row__content--ink .rr-winpct,
+  .ink-row--race .ink-row__content--ink .rr-cleanpct,
+  .ink-row--race .ink-row__content--ink .rr-eq,
+  .ink-row--race .ink-row__content--ink .rr-odds { color: inherit; opacity: 0.78; }
+  /* changed-equipment red needs to glow to stay legible against dark ink */
+  .ink-row--race .ink-row__content--ink .shoe-icon.shoe-changed {
+    color: #ff5252;
+    filter: drop-shadow(0 0 4px rgba(255, 82, 82, 0.9));
+    opacity: 1;
+  }
+  .ink-row--race .ink-row__content--ink .rr-sulky.sulky-changed {
+    color: #ff5252;
+    text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
+    opacity: 1;
+  }
+  /* gal% used its own fixed colors (lo = muted grey, mid/hi = fixed hues) that
+     ignored the ink layer's white-on-dark flip and vanished once filled. */
+  .ink-row--race .ink-row__content--ink .gal-lo,
+  .ink-row--race .ink-row__content--ink .gal-empty { color: inherit; }
+  .ink-row--race .ink-row__content--ink .gal-mid { color: #f0a83c; }
+  .ink-row--race .ink-row__content--ink .gal-hi { color: #ff5252; }
+
+  /* column-title header row, reusing the data-row column widths so labels
+     line up exactly with the cells below. */
+  .ink-row--head {
+    height: 22px;
+    cursor: default;
+    color: var(--fg-muted);
+    text-transform: lowercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-row--head .ink-row__content { align-items: center; }
+  .ink-row--head + .ink-row--race { border-top: none; }
+  .ink-row--head .rr-num,
+  .ink-row--head .rr-horse,
+  .ink-row--head .rr-drv,
+  .ink-row--head .rr-trn,
+  .ink-row--head .rr-gal,
+  .ink-row--head .rr-winpct,
+  .ink-row--head .rr-cleanpct,
+  .ink-row--head .rr-pct,
+  .ink-row--head .rr-odds {
+    font-size: 10px; font-weight: 400; color: inherit;
+  }
+  /* the big tabular start-number sets rr-num's baseline in data rows; keep the
+     header's "#" caption at the label size so it doesn't tower over the rest. */
+  .ink-row--head .rr-num { font-size: 10px; text-align: center; line-height: 26px; }
+
+  /* tillägg divider — small inset row between distance groups (volts),
+     same treatment as the real entries table. */
+  .ink-row--tillagg {
+    padding: 5px 16px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    background: var(--hover);
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-racelist .empty-section {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  /* scratched — mirrors the real entries table: a thin red line through
+     the middle of the row, muted/faded text, no "scr" label. */
+  .ink-row--race.ink-row--scratched {
+    opacity: 1;
+    position: relative;
+  }
+  .ink-row--race.ink-row--scratched .ink-row__content { color: var(--fg-muted); opacity: 0.55; }
+  .ink-row--race.ink-row--scratched::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 1.2px;
+    margin-top: -0.6px;
+    background: rgba(255, 45, 45, 0.7);
+    pointer-events: none;
   }
 
 {% endblock %}
@@ -634,7 +1337,7 @@
 {% block scripts %}
 <style>
   /* Nav bubble demo — late cascade overrides (scoped, never touches production header) */
-  html.liquid .nav-bubble-demo .fluid-nav-highlight .fluid-bubble__label {
+  .nav-bubble-demo .fluid-nav-highlight .fluid-bubble__label {
     color: var(--fluid-toggle-fg) !important;
     font-size: 14px !important;
     font-weight: 600 !important;
@@ -645,14 +1348,14 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  html.liquid .nav-bubble-demo .subnav .fluid-nav-highlight .fluid-bubble__label {
+  .nav-bubble-demo .subnav .fluid-nav-highlight .fluid-bubble__label {
     text-transform: lowercase;
   }
 
-  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target),
-  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target):hover,
-  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner a.active:not(.is-bubble-target),
-  html.liquid .nav-bubble-demo .nav-inline-segment .nav-bar-inner:not(:hover):not(:focus-within) a:not(.is-bubble-target) {
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target),
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner a:not(.is-bubble-target):hover,
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner a.active:not(.is-bubble-target),
+  .nav-bubble-demo .nav-inline-segment .nav-bar-inner:not(:hover):not(:focus-within) a:not(.is-bubble-target) {
     color: rgba(90, 90, 94, 0.34) !important;
     -webkit-text-fill-color: rgba(90, 90, 94, 0.34) !important;
     font-weight: 400 !important;
@@ -705,8 +1408,8 @@
     max-width: 140px !important;
   }
 
-  html.liquid .nav-bubble-demo .nav-inline-segment.topnav a:hover,
-  html.liquid .nav-bubble-demo .nav-inline-segment.subnav a:hover {
+  .nav-bubble-demo .nav-inline-segment.topnav a:hover,
+  .nav-bubble-demo .nav-inline-segment.subnav a:hover {
     padding: 8px 18px !important;
     font-weight: 400 !important;
   }
@@ -747,7 +1450,7 @@ const COMPONENTS = [
     label: 'panels',
     render: () => `
       <h2>panels</h2>
-      <p class="demo-label">Pearl fill panels — warm glass surface at 100% intensity.</p>
+      <p class="demo-label">Glass panels — sharp outline, transparent fill.</p>
       <div class="demo-row">
         <div class="glass-panel demo-glass">
           default
@@ -777,7 +1480,7 @@ const COMPONENTS = [
         </div>
       `)}
       ${sphereCollapsibleSection('form-panels', 'form panels', `
-        <p class="demo-label">Frosted pearl fill — sign-based green/red deltas.</p>
+        <p class="demo-label">Sharp glass fill — sign-based green/red deltas.</p>
         <div class="demo-form-panels-grid">
           ${formPanelDemoHtml({ variant: 'hot', frosted: true, experiment: true })}
           ${formPanelDemoHtml({ variant: 'cold', frosted: true, experiment: true })}
@@ -974,7 +1677,7 @@ const COMPONENTS = [
     label: 'sliders',
     render: () => `
       <h2>sliders</h2>
-      <p class="demo-label">Ink-tinted slider fill on pearl panels — drag the bar edge (same as production stats filters).</p>
+      <p class="demo-label">Pearl glass fill on the active portion — drag the bar edge (same as production stats filters).</p>
       <div class="glass-panel" style="padding:20px 22px 24px;max-width:560px">
       <div class="demo-row" style="flex-direction:column;align-items:stretch;gap:32px">
         <div>
@@ -1004,6 +1707,31 @@ const COMPONENTS = [
         <div>
           <p class="demo-label">intensity <span class="val" id="demoFillIntensityVal" style="float:right;color:var(--fg);font-size:11px;text-transform:none;letter-spacing:0">0</span></p>
           <div id="demoFillIntensity"></div>
+        </div>
+      </div>
+      <p class="demo-label" style="margin-top:36px">Play / coupon tokens — production CSS variables.</p>
+      <div class="demo-fill-token-grid">
+        <div class="demo-fill-token">
+          <div class="demo-fill-token__swatch" style="background:var(--coupon-fill)"></div>
+          <div class="demo-fill-token__meta">
+            coupon fill<br><code>--coupon-fill</code><br>rgb(255, 246, 207)
+          </div>
+        </div>
+        <div class="demo-fill-token">
+          <div class="demo-fill-token__swatch demo-fill-token__swatch--logo">
+            <span class="game-type-symbol game-type-symbol--panel" style="color:var(--coupon-logo-fill)">
+              ${typeof gameTypeSymbolById === 'function' ? gameTypeSymbolById('v64', { size: 'panel' }) : 'V64'}
+            </span>
+          </div>
+          <div class="demo-fill-token__meta">
+            game logo fill<br><code>--coupon-logo-fill</code><br>rgb(50, 76, 105)
+          </div>
+        </div>
+        <div class="demo-fill-token">
+          <div class="demo-fill-token__swatch" style="background:var(--coupon-ink)"></div>
+          <div class="demo-fill-token__meta">
+            coupon ink<br><code>--coupon-ink</code><br>rgb(89, 89, 83)
+          </div>
         </div>
       </div>
     `
@@ -1198,12 +1926,212 @@ const COMPONENTS = [
       `, { open: true })}
     `
   },
+  {
+    id: 'play',
+    label: 'play',
+    render: () => `
+      <h2>play</h2>
+      <nav class="demo-ink-subtabs" id="playSubtabs">
+        <button type="button" data-play-subtab="sphere" class="active">coupon sphere</button>
+        <button type="button" data-play-subtab="coupon">coupon</button>
+        <button type="button" data-play-subtab="coupon-xp">experimental coupon</button>
+      </nav>
+      <div class="demo-play-subpanel is-active" data-play-subpanel="sphere">
+        <p class="demo-label">Floating cost sphere — saved coupon <em>Blank / Zarajevo Games</em> (792,00 kr).</p>
+        <div class="demo-coupon-sphere-wrap">
+          <button type="button" class="coupon-sphere demo-coupon-sphere" aria-label="coupon demo">
+            <span class="coupon-sphere__cost">${designCouponAmount(DESIGN_DEMO_COUPON.cost)}</span>
+            <span class="coupon-sphere__meta">${DESIGN_DEMO_COUPON.gameType.toLowerCase()}</span>
+          </button>
+          <button type="button" class="coupon-sphere demo-coupon-sphere is-incomplete" aria-label="coupon demo incomplete">
+            <span class="coupon-sphere__cost">42,00</span>
+            <span class="coupon-sphere__meta">4/6</span>
+          </button>
+        </div>
+      </div>
+      <div class="demo-play-subpanel" data-play-subpanel="coupon">
+        <p class="demo-label">Coupon receipt — saved <em>Blank / Zarajevo Games</em> · Bergsåker V64 2026-07-23.</p>
+        <div class="demo-play-stack">
+          ${designCouponReceiptHtml()}
+        </div>
+      </div>
+      <div class="demo-play-subpanel" data-play-subpanel="coupon-xp">
+        <p class="demo-label">Experimental — same saved coupon with pearl glass fill instead of coupon yellow.</p>
+        <div class="demo-play-stack">
+          ${designCouponReceiptHtml({ pearl: true })}
+        </div>
+      </div>
+    `
+  },
+  {
+    id: 'ink',
+    label: 'ink',
+    render: () => `
+      <h2>ink</h2>
+      <nav class="demo-ink-subtabs" id="inkSubtabs">
+        <button type="button" data-ink-subtab="sandbox" class="active">sandbox</button>
+        <button type="button" data-ink-subtab="spheres">spheres</button>
+        <button type="button" data-ink-subtab="panels">panels</button>
+        <button type="button" data-ink-subtab="rows">rows</button>
+      </nav>
+      <div class="demo-ink-subpanel is-active" data-ink-subpanel="sandbox">
+        <p class="demo-label">Suminagashi — GPU fluid sim. Pick two inks, press start. Drag to stir the water, click to drop more ink.</p>
+        <div class="demo-ink">
+          <div class="demo-ink-sphere" id="inkSphere">
+            <canvas id="inkCanvas"></canvas>
+            <div class="demo-ink-gloss" aria-hidden="true"></div>
+          </div>
+          <div class="demo-ink-controls">
+            <label class="demo-ink-swatch">ink 1 <input type="color" id="inkColorA" value="#000000"></label>
+            <label class="demo-ink-swatch">ink 2 <input type="color" id="inkColorB" value="#000000"></label>
+            <label class="demo-ink-swatch">paper <input type="color" id="inkPaper" value="#f2effb"></label>
+            <button class="ghost" id="inkWashBtn">wash</button>
+          </div>
+          <div class="demo-ink-controls">
+            <div class="demo-ink-seg" id="inkShape">
+              <span class="demo-ink-seg__label">shape</span>
+              <button data-shape="circle" class="active">circle</button>
+              <button data-shape="pill">pill</button>
+              <button data-shape="box">box</button>
+            </div>
+          </div>
+          <div class="demo-ink-sliders">
+            <div>
+              <p class="demo-label">speed <span class="val" id="inkSpeedVal" style="float:right;color:var(--fg)">0.5</span></p>
+              <input type="range" id="inkSpeed" min="10" max="300" value="50">
+            </div>
+            <div>
+              <p class="demo-label">swirl <span class="val" id="inkSwirlVal" style="float:right;color:var(--fg)">1.0</span></p>
+              <input type="range" id="inkSwirl" min="0" max="300" value="100">
+            </div>
+            <div>
+              <p class="demo-label">density <span class="val" id="inkDensityVal" style="float:right;color:var(--fg)">2.0</span></p>
+              <input type="range" id="inkDensity" min="10" max="250" value="200">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-ink-subpanel" data-ink-subpanel="spheres"></div>
+      <div class="demo-ink-subpanel" data-ink-subpanel="panels"></div>
+      <div class="demo-ink-subpanel" data-ink-subpanel="rows"></div>
+    `
+  },
 ];
 
 const nav = document.getElementById('designNav');
 const stage = document.getElementById('designStage');
 
 const SPHERE_COLLAPSIBLE_STORAGE = 'design-sphere-collapsible';
+
+// Saved production coupon — id 5, "Blank / Zarajevo Games" (Bergsåker V64 2026-07-23).
+const DESIGN_DEMO_COUPON = {
+  name: 'Blank / Zarajevo Games',
+  gameType: 'V64',
+  trackName: 'Bergsåker',
+  gameDate: '2026-07-23',
+  linePrice: 1,
+  numLines: 792,
+  cost: 792,
+  legs: [
+    { leg: 1, numbers: [1], horseNames: { '1': 'Blank (US)' } },
+    { leg: 2, numbers: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 14] },
+    { leg: 3, numbers: [2, 9, 10] },
+    { leg: 4, numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    { leg: 5, numbers: [9], horseNames: { '9': 'Zarajevo Games' } },
+    { leg: 6, numbers: [4, 10] },
+  ],
+};
+
+function designCouponAmount(v) {
+  return Number(v).toLocaleString('sv-SE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function designCouponKr(v) {
+  const frac = Math.abs(v - Math.round(v)) > 1e-9;
+  return v.toLocaleString('sv-SE', {
+    minimumFractionDigits: frac ? 2 : 0,
+    maximumFractionDigits: 2,
+  }) + ' kr';
+}
+
+function designCouponPickHtml(numbers, horseNames) {
+  if (!numbers.length) {
+    return '<span class="coupon-pick coupon-pick--empty">–</span>';
+  }
+  if (numbers.length === 1) {
+    const n = numbers[0];
+    const raw = horseNames && (horseNames[n] ?? horseNames[String(n)]);
+    if (raw) {
+      let text = String(raw).replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
+      const m = text.match(/\(([A-Z]{2})\)/);
+      let flag = 'se';
+      if (m) {
+        flag = m[1].toLowerCase();
+        text = text.replace(/\s*\([A-Z]{2}\)\s*$/g, '').trim();
+      }
+      text = text.trim().toUpperCase();
+      return `<span class="coupon-pick coupon-pick--banker">${n} ${esc(text)} <img class="flag" src="https://flagcdn.com/${flag}.svg" alt="${flag.toUpperCase()}"></span>`;
+    }
+  }
+  return numbers.map(n => `<span class="coupon-pick">${n}</span>`).join('');
+}
+
+function designCouponReceiptHtml({ pearl = false } = {}) {
+  const c = DESIGN_DEMO_COUPON;
+  const symbol = typeof gameTypeSymbolById === 'function'
+    ? gameTypeSymbolById(c.gameType.toLowerCase(), { size: 'panel' })
+    : `<span>${esc(c.gameType)}</span>`;
+  const pearlCls = pearl ? ' coupon-receipt--pearl' : '';
+  const counts = c.legs.map(l => l.numbers.length);
+  const rowsHtml = c.legs.map(l => `
+          <tr>
+            <td class="coupon-receipt__leg">${l.leg}</td>
+            <td><div class="coupon-receipt__nums">${designCouponPickHtml(l.numbers, l.horseNames)}</div></td>
+          </tr>`).join('');
+  return `
+    <div class="coupon-receipt demo-coupon-receipt${pearlCls}" role="img" aria-label="${esc(c.name)} coupon demo">
+      <div class="coupon-receipt__head">
+        <div>
+          <div class="coupon-receipt__game">${symbol}</div>
+          <div class="coupon-receipt__track">${esc(c.trackName.toLowerCase())} · ${esc(c.gameDate)}</div>
+        </div>
+        <div class="coupon-receipt__cost">
+          <span class="coupon-receipt__cost-value">${designCouponAmount(c.cost)}</span>
+        </div>
+      </div>
+      <table class="coupon-receipt__table">
+        <tbody>${rowsHtml}
+        </tbody>
+      </table>
+      <div class="coupon-receipt__details">
+        <div>${counts.join(' × ')} = ${c.numLines.toLocaleString('sv-SE')} lines</div>
+        <div>${c.numLines.toLocaleString('sv-SE')} × ${designCouponKr(c.linePrice)} = ${designCouponKr(c.cost)}</div>
+        <div class="total">total: ${designCouponKr(c.cost)}</div>
+      </div>
+    </div>`;
+}
+
+function initDemoPlay(root) {
+  const VALID = ['sphere', 'coupon', 'coupon-xp'];
+  const querySub = new URLSearchParams(location.search).get('playsub');
+  let subtab = VALID.includes(querySub) ? querySub : (initDemoPlay._subtab || 'sphere');
+
+  function activate(id) {
+    subtab = initDemoPlay._subtab = id;
+    root.querySelectorAll('[data-play-subtab]').forEach(b =>
+      b.classList.toggle('active', b.dataset.playSubtab === id));
+    root.querySelectorAll('[data-play-subpanel]').forEach(p =>
+      p.classList.toggle('is-active', p.dataset.playSubpanel === id));
+  }
+
+  root.querySelectorAll('[data-play-subtab]').forEach(b => {
+    b.addEventListener('click', () => activate(b.dataset.playSubtab));
+  });
+  activate(subtab);
+}
 
 function sphereCollapsibleSection(id, title, bodyHtml, { open = false } = {}) {
   return `
@@ -1307,8 +2235,16 @@ function afterRender(id) {
     initDemoFills(stage);
   }
 
+  if (id === 'play') {
+    initDemoPlay(stage);
+  }
+
   if (id === 'caret') {
     initDemoCaret(stage);
+  }
+
+  if (id === 'ink') {
+    initDemoInk(stage);
   }
 
 }
@@ -1323,17 +2259,7 @@ function lerpChannel(from, to, t) {
 
 function applyPearlIntensity(el, intensity, opts = {}) {
   const t = Math.max(0, Math.min(100, intensity)) / 100;
-  const liquid = document.documentElement.classList.contains('liquid');
   const slider = !!opts.slider;
-
-  if (!liquid) {
-    el.style.background = '';
-    el.style.removeProperty('--pearl-blur');
-    el.style.removeProperty('--pearl-saturate');
-    el.style.removeProperty('--pearl-inset');
-    el.style.removeProperty('--pearl-glow');
-    return;
-  }
 
   const alpha = lerp(0.52, 0.88, t);
   const blur = lerp(12, 6, t);
@@ -1433,6 +2359,1822 @@ function initDemoCaret(root) {
   syncFakeCaret();
 }
 
+function initDemoInk(root) {
+  if (initDemoInk._destroy) {
+    initDemoInk._destroy();
+    initDemoInk._destroy = null;
+  }
+
+  const VALID_SUBTABS = ['sandbox', 'spheres', 'panels', 'rows'];
+  const querySub = new URLSearchParams(location.search).get('inksub');
+  let subtab = (VALID_SUBTABS.includes(querySub) ? querySub : null) || initDemoInk._subtab || 'sandbox';
+
+  function destroySandbox() {
+    if (initDemoInk._sandboxDestroy) {
+      initDemoInk._sandboxDestroy();
+      initDemoInk._sandboxDestroy = null;
+    }
+  }
+  function destroyRows() {
+    if (initDemoInk._rowsDestroy) {
+      initDemoInk._rowsDestroy();
+      initDemoInk._rowsDestroy = null;
+    }
+  }
+  function destroySpheres() {
+    if (initDemoInk._spheresDestroy) {
+      initDemoInk._spheresDestroy();
+      initDemoInk._spheresDestroy = null;
+    }
+  }
+  function destroyActive() {
+    destroySandbox();
+    destroyRows();
+    destroySpheres();
+  }
+
+  function showSubtab(id) {
+    subtab = initDemoInk._subtab = id;
+    root.querySelectorAll('[data-ink-subtab]').forEach(b =>
+      b.classList.toggle('active', b.dataset.inkSubtab === id));
+    root.querySelectorAll('[data-ink-subpanel]').forEach(p =>
+      p.classList.toggle('is-active', p.dataset.inkSubpanel === id));
+    if (id === 'sandbox') initInkSandbox(root);
+    else if (id === 'rows') initInkRows(root);
+    else if (id === 'spheres') initInkSpheres(root);
+  }
+
+  root.querySelectorAll('[data-ink-subtab]').forEach(b => {
+    b.addEventListener('click', () => {
+      const id = b.dataset.inkSubtab;
+      if (subtab === id) return;
+      destroyActive();
+      showSubtab(id);
+    });
+  });
+
+  initDemoInk._destroy = destroyActive;
+  showSubtab(subtab);
+}
+
+/* ── ink sandbox — suminagashi GPU fluid (WebGL2 Stable Fluids) ──
+   Real incompressible fluid solver: low-res velocity field advects a
+   higher-res dye field. Dye is absorbance → paper × exp(-A). */
+function initInkSandbox(root) {
+  const sphereEl = root.querySelector('#inkSphere');
+  if (!sphereEl) return;
+
+  /* ── UI state ── */
+  const colorA = root.querySelector('#inkColorA');
+  const colorB = root.querySelector('#inkColorB');
+  const paperInput = root.querySelector('#inkPaper');
+  const controls = {
+    speed:   { input: root.querySelector('#inkSpeed'),   val: root.querySelector('#inkSpeedVal'),   fmt: v => (v / 100).toFixed(1) },
+    swirl:   { input: root.querySelector('#inkSwirl'),   val: root.querySelector('#inkSwirlVal'),   fmt: v => (v / 100).toFixed(1) },
+    density: { input: root.querySelector('#inkDensity'), val: root.querySelector('#inkDensityVal'), fmt: v => (v / 100).toFixed(1) },
+  };
+  Object.values(controls).forEach(c => {
+    c.input.addEventListener('input', () => { c.val.textContent = c.fmt(+c.input.value); });
+  });
+  const ctl = name => +controls[name].input.value / 100;
+  // Slider 1.0 maps to the calm pace that looked right in testing.
+  const spd = () => ctl('speed') * 0.1;
+
+  const SHAPE_IDS = { circle: 0, pill: 1, box: 2 };
+  let shape = initDemoInk._shape || 'circle';
+
+  function syncSegButtons(segId, dataKey, current) {
+    root.querySelectorAll(`#${segId} button`).forEach(b =>
+      b.classList.toggle('active', b.dataset[dataKey] === current));
+  }
+  function applyShapeClass() {
+    sphereEl.classList.toggle('demo-ink-sphere--pill', shape === 'pill');
+    sphereEl.classList.toggle('demo-ink-sphere--box', shape === 'box');
+    syncSegButtons('inkShape', 'shape', shape);
+  }
+  root.querySelectorAll('#inkShape button').forEach(b => {
+    b.addEventListener('click', () => {
+      if (shape === b.dataset.shape) return;
+      shape = initDemoInk._shape = b.dataset.shape;
+      applyShapeClass();
+      rebuild();
+    });
+  });
+
+  // Paper defaults to the page's live background so the sphere reads as
+  // "cut into" the page rather than a separate card — until the user
+  // picks a color explicitly, keep it in sync with the active theme.
+  function themeBg() {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    return /^#[0-9a-f]{6}$/i.test(v) ? v : '#f2effb';
+  }
+  if (!initDemoInk._paperCustom) paperInput.value = themeBg();
+  paperInput.addEventListener('input', () => { initDemoInk._paperCustom = true; });
+
+  function hexRgb01(hex) {
+    return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
+  }
+  /* display color → Beer-Lambert absorbance vector */
+  function hexAbsorption(hex, strength) {
+    const c = hexRgb01(hex).map(v => Math.max(v, 0.012));
+    return c.map(v => -Math.log(v) * strength);
+  }
+
+  /* ── pointer (attached once; delegates to current sim) ── */
+  const pointer = { down: false, moved: false, x: 0, y: 0, px: 0, py: 0, color: '#000000' };
+  let clickTick = 0;
+  function toUV(e) {
+    const rect = sphereEl.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) / rect.width, y: 1 - (e.clientY - rect.top) / rect.height };
+  }
+  sphereEl.addEventListener('pointerdown', e => {
+    const p = toUV(e);
+    pointer.down = true;
+    pointer.x = pointer.px = p.x;
+    pointer.y = pointer.py = p.y;
+    pointer.color = clickTick++ % 2 === 0 ? colorA.value : colorB.value;
+    if (sim) sim.drop(p.x, p.y, pointer.color, 0.5 + Math.random() * 0.4);
+  });
+  sphereEl.addEventListener('pointermove', e => {
+    const p = toUV(e);
+    pointer.px = pointer.x; pointer.py = pointer.y;
+    pointer.x = p.x; pointer.y = p.y;
+    pointer.moved = true;
+  });
+  const onUp = () => { pointer.down = false; };
+  addEventListener('pointerup', onUp);
+
+  root.querySelector('#inkWashBtn').addEventListener('click', () => { if (sim) sim.wash(); });
+
+  let sim = null;
+  function rebuild() {
+    if (sim) { sim.destroy(); sim = null; }
+    const oldCanvas = sphereEl.querySelector('canvas');
+    const canvas = document.createElement('canvas');
+    canvas.id = 'inkCanvas';
+    if (oldCanvas) oldCanvas.replaceWith(canvas);
+    else sphereEl.prepend(canvas);
+    sim = buildSim(canvas);
+  }
+
+  initDemoInk._sandboxDestroy = () => {
+    if (sim) { sim.destroy(); sim = null; }
+    removeEventListener('pointerup', onUp);
+  };
+
+  /* ── one fluid sim instance, rebuilt on shape change ── */
+  function buildSim(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = sphereEl.clientWidth || 480;
+  const cssH = sphereEl.clientHeight || cssW;
+  const W = Math.round(cssW * dpr);
+  const H = Math.round(cssH * dpr);
+  canvas.width = W;
+  canvas.height = H;
+  const aspect = W / H;
+  const shapeId = SHAPE_IDS[shape];
+
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
+  if (!gl || !gl.getExtension('EXT_color_buffer_float')) {
+    sphereEl.innerHTML = '<p class="demo-label" style="display:flex;align-items:center;justify-content:center;height:100%">webgl2 float rendering unavailable</p>';
+    return null;
+  }
+
+  const SIM_RES = 192;                       // velocity grid (short side)
+  const DYE_RES = 1024;                      // ink grid (long side, above canvas res to fight advection blur)
+  const PRESSURE_ITER = 24;
+  const VEL_DISSIPATION = 0.09;
+  const DYE_DISSIPATION = 0.006;
+  const SPLAT_FORCE = 5200;
+
+  const simW = aspect >= 1 ? Math.round(SIM_RES * aspect) : SIM_RES;
+  const simH = aspect >= 1 ? SIM_RES : Math.round(SIM_RES / aspect);
+  const dyeW = aspect >= 1 ? DYE_RES : Math.round(DYE_RES * aspect);
+  const dyeH = aspect >= 1 ? Math.round(DYE_RES / aspect) : DYE_RES;
+
+  /* ── shaders ── */
+  const VERT = `#version 300 es
+    layout(location=0) in vec2 aPos;
+    out vec2 vUv;
+    void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  /* shared header: signed distance to the vessel wall (<0 inside) */
+  const HEAD = `#version 300 es
+    precision highp float; precision highp sampler2D;
+    in vec2 vUv; out vec4 frag;
+    uniform float uShape, uAspect;
+    float sdShape(vec2 uv){
+      vec2 p = (uv - 0.5) * vec2(uAspect, 1.0);
+      if (uShape < 0.5) return length(p) - 0.5;
+      if (uShape < 1.5) {
+        vec2 q = abs(p) - vec2(max(uAspect * 0.5 - 0.5, 0.0), 0.0);
+        return length(max(q, 0.0)) - 0.5;
+      }
+      vec2 q = abs(p) - vec2(uAspect * 0.5, 0.5);
+      return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
+    }`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const vertShader = compile(gl.VERTEX_SHADER, VERT);
+  function prog(body) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vertShader);
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + body));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const info = gl.getActiveUniform(p, i);
+      u[info.name] = gl.getUniformLocation(p, info.name);
+    }
+    return { p, u };
+  }
+  function setShapeUniforms(pr) {
+    gl.uniform1f(pr.u.uShape, shapeId);
+    gl.uniform1f(pr.u.uAspect, aspect);
+  }
+
+  const splatProg = prog(`
+    uniform sampler2D uTarget;
+    uniform vec2 uPoint;
+    uniform vec3 uColor;
+    uniform float uRadius;
+    void main(){
+      vec2 d = vUv - uPoint;
+      d.x *= uAspect;
+      frag = vec4(texture(uTarget, vUv).rgb + exp(-dot(d,d)/uRadius) * uColor, 1.0);
+    }`);
+
+  const advectProg = prog(`
+    uniform sampler2D uVelocity, uSource;
+    uniform vec2 uTexel;
+    uniform float uDt, uDissipation, uEdgeMask;
+    void main(){
+      vec2 coord = vUv - uDt * texture(uVelocity, vUv).xy * uTexel;
+      vec3 result = texture(uSource, coord).rgb / (1.0 + uDissipation * uDt);
+      // no-slip only in a thin band at the wall so ink can reach the rim
+      float m = 1.0 - smoothstep(-0.012, 0.0, sdShape(vUv));
+      frag = vec4(result * mix(1.0, m, uEdgeMask), 1.0);
+    }`);
+
+  const curlProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).y;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).y;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
+    }`);
+
+  const vorticityProg = prog(`
+    uniform sampler2D uVelocity, uCurl;
+    uniform vec2 uTexel;
+    uniform float uCurlStrength, uDt, uSpin;
+    void main(){
+      float L = texture(uCurl, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uCurl, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uCurl, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uCurl, vUv + vec2(0.0, uTexel.y)).x;
+      float C = texture(uCurl, vUv).x;
+      vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+      force /= length(force) + 0.0001;
+      force *= uCurlStrength * C;
+      force.y *= -1.0;
+      vec2 vel = texture(uVelocity, vUv).xy + force * uDt;
+      // ambient circulation: slow solid-body-ish rotation, strongest mid-radius
+      vec2 dc = vUv - 0.5;
+      float rr = length(dc) * 2.0;
+      vel += vec2(-dc.y, dc.x) * uSpin * uDt * smoothstep(1.0, 0.25, rr);
+      frag = vec4(clamp(vel, -1000.0, 1000.0), 0.0, 1.0);
+    }`);
+
+  const divergeProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).y;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).y;
+      vec2 C = texture(uVelocity, vUv).xy;
+      if (vUv.x - uTexel.x < 0.0) L = -C.x;
+      if (vUv.x + uTexel.x > 1.0) R = -C.x;
+      if (vUv.y - uTexel.y < 0.0) B = -C.y;
+      if (vUv.y + uTexel.y > 1.0) T = -C.y;
+      frag = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
+    }`);
+
+  const clearProg = prog(`
+    uniform sampler2D uTexture;
+    uniform float uValue;
+    void main(){ frag = uValue * texture(uTexture, vUv); }`);
+
+  const pressureProg = prog(`
+    uniform sampler2D uPressure, uDivergence;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      float div = texture(uDivergence, vUv).x;
+      frag = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
+    }`);
+
+  const gradientProg = prog(`
+    uniform sampler2D uPressure, uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(texture(uVelocity, vUv).xy - vec2(R - L, T - B), 0.0, 1.0);
+    }`);
+
+  /* paper × exp(-absorbance) + paper structure noise */
+  const displayProg = prog(`
+    uniform sampler2D uDye;
+    uniform vec3 uPaper;
+    uniform float uFiber;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+                 mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+    }
+    void main(){
+      float fiber = (noise(vUv * 420.0) * 0.028
+                   + noise(vUv * 180.0) * 0.022
+                   + noise(vUv * 60.0)  * 0.018) * uFiber;
+      vec3 A = texture(uDye, vUv).rgb;
+      vec3 col = uPaper * exp(-A) + fiber;
+      col *= 1.0 - 0.06 * smoothstep(-0.10, 0.02, sdShape(vUv));
+      frag = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }`);
+
+  /* ── fullscreen quad + render targets ── */
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.BLEND);
+
+  function makeRT(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    return { tex, fbo, w, h };
+  }
+  function makeDouble(w, h) {
+    return {
+      read: makeRT(w, h), write: makeRT(w, h), texel: [1 / w, 1 / h],
+      swap() { const t = this.read; this.read = this.write; this.write = t; },
+    };
+  }
+
+  const velocity = makeDouble(simW, simH);
+  const dye = makeDouble(dyeW, dyeH);
+  const pressure = makeDouble(simW, simH);
+  const curlRT = makeRT(simW, simH);
+  const divergeRT = makeRT(simW, simH);
+
+  function bindTex(tex, unit) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    return unit;
+  }
+  function blit(target) {
+    if (target) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, target.w, target.h);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  /* ── splats ── */
+  function splat(field, x, y, color3, radiusMul) {
+    gl.useProgram(splatProg.p);
+    setShapeUniforms(splatProg);
+    gl.uniform1i(splatProg.u.uTarget, bindTex(field.read.tex, 0));
+    gl.uniform2f(splatProg.u.uPoint, x, y);
+    gl.uniform3f(splatProg.u.uColor, color3[0], color3[1], color3[2]);
+    gl.uniform1f(splatProg.u.uRadius, 0.0026 * (radiusMul || 1));
+    blit(field.write);
+    field.swap();
+  }
+  const splatVelocity = (x, y, fx, fy, mul) => splat(velocity, x, y, [fx, fy, 0], mul);
+  const splatDye = (x, y, abs3, mul) => splat(dye, x, y, abs3, mul);
+
+  function dropInk(x, y, hex, strength) {
+    splatDye(x, y, hexAbsorption(hex, strength * 0.9 * ctl('density')), 0.7);
+    const a = Math.random() * Math.PI * 2;
+    const sp = (60 + Math.random() * 80) * (0.5 + spd());
+    splatVelocity(x, y, Math.cos(a) * sp, Math.sin(a) * sp, 1.2);
+  }
+
+  let washing = 0;
+
+  function applyPointer() {
+    if (!pointer.moved) return;
+    pointer.moved = false;
+    const dx = pointer.x - pointer.px;
+    const dy = pointer.y - pointer.py;
+    if (Math.abs(dx) + Math.abs(dy) < 1e-6) return;
+    splatVelocity(pointer.x, pointer.y, dx * SPLAT_FORCE, dy * SPLAT_FORCE, pointer.down ? 2.0 : 1.4);
+    if (pointer.down) {
+      const sp = Math.min(Math.hypot(dx, dy) * 30, 1);
+      splatDye(pointer.x, pointer.y, hexAbsorption(pointer.color, (0.1 + sp * 0.2) * ctl('density')), 0.9);
+    }
+  }
+
+  /* ── simulation step ── */
+  function step(dt) {
+    gl.useProgram(curlProg.p);
+    gl.uniform1i(curlProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(curlProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(curlRT);
+
+    gl.useProgram(vorticityProg.p);
+    gl.uniform1i(vorticityProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(vorticityProg.u.uCurl, bindTex(curlRT.tex, 1));
+    gl.uniform2f(vorticityProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(vorticityProg.u.uCurlStrength, 22 * ctl('swirl'));
+    gl.uniform1f(vorticityProg.u.uSpin, 15 * spd());
+    gl.uniform1f(vorticityProg.u.uDt, dt);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(divergeProg.p);
+    gl.uniform1i(divergeProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(divergeProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(divergeRT);
+
+    gl.useProgram(clearProg.p);
+    gl.uniform1i(clearProg.u.uTexture, bindTex(pressure.read.tex, 0));
+    gl.uniform1f(clearProg.u.uValue, 0.8);
+    blit(pressure.write);
+    pressure.swap();
+
+    gl.useProgram(pressureProg.p);
+    gl.uniform2f(pressureProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(pressureProg.u.uDivergence, bindTex(divergeRT.tex, 1));
+    for (let i = 0; i < PRESSURE_ITER; i++) {
+      gl.uniform1i(pressureProg.u.uPressure, bindTex(pressure.read.tex, 0));
+      blit(pressure.write);
+      pressure.swap();
+    }
+
+    gl.useProgram(gradientProg.p);
+    gl.uniform1i(gradientProg.u.uPressure, bindTex(pressure.read.tex, 0));
+    gl.uniform1i(gradientProg.u.uVelocity, bindTex(velocity.read.tex, 1));
+    gl.uniform2f(gradientProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(advectProg.p);
+    setShapeUniforms(advectProg);
+    gl.uniform2f(advectProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(advectProg.u.uDt, dt);
+    gl.uniform1f(advectProg.u.uDissipation, VEL_DISSIPATION);
+    gl.uniform1f(advectProg.u.uEdgeMask, 1);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, 0);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.uniform1f(advectProg.u.uDissipation, DYE_DISSIPATION + (washing > 0 ? 2.4 : 0));
+    gl.uniform1f(advectProg.u.uEdgeMask, 0);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, bindTex(dye.read.tex, 1));
+    blit(dye.write);
+    dye.swap();
+
+    if (washing > 0) washing -= dt;
+  }
+
+  /* ── main loop ── */
+  let rafId = 0;
+  let lastT = performance.now();
+  function frame(now) {
+    if (!canvas.isConnected) {
+      // tab switched away: full teardown of listeners + GL
+      if (initDemoInk._destroy) {
+        initDemoInk._destroy();
+        initDemoInk._destroy = null;
+      }
+      return;
+    }
+    rafId = requestAnimationFrame(frame);
+
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+    dt = Math.min(dt, 1 / 30);
+    if (dt <= 0) return;
+    dt *= 0.4 + 0.6 * spd();
+
+    applyPointer();
+    step(dt);
+
+    const paper = hexRgb01(paperInput.value);
+    gl.useProgram(displayProg.p);
+    setShapeUniforms(displayProg);
+    gl.uniform1i(displayProg.u.uDye, bindTex(dye.read.tex, 0));
+    gl.uniform3f(displayProg.u.uPaper, paper[0], paper[1], paper[2]);
+    gl.uniform1f(displayProg.u.uFiber, 0.0);
+    blit(null);
+  }
+
+  rafId = requestAnimationFrame(frame);
+
+  return {
+    drop: dropInk,
+    wash() { washing = 1.6; },
+    destroy() {
+      cancelAnimationFrame(rafId);
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    },
+  };
+  }
+
+  applyShapeClass();
+  rebuild();
+}
+
+/* ── ink rows — list rows that flood-fill with ink on click ──
+   Each row runs its own compact Stable-Fluids sim in a box domain
+   (the texture edges are the walls). A "fill front" is driven
+   left→right by injecting dye + rightward, turbulent velocity at the
+   moving front; dye persists behind it so the row floods with an
+   organic edge. Clicking a filled row reverses: a wash front sweeps
+   back right→left and drains it. A masked white text layer is
+   revealed in lock-step with the front so text stays legible on ink. */
+function initInkRows(root) {
+  const panel = root.querySelector('[data-ink-subpanel="rows"]');
+  if (!panel) return;
+
+  const INK = '#f4ffe5'; // pale-green row fill — pairs with the green number sphere
+  const NUM_INK = '#4c9e29'; // rgb(76, 158, 41) — sphere ink behind start numbers
+  const INK_PRESETS = [
+    { id: 'favorite', hex: '#f4ffe5', label: 'favorite' },
+  ];
+  const RACES = ['2026-07-15_14_8'];
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // Paper matches the live page background so rows blend into the app
+  // instead of sitting in separate white cards.
+  const themeBg = () => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    return /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+  };
+
+  // Header row shares the exact same column markup/classes as data rows so
+  // widths line up without duplicating the flex layout.
+  const headRowHtml = () => `
+    <div class="ink-row ink-row--race ink-row--head">
+      <div class="ink-row__content">
+        <span class="rr-num">#</span>
+        <span class="rr-horse">horse</span>
+        <span class="rr-people">
+          <span class="rr-drv">driver</span>
+          <span class="rr-trn">trainer</span>
+        </span>
+        <span class="rr-eq"></span>
+        <span class="rr-gal">gal%</span>
+        <span class="rr-winpct">win%</span>
+        <span class="rr-cleanpct">clean%</span>
+        <span class="rr-pct">row%</span>
+        <span class="rr-odds">odds</span>
+      </div>
+    </div>`;
+
+  panel.innerHTML = `
+    <p class="demo-label">Tap a runner to ink it in, tap again to drain. Fluid floods left→right; the label flips to stay legible.</p>
+    <div class="demo-ink-controls" style="margin-bottom:10px">
+      <div class="ink-row-presets" id="inkRowPresets">
+        ${INK_PRESETS.map((p, i) =>
+          `<button type="button" class="ink-row-preset${i === 0 ? ' is-active' : ''}" data-ink="${p.hex}" style="--ink-preset:${p.hex}" title="${p.label}" aria-label="${p.label}"></button>`
+        ).join('')}
+      </div>
+      <label class="demo-ink-swatch">ink <input type="color" id="inkRowColor" value="${INK}"></label>
+    </div>
+    ${RACES.map((_, i) => `
+      <div class="ink-race">
+        <div class="ink-racelist" id="inkRaceRows-${i}">${headRowHtml()}</div>
+      </div>`).join('')}`;
+
+  let activeInk = INK;
+  let aborted = false;
+  const sims = [];
+
+  const colorInput = panel.querySelector('#inkRowColor');
+  const presetBtns = [...panel.querySelectorAll('.ink-row-preset')];
+
+  const applyInk = hex => {
+    activeInk = hex;
+    colorInput.value = hex;
+    presetBtns.forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.ink.toLowerCase() === hex.toLowerCase());
+    });
+    sims.forEach(s => s.setInk(activeInk));
+  };
+
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => applyInk(btn.dataset.ink));
+  });
+  colorInput.addEventListener('input', () => applyInk(colorInput.value));
+
+  // cleanup registered synchronously so a fast subtab switch still tears down
+  initDemoInk._rowsDestroy = () => {
+    aborted = true;
+    sims.forEach(s => s.destroy());
+    sims.length = 0;
+  };
+
+  // --- dense race-row rendering (mirrors the real race table) -------------
+  // flagify()/swedishSex() are global layout helpers; fall back gracefully.
+  const nameHtml = n => (typeof flagify === 'function')
+    ? flagify(n)
+    : esc(String(n == null ? '' : n).replace(/\*/g, ''));
+  const swSex = (typeof swedishSex === 'function') ? swedishSex : (s => String(s || '').toLowerCase());
+  const sexAge = e => {
+    const s = swSex(e.sex);
+    const a = e.age != null ? e.age : '';
+    return (s || a) ? `${s}${a}` : '';
+  };
+  const pctCell = l => {
+    if (!l || l.betDist == null) return '';
+    let tr = '';
+    if (l.trend != null && Math.abs(l.trend) > 0.003) {
+      tr = l.trend > 0 ? '<span class="rr-tr up">▲</span>' : '<span class="rr-tr dn">▼</span>';
+    }
+    return `${tr}${l.betDist.toFixed(1)}%`;
+  };
+  const oddsTxt = l => (l && l.winOdds != null) ? l.winOdds.toFixed(2) : '';
+
+  // gal% (expected galopp risk), win% and clean% (win% over non-galopp/DQ
+  // starts) — same fields/thresholds as the real entries table.
+  const galCell = e => {
+    const risk = e.xgal_general ?? e.xgal_track;
+    if (risk == null) return '<span class="gal-empty"></span>';
+    const p = risk * 100;
+    const cls = p >= 25 ? 'gal-hi' : p >= 15 ? 'gal-mid' : 'gal-lo';
+    return `<span class="gal-risk ${cls}">${p.toFixed(0)}%</span>`;
+  };
+  const winRateCell = e => {
+    if (!e.pre_starts) return '';
+    return Math.round((e.pre_wins / e.pre_starts) * 100) + '%';
+  };
+  const cleanRateCell = e => {
+    if (!e.pre_galadj_starts) return '';
+    return Math.round((e.pre_galadj_wins / e.pre_galadj_starts) * 100) + '%';
+  };
+
+  // Horseshoe icons — same paths/semantics as the real entries table:
+  // shoe_code '1'=none '2'=back only '3'=front only '4'=both; *_changed -> red.
+  const SHOE_ON_PATH =
+    'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+    ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+    'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+    's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+  const SHOE_OFF_PATH =
+    'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+    'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+    'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+    'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+    'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+    '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+    '.22-.04.36-.04.42.12l.42 1.24Z' +
+    'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+  const shoeIcon = (has, changed) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/>
+    </svg>`;
+  const shoeCells = (code, frontChanged, backChanged) => {
+    if (!code) return '';
+    const frontHas = code === '3' || code === '4';
+    const backHas = code === '2' || code === '4';
+    return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+  };
+  const sulkyCell = e => {
+    if (!e.sulky) return '';
+    const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+    return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+  };
+  const eqCell = e => `${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${sulkyCell(e)}`;
+
+  const raceRowHtml = (e, l, scratched) => {
+    const sa = sexAge(e);
+    const numSpacer = '<span class="rr-num"></span>';
+    const numBadge = scratched ? '' : `
+      <div class="ink-row__num-badge">
+        <div class="demo-ink-numbadge demo-ink-numbadge--simple" data-num-badge>
+          <span class="demo-ink-numbadge__digit">${esc(e.number)}</span>
+        </div>
+      </div>`;
+    const cell = kind => `
+      <div class="ink-row__content ink-row__content--${kind}"${kind === 'ink' ? ' aria-hidden="true"' : ''}>
+        ${scratched ? `<span class="rr-num">${esc(e.number)}</span>` : numSpacer}
+        <span class="rr-horse">${nameHtml(e.horse_name)}${sa ? ` <span class="rr-sa">${esc(sa)}</span>` : ''}</span>
+        <span class="rr-people">
+          <span class="rr-drv">${esc(e.driver_short || e.driver_name || '')}</span>
+          <span class="rr-trn">${esc(e.trainer_short || e.trainer_name || '')}</span>
+        </span>
+        <span class="rr-eq">${eqCell(e)}</span>
+        <span class="rr-gal">${galCell(e)}</span>
+        <span class="rr-winpct">${winRateCell(e)}</span>
+        <span class="rr-cleanpct">${cleanRateCell(e)}</span>
+        <span class="rr-pct">${pctCell(l)}</span>
+        <span class="rr-odds">${oddsTxt(l)}</span>
+      </div>`;
+    return `
+      <div class="ink-row ink-row--race${scratched ? ' ink-row--scratched' : ''}"${scratched ? '' : ' data-row'}>
+        <canvas class="ink-row__canvas"></canvas>
+        ${numBadge}
+        ${cell('base')}${cell('ink')}
+      </div>`;
+  };
+
+  // For volt starts the distance changes between program numbers; insert a
+  // small tillägg divider labelled with the offset from the base distance —
+  // same logic/labelling as the real race page.
+  const tillaggRowsHtml = sorted => {
+    const distances = sorted.map(e => e.distance).filter(d => d != null);
+    const baseDist = distances.length ? Math.min(...distances) : null;
+    let prevDist = null;
+    const parts = [];
+    sorted.forEach(e => {
+      if (e.distance != null && baseDist != null && prevDist != null && e.distance !== prevDist) {
+        const offset = e.distance - baseDist;
+        parts.push(`<div class="ink-row--tillagg">${offset > 0 ? '+' : ''}${offset}m</div>`);
+      }
+      if (e.distance != null) prevDist = e.distance;
+      const l = e._live || {};
+      const scratched = !!(e.withdrawn || l.scratched);
+      parts.push(raceRowHtml(e, l, scratched));
+    });
+    return parts.join('');
+  };
+
+  // fetch a real race (runner list + live win odds) and render its rows
+  const loadRace = async (raceId, mountId) => {
+    const j = url => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
+    const [detail, live] = await Promise.all([
+      j(`/api/race/atg/${raceId}`),
+      j(`/api/race/atg/${raceId}/live`),
+    ]);
+    if (aborted) return;
+
+    const raceRows = panel.querySelector(`#${mountId}`);
+    if (!raceRows) return;
+    if (!detail || !(detail.results || []).length) {
+      raceRows.insertAdjacentHTML('beforeend', '<div class="empty-section">race unavailable</div>');
+      return;
+    }
+
+    const liveByNum = {};
+    (live && live.starts || []).forEach(s => { liveByNum[s.number] = s; });
+
+    const sorted = detail.results.slice().sort((a, b) =>
+      (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
+    sorted.forEach(e => { e._live = liveByNum[e.number]; });
+
+    raceRows.insertAdjacentHTML('beforeend', tillaggRowsHtml(sorted));
+    raceRows.querySelectorAll('[data-row]').forEach(rowEl => {
+      const sim = buildRowFluid(rowEl, activeInk, themeBg(), NUM_INK);
+      if (sim) sims.push(sim);
+    });
+  };
+
+  RACES.forEach((raceId, i) => loadRace(raceId, `inkRaceRows-${i}`));
+}
+
+function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
+  const canvas = rowEl.querySelector('.ink-row__canvas');
+  const overlay = rowEl.querySelector('.ink-row__content--ink');
+  const numBadge = rowEl.querySelector('[data-num-badge]');
+  const numSim = numBadge && numInkHex
+    ? buildNumberBadgeSimple(numBadge, numInkHex)
+    : null;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = rowEl.clientWidth || 640;
+  const cssH = rowEl.clientHeight || 76;
+  const W = Math.max(2, Math.round(cssW * dpr));
+  const H = Math.max(2, Math.round(cssH * dpr));
+  canvas.width = W;
+  canvas.height = H;
+  const aspect = W / H;
+
+  // Short, wide rows deposit less dye per column (aspect-corrected splats) and
+  // give the swirl no vertical room, so they read pale. Scale ink density and
+  // splat size up as the row falls below the tall demo's height so thin race
+  // rows saturate the same way. Demo (76px) → 1.0, race rows (40px) → ~1.9.
+  const REF_H = 76;
+  const densityBoost = Math.min(Math.max(REF_H / cssH, 1), 2.2);
+
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
+  if (!gl || !gl.getExtension('EXT_color_buffer_float')) return null;
+
+  const SIM_H = 56, SIM_W = Math.min(Math.round(SIM_H * aspect), 640);
+  const DYE_H = 200, DYE_W = Math.min(Math.round(DYE_H * aspect), 1600);
+  const PRESSURE_ITER = 20;
+  const VEL_DISSIPATION = 0.1;
+  const CURL = 20;
+
+  function hexRgb01(hex) {
+    return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
+  }
+  function hexAbsorption(hex, strength) {
+    return hexRgb01(hex).map(v => -Math.log(Math.max(v, 0.012)) * strength);
+  }
+  let absorb = hexAbsorption(inkHex, 1.3 * densityBoost);
+
+  function applyInkColor(hex) {
+    absorb = hexAbsorption(hex, 1.3 * densityBoost);
+    const rgb = hexRgb01(hex);
+    const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    overlay.style.color = lum < 0.5 ? '#ffffff' : '#111114';
+  }
+  applyInkColor(inkHex);
+
+  /* ── shaders ── */
+  const VERT = `#version 300 es
+    layout(location=0) in vec2 aPos;
+    out vec2 vUv;
+    void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  const HEAD = `#version 300 es
+    precision highp float; precision highp sampler2D;
+    in vec2 vUv; out vec4 frag;`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const vertShader = compile(gl.VERTEX_SHADER, VERT);
+  function prog(body) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vertShader);
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + body));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const info = gl.getActiveUniform(p, i);
+      u[info.name] = gl.getUniformLocation(p, info.name);
+    }
+    return { p, u };
+  }
+
+  const splatProg = prog(`
+    uniform sampler2D uTarget;
+    uniform vec2 uPoint;
+    uniform vec3 uColor;
+    uniform float uRadius, uAspect;
+    void main(){
+      vec2 d = vUv - uPoint;
+      d.x *= uAspect;
+      frag = vec4(texture(uTarget, vUv).rgb + exp(-dot(d,d)/uRadius) * uColor, 1.0);
+    }`);
+
+  const advectProg = prog(`
+    uniform sampler2D uVelocity, uSource;
+    uniform vec2 uTexel;
+    uniform float uDt, uDissipation, uWashAmt, uWashX;
+    void main(){
+      vec2 coord = vUv - uDt * texture(uVelocity, vUv).xy * uTexel;
+      float diss = uDissipation + uWashAmt * step(uWashX, vUv.x);
+      frag = vec4(texture(uSource, coord).rgb / (1.0 + diss * uDt), 1.0);
+    }`);
+
+  const curlProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).y;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).y;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
+    }`);
+
+  const vorticityProg = prog(`
+    uniform sampler2D uVelocity, uCurl;
+    uniform vec2 uTexel;
+    uniform float uCurlStrength, uDt;
+    void main(){
+      float L = texture(uCurl, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uCurl, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uCurl, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uCurl, vUv + vec2(0.0, uTexel.y)).x;
+      float C = texture(uCurl, vUv).x;
+      vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+      force /= length(force) + 0.0001;
+      force *= uCurlStrength * C;
+      force.y *= -1.0;
+      vec2 vel = texture(uVelocity, vUv).xy + force * uDt;
+      frag = vec4(clamp(vel, -1000.0, 1000.0), 0.0, 1.0);
+    }`);
+
+  const divergeProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).y;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).y;
+      vec2 C = texture(uVelocity, vUv).xy;
+      if (vUv.x - uTexel.x < 0.0) L = -C.x;
+      if (vUv.x + uTexel.x > 1.0) R = -C.x;
+      if (vUv.y - uTexel.y < 0.0) B = -C.y;
+      if (vUv.y + uTexel.y > 1.0) T = -C.y;
+      frag = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
+    }`);
+
+  const clearProg = prog(`
+    uniform sampler2D uTexture;
+    uniform float uValue;
+    void main(){ frag = uValue * texture(uTexture, vUv); }`);
+
+  const pressureProg = prog(`
+    uniform sampler2D uPressure, uDivergence;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      float div = texture(uDivergence, vUv).x;
+      frag = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
+    }`);
+
+  const gradientProg = prog(`
+    uniform sampler2D uPressure, uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(texture(uVelocity, vUv).xy - vec2(R - L, T - B), 0.0, 1.0);
+    }`);
+
+  const displayProg = prog(`
+    uniform sampler2D uDye;
+    uniform vec3 uPaper;
+    void main(){
+      vec3 A = texture(uDye, vUv).rgb;
+      frag = vec4(clamp(uPaper * exp(-A), 0.0, 1.0), 1.0);
+    }`);
+
+  /* ── quad + render targets ── */
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.BLEND);
+
+  function makeRT(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    return { tex, fbo, w, h };
+  }
+  function makeDouble(w, h) {
+    return {
+      read: makeRT(w, h), write: makeRT(w, h), texel: [1 / w, 1 / h],
+      swap() { const t = this.read; this.read = this.write; this.write = t; },
+    };
+  }
+
+  const velocity = makeDouble(SIM_W, SIM_H);
+  const dye = makeDouble(DYE_W, DYE_H);
+  const pressure = makeDouble(SIM_W, SIM_H);
+  const curlRT = makeRT(SIM_W, SIM_H);
+  const divergeRT = makeRT(SIM_W, SIM_H);
+
+  function bindTex(tex, unit) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    return unit;
+  }
+  function blit(target) {
+    if (target) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, target.w, target.h);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  function splat(field, x, y, color3, radiusMul) {
+    gl.useProgram(splatProg.p);
+    gl.uniform1f(splatProg.u.uAspect, aspect);
+    gl.uniform1i(splatProg.u.uTarget, bindTex(field.read.tex, 0));
+    gl.uniform2f(splatProg.u.uPoint, x, y);
+    gl.uniform3f(splatProg.u.uColor, color3[0], color3[1], color3[2]);
+    gl.uniform1f(splatProg.u.uRadius, 0.0026 * radiusMul);
+    blit(field.write);
+    field.swap();
+  }
+
+  // Three rails at the front: top edge, centre, bottom edge. Edges get shear
+  // for swirl; the centre lane closes the gap without the flat backfill look.
+  function injectFill(px) {
+    const t = performance.now() * 0.001;
+    const lanes = [0.06, 0.16, 0.50, 0.84, 0.94];
+    for (const y of lanes) {
+      const wob = Math.sin(t * 2.6 + y * 9.0) * 0.02;
+      const x = Math.min(Math.max(px + wob, 0.0), 1.0);
+      splat(dye, x, y, absorb, 6 * densityBoost);
+      const shear = Math.sin(t * 4.0 + y * 8.0) * (y === 0.5 ? 8 : 16);
+      splat(velocity, x, y, [30, shear, 0], 8);
+    }
+  }
+
+  /* DRAIN: no new ink, just nudge the fluid leftward at the receding front */
+  function injectDrain(px) {
+    for (let i = 0; i < 5; i++) {
+      const y = (i + 0.5) / 5;
+      splat(velocity, px, y, [-24, (Math.random() - 0.5) * 18, 0], 8);
+    }
+  }
+
+  function step(dt, washAmt, washX) {
+    gl.useProgram(curlProg.p);
+    gl.uniform1i(curlProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(curlProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(curlRT);
+
+    gl.useProgram(vorticityProg.p);
+    gl.uniform1i(vorticityProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(vorticityProg.u.uCurl, bindTex(curlRT.tex, 1));
+    gl.uniform2f(vorticityProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(vorticityProg.u.uCurlStrength, CURL);
+    gl.uniform1f(vorticityProg.u.uDt, dt);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(divergeProg.p);
+    gl.uniform1i(divergeProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(divergeProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(divergeRT);
+
+    gl.useProgram(clearProg.p);
+    gl.uniform1i(clearProg.u.uTexture, bindTex(pressure.read.tex, 0));
+    gl.uniform1f(clearProg.u.uValue, 0.8);
+    blit(pressure.write);
+    pressure.swap();
+
+    gl.useProgram(pressureProg.p);
+    gl.uniform2f(pressureProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(pressureProg.u.uDivergence, bindTex(divergeRT.tex, 1));
+    for (let i = 0; i < PRESSURE_ITER; i++) {
+      gl.uniform1i(pressureProg.u.uPressure, bindTex(pressure.read.tex, 0));
+      blit(pressure.write);
+      pressure.swap();
+    }
+
+    gl.useProgram(gradientProg.p);
+    gl.uniform1i(gradientProg.u.uPressure, bindTex(pressure.read.tex, 0));
+    gl.uniform1i(gradientProg.u.uVelocity, bindTex(velocity.read.tex, 1));
+    gl.uniform2f(gradientProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(advectProg.p);
+    gl.uniform2f(advectProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(advectProg.u.uDt, dt);
+    gl.uniform1f(advectProg.u.uWashAmt, 0.0);
+    gl.uniform1f(advectProg.u.uWashX, 0.0);
+    gl.uniform1f(advectProg.u.uDissipation, VEL_DISSIPATION);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, 0);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.uniform1f(advectProg.u.uDissipation, 0.0);
+    gl.uniform1f(advectProg.u.uWashAmt, washAmt);
+    gl.uniform1f(advectProg.u.uWashX, washX);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, bindTex(dye.read.tex, 1));
+    blit(dye.write);
+    dye.swap();
+  }
+
+  /* ── fill state ── */
+  let filled = false;
+  let progress = 0;                      // 0 = empty, 1 = full
+  let flushT = 0;                        // extra wash time so no ink lingers
+  let mergeT = 0;                        // post-fill swirl time before freeze
+  const MERGE_HOLD = 6.5;                // seconds to swirl after sweep ends
+  rowEl.addEventListener('click', () => {
+    const wasFilled = filled;
+    filled = !filled;
+    if (!wasFilled) injectFill(0);
+    if (numSim) numSim.setActive(filled);
+    ensureRunning();
+  });
+
+  function updateOverlayMask() {
+    let g;
+    if (progress >= 0.999) g = 'linear-gradient(#000, #000)';
+    else if (progress <= 0.001) g = 'linear-gradient(transparent, transparent)';
+    else {
+      const front = progress * 100;
+      const a = Math.max(0, front - 7);
+      const b = Math.min(100, front + 3);
+      g = `linear-gradient(to right, #000 ${a}%, transparent ${b}%)`;
+    }
+    overlay.style.webkitMaskImage = g;
+    overlay.style.maskImage = g;
+  }
+  updateOverlayMask();
+
+  const PAPER = (paperHex && /^#[0-9a-f]{6}$/i.test(paperHex)) ? hexRgb01(paperHex) : [1, 1, 1];
+  let rafId = 0;
+  let running = false;
+  let lastT = performance.now();
+
+  // Wake the sim on interaction. Idle rows sleep (loop fully stopped) so a page
+  // full of rows costs nothing until one is actually animating.
+  function ensureRunning() {
+    if (running || !canvas.isConnected) return;
+    running = true;
+    lastT = performance.now();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function frame(now) {
+    if (!canvas.isConnected) { running = false; return; }
+
+    // Tab hidden / low-power throttle: don't let a huge dt gap hose the fluid,
+    // but keep the loop alive so it resumes cleanly when the tab is shown.
+    if (document.hidden) {
+      lastT = now;
+      rafId = requestAnimationFrame(frame);
+      return;
+    }
+
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+    if (dt > 0.1) dt = 1 / 60;
+    dt = Math.min(dt, 1 / 30);
+    if (dt <= 0) { rafId = requestAnimationFrame(frame); return; }
+
+    const target = filled ? 1 : 0;
+    let mode = 0;
+    if (progress < target) { progress = Math.min(target, progress + dt / 0.57); mode = 1; }
+    else if (progress > target) { progress = Math.max(target, progress - dt / 0.57); mode = -1; }
+    updateOverlayMask();
+
+    if (filled && mode === 1) injectFill(progress);
+
+    // Keep sim alive briefly after the sweep ends so ink can swirl and merge.
+    if (filled) {
+      if (mode === 1) mergeT = MERGE_HOLD;
+      else if (progress >= 0.999 && mergeT > 0) mergeT -= dt;
+    } else {
+      mergeT = 0;
+    }
+
+    // Wash while draining, then keep flushing the whole row briefly after the
+    // front reaches 0 so no residual ink is left behind.
+    let washAmt = 0, washX = progress;
+    if (!filled) {
+      if (progress > 0.0001) {
+        washAmt = 7.0; washX = progress; flushT = 1.2;
+        if (mode === -1) injectDrain(progress);
+      } else if (flushT > 0) {
+        washAmt = 9.0; washX = 0.0; flushT -= dt;
+      }
+    }
+
+    // Settled rows (fully filled or fully drained) freeze the fluid solve.
+    // Without this, zero dye dissipation + leftover velocity slowly slosh all
+    // the ink to the left wall — looks fine at first, weird after a minute.
+    const settled = (filled && progress >= 0.999 && mergeT <= 0) ||
+                    (!filled && progress <= 0.001 && flushT <= 0);
+    if (!settled) step(dt, washAmt, washX);
+
+    gl.useProgram(displayProg.p);
+    gl.uniform1i(displayProg.u.uDye, bindTex(dye.read.tex, 0));
+    gl.uniform3f(displayProg.u.uPaper, PAPER[0], PAPER[1], PAPER[2]);
+    blit(null);
+
+    // We just drew the final frame of a settled row; stop looping (no per-frame
+    // reblits) until a click wakes us again. This is what keeps a list of rows
+    // from all burning GPU time at rest.
+    if (settled) { running = false; return; }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  // Draw the initial (empty) state once, then sleep until interaction.
+  ensureRunning();
+
+  return {
+    setInk(hex) { applyInkColor(hex); },
+    destroy() {
+      running = false;
+      cancelAnimationFrame(rafId);
+      if (numSim) numSim.destroy();
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    },
+  };
+}
+
+/* ── number-badge ink (simple, no canvas) ──
+   A real fluid swirl doesn't hold up at 26px (reads as mush) and a GPU
+   context per badge doesn't scale to a full race. This is just a fast CSS
+   colour crossfade — white circle/dark digit <-> ink colour/white digit —
+   driven by toggling one class and one custom property. Zero animation
+   loop, zero draw calls; the transition is pure CSS. */
+function buildNumberBadgeSimple(el, hex) {
+  el.style.setProperty('--badge-ink', hex);
+  let active = false;
+  return {
+    setActive(on) {
+      if (active === on) return;
+      active = on;
+      el.classList.toggle('is-active', active);
+    },
+    setActiveInk(h) { el.style.setProperty('--badge-ink', h); },
+    destroy() {},
+  };
+}
+
+/* ── ink spheres — start-number badge: ink fills the circle *behind* the
+   digit and toggles between two states on click:
+     inactive → no ink, plain white circle, dark number
+     active   → circle floods with the chosen ink color, number flips white
+   Same Stable-Fluids engine as the row demo, but the domain is a small
+   square (cropped to a circle by CSS) and the "front" is radial instead of
+   left-to-right, since there's no natural sweep direction in a badge. */
+function initInkSpheres(root) {
+  const panel = root.querySelector('[data-ink-subpanel="spheres"]');
+  if (!panel) return;
+
+  const PRESETS = [
+    { hex: '#000000', label: 'default' },
+    { hex: '#f4ffe5', label: 'favorite' },
+  ];
+  let activeHex = PRESETS[0].hex;
+  const insts = [];
+
+  panel.innerHTML = `
+    <p class="demo-label">Click a number to toggle it — the ink swirls in behind the digit from the centre out, and the digit flips to stay legible.</p>
+    <div class="demo-ink-controls" style="margin-bottom:22px">
+      <div class="ink-row-presets" id="numSpherePresets">
+        ${PRESETS.map((p, i) =>
+          `<button type="button" class="ink-row-preset${i === 0 ? ' is-active' : ''}" data-ink="${p.hex}" style="--ink-preset:${p.hex}" title="${p.label}" aria-label="${p.label}"></button>`
+        ).join('')}
+      </div>
+      <label class="demo-ink-swatch">active ink <input type="color" id="numSphereColor" value="${activeHex}"></label>
+    </div>
+    <div class="demo-ink-numsphere-wrap">
+      <div class="demo-ink-numsphere" data-num-toggle>
+        <canvas></canvas>
+        <span class="demo-ink-numsphere__num demo-ink-numsphere__num--base">7</span>
+        <span class="demo-ink-numsphere__num demo-ink-numsphere__num--ink" aria-hidden="true">7</span>
+      </div>
+      <p class="demo-ink-numrow-label">at actual row scale</p>
+      <div class="demo-ink-numrow">
+        ${[1, 2, 3, 4, 5, 6].map(n => `
+          <div class="demo-ink-numbadge" data-num-toggle>
+            <canvas></canvas>
+            <span class="demo-ink-numbadge__num demo-ink-numbadge__num--base">${n}</span>
+            <span class="demo-ink-numbadge__num demo-ink-numbadge__num--ink" aria-hidden="true">${n}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  panel.querySelectorAll('[data-num-toggle]').forEach(el => {
+    const inst = buildNumberInk(el, activeHex);
+    insts.push(inst);
+  });
+
+  const colorInput = panel.querySelector('#numSphereColor');
+  const presetBtns = [...panel.querySelectorAll('.ink-row-preset')];
+  const applyActiveColor = hex => {
+    activeHex = hex;
+    colorInput.value = hex;
+    presetBtns.forEach(btn => {
+      btn.classList.toggle('is-active', btn.dataset.ink.toLowerCase() === hex.toLowerCase());
+    });
+    insts.forEach(inst => inst.setActiveInk(activeHex));
+  };
+  presetBtns.forEach(btn => btn.addEventListener('click', () => applyActiveColor(btn.dataset.ink)));
+  colorInput.addEventListener('input', () => applyActiveColor(colorInput.value));
+
+  initDemoInk._spheresDestroy = () => {
+    insts.forEach(inst => inst.destroy());
+    insts.length = 0;
+  };
+}
+
+function buildNumberInk(el, activeHex, opts = {}) {
+  const interactive = opts.interactive !== false;
+  const canvas = el.querySelector('canvas');
+  const baseNum = el.querySelector('[class$="__num--base"]');
+  const inkNum = el.querySelector('[class$="__num--ink"]');
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cssW = el.clientWidth || 120;
+  const cssH = el.clientHeight || cssW;
+  const W = Math.max(2, Math.round(cssW * dpr));
+  const H = Math.max(2, Math.round(cssH * dpr));
+  canvas.width = W;
+  canvas.height = H;
+  const aspect = W / H;
+
+  // Unlike race rows (elongated, variable aspect ratio, so thinner rows
+  // genuinely dilute dye per splat), every badge here is a plain circle
+  // with aspect === 1 and the same normalized sim/dye resolution regardless
+  // of on-screen pixel size — so absorbance needs no size compensation;
+  // the big preview and the tiny row-scale badges saturate identically.
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
+  if (!gl || !gl.getExtension('EXT_color_buffer_float')) return { setActiveInk(){}, destroy(){} };
+
+  const SIM = 40, DYE = 140;
+  const PRESSURE_ITER = 16;
+  const VEL_DISSIPATION = 0.14;
+  const CURL = 12;
+  const FILL_SECONDS = 0.75; // toggle transition duration
+
+  function hexRgb01(hex) {
+    return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
+  }
+  function hexAbsorption(hex, strength) {
+    return hexRgb01(hex).map(v => -Math.log(Math.max(v, 0.012)) * strength);
+  }
+  let absorb = hexAbsorption(activeHex, 1.3);
+  function applyActiveInk(hex) { activeHex = hex; absorb = hexAbsorption(hex, 1.3); }
+
+  const VERT = `#version 300 es
+    layout(location=0) in vec2 aPos;
+    out vec2 vUv;
+    void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+  const HEAD = `#version 300 es
+    precision highp float; precision highp sampler2D;
+    in vec2 vUv; out vec4 frag;`;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const vertShader = compile(gl.VERTEX_SHADER, VERT);
+  function prog(body) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vertShader);
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + body));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const info = gl.getActiveUniform(p, i);
+      u[info.name] = gl.getUniformLocation(p, info.name);
+    }
+    return { p, u };
+  }
+
+  const splatProg = prog(`
+    uniform sampler2D uTarget;
+    uniform vec2 uPoint;
+    uniform vec3 uColor;
+    uniform float uRadius, uAspect;
+    void main(){
+      vec2 d = vUv - uPoint;
+      d.x *= uAspect;
+      frag = vec4(texture(uTarget, vUv).rgb + exp(-dot(d,d)/uRadius) * uColor, 1.0);
+    }`);
+
+  const advectProg = prog(`
+    uniform sampler2D uVelocity, uSource;
+    uniform vec2 uTexel;
+    uniform float uDt, uDissipation, uWashAmt;
+    void main(){
+      vec2 coord = vUv - uDt * texture(uVelocity, vUv).xy * uTexel;
+      float diss = uDissipation + uWashAmt;
+      frag = vec4(texture(uSource, coord).rgb / (1.0 + diss * uDt), 1.0);
+    }`);
+
+  const curlProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).y;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).y;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
+    }`);
+
+  const vorticityProg = prog(`
+    uniform sampler2D uVelocity, uCurl;
+    uniform vec2 uTexel;
+    uniform float uCurlStrength, uDt;
+    void main(){
+      float L = texture(uCurl, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uCurl, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uCurl, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uCurl, vUv + vec2(0.0, uTexel.y)).x;
+      float C = texture(uCurl, vUv).x;
+      vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+      force /= length(force) + 0.0001;
+      force *= uCurlStrength * C;
+      force.y *= -1.0;
+      vec2 vel = texture(uVelocity, vUv).xy + force * uDt;
+      frag = vec4(clamp(vel, -1000.0, 1000.0), 0.0, 1.0);
+    }`);
+
+  const divergeProg = prog(`
+    uniform sampler2D uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).y;
+      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).y;
+      vec2 C = texture(uVelocity, vUv).xy;
+      if (vUv.x - uTexel.x < 0.0) L = -C.x;
+      if (vUv.x + uTexel.x > 1.0) R = -C.x;
+      if (vUv.y - uTexel.y < 0.0) B = -C.y;
+      if (vUv.y + uTexel.y > 1.0) T = -C.y;
+      frag = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
+    }`);
+
+  const clearProg = prog(`
+    uniform sampler2D uTexture;
+    uniform float uValue;
+    void main(){ frag = uValue * texture(uTexture, vUv); }`);
+
+  const pressureProg = prog(`
+    uniform sampler2D uPressure, uDivergence;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      float div = texture(uDivergence, vUv).x;
+      frag = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
+    }`);
+
+  const gradientProg = prog(`
+    uniform sampler2D uPressure, uVelocity;
+    uniform vec2 uTexel;
+    void main(){
+      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
+      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
+      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
+      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
+      frag = vec4(texture(uVelocity, vUv).xy - vec2(R - L, T - B), 0.0, 1.0);
+    }`);
+
+  const displayProg = prog(`
+    uniform sampler2D uDye;
+    uniform vec3 uPaper;
+    void main(){
+      vec3 A = texture(uDye, vUv).rgb;
+      frag = vec4(clamp(uPaper * exp(-A), 0.0, 1.0), 1.0);
+    }`);
+
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.BLEND);
+
+  function makeRT(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    return { tex, fbo, w, h };
+  }
+  function makeDouble(w, h) {
+    return {
+      read: makeRT(w, h), write: makeRT(w, h), texel: [1 / w, 1 / h],
+      swap() { const t = this.read; this.read = this.write; this.write = t; },
+    };
+  }
+
+  const velocity = makeDouble(SIM, SIM);
+  const dye = makeDouble(DYE, DYE);
+  const pressure = makeDouble(SIM, SIM);
+  const curlRT = makeRT(SIM, SIM);
+  const divergeRT = makeRT(SIM, SIM);
+
+  function bindTex(tex, unit) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    return unit;
+  }
+  function blit(target) {
+    if (target) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+      gl.viewport(0, 0, target.w, target.h);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, W, H);
+    }
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  function splat(field, x, y, color3, radiusMul) {
+    gl.useProgram(splatProg.p);
+    gl.uniform1f(splatProg.u.uAspect, aspect);
+    gl.uniform1i(splatProg.u.uTarget, bindTex(field.read.tex, 0));
+    gl.uniform2f(splatProg.u.uPoint, x, y);
+    gl.uniform3f(splatProg.u.uColor, color3[0], color3[1], color3[2]);
+    gl.uniform1f(splatProg.u.uRadius, 0.01 * radiusMul);
+    blit(field.write);
+    field.swap();
+  }
+
+  // No sweep direction in a badge — ink blooms outward from a near-fixed
+  // cluster of points instead of a moving front. Unlike the row demo (where
+  // dissipation is 0 while filling but the injection point keeps sweeping
+  // into fresh dye, so absorbance never piles up at one spot), a stationary
+  // point would accumulate pigment for the whole transition regardless of
+  // how pale the target color is — a black fill and a near-white fill would
+  // both end up fully saturated. Dose by dt/FILL_SECONDS so the total ink
+  // deposited over the whole transition approximates `absorb` once, however
+  // long the transition takes or however fast the frame rate runs.
+  function injectActivate(dt) {
+    const t = performance.now() * 0.001;
+    const pts = [[0.5, 0.5], [0.32, 0.5], [0.68, 0.5], [0.5, 0.32], [0.5, 0.68]];
+    const dose = Math.min(dt / FILL_SECONDS, 1);
+    const doseColor = absorb.map(v => v * dose);
+    for (const [px, py] of pts) {
+      const wob = 0.03;
+      const x = px + Math.sin(t * 3.1 + py * 11) * wob;
+      const y = py + Math.cos(t * 2.7 + px * 11) * wob;
+      splat(dye, x, y, doseColor, 6.5);
+      const ang = t * 5 + (px + py) * 14;
+      splat(velocity, x, y, [Math.cos(ang) * 22, Math.sin(ang) * 22, 0], 6);
+    }
+  }
+
+  // No new ink — just a little turbulence while the uniform wash (below)
+  // dissolves everything back to plain paper.
+  function injectDeactivate() {
+    for (let i = 0; i < 4; i++) {
+      const a = (performance.now() * 0.001) * 3 + i * 1.6;
+      splat(velocity, 0.5 + Math.cos(a) * 0.18, 0.5 + Math.sin(a) * 0.18, [Math.cos(a) * -18, Math.sin(a) * -18, 0], 6);
+    }
+  }
+
+  function step(dt, washAmt) {
+    gl.useProgram(curlProg.p);
+    gl.uniform1i(curlProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(curlProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(curlRT);
+
+    gl.useProgram(vorticityProg.p);
+    gl.uniform1i(vorticityProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(vorticityProg.u.uCurl, bindTex(curlRT.tex, 1));
+    gl.uniform2f(vorticityProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(vorticityProg.u.uCurlStrength, CURL);
+    gl.uniform1f(vorticityProg.u.uDt, dt);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(divergeProg.p);
+    gl.uniform1i(divergeProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform2f(divergeProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(divergeRT);
+
+    gl.useProgram(clearProg.p);
+    gl.uniform1i(clearProg.u.uTexture, bindTex(pressure.read.tex, 0));
+    gl.uniform1f(clearProg.u.uValue, 0.8);
+    blit(pressure.write);
+    pressure.swap();
+
+    gl.useProgram(pressureProg.p);
+    gl.uniform2f(pressureProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1i(pressureProg.u.uDivergence, bindTex(divergeRT.tex, 1));
+    for (let i = 0; i < PRESSURE_ITER; i++) {
+      gl.uniform1i(pressureProg.u.uPressure, bindTex(pressure.read.tex, 0));
+      blit(pressure.write);
+      pressure.swap();
+    }
+
+    gl.useProgram(gradientProg.p);
+    gl.uniform1i(gradientProg.u.uPressure, bindTex(pressure.read.tex, 0));
+    gl.uniform1i(gradientProg.u.uVelocity, bindTex(velocity.read.tex, 1));
+    gl.uniform2f(gradientProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.useProgram(advectProg.p);
+    gl.uniform2f(advectProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+    gl.uniform1f(advectProg.u.uDt, dt);
+    gl.uniform1f(advectProg.u.uWashAmt, 0.0);
+    gl.uniform1f(advectProg.u.uDissipation, VEL_DISSIPATION);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, 0);
+    blit(velocity.write);
+    velocity.swap();
+
+    gl.uniform1f(advectProg.u.uDissipation, 0.0);
+    gl.uniform1f(advectProg.u.uWashAmt, washAmt);
+    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+    gl.uniform1i(advectProg.u.uSource, bindTex(dye.read.tex, 1));
+    blit(dye.write);
+    dye.swap();
+  }
+
+  /* ── toggle state ── */
+  let active = false;
+  let progress = 0;                 // 0 = plain white, 1 = fully inked
+  let flushT = 0;                   // extra wash time so no tint lingers
+  let mergeT = 0;                   // post-fill swirl time before freeze
+  const MERGE_HOLD = 3.2;
+  const RATE = FILL_SECONDS;         // seconds for a full transition
+  const MASK_SPEEDUP = 1.7;          // digit flips faster than the ink itself finishes filling/draining
+
+  function updateMask() {
+    const maskP = Math.min(progress * MASK_SPEEDUP, 1);
+    let g;
+    if (maskP >= 0.999) g = 'radial-gradient(circle, #000 100%, #000 100%)';
+    else if (maskP <= 0.001) g = 'radial-gradient(circle, transparent 100%, transparent 100%)';
+    else {
+      const r = maskP * 62;
+      const a = Math.max(0, r - 12);
+      const b = Math.min(75, r + 6);
+      g = `radial-gradient(circle, #000 ${a}%, transparent ${b}%)`;
+    }
+    inkNum.style.webkitMaskImage = g;
+    inkNum.style.maskImage = g;
+  }
+  updateMask();
+
+  if (interactive) {
+    el.addEventListener('click', () => {
+      active = !active;
+      ensureRunning();
+    });
+  }
+
+  const PAPER = [1, 1, 1]; // forced true white — see comment above buildNumberInk
+  let rafId = 0;
+  let running = false;
+  let lastT = performance.now();
+  let cooling = false, coolT = 0;
+  const COOL_TIME = 0.5; // ease the sim to a stop instead of cutting it off mid-swirl
+
+  function ensureRunning() {
+    if (running || !canvas.isConnected) return;
+    running = true;
+    lastT = performance.now();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function frame(now) {
+    if (!canvas.isConnected) { running = false; return; }
+
+    if (document.hidden) {
+      lastT = now;
+      rafId = requestAnimationFrame(frame);
+      return;
+    }
+
+    let dt = (now - lastT) / 1000;
+    lastT = now;
+    if (dt > 0.1) dt = 1 / 60;
+    dt = Math.min(dt, 1 / 30);
+    if (dt <= 0) { rafId = requestAnimationFrame(frame); return; }
+
+    const target = active ? 1 : 0;
+    let mode = 0;
+    if (progress < target) { progress = Math.min(target, progress + dt / RATE); mode = 1; }
+    else if (progress > target) { progress = Math.max(target, progress - dt / RATE); mode = -1; }
+    updateMask();
+
+    if (active && mode === 1) injectActivate(dt);
+
+    if (active) {
+      if (mode === 1) mergeT = MERGE_HOLD;
+      else if (progress >= 0.999 && mergeT > 0) mergeT -= dt;
+    } else {
+      mergeT = 0;
+    }
+
+    let washAmt = 0;
+    if (!active) {
+      if (progress > 0.0001) {
+        washAmt = 9.0; flushT = 0.7;
+        if (mode === -1) injectDeactivate();
+      } else if (flushT > 0) {
+        washAmt = 11.0; flushT -= dt;
+      }
+    }
+
+    const settled = (active && progress >= 0.999 && mergeT <= 0) ||
+                    (!active && progress <= 0.001 && flushT <= 0);
+
+    // Ease into the freeze rather than cutting the sim off mid-swirl: once
+    // settled, keep stepping with a shrinking dt so velocity/vorticity decay
+    // smoothly to rest instead of an abrupt last-frame stop.
+    if (settled) {
+      if (!cooling) { cooling = true; coolT = 0; }
+      coolT += dt;
+    } else {
+      cooling = false; coolT = 0;
+    }
+    const coolFrac = cooling ? Math.min(coolT / COOL_TIME, 1) : 0;
+    const frozen = cooling && coolFrac >= 1;
+    if (!frozen) step(dt * (1 - coolFrac), washAmt);
+
+    gl.useProgram(displayProg.p);
+    gl.uniform1i(displayProg.u.uDye, bindTex(dye.read.tex, 0));
+    gl.uniform3f(displayProg.u.uPaper, PAPER[0], PAPER[1], PAPER[2]);
+    blit(null);
+
+    if (frozen) { running = false; return; }
+    rafId = requestAnimationFrame(frame);
+  }
+
+  ensureRunning();
+
+  return {
+    setActive(on) {
+      if (active === on) return;
+      active = on;
+      ensureRunning();
+    },
+    setActiveInk: applyActiveInk,
+    destroy() {
+      running = false;
+      cancelAnimationFrame(rafId);
+      const lose = gl.getExtension('WEBGL_lose_context');
+      if (lose) lose.loseContext();
+    },
+  };
+}
+
 async function loadHybridXpV85PanelInto(root, mountSelector) {
   const mount = root.querySelector(mountSelector);
   if (!mount || typeof buildHybridXpGamePanelsHtml !== 'function') return;
@@ -1450,6 +4192,7 @@ async function loadHybridXpV85Panels(root) {
   await loadHybridXpV85PanelInto(root, '#hybridXpV85Stack');
 }
 
-selectComponent(0);
+const initialIdx = COMPONENTS.findIndex(c => c.id === location.hash.slice(1));
+selectComponent(initialIdx >= 0 ? initialIdx : 0);
 </script>
 {% endblock %}

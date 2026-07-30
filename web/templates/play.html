@@ -1,0 +1,179 @@
+{% extends "_layout.html" %}
+
+{% block title %}play - stable{% endblock %}
+
+{% block extra_style %}
+  body { padding: 80px 20px 60px; }
+
+  .play-page { width: 100%; max-width: 1100px; }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 32px 0 12px;
+  }
+  .section-header:first-child { margin-top: 0; }
+  .section-title {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0;
+    font-weight: 600;
+    text-transform: lowercase;
+  }
+
+  /* upcoming-races date navigation (same as home) */
+  .date-nav {
+    display: inline-flex; align-items: center; gap: 10px;
+    margin-left: auto;
+  }
+  .date-nav__arrow {
+    background: none; border: none; cursor: pointer;
+    color: var(--fg-muted); font-family: inherit; font-size: 18px; line-height: 1;
+    padding: 2px 6px; border-radius: 6px;
+    transition: color 0.15s, background 0.15s, opacity 0.15s;
+  }
+  .date-nav__arrow:hover { color: var(--fg); background: var(--hover); }
+  .date-nav__arrow.is-hidden { visibility: hidden; pointer-events: none; }
+  .date-nav__arrow.is-disabled { opacity: 0.25; pointer-events: none; }
+  .date-nav__label {
+    color: var(--fg); font-size: 12px; letter-spacing: 1px;
+    min-width: 132px; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  .date-nav__label .date-rel { color: var(--fg-muted); }
+
+  .sphere-behavior-cluster.is-unposted {
+    filter: grayscale(1) brightness(0.95) opacity(0.62);
+    pointer-events: none;
+  }
+  .upcoming-empty {
+    color: var(--fg-muted); font-size: 12px; letter-spacing: 0.5px;
+    padding: 28px 4px; text-align: center; width: 100%;
+  }
+
+  .play-page .section-title { color: var(--fg-muted); }
+{% endblock %}
+
+{% block content %}
+  <div class="play-page">
+    <div class="section-header">
+      <div class="section-title">upcoming</div>
+      <div class="date-nav" id="dateNav">
+        <button class="date-nav__arrow" id="datePrev" type="button" aria-label="previous day">‹</button>
+        <span class="date-nav__label" id="dateLabel"></span>
+        <button class="date-nav__arrow" id="dateNext" type="button" aria-label="next day">›</button>
+      </div>
+    </div>
+    <div class="glass-panel home-headlines-glass">
+      <div class="upcoming-races__stage">
+        <div class="game-type-row" id="gameTypeRow" aria-label="Upcoming race tracks"></div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    /* Upcoming races panel — identical behavior to the home page panel. */
+    const gameTypeRow = document.getElementById('gameTypeRow');
+
+    const UPCOMING_MAX_DAYS = 7;
+    const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+    function isoDate(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    const upcomingToday = new Date();
+    upcomingToday.setHours(0, 0, 0, 0);
+    const upcomingMax = new Date(upcomingToday);
+    upcomingMax.setDate(upcomingMax.getDate() + UPCOMING_MAX_DAYS);
+    let upcomingSel = new Date(upcomingToday);
+
+    function dayOffset() {
+      return Math.round((upcomingSel - upcomingToday) / 86400000);
+    }
+
+    function renderDateNav() {
+      const off = dayOffset();
+      const rel = off === 0 ? 'today' : off === 1 ? 'tomorrow' : '';
+      const label = `${WEEKDAYS[upcomingSel.getDay()]} · ${isoDate(upcomingSel)}`;
+      document.getElementById('dateLabel').innerHTML =
+        rel ? `<span class="date-rel">${rel}</span> · ${label}` : label;
+      document.getElementById('datePrev').classList.toggle('is-hidden', upcomingSel <= upcomingToday);
+      document.getElementById('dateNext').classList.toggle('is-disabled', upcomingSel >= upcomingMax);
+    }
+
+    async function loadUpcoming() {
+      if (!gameTypeRow) return;
+      renderDateNav();
+      try {
+        const res = await fetch('/api/home/upcoming?date=' + isoDate(upcomingSel));
+        if (!res.ok) throw new Error('fetch failed');
+        const tracks = await res.json();
+        if (!tracks.length) {
+          gameTypeRow.innerHTML = '<div class="upcoming-empty">no race day published for this date</div>';
+          return;
+        }
+
+        const cyanOrder = window.HOME_CYAN_SATELLITE_IDS || ['vinnare', 'dd', 'ld', 'v5', 'v4', 'plats'];
+
+        const entries = tracks.map(t => {
+          const headlineId = t.headline;
+          const gameIdById = {};
+          if (headlineId && t.headlineGameId) gameIdById[headlineId] = t.headlineGameId;
+          for (const s of t.satellites) {
+            if (s.gameId) gameIdById[s.id] = s.gameId;
+          }
+          const satelliteIds = [];
+          if (headlineId) satelliteIds.push(headlineId);
+          for (const id of cyanOrder) {
+            if (t.satellites.some(s => s.id === id)) {
+              satelliteIds.push(id);
+            }
+          }
+          return {
+            trackName: t.trackName,
+            gameTypeId: headlineId || (satelliteIds[0] || 'v4'),
+            satelliteIds,
+            satelliteHrefs: satelliteIds.map(id => gameIdById[id] ? `/game/${gameIdById[id]}` : null),
+            sphereSize: window.HOME_SPHERE_SIZE || 87,
+            headlineHref: t.headlineGameId ? `/game/${t.headlineGameId}` : null,
+            jackpot: !!t.jackpot,
+            unposted: !t.posted,
+          };
+        });
+
+        const dayHtml = sphereBehaviorDayHtml(entries);
+        gameTypeRow.innerHTML = dayHtml;
+
+        const clusters = gameTypeRow.querySelectorAll('[data-sphere-behavior-cluster]');
+        clusters.forEach((cl, i) => {
+          if (entries[i] && entries[i].unposted) cl.classList.add('is-unposted');
+        });
+
+        const mount = gameTypeRow.closest('.home-headlines-glass') || gameTypeRow;
+        if (typeof initSphereBehaviorCluster === 'function') initSphereBehaviorCluster(mount);
+        if (typeof initSphereBehaviorDay === 'function') initSphereBehaviorDay(mount);
+        if (typeof initSphereClickFlash === 'function') initSphereClickFlash(mount);
+      } catch (e) {
+        gameTypeRow.innerHTML = '';
+      }
+    }
+
+    document.getElementById('datePrev').addEventListener('click', () => {
+      if (upcomingSel <= upcomingToday) return;
+      upcomingSel.setDate(upcomingSel.getDate() - 1);
+      loadUpcoming();
+    });
+    document.getElementById('dateNext').addEventListener('click', () => {
+      if (upcomingSel >= upcomingMax) return;
+      upcomingSel.setDate(upcomingSel.getDate() + 1);
+      loadUpcoming();
+    });
+
+    loadUpcoming();
+  </script>
+{% endblock %}

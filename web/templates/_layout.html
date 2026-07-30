@@ -2,18 +2,15 @@
 <html lang="sv">
 <head>
   <script>
-    // "liquid" = styled app (always on). Theme layer on top: pearl (default) or bone.
-    document.documentElement.classList.add('liquid');
-    try {
-      var __theme = localStorage.getItem('theme');
-      if (__theme === 'clean') {
-        localStorage.setItem('theme', 'bone');
-        __theme = 'bone';
-      }
-      if (__theme === 'bone') {
-        document.documentElement.classList.add('theme-bone');
-      }
-    } catch (e) {}
+    // Restore saved background before first paint to avoid a flash.
+    (function () {
+      try {
+        var saved = localStorage.getItem('stable-bg');
+        if (saved && /^#[0-9a-fA-F]{6}$/.test(saved)) {
+          document.documentElement.style.setProperty('--bg', saved);
+        }
+      } catch (_) {}
+    })();
   </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,68 +21,61 @@
   {% block extra_head %}{% endblock %}
   <style>
     :root {
-      --bg: #f2effb;
-      --liquid-bg: #f2effb;
-      --liquid-ink-rgb: 28, 28, 30;
-      --liquid-ink-mid-rgb: 44, 44, 48;
-      --liquid-ink-soft-rgb: 90, 90, 94;
-      --liquid-ink-muted-rgb: 70, 70, 74;
-      --fg-heading: #1c1c1e;
+      --bg: #f1eee5;
+      --ink-rgb: 0, 0, 0;
+      --ink-mid-rgb: 0, 0, 0;
+      --ink-soft-rgb: 60, 60, 60;
+      --ink-muted-rgb: 90, 90, 90;
+      --fg-heading: #000000;
       --track-name-fg: var(--fg-heading);
       --track-name-bubble-fg: rgba(255, 255, 255, 0.97);
       --track-name-bubble-stroke: rgba(50, 50, 54, 0.28);
-      --fg: #2c2c2e;
-      --fg-muted: rgba(70, 70, 74, 0.88);
-      --fluid-toggle-fg: rgba(90, 90, 94, 0.72);
-      --fluid-toggle-fg-hover: rgba(55, 55, 58, 0.88);
+      --fg: #1c1c1e;
+      --fg-muted: rgba(0, 0, 0, 0.48);
+      --fluid-toggle-fg: rgba(0, 0, 0, 0.34);
+      --fluid-toggle-fg-hover: rgba(0, 0, 0, 0.88);
       --fluid-toggle-fg-active: rgba(28, 28, 30, 0.92);
-      --liquid-title-fg: #141416;
-      --panel-border: rgba(255, 255, 255, 0.58);
-      --border: var(--panel-border);
-      --border-focus: rgba(255, 255, 255, 0.82);
-      --hover: rgba(255, 255, 255, 0.28);
+      --panel-border: rgba(255, 255, 255, 0.92);
+      --list-line: rgba(255, 255, 255, 0.92);
+      --border: rgba(0, 0, 0, 0.58);
+      --border-focus: rgba(0, 0, 0, 0.72);
+      --hover: rgba(0, 0, 0, 0.045);
       --flag-opacity: 1;
       --accent-hot: #249740;
       --accent-cold: #b00010;
       --accent-warn: #b00010;
-      --chart-form: #1f6feb;
+      --chart-form: #1c1c1e;
       --chart-odds: #d97706;
       --chart-wr: #4b5563;
-      --accent-glow: var(--fg);
-      --accent-glow-rgb: var(--liquid-ink-mid-rgb);
-      --nav-active: var(--fg-heading);
+      --accent-glow: #000000;
+      --accent-glow-rgb: 0, 0, 0;
+      --nav-active: rgba(28, 28, 30, 0.92);
       --glow-shadow: none;
       --glow-shadow-strong: none;
       --glow-shadow-muted: none;
       --glow-filter: none;
       --caret-shadow: none;
-      --highlight-weight: 600;
-      --panel-bg: rgba(255, 255, 255, 0.32);
-      --panel-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.42),
-        0 0 0 1px rgba(255, 255, 255, 0.14),
-        0 2px 8px rgba(255, 255, 255, 0.18),
-        0 6px 18px rgba(255, 255, 255, 0.1);
+      --highlight-weight: 400;
+      --panel-bg: transparent;
+      --panel-shadow: none;
       --panel-blur: 22px;
       --panel-saturate: 1.55;
-      --pearl-fill-gradient: linear-gradient(
+      --glass-fill-gradient: linear-gradient(
         135deg,
         rgba(255, 253, 255, 0.88) 0%,
         rgba(255, 248, 252, 0.83) 50%,
         rgba(255, 255, 255, 0.8) 100%
       );
-      --pearl-fill-blur: 6px;
-      --pearl-fill-saturate: 3;
-      --pearl-fill-border: rgba(255, 255, 255, 0.42);
-      --pearl-fill-shadow:
+      --glass-fill-blur: 6px;
+      --glass-fill-saturate: 3;
+      --glass-fill-border: rgba(255, 255, 255, 0.42);
+      --glass-fill-shadow:
         inset 0 1.5px 1px rgba(255, 255, 255, 0.95),
         inset 0 -0.5px 0 rgba(255, 255, 255, 0.22);
-      --slider-fill-gradient: linear-gradient(
-        135deg,
-        rgba(var(--liquid-ink-soft-rgb), 0.32) 0%,
-        rgba(var(--liquid-ink-mid-rgb), 0.26) 50%,
-        rgba(var(--liquid-ink-soft-rgb), 0.3) 100%
-      );
+      /* play / coupon — ATG kvitto palette */
+      --coupon-fill: rgb(255, 246, 207);
+      --coupon-logo-fill: rgb(50, 76, 105);
+      --coupon-ink: rgb(89, 89, 83);
       /* xLabs / kmtid — neon magenta, separate from UI accent */
       --source-xlabs: #ff6bef;
       --source-xlabs-rgb: 255, 107, 239;
@@ -102,15 +92,15 @@
       --accent-third: #c8793a;
     }
 
-    html.liquid {
-      background: var(--liquid-bg);
+    html {
+      background: var(--bg);
       min-height: 100%;
     }
 
-    html.liquid h1, html.liquid h2, html.liquid h3,
-    html.liquid .trainer-name, html.liquid .driver-name,
-    html.liquid .race-title {
-      color: var(--liquid-title-fg);
+    h1, h2, h3,
+    .trainer-name, .driver-name,
+    .race-title {
+      color: var(--fg-heading);
       opacity: 1;
       font-weight: 600;
     }
@@ -127,15 +117,40 @@
       flex-direction: column;
       align-items: center;
       padding: 80px 20px 40px;
-    }
-
-    /* ---- Liquid theme: static grey background ---- */
-
-    html.liquid body {
-      background: var(--liquid-bg);
       position: relative;
       z-index: 1;
     }
+
+    /* Dev/design: live background picker (bottom-left) */
+    .bg-picker {
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      z-index: 10000;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+      overflow: hidden;
+      border: 1px solid #ffffff;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+      background: var(--bg);
+      cursor: pointer;
+    }
+    .bg-picker input[type="color"] {
+      display: block;
+      width: 44px;
+      height: 44px;
+      margin: -8px;
+      padding: 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+    .bg-picker input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    .bg-picker input[type="color"]::-webkit-color-swatch { border: none; }
+    .bg-picker input[type="color"]::-moz-color-swatch { border: none; }
 
     /* ---------- panels (leaderboards, charts, etc.) ---------- */
 
@@ -145,15 +160,17 @@
       box-shadow: var(--panel-shadow);
       border-radius: 10px;
     }
-    html.liquid .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
-    html.liquid .glass-panel--form.glass-panel--form-frosted,
-    html.liquid .filters,
-    html.liquid .live-banner {
-      border-color: var(--pearl-fill-border);
-      background: var(--pearl-fill-gradient);
-      box-shadow: var(--pearl-fill-shadow);
-      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
+    .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
+    .glass-panel--form.glass-panel--form-frosted,
+    .card.glass-panel,
+    .filters,
+    .live-banner {
+      border-radius: 0 !important;
+      background: transparent !important;
+      border: 1px solid #ffffff !important;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
     }
 
     /* Hybrid — brand-light diagonal gradient + plasma + frosted blur + depth shadow */
@@ -182,7 +199,7 @@
         0 12px 24px rgba(0, 0, 0, 0.12),
         inset 0 -1px 0 rgba(0, 0, 0, 0.06);
     }
-    html.liquid .glass-panel--hybrid {
+    .glass-panel--hybrid {
       -webkit-backdrop-filter: blur(14px) saturate(1.5);
       backdrop-filter: blur(14px) saturate(1.5);
     }
@@ -631,7 +648,7 @@
         0 3px 10px rgba(0, 0, 0, 0.08),
         0 14px 28px rgba(0, 0, 0, 0.12);
     }
-    html.liquid .glass-panel--form:not(.glass-panel--form-frosted) {
+    .glass-panel--form:not(.glass-panel--form-frosted) {
       -webkit-backdrop-filter: blur(16px) saturate(1.45);
       backdrop-filter: blur(16px) saturate(1.45);
     }
@@ -781,7 +798,8 @@
     .glass-panel--form .form-panel__title {
       margin: 0 0 10px;
       font-size: 11px;
-      letter-spacing: 2px;
+      letter-spacing: 0;
+      font-weight: 600;
       text-transform: lowercase;
       color: rgba(255, 255, 255, 0.82);
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
@@ -1020,7 +1038,7 @@
     .glass-panel--form-bright.glass-panel--form-fx.glass-panel--form-hot .form-panel__list a:is(:hover, :focus-visible) {
       color: rgba(24, 44, 72, 0.94) !important;
     }
-    /* Form panel — frosted glass (pearl fill via shared liquid rule). */
+    /* Form panel — sharp glass panel via shared glass rule. */
     .glass-panel--form-frosted .form-panel__title {
       color: rgba(24, 44, 72, 0.9);
       text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
@@ -1239,6 +1257,19 @@
       justify-self: start;
     }
 
+    /* Third nav level (e.g. stable / play / coupons): the right grid cell
+       holds subnav + "/" + sub-subnav on one flex line. */
+    .nav-inline-row--split > .nav-inline-tail {
+      justify-self: start;
+      display: flex;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .nav-inline-tail .nav-inline-segment.subnav .nav-bar-inner {
+      justify-content: flex-start;
+    }
+
     .nav-inline-row--split .nav-inline-segment.topnav .nav-bar-inner {
       justify-content: flex-end;
     }
@@ -1326,7 +1357,7 @@
 
     .nav-inline-sep {
       font-size: 14px;
-      color: rgba(var(--liquid-ink-muted-rgb), 0.28);
+      color: rgba(var(--ink-muted-rgb), 0.28);
       padding: 0 8px;
       user-select: none;
       font-weight: 300;
@@ -1561,7 +1592,7 @@
     .src-pill.letrot { background: var(--src-letrot); }
     .src-pill.atg    { background: var(--src-atg); }
     .src-pill.kmtid  { background: var(--src-kmtid); }
-    html.liquid .src-pill { opacity: 0.95; }
+    .src-pill { opacity: 0.95; }
     .source-pills { display: inline-flex; gap: 4px; align-items: center; margin-left: 6px; }
 
     .muted { color: var(--fg-muted); }
@@ -1583,21 +1614,21 @@
     .pos-dark {
       color: #1c1c1e;
     }
-    html.liquid table .pos-1 {
+    table .pos-1 {
       color: var(--accent-first);
       text-shadow: var(--accent-first-glow);
       opacity: 1;
     }
-    html.liquid table .pos-2 {
+    table .pos-2 {
       color: var(--accent-second);
       text-shadow: var(--accent-second-glow);
       opacity: 1;
     }
-    html.liquid table .pos-3 {
+    table .pos-3 {
       color: var(--accent-third);
       opacity: 1;
     }
-    html.liquid table .pos-dark {
+    table .pos-dark {
       color: #1c1c1e;
       opacity: 1;
     }
@@ -1639,15 +1670,17 @@
       color: var(--fg) !important;
       transform: translateX(-1px);
     }
-    html.liquid a.page-back:hover,
-    html.liquid a.page-back:focus-visible {
+    a.page-back:hover,
+    a.page-back:focus-visible {
       color: var(--fluid-toggle-fg-hover) !important;
     }
 
 
     button.ghost {
       background: none;
-      border: 1px solid var(--border);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+      border-radius: 0;
       color: var(--fg);
       font-family: inherit;
       font-size: 13px;
@@ -1656,17 +1689,23 @@
       transition: border-color 0.2s, color 0.2s, font-weight 0.15s;
     }
     button.ghost:hover:not(:disabled) {
-      border-color: var(--border-focus);
+      border-color: var(--panel-border);
       color: var(--accent-glow);
       text-shadow: var(--glow-shadow-muted);
       font-weight: var(--highlight-weight);
     }
     button.ghost:disabled { opacity: 0.5; cursor: progress; }
 
-    input[type="text"], input[type="date"] {
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    input[type="search"],
+    select,
+    textarea {
       background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 6px;
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+      border-radius: 0;
       color: var(--fg);
       font-family: inherit;
       font-size: 14px;
@@ -1674,8 +1713,33 @@
       outline: none;
       transition: border-color 0.2s;
     }
-    input[type="text"]:focus, input[type="date"]:focus { border-color: var(--border-focus); }
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="number"]:focus,
+    input[type="search"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--panel-border);
+    }
     input[type="date"] { color-scheme: light; }
+
+    /* Shared horizontal bar — bone track + pearl glass fill (sliders, ML weights, …) */
+    .bar-track {
+      overflow: hidden;
+      background: color-mix(in srgb, var(--bg) 94%, black 6%);
+      box-shadow:
+        inset 0 1.5px 2.5px rgba(0, 0, 0, 0.1),
+        inset 0 -0.5px 0 rgba(255, 255, 255, 0.22);
+    }
+    .bar-fill {
+      display: block;
+      height: 100%;
+      background: var(--glass-fill-gradient);
+      border: 1px solid var(--glass-fill-border);
+      -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      box-shadow: var(--glass-fill-shadow);
+    }
 
     /* ---- Shared toggle components (used app-wide + design sandbox) ----
        Pair with .fluid-toggle + .fluid-toggle__btn for the animated glass thumb. */
@@ -1693,7 +1757,7 @@
       cursor: pointer;
       border: none;
       background: none;
-      letter-spacing: 1px;
+      letter-spacing: 0;
       font-family: inherit;
     }
     .period-btn:not(:last-child) { border-right: 1px solid var(--border); }
@@ -1992,24 +2056,24 @@
     pointer-events: none;
   }
 
-  /* Pop-out game bubbles — pearl glass ring behind plasma (center stays clear for screen-blend pools). */
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"] {
+  /* Pop-out game bubbles — glass ring behind plasma (center stays clear for screen-blend pools). */
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"] {
     background: transparent;
-    border-color: var(--pearl-fill-border);
+    border-color: var(--glass-fill-border);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     box-shadow: none;
   }
 
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma::before,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]::before {
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma::before,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]::before {
     display: block;
     z-index: 0;
-    background: var(--pearl-fill-gradient);
-    -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-    backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-    box-shadow: var(--pearl-fill-shadow);
+    background: var(--glass-fill-gradient);
+    -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+    backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+    box-shadow: var(--glass-fill-shadow);
     -webkit-mask-image: radial-gradient(
       circle at 50% 50%,
       transparent 50%,
@@ -2024,18 +2088,18 @@
     );
   }
 
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:hover,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:active,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:hover,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:active {
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:hover,
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:active,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:hover,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:active {
     box-shadow: none;
   }
 
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:hover::before,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:active::before,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:hover::before,
-  html.liquid .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:active::before {
-    box-shadow: var(--pearl-fill-shadow);
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:hover::before,
+  .sphere-behavior-cluster__satellite .sphere-btn.sphere-btn--dual-plasma:active::before,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:hover::before,
+  .sphere-behavior-cluster__satellite .sphere-btn[class*="sphere-btn--var-plasma"]:active::before {
+    box-shadow: var(--glass-fill-shadow);
   }
 
   .sphere-behavior-cluster.is-expanded .sphere-behavior-cluster__satellite[data-headline-link],
@@ -2984,47 +3048,10 @@
       z-index: 0;
       pointer-events: none;
       border-radius: inherit;
-      border: 1px solid var(--pearl-fill-border);
-      background: var(--pearl-fill-gradient);
-      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      box-shadow:
-        var(--pearl-fill-shadow),
-        0 0 8px rgba(255, 255, 255, 0.2),
-        0 1px 5px rgba(0, 0, 0, 0.05);
+      background: #000000;
+      border: none;
+      box-shadow: none;
       transition: box-shadow var(--form-bubble-flow-ms) var(--form-bubble-flow-ease);
-    }
-
-    .form-bubble-toggle--hot-cold.is-hot-active .form-bubble-toggle__slider .form-bubble-toggle__glass {
-      box-shadow:
-        var(--pearl-fill-shadow),
-        0 0 14px rgba(255, 150, 55, 0.34),
-        0 0 26px rgba(235, 105, 40, 0.18),
-        0 1px 5px rgba(0, 0, 0, 0.05);
-    }
-
-    .form-bubble-toggle--hot-cold.is-cold-active .form-bubble-toggle__slider .form-bubble-toggle__glass {
-      box-shadow:
-        var(--pearl-fill-shadow),
-        0 0 14px rgba(195, 225, 255, 0.26),
-        0 0 26px rgba(155, 195, 245, 0.12),
-        0 1px 5px rgba(0, 0, 0, 0.05);
-    }
-
-    .form-bubble-toggle--on-off.is-hot-active .form-bubble-toggle__slider .form-bubble-toggle__glass {
-      box-shadow:
-        var(--pearl-fill-shadow),
-        0 0 14px rgba(140, 255, 70, 0.36),
-        0 0 26px rgba(90, 230, 45, 0.18),
-        0 1px 5px rgba(0, 0, 0, 0.05);
-    }
-
-    .form-bubble-toggle--on-off.is-cold-active .form-bubble-toggle__slider .form-bubble-toggle__glass {
-      box-shadow:
-        var(--pearl-fill-shadow),
-        0 0 14px rgba(245, 250, 255, 0.28),
-        0 0 26px rgba(220, 230, 245, 0.14),
-        0 1px 5px rgba(0, 0, 0, 0.05);
     }
 
     .form-bubble-toggle__slider .form-bubble-toggle__lobe {
@@ -3114,7 +3141,7 @@
     .form-bubble-toggle__hit--cold { right: 0; left: auto; }
 
     .form-bubble-toggle__hit:focus-visible {
-      outline: 2px solid rgba(var(--liquid-ink-rgb), 0.35);
+      outline: 2px solid rgba(var(--ink-rgb), 0.35);
       outline-offset: 2px;
     }
 
@@ -3490,11 +3517,11 @@
 
     {% block extra_style %}{% endblock %}
 
-    /* ---- Liquid theme: fluid segmented / tab toggles ----
+    /* ---- Fluid segmented / tab toggles ----
        Markup: .fluid-toggle > .fluid-toggle__btn.active (+ thumb injected by JS).
-       Variants: --segmented (pill track), --tabs (tab row). Liquid only. */
+       Variants: --segmented (pill track), --tabs (tab row). */
 
-    html.liquid .fluid-toggle {
+    .fluid-toggle {
       position: relative;
       isolation: isolate;
       --fluid-toggle-ms: 720ms;
@@ -3503,18 +3530,18 @@
       --fluid-label-on: 1.03;
     }
 
-    html.liquid .fluid-toggle--segmented {
+    .fluid-toggle--segmented {
       border: none !important;
       border-radius: 9999px;
       overflow: visible;
     }
 
-    html.liquid .fluid-toggle--tabs {
+    .fluid-toggle--tabs {
       border-bottom: none !important;
     }
 
-    /* Shared liquid glass bubble (toggles, nav, clickables). */
-    html.liquid .fluid-bubble {
+    /* Shared glass bubble (toggles, nav, clickables). */
+    .fluid-bubble {
       position: absolute;
       z-index: 0;
       pointer-events: none;
@@ -3532,7 +3559,7 @@
       will-change: left, width, top, height, opacity;
     }
 
-    html.liquid .fluid-bubble::before {
+    .fluid-bubble::before {
       content: '';
       position: absolute;
       inset: 0;
@@ -3547,7 +3574,7 @@
       pointer-events: none;
     }
 
-    html.liquid .fluid-bubble::after {
+    .fluid-bubble::after {
       content: '';
       position: absolute;
       inset: 0;
@@ -3567,67 +3594,62 @@
       pointer-events: none;
     }
 
-    html.liquid .fluid-toggle__thumb {
+    .fluid-toggle__thumb {
       display: none;
     }
 
-    html.liquid .fluid-highlight {
+    .fluid-highlight {
       position: relative;
       z-index: 0;
       border-radius: 9999px;
     }
 
-    html.liquid a.fluid-highlight,
-    html.liquid button.fluid-highlight {
+    a.fluid-highlight,
+    button.fluid-highlight {
       display: inline-flex;
       align-items: center;
       justify-content: center;
     }
 
-    html.liquid table a.fluid-highlight,
-    html.liquid table.history a,
-    html.liquid table.offspring a {
+    table a.fluid-highlight,
+    table.history a,
+    table.offspring a {
       padding: 2px 6px;
       margin: -2px -4px;
     }
 
-    html.liquid .horse-passport a:not(.ext),
-    html.liquid table.history a,
-    html.liquid table.offspring a {
+    .horse-passport a:not(.ext),
+    table.history a,
+    table.offspring a {
       position: relative;
       z-index: 0;
       border-radius: 9999px;
     }
 
     /* Clickable links — bold only on hover (no glass bubble). */
-    html.liquid .fluid-highlight > .fluid-bubble {
+    .fluid-highlight > .fluid-bubble {
       display: none !important;
       visibility: hidden !important;
     }
 
-    html.liquid .fluid-nav-highlight > .fluid-bubble {
+    .fluid-nav-highlight > .fluid-bubble {
       opacity: 1;
       visibility: visible;
       z-index: 2;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--pearl-fill-gradient);
-      border-color: var(--pearl-fill-border);
-      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      box-shadow: var(--pearl-fill-shadow);
     }
 
-    html.liquid .fluid-nav-highlight > .fluid-bubble::after {
+    .fluid-nav-highlight > .fluid-bubble::after {
       display: none;
     }
 
-    html.liquid .fluid-nav-highlight > .fluid-bubble::before {
+    .fluid-nav-highlight > .fluid-bubble::before {
       display: none;
     }
 
-    html.liquid .fluid-nav-highlight .fluid-bubble__label {
+    .fluid-nav-highlight .fluid-bubble__label {
       position: relative;
       z-index: 3;
       pointer-events: none;
@@ -3640,34 +3662,34 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    html.liquid .topnav .fluid-nav-highlight .fluid-bubble__label {
+    .topnav .fluid-nav-highlight .fluid-bubble__label {
       font-size: 13px;
       letter-spacing: 1px;
     }
 
-    html.liquid .subnav .fluid-nav-highlight .fluid-bubble__label {
+    .subnav .fluid-nav-highlight .fluid-bubble__label {
       font-size: 10px;
       letter-spacing: 1px;
       text-transform: lowercase;
     }
 
-    html.liquid .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label {
+    .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label {
       font-size: 12px;
     }
 
-    html.liquid .topnav .fluid-nav-highlight a.is-bubble-target,
-    html.liquid .subnav .fluid-nav-highlight a.is-bubble-target {
+    .topnav .fluid-nav-highlight a.is-bubble-target,
+    .subnav .fluid-nav-highlight a.is-bubble-target {
       color: transparent !important;
       -webkit-text-fill-color: transparent !important;
       text-shadow: none !important;
     }
 
-    html.liquid .topnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
-    html.liquid .topnav .fluid-nav-highlight a.active:not(.is-bubble-target),
-    html.liquid .subnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
-    html.liquid .subnav .fluid-nav-highlight a.active:not(.is-bubble-target) {
+    .topnav .fluid-nav-highlight a:not(.is-bubble-target),
+    .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    .topnav .fluid-nav-highlight a.active:not(.is-bubble-target),
+    .subnav .fluid-nav-highlight a:not(.is-bubble-target),
+    .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    .subnav .fluid-nav-highlight a.active:not(.is-bubble-target) {
       color: rgba(90, 90, 94, 0.34) !important;
       -webkit-text-fill-color: rgba(90, 90, 94, 0.34) !important;
       font-weight: 400 !important;
@@ -3681,40 +3703,31 @@
     }
 
     /* Hover beats active — dim/blur the bubble when pointing at another tab. */
-    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble,
-    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble {
+    .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble,
+    .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight > .fluid-bubble {
       opacity: 0.42;
       filter: blur(0.6px);
     }
-    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
-    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
-    html.liquid .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
-    html.liquid .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
+    .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
+    .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight .fluid-bubble__label,
+    .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
+    .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
       color: rgba(90, 90, 94, 0.34) !important;
       -webkit-text-fill-color: rgba(90, 90, 94, 0.34) !important;
     }
 
-    html.liquid .fluid-toggle.is-ready .fluid-toggle__thumb {
+    .fluid-toggle.is-ready .fluid-toggle__thumb {
       display: block;
       opacity: 1;
       visibility: visible;
     }
 
-    /* Toggle thumb — match nav bar bubble exactly: pearl fill, no sheen/fisheye. */
-    html.liquid .fluid-toggle__thumb {
-      background: var(--pearl-fill-gradient);
-      border-color: var(--pearl-fill-border);
-      box-shadow: var(--pearl-fill-shadow);
-      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-    }
-
-    html.liquid .fluid-toggle__thumb::before,
-    html.liquid .fluid-toggle__thumb::after {
+    .fluid-toggle__thumb::before,
+    .fluid-toggle__thumb::after {
       display: none;
     }
 
-    html.liquid .fluid-toggle__btn {
+    .fluid-toggle__btn {
       position: relative;
       z-index: 1;
       display: inline-flex;
@@ -3728,21 +3741,21 @@
       color: var(--fluid-toggle-fg);
     }
 
-    /* home.html .period-btn.active sets background: var(--border) (glass white
-       in liquid) — must stay transparent so obsidian thumb shows through. */
-    html.liquid .fluid-toggle .period-btn,
-    html.liquid .fluid-toggle .sort-tab {
+    /* home.html .period-btn.active sets background: var(--border)
+       — must stay transparent so the glass thumb shows through. */
+    .fluid-toggle .period-btn,
+    .fluid-toggle .sort-tab {
       background: transparent !important;
       background-color: transparent !important;
     }
 
-    html.liquid .fluid-toggle .period-btn.active,
-    html.liquid .fluid-toggle .sort-tab.active {
+    .fluid-toggle .period-btn.active,
+    .fluid-toggle .sort-tab.active {
       background: transparent !important;
       background-color: transparent !important;
     }
 
-    html.liquid .fluid-toggle__label {
+    .fluid-toggle__label {
       display: block;
       text-align: center;
       transform: scale(var(--fluid-label-off));
@@ -3756,63 +3769,63 @@
       text-shadow: none;
     }
 
-    html.liquid .fluid-toggle__btn.active .fluid-toggle__label {
+    .fluid-toggle__btn.active .fluid-toggle__label {
       transform: scale(var(--fluid-label-on));
       font-weight: var(--highlight-weight);
       text-shadow: none;
     }
 
-    html.liquid .fluid-toggle__btn:hover {
+    .fluid-toggle__btn:hover {
       color: var(--fluid-toggle-fg-hover);
     }
 
-    html.liquid .fluid-toggle__btn.active {
+    .fluid-toggle__btn.active {
       color: var(--fluid-toggle-fg-active) !important;
       background: transparent !important;
       background-color: transparent !important;
       border-bottom-color: transparent !important;
     }
 
-    html.liquid .fluid-toggle--segmented .fluid-toggle__btn:not(:last-child) {
+    .fluid-toggle--segmented .fluid-toggle__btn:not(:last-child) {
       border-right: none !important;
     }
 
-    html.liquid .fluid-toggle--segmented .fluid-toggle__btn.active {
+    .fluid-toggle--segmented .fluid-toggle__btn.active {
       background: none !important;
     }
 
-    html.liquid .fluid-toggle--tabs .fluid-toggle__btn {
+    .fluid-toggle--tabs .fluid-toggle__btn {
       border-bottom: none !important;
       margin-bottom: 0;
     }
 
     @media (prefers-reduced-motion: reduce) {
-      html.liquid .fluid-toggle__thumb {
+      .fluid-toggle__thumb {
         transition: none !important;
       }
-      html.liquid .fluid-toggle__btn {
+      .fluid-toggle__btn {
         transition: none;
       }
-      html.liquid .fluid-toggle__label {
+      .fluid-toggle__label {
         transition: none;
         transform: scale(var(--fluid-label-off));
       }
-      html.liquid .fluid-toggle__btn.active .fluid-toggle__label {
+      .fluid-toggle__btn.active .fluid-toggle__label {
         transform: scale(var(--fluid-label-on));
       }
     }
 
-    /* ---- Liquid theme: glass bubble highlights (nav + clickables) ---- */
+    /* ---- Glass bubble highlights (nav + clickables) ---- */
 
-    html.liquid .topnav a,
-    html.liquid .subnav a {
+    .topnav a,
+    .subnav a {
       position: relative;
       z-index: 1;
       color: var(--fluid-toggle-fg);
     }
 
-    html.liquid .topnav a.active,
-    html.liquid .subnav a.active {
+    .topnav a.active,
+    .subnav a.active {
       color: var(--fluid-toggle-fg-active) !important;
       text-shadow: none !important;
       font-weight: var(--highlight-weight);
@@ -3821,18 +3834,18 @@
       animation: none !important;
     }
 
-    html.liquid .topnav a:hover,
-    html.liquid .subnav a:hover {
+    .topnav a:hover,
+    .subnav a:hover {
       color: var(--fluid-toggle-fg-hover) !important;
       text-shadow: none !important;
       font-weight: var(--highlight-weight);
     }
 
-    html.liquid .fluid-highlight:is(:hover, :focus-visible),
-    html.liquid .horse-page a:not(.ext):is(:hover, :focus-visible),
-    html.liquid table.history a:is(:hover, :focus-visible),
-    html.liquid table.offspring a:is(:hover, :focus-visible),
-    html.liquid .results li a:hover .horse-name {
+    .fluid-highlight:is(:hover, :focus-visible),
+    .horse-page a:not(.ext):is(:hover, :focus-visible),
+    table.history a:is(:hover, :focus-visible),
+    table.offspring a:is(:hover, :focus-visible),
+    .results li a:hover .horse-name {
       color: var(--accent-glow) !important;
       font-weight: var(--highlight-weight) !important;
       background-image: none !important;
@@ -3844,32 +3857,32 @@
       filter: none;
     }
 
-    html.liquid .results li a:hover {
+    .results li a:hover {
       color: inherit !important;
       font-weight: inherit !important;
     }
-    html.liquid .results li a:hover .star-mark,
-    html.liquid .results li a:hover .horse-meta {
+    .results li a:hover .star-mark,
+    .results li a:hover .horse-meta {
       color: var(--fg-muted) !important;
       font-weight: inherit !important;
     }
 
-    html.liquid .src-pill:hover {
+    .src-pill:hover {
       box-shadow: none;
       opacity: 1;
     }
 
-    html.liquid .fake-caret {
+    .fake-caret {
       background: var(--fg);
       box-shadow: none;
     }
 
-    html.liquid .kind-toggle button.flash {
+    .kind-toggle button.flash {
       animation: none;
       font-weight: var(--highlight-weight);
     }
 
-    html.liquid .tl-row-label:hover {
+    .tl-row-label:hover {
       fill: var(--fg);
       filter: none;
       font-weight: var(--highlight-weight);
@@ -3879,7 +3892,7 @@
       font-weight: 600 !important;
       opacity: 1 !important;
     }
-    html.liquid #horseName a.ext {
+    #horseName a.ext {
       color: var(--fg-muted) !important;
       -webkit-text-fill-color: var(--fg-muted) !important;
     }
@@ -3940,145 +3953,104 @@
       text-transform: lowercase;
     }
 
-    html.liquid .nav-inline-row .topnav a:hover,
-    html.liquid .nav-inline-row .subnav a:hover,
-    html.liquid .nav-inline-row .topnav a.active,
-    html.liquid .nav-inline-row .subnav a.active {
+    .nav-inline-row .topnav a:hover,
+    .nav-inline-row .subnav a:hover,
+    .nav-inline-row .topnav a.active,
+    .nav-inline-row .subnav a.active {
       padding: 6px 14px !important;
       font-size: 13px !important;
       max-width: 120px !important;
     }
 
-    html.liquid .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label,
-    html.liquid .nav-inline-row .topnav .fluid-nav-highlight .fluid-bubble__label {
+    .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label,
+    .nav-inline-row .topnav .fluid-nav-highlight .fluid-bubble__label {
       font-size: 13px !important;
       letter-spacing: 1px;
       font-weight: var(--highlight-weight) !important;
     }
 
-    html.liquid .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label {
+    .nav-inline-row .subnav .fluid-nav-highlight .fluid-bubble__label {
       text-transform: lowercase;
     }
 
     /* ============================================================
-       BONE THEME — black & white, no frosted glass, no bubbles.
+       Sharp, minimal panels — no frosted glass, no bubbles.
        Colour is reserved for semantics only: flags, hot/cold values,
        #1 gold, headline-race colours, and upcoming-races spheres.
        ============================================================ */
-    html.theme-bone {
-      --bg: #f5f2eb;
-      --liquid-bg: #f5f2eb;
-      --liquid-ink-rgb: 0, 0, 0;
-      --liquid-ink-mid-rgb: 0, 0, 0;
-      --liquid-ink-soft-rgb: 60, 60, 60;
-      --liquid-ink-muted-rgb: 90, 90, 90;
-      --fg-heading: #000000;
-      --fg: #1c1c1e;
-      --fg-muted: rgba(0, 0, 0, 0.48);
-      --liquid-title-fg: #000000;
-      --track-name-fg: #000000;
-      --fluid-toggle-fg: rgba(0, 0, 0, 0.34);
-      --fluid-toggle-fg-hover: rgba(0, 0, 0, 0.88);
-      --fluid-toggle-fg-active: rgba(28, 28, 30, 0.92);
-      --panel-border: rgba(255, 255, 255, 0.92);
-      --list-line: rgba(255, 255, 255, 0.92);
-      --border: rgba(0, 0, 0, 0.58);
-      --border-focus: rgba(0, 0, 0, 0.72);
-      --hover: rgba(0, 0, 0, 0.045);
-      --panel-bg: transparent;
-      --panel-shadow: none;
-      --accent-glow: #000000;
-      --accent-glow-rgb: 0, 0, 0;
-      --nav-active: rgba(28, 28, 30, 0.92);
-      --highlight-weight: 400;
-      --chart-form: #1c1c1e;
-    }
 
     /* Sharp panels + darker outlines. */
-    html.liquid.theme-bone .glass-panel,
-    html.liquid.theme-bone .home-headlines-glass,
-    html.liquid.theme-bone .filters,
-    html.liquid.theme-bone .live-banner,
-    html.liquid.theme-bone .card,
-    html.liquid.theme-bone .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
+    .glass-panel,
+    .home-headlines-glass,
+    .filters,
+    .live-banner,
+    .card,
+    .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
       border-radius: 0 !important;
     }
 
-    /* Panels — no fill, white outline. */
-    html.liquid.theme-bone .glass-panel:not(.glass-panel--hybrid):not(.glass-panel--form),
-    html.liquid.theme-bone .glass-panel--form.glass-panel--form-frosted,
-    html.liquid.theme-bone .card.glass-panel,
-    html.liquid.theme-bone .filters,
-    html.liquid.theme-bone .live-banner {
-      background: transparent !important;
-      border: 1px solid #ffffff !important;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    html.liquid.theme-bone .glass-panel,
-    html.liquid.theme-bone .home-headlines-glass {
+    .glass-panel,
+    .home-headlines-glass {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
 
     /* List row dividers — white lines (not on home page lists). */
-    html.liquid.theme-bone table th,
-    html.liquid.theme-bone table td {
+    table th,
+    table td {
       border-bottom-color: var(--list-line) !important;
     }
-    html.liquid.theme-bone .home-page table.top-list th,
-    html.liquid.theme-bone .home-page table.top-list td,
-    html.liquid.theme-bone .home-page table.form-list th,
-    html.liquid.theme-bone .home-page table.form-list td,
-    html.liquid.theme-bone .home-page .form-panel__list th,
-    html.liquid.theme-bone .home-page .form-panel__list td {
+    .home-page table.top-list th,
+    .home-page table.top-list td,
+    .home-page table.form-list th,
+    .home-page table.form-list td,
+    .home-page .form-panel__list th,
+    .home-page .form-panel__list td {
       border-bottom: none !important;
     }
-    html.liquid.theme-bone table tbody tr:hover {
+    table tbody tr:hover {
       background: rgba(255, 255, 255, 0.38) !important;
     }
 
     /* Horse page — passport divider: darker bone, not black. */
-    html.liquid.theme-bone .horse-passport {
+    .horse-passport {
       border-bottom-color: #ddd8cc !important;
     }
-    html.liquid.theme-bone .source-chip {
+    .source-chip {
       border-color: #ffffff;
     }
 
     /* Trainer/driver charts — white grid, black win% line + fill. */
-    html.liquid.theme-bone .form-chart .grid-line {
+    .form-chart .grid-line {
       stroke: rgba(255, 255, 255, 0.92);
     }
-    html.liquid.theme-bone .form-chart .zero-line {
+    .form-chart .zero-line {
       stroke: rgba(255, 255, 255, 0.55);
     }
-    html.liquid.theme-bone .form-path.tf,
-    html.liquid.theme-bone .form-path.df {
+    .form-path.tf,
+    .form-path.df {
       stroke: #1c1c1e;
     }
-    html.liquid.theme-bone .form-area.tf,
-    html.liquid.theme-bone .form-area.df {
+    .form-area.tf,
+    .form-area.df {
       fill: rgba(28, 28, 30, 0.14);
     }
-    html.liquid.theme-bone .form-dot.tf,
-    html.liquid.theme-bone .form-dot.df {
+    .form-dot.tf,
+    .form-dot.df {
       fill: #1c1c1e;
     }
 
-    /* ---- Nav: pearl-like blur/mute on inactive; active darker, not bold ---- */
-    html.liquid.theme-bone .fluid-nav-highlight > .fluid-bubble {
+    /* ---- Nav: blur/mute on inactive; active darker, not bold ---- */
+    .fluid-nav-highlight > .fluid-bubble {
       display: none !important;
     }
 
-    html.liquid.theme-bone .topnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid.theme-bone .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
-    html.liquid.theme-bone .topnav .fluid-nav-highlight a.active:not(.is-bubble-target),
-    html.liquid.theme-bone .subnav .fluid-nav-highlight a:not(.is-bubble-target),
-    html.liquid.theme-bone .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
-    html.liquid.theme-bone .subnav .fluid-nav-highlight a.active:not(.is-bubble-target) {
+    .topnav .fluid-nav-highlight a:not(.is-bubble-target),
+    .topnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    .topnav .fluid-nav-highlight a.active:not(.is-bubble-target),
+    .subnav .fluid-nav-highlight a:not(.is-bubble-target),
+    .subnav .fluid-nav-highlight a:not(.is-bubble-target):hover,
+    .subnav .fluid-nav-highlight a.active:not(.is-bubble-target) {
       color: rgba(0, 0, 0, 0.34) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
       font-weight: 400 !important;
@@ -4091,10 +4063,10 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    html.liquid.theme-bone .topnav .fluid-nav-highlight a.is-bubble-target,
-    html.liquid.theme-bone .subnav .fluid-nav-highlight a.is-bubble-target,
-    html.liquid.theme-bone .topnav a.active,
-    html.liquid.theme-bone .subnav a.active {
+    .topnav .fluid-nav-highlight a.is-bubble-target,
+    .subnav .fluid-nav-highlight a.is-bubble-target,
+    .topnav a.active,
+    .subnav a.active {
       color: var(--nav-active) !important;
       -webkit-text-fill-color: var(--nav-active) !important;
       font-weight: 400 !important;
@@ -4103,17 +4075,17 @@
       opacity: 1 !important;
     }
 
-    html.liquid.theme-bone .topnav a:hover,
-    html.liquid.theme-bone .subnav a:hover {
+    .topnav a:hover,
+    .subnav a:hover {
       color: rgba(0, 0, 0, 0.88) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
       font-weight: 400 !important;
     }
 
-    html.liquid.theme-bone .topnav a.active:hover,
-    html.liquid.theme-bone .subnav a.active:hover,
-    html.liquid.theme-bone .topnav .fluid-nav-highlight a.is-bubble-target:hover,
-    html.liquid.theme-bone .subnav .fluid-nav-highlight a.is-bubble-target:hover {
+    .topnav a.active:hover,
+    .subnav a.active:hover,
+    .topnav .fluid-nav-highlight a.is-bubble-target:hover,
+    .subnav .fluid-nav-highlight a.is-bubble-target:hover {
       color: var(--nav-active) !important;
       -webkit-text-fill-color: var(--nav-active) !important;
       filter: none !important;
@@ -4121,91 +4093,91 @@
     }
 
     /* Hover beats active — pointing at another tab blurs/mutes the current one too. */
-    html.liquid.theme-bone .topnav .nav-bar-inner:has(a:not(.active):hover) a.active,
-    html.liquid.theme-bone .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
-    html.liquid.theme-bone .subnav .nav-bar-inner:has(a:not(.active):hover) a.active,
-    html.liquid.theme-bone .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
+    .topnav .nav-bar-inner:has(a:not(.active):hover) a.active,
+    .topnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target,
+    .subnav .nav-bar-inner:has(a:not(.active):hover) a.active,
+    .subnav .nav-bar-inner:has(a:not(.active):hover) .fluid-nav-highlight a.is-bubble-target {
       color: rgba(0, 0, 0, 0.34) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
       filter: blur(0.45px) !important;
       opacity: 0.72 !important;
     }
 
-    html.liquid.theme-bone .topnav .nav-bar-inner a:not(.active):hover,
-    html.liquid.theme-bone .subnav .nav-bar-inner a:not(.active):hover {
+    .topnav .nav-bar-inner a:not(.active):hover,
+    .subnav .nav-bar-inner a:not(.active):hover {
       color: rgba(0, 0, 0, 0.88) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
       filter: none !important;
       opacity: 1 !important;
     }
 
-    html.liquid.theme-bone .nav-inline-row .topnav a:hover,
-    html.liquid.theme-bone .nav-inline-row .subnav a:hover,
-    html.liquid.theme-bone .nav-inline-row .topnav a.active,
-    html.liquid.theme-bone .nav-inline-row .subnav a.active {
+    .nav-inline-row .topnav a:hover,
+    .nav-inline-row .subnav a:hover,
+    .nav-inline-row .topnav a.active,
+    .nav-inline-row .subnav a.active {
       font-weight: 400 !important;
     }
 
     /* ---- Clickable hover: darker black, not bold ---- */
-    html.liquid.theme-bone .fluid-highlight:is(:hover, :focus-visible),
-    html.liquid.theme-bone .horse-page a:not(.ext):is(:hover, :focus-visible),
-    html.liquid.theme-bone table.history a:is(:hover, :focus-visible),
-    html.liquid.theme-bone table.offspring a:is(:hover, :focus-visible),
-    html.liquid.theme-bone table.siblings a:is(:hover, :focus-visible),
-    html.liquid.theme-bone table a:is(:hover, :focus-visible),
-    html.liquid.theme-bone .results li a:hover .horse-name,
-    html.liquid.theme-bone a.page-back:hover,
-    html.liquid.theme-bone a.page-back:focus-visible {
+    .fluid-highlight:is(:hover, :focus-visible),
+    .horse-page a:not(.ext):is(:hover, :focus-visible),
+    table.history a:is(:hover, :focus-visible),
+    table.offspring a:is(:hover, :focus-visible),
+    table.siblings a:is(:hover, :focus-visible),
+    table a:is(:hover, :focus-visible),
+    .results li a:hover .horse-name,
+    a.page-back:hover,
+    a.page-back:focus-visible {
       color: #000000 !important;
       -webkit-text-fill-color: #000000 !important;
       font-weight: inherit !important;
       filter: none !important;
     }
 
-    html.liquid.theme-bone .kind-toggle button.flash,
-    html.liquid.theme-bone .tl-row-label:hover {
+    .kind-toggle button.flash,
+    .tl-row-label:hover {
       font-weight: 400 !important;
     }
 
-    /* ---- Toggles: nav-like blur/mute (no pearl scale/thumb) ---- */
-    html.liquid.theme-bone .fluid-toggle__thumb {
+    /* ---- Toggles: nav-like blur/mute, no glass thumb ---- */
+    .fluid-toggle__thumb {
       display: none !important;
     }
-    html.liquid.theme-bone .period-toggle.fluid-toggle {
+    .period-toggle.fluid-toggle {
       border: none !important;
     }
-    html.liquid.theme-bone .fluid-toggle .period-btn:not(:last-child) {
+    .fluid-toggle .period-btn:not(:last-child) {
       border-right: none !important;
     }
-    html.liquid.theme-bone .sort-tabs.fluid-toggle {
+    .sort-tabs.fluid-toggle {
       border-bottom: none !important;
     }
-    html.liquid.theme-bone .fluid-toggle__label {
+    .fluid-toggle__label {
       transform: none !important;
       transition: color 0.12s ease, filter 0.12s ease, opacity 0.12s ease !important;
     }
-    html.liquid.theme-bone .fluid-toggle__btn.active .fluid-toggle__label {
+    .fluid-toggle__btn.active .fluid-toggle__label {
       transform: none !important;
       font-weight: 400 !important;
     }
-    html.liquid.theme-bone .fluid-toggle__btn:not(.active) {
+    .fluid-toggle__btn:not(.active) {
       color: rgba(0, 0, 0, 0.34) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
       filter: blur(0.45px);
       opacity: 0.72;
       -webkit-font-smoothing: antialiased;
     }
-    html.liquid.theme-bone .fluid-toggle__btn.active,
-    html.liquid.theme-bone .fluid-toggle .period-btn.active,
-    html.liquid.theme-bone .fluid-toggle .sort-tab.active,
-    html.liquid.theme-bone .fluid-toggle__btn.active .fluid-toggle__label {
+    .fluid-toggle__btn.active,
+    .fluid-toggle .period-btn.active,
+    .fluid-toggle .sort-tab.active,
+    .fluid-toggle__btn.active .fluid-toggle__label {
       color: var(--fluid-toggle-fg-active) !important;
       -webkit-text-fill-color: var(--fluid-toggle-fg-active) !important;
       font-weight: 400 !important;
       filter: none !important;
       opacity: 1 !important;
     }
-    html.liquid.theme-bone .fluid-toggle__btn:not(.active):hover {
+    .fluid-toggle__btn:not(.active):hover {
       color: rgba(0, 0, 0, 0.88) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.88) !important;
       font-weight: 400 !important;
@@ -4213,81 +4185,81 @@
       opacity: 1 !important;
     }
     /* Hover beats active within a toggle group. */
-    html.liquid.theme-bone .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active,
-    html.liquid.theme-bone .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active .fluid-toggle__label {
+    .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active,
+    .fluid-toggle:has(.fluid-toggle__btn:not(.active):hover) .fluid-toggle__btn.active .fluid-toggle__label {
       color: rgba(0, 0, 0, 0.34) !important;
       -webkit-text-fill-color: rgba(0, 0, 0, 0.34) !important;
       filter: blur(0.45px) !important;
       opacity: 0.72 !important;
     }
 
-    html.liquid.theme-bone .wl-tabs {
+    .wl-tabs {
       margin-bottom: 16px;
     }
 
     /* ---- Race view list/result toggle ---- */
-    html.liquid.theme-bone .mode-toggle {
+    .mode-toggle {
       border-color: #ffffff;
     }
-    html.liquid.theme-bone .mode-toggle button + button {
+    .mode-toggle button + button {
       border-left-color: #ffffff;
     }
-    html.liquid.theme-bone .mode-toggle button {
+    .mode-toggle button {
       transition: color 0.12s ease, filter 0.12s ease, opacity 0.12s ease;
     }
-    html.liquid.theme-bone .mode-toggle button:not(.active) {
+    .mode-toggle button:not(.active) {
       color: rgba(0, 0, 0, 0.34) !important;
       background: none !important;
       filter: blur(0.45px);
       opacity: 0.72;
     }
-    html.liquid.theme-bone .mode-toggle button.active {
+    .mode-toggle button.active {
       color: var(--fluid-toggle-fg-active) !important;
       background: none !important;
       filter: none !important;
       opacity: 1 !important;
       font-weight: 400 !important;
     }
-    html.liquid.theme-bone .mode-toggle button:not(.active):hover {
+    .mode-toggle button:not(.active):hover {
       color: rgba(0, 0, 0, 0.88) !important;
       filter: none !important;
       opacity: 1 !important;
     }
-    html.liquid.theme-bone .mode-toggle:has(button:not(.active):hover) button.active {
+    .mode-toggle:has(button:not(.active):hover) button.active {
       color: rgba(0, 0, 0, 0.34) !important;
       filter: blur(0.45px) !important;
       opacity: 0.72 !important;
     }
 
-    /* ---- Form leaderboards (home): match bone B/W typography ---- */
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__title {
-      color: var(--fg-heading);
-      text-shadow: none;
-    }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th {
+    /* ---- Form leaderboards (home): B/W typography ---- */
+    .glass-panel--form-frosted .form-panel__title {
       color: var(--fg-muted);
       text-shadow: none;
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th.sortable:hover,
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list th.sortable.active {
+    .glass-panel--form-frosted .form-panel__list th {
+      color: var(--fg-muted);
+      text-shadow: none;
+    }
+    .glass-panel--form-frosted .form-panel__list th.sortable:hover,
+    .glass-panel--form-frosted .form-panel__list th.sortable.active {
       color: var(--fg);
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list td {
+    .glass-panel--form-frosted .form-panel__list td {
       color: var(--fg);
       text-shadow: none;
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list .rank {
+    .glass-panel--form-frosted .form-panel__list .rank {
       color: var(--fg-muted);
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list .muted {
+    .glass-panel--form-frosted .form-panel__list .muted {
       color: var(--fg-muted);
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list a {
+    .glass-panel--form-frosted .form-panel__list a {
       color: var(--fg);
       font-weight: 400;
       text-shadow: none;
     }
-    html.liquid.theme-bone .glass-panel--form-frosted .form-panel__list a:is(:hover, :focus-visible) {
+    .glass-panel--form-frosted .form-panel__list a:is(:hover, :focus-visible) {
       color: #000000 !important;
       font-weight: 400 !important;
       text-shadow: none;
@@ -4295,40 +4267,40 @@
     }
 
     /* ---- Form direction toggle: hidden ---- */
-    html.liquid.theme-bone .form-bubble-toggle__track {
+    .form-bubble-toggle__track {
       filter: none;
     }
-    html.liquid.theme-bone .form-bubble-toggle__glass {
+    .form-bubble-toggle__glass {
       background: #000000 !important;
       border: none !important;
       box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
-    html.liquid.theme-bone .form-bubble-toggle__plasma,
-    html.liquid.theme-bone .form-bubble-toggle__lobe {
+    .form-bubble-toggle__plasma,
+    .form-bubble-toggle__lobe {
       display: none !important;
     }
 
     /* Track anchor spheres — inner ring glow (matches pop-out satellites). */
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"] {
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"] {
       background: transparent;
-      border-color: var(--pearl-fill-border);
+      border-color: var(--glass-fill-border);
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
       box-shadow: none;
     }
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]::before {
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track::before,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma::before,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]::before {
       display: block;
       z-index: 0;
-      background: var(--pearl-fill-gradient);
-      -webkit-backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      backdrop-filter: blur(var(--pearl-fill-blur)) saturate(var(--pearl-fill-saturate));
-      box-shadow: var(--pearl-fill-shadow);
+      background: var(--glass-fill-gradient);
+      -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      box-shadow: var(--glass-fill-shadow);
       -webkit-mask-image: radial-gradient(
         circle at 50% 50%,
         transparent 50%,
@@ -4342,22 +4314,164 @@
         #000 70%
       );
     }
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active {
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active {
       box-shadow: none;
     }
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover::before,
-    html.liquid.theme-bone .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active::before {
-      box-shadow: var(--pearl-fill-shadow);
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:hover::before,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--track:active::before,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:hover::before,
+    .sphere-behavior-cluster__anchor .sphere-btn.sphere-btn--dual-plasma:active::before,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:hover::before,
+    .sphere-behavior-cluster__anchor .sphere-btn[class*="sphere-btn--var-plasma"]:active::before {
+      box-shadow: var(--glass-fill-shadow);
     }
+    /* ---------- coupon (stable / play) ---------- */
+
+    /* Floating cost sphere — bottom right, same fill as selected number spheres. */
+    .coupon-sphere {
+      position: fixed; right: 26px; bottom: 26px; z-index: 90;
+      width: 70px; height: 70px; border-radius: 50%;
+      background: #07bc0c;
+      color: #fff; border: none; font-family: inherit;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; cursor: pointer;
+      box-shadow: 0 12px 30px rgba(7, 188, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.2s ease;
+    }
+    .coupon-sphere:hover {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 16px 34px rgba(7, 188, 12, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .coupon-sphere.is-hidden { display: none; }
+    .coupon-sphere.is-incomplete { filter: saturate(0.72); }
+    .coupon-sphere__cost {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.2px;
+      font-variant-numeric: tabular-nums; line-height: 1.05;
+      max-width: 62px; text-align: center;
+    }
+    .coupon-sphere__meta {
+      font-size: 9px; letter-spacing: 1.2px; opacity: 0.88; text-transform: lowercase;
+    }
+    .coupon-sphere.is-shake { animation: coupon-shake 0.4s ease; }
+    @keyframes coupon-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      50% { transform: translateX(6px); }
+      75% { transform: translateX(-3px); }
+    }
+
+    /* Receipt overlay */
+    .coupon-overlay {
+      position: fixed; inset: 0; z-index: 95;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .coupon-overlay__backdrop {
+      position: absolute; inset: 0;
+      background: rgba(20, 22, 18, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+    .coupon-receipt {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 440px; max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      background: var(--coupon-fill);
+      color: var(--coupon-ink);
+      border: none;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+      border-radius: 0;
+      padding: 22px 24px 20px;
+    }
+    .coupon-receipt__head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 14px; margin-bottom: 16px;
+    }
+    .coupon-receipt__game .game-type-symbol {
+      color: var(--coupon-logo-fill);
+    }
+    .coupon-receipt__game .game-type-symbol--panel {
+      filter: none;
+    }
+    .coupon-receipt__game .game-type-symbol svg { height: 34px; width: auto; }
+    .coupon-receipt__track {
+      margin-top: 8px; font-size: 12px; color: var(--coupon-ink);
+      letter-spacing: 0.5px; text-transform: lowercase;
+    }
+    .coupon-receipt__cost { text-align: right; align-self: flex-start; }
+    .coupon-receipt__cost-value {
+      font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;
+      color: var(--coupon-ink);
+    }
+    table.coupon-receipt__table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+      color: var(--coupon-ink);
+    }
+    table.coupon-receipt__table td {
+      padding: 7px 6px; border-bottom: 1px solid rgba(89, 89, 83, 0.18);
+      vertical-align: middle;
+    }
+    table.coupon-receipt__table td.coupon-receipt__leg {
+      width: 34px; font-weight: 700; font-variant-numeric: tabular-nums;
+      font-size: 17px; color: var(--coupon-ink);
+    }
+    a.coupon-receipt__legrow { text-decoration: none; color: inherit; }
+    table.coupon-receipt__table tr[data-leg-href] { cursor: pointer; }
+    table.coupon-receipt__table tr[data-leg-href]:hover { background: rgba(89, 89, 83, 0.06); }
+    .coupon-receipt__nums {
+      display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline;
+    }
+    .coupon-pick {
+      font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+      color: var(--coupon-ink); line-height: 1.25;
+    }
+    .coupon-pick--banker {
+      display: inline-flex; align-items: baseline; gap: 4px;
+      letter-spacing: 0.3px; text-transform: uppercase;
+    }
+    .coupon-pick--banker .flag {
+      flex-shrink: 0;
+      position: relative; top: 1px;
+    }
+    .coupon-pick--empty { font-weight: 400; opacity: 0.55; }
+    .coupon-receipt__details {
+      margin-top: 14px; font-size: 11px; color: var(--coupon-ink);
+      letter-spacing: 0.5px; line-height: 1.7; font-variant-numeric: tabular-nums;
+    }
+    .coupon-receipt__details .total { font-weight: 700; color: var(--coupon-ink); }
+    .coupon-receipt__name {
+      width: 100%; margin-top: 14px;
+      font-family: inherit; font-size: 13px; color: var(--coupon-ink);
+      background: transparent; border: none; outline: none;
+      border-bottom: 1px solid rgba(89, 89, 83, 0.22); padding: 6px 2px;
+    }
+    .coupon-receipt__name::placeholder { color: var(--coupon-ink); opacity: 0.45; }
+    .coupon-receipt__actions {
+      display: flex; gap: 10px; margin-top: 18px; align-items: center;
+      justify-content: flex-end;
+    }
+    .coupon-btn {
+      font-family: inherit; font-size: 11px; letter-spacing: 1.5px;
+      text-transform: lowercase; padding: 8px 18px; cursor: pointer;
+      border: 1px solid var(--border); background: none; color: var(--coupon-ink);
+      border-radius: 8px; transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .coupon-btn:hover { background: rgba(89, 89, 83, 0.08); }
+    .coupon-btn[data-coupon-close],
+    .coupon-btn--danger {
+      border: none; background: none;
+    }
+    .coupon-btn--save {
+      background: #07bc0c; border: none; color: #fff;
+      border-radius: 999px;
+    }
+    .coupon-btn--save:hover { background: #06a80b; }
+    .coupon-btn--danger:hover { color: #b00010; background: none; }
   </style>
 </head>
 <body>
@@ -4373,7 +4487,8 @@
     </defs>
   </svg>
 
-  {% set subnav_stable = active_tab in ['stable','stable_search','stable_watchlist'] %}
+  {% set subnav_play = active_tab in ['stable_play','stable_play_coupons'] %}
+  {% set subnav_stable = active_tab in ['stable','stable_search','stable_watchlist'] or subnav_play %}
   {% set subnav_stats = active_tab in ['stats','stats_horse','stats_driver','stats_trainer','stats_track'] %}
   {% set subnav_admin = active_tab in ['admin','update','matching','design'] %}
   {% set has_subnav = subnav_stable or subnav_stats or subnav_admin %}
@@ -4382,7 +4497,7 @@
     <nav class="topnav nav-inline-segment">
       <div class="nav-bar-inner">
         <a href="/home"   class="{% if active_tab == 'home' %}active{% endif %}">home</a>
-        <a href="/"       class="{% if active_tab in ['stable','stable_search','stable_watchlist'] %}active{% endif %}">stable</a>
+        <a href="/"       class="{% if subnav_stable %}active{% endif %}">stable</a>
         <a href="/stats/horse" class="{% if subnav_stats %}active{% endif %}">stats</a>
         <a href="/ml/models"  class="{% if active_tab in ['ml','ml_models'] %}active{% endif %}">ml</a>
         <a href="/admin/design"  class="{% if active_tab in ['admin','update','matching','design'] %}active{% endif %}">admin</a>
@@ -4390,11 +4505,28 @@
     </nav>
     {% if has_subnav %}
     <span class="nav-inline-sep" aria-hidden="true">/</span>
-    {% if subnav_stable %}
+    {% if subnav_play %}
+    <div class="nav-inline-tail">
+      <nav class="subnav nav-inline-segment">
+        <div class="nav-bar-inner">
+          <a href="/"          class="">search</a>
+          <a href="/watchlist" class="">watchlist</a>
+          <a href="/play"      class="active">play</a>
+        </div>
+      </nav>
+      <span class="nav-inline-sep" aria-hidden="true">/</span>
+      <nav class="subnav nav-inline-segment">
+        <div class="nav-bar-inner">
+          <a href="/play/coupons" class="{% if active_tab == 'stable_play_coupons' %}active{% endif %}">coupons</a>
+        </div>
+      </nav>
+    </div>
+    {% elif subnav_stable %}
     <nav class="subnav nav-inline-segment">
       <div class="nav-bar-inner">
         <a href="/"          class="{% if active_tab in ['stable','stable_search'] %}active{% endif %}">search</a>
         <a href="/watchlist" class="{% if active_tab == 'stable_watchlist' %}active{% endif %}">watchlist</a>
+        <a href="/play"      class="">play</a>
       </div>
     </nav>
     {% elif subnav_stats %}
@@ -4418,48 +4550,6 @@
     {% endif %}
   </div>
 
-  <!-- App-wide theme toggle (bottom-left, persisted in localStorage). -->
-  <button type="button" class="theme-toggle" id="themeToggle" aria-label="cycle theme">pearl</button>
-  <style>
-    .theme-toggle {
-      position: fixed;
-      left: 14px;
-      bottom: 14px;
-      z-index: 60;
-      opacity: 0.55;
-      transition: opacity 0.15s ease;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 1px;
-      color: var(--fg-muted);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0;
-      text-transform: lowercase;
-    }
-    .theme-toggle:hover { opacity: 1; color: var(--fg); }
-  </style>
-  <script>
-    (function () {
-      var root = document.documentElement;
-      var btn = document.getElementById('themeToggle');
-      if (!btn) return;
-      function current() {
-        return root.classList.contains('theme-bone') ? 'bone' : 'pearl';
-      }
-      function apply(theme) {
-        if (theme === 'bone') root.classList.add('theme-bone');
-        else root.classList.remove('theme-bone');
-        try { localStorage.setItem('theme', theme); } catch (e) {}
-        btn.textContent = theme;
-      }
-      btn.addEventListener('click', function () {
-        apply(current() === 'bone' ? 'pearl' : 'bone');
-      });
-      btn.textContent = current();
-    })();
-  </script>
   {% block content %}{% endblock %}
 
   <script>
@@ -4586,14 +4676,13 @@
       return first.join(' ') + ' ' + last;
     }
 
-    /* Liquid-only fluid bubbles — toggles, nav, clickables. */
+    /* Fluid bubbles — toggles, nav, clickables. */
     const FLUID_TOGGLE_EASE = 'cubic-bezier(0.34, 1.08, 0.64, 1)';
     const FLUID_TOGGLE_MS = 720;
     const FLUID_HIGHLIGHT_MS = 480;
 
     const FLUID_LINK_SELECTOR = [
       'a.glow-link',
-      'button.ghost',
       'a.source-link',
       'a.short-name',
       'table.top-list a',
@@ -4604,10 +4693,6 @@
       'table.form-list a',
       '.horse-page a:not(.ext)',
     ].join(', ');
-
-    function fluidIsLiquid() {
-      return document.documentElement.classList.contains('liquid');
-    }
 
     function fluidCreateBubble() {
       const bubble = document.createElement('span');
@@ -4681,15 +4766,8 @@
     }
 
     function syncFluidToggle(toggle, animate) {
-      const isLiquid = document.documentElement.classList.contains('liquid');
       let thumb = toggle.querySelector('.fluid-toggle__thumb');
       const active = toggle.querySelector('.fluid-toggle__btn.active');
-
-      if (!isLiquid) {
-        toggle.classList.remove('is-ready');
-        if (thumb) thumb.style.display = 'none';
-        return;
-      }
 
       if (!thumb) {
         thumb = fluidCreateBubble();
@@ -4705,12 +4783,7 @@
     }
 
     function fluidToggleStabilizeWidths(toggle) {
-      const isLiquid = document.documentElement.classList.contains('liquid');
       toggle.querySelectorAll('.fluid-toggle__btn').forEach(btn => {
-        if (!isLiquid) {
-          btn.style.minWidth = '';
-          return;
-        }
         const label = btn.querySelector('.fluid-toggle__label');
         if (!label) return;
         label.style.fontWeight = '600';
@@ -4765,16 +4838,6 @@
     }
 
     function syncFluidNav(navInner, animate) {
-      if (!fluidIsLiquid()) {
-        navInner.classList.remove('fluid-nav-highlight');
-        navInner.querySelectorAll('a.is-bubble-target').forEach(a => {
-          a.classList.remove('is-bubble-target');
-        });
-        const bubble = navInner.querySelector('.fluid-bubble');
-        if (bubble) bubble.style.display = 'none';
-        return;
-      }
-
       let bubble = navInner.querySelector('.fluid-bubble');
       if (!bubble) {
         bubble = fluidCreateBubble();
@@ -4824,8 +4887,6 @@
 
     function initFluidHighlight(el) {
       if (shouldSkipFluidHighlight(el) || el.dataset.fluidHighlightBound) return;
-      if (el.matches('button.ghost') && el.disabled) return;
-
       el.dataset.fluidHighlightBound = '1';
       el.classList.add('fluid-highlight');
       el.classList.remove('is-bubble-visible');
@@ -6584,9 +6645,444 @@ window.trackNameHtml = trackNameHtml;
         } catch (_) { /* follow href fallback */ }
       });
     });
+
+    /* =====================================================================
+       Coupon (stable / play) — shared draft state + floating cost sphere.
+
+       A coupon draft lives in localStorage so it follows the user across
+       race pages while they pick horses. Selecting a horse on an upcoming
+       race adds it to the draft for that race's game; the bottom-right
+       sphere shows the running cost and opens the receipt overlay once
+       every leg has at least one pick.
+       ===================================================================== */
+
+    // Official ATG rules per multi-leg bet type (atg.se kundservice, 2026).
+    // Coupon cost = (product of picks per leg) × linePrice ("radpris").
+    // maxSystems is ATG's cap per account/competition — informational only,
+    // there is no official per-coupon cost cap.
+    // Mirrored server-side in web/app.py (_COUPON_GAME_RULES) — keep in sync.
+    const COUPON_GAME_RULES = {
+      V86:  { legs: 8, linePrice: 0.25, maxSystems: 5000 },
+      V85:  { legs: 8, linePrice: 0.50, maxSystems: 5000 },
+      V75:  { legs: 7, linePrice: 0.50, maxSystems: 5000 },
+      GS75: { legs: 7, linePrice: 1.00, maxSystems: 5000 },
+      V64:  { legs: 6, linePrice: 1.00, maxSystems: 2000 },
+      V65:  { legs: 6, linePrice: 1.00, maxSystems: 2000 },
+      V5:   { legs: 5, linePrice: 1.00, maxSystems: 500  },
+      V4:   { legs: 4, linePrice: 2.00, maxSystems: 500  },
+    };
+
+    const COUPON_DRAFT_KEY = 'couponDraft.v1';
+
+    function couponAmount(v) {
+      return Number(v).toLocaleString('sv-SE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function couponKr(v) {
+      const frac = Math.abs(v - Math.round(v)) > 1e-9;
+      return v.toLocaleString('sv-SE', {
+        minimumFractionDigits: frac ? 2 : 0,
+        maximumFractionDigits: 2,
+      }) + ' kr';
+    }
+
+    function couponHorseNameText(raw) {
+      if (!raw) return '';
+      let text = String(raw).replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
+      text = text.replace(/\s*\([A-Z]{2}\)\s*$/g, '').trim();
+      return text.toUpperCase();
+    }
+
+    function couponHorseFlag(raw) {
+      if (!raw) return countryFlag('SE');
+      let display = String(raw).replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
+      const m = display.match(/\(([A-Z]{2})\)/);
+      return m ? countryFlag(m[1]) : countryFlag('SE');
+    }
+
+    function formatCouponBankerPick(number, raw) {
+      const name = couponHorseNameText(raw);
+      if (!name) return `<span class="coupon-pick">${number}</span>`;
+      return `<span class="coupon-pick coupon-pick--banker">${number} ${esc(name)} ${couponHorseFlag(raw)}</span>`;
+    }
+
+    function formatCouponPicks(numbers, horseNames) {
+      if (!numbers.length) {
+        return '<span class="coupon-pick coupon-pick--empty">–</span>';
+      }
+      if (numbers.length === 1) {
+        const n = numbers[0];
+        const raw = horseNames && (horseNames[n] ?? horseNames[String(n)]);
+        if (raw) return formatCouponBankerPick(n, raw);
+      }
+      return numbers.map(n => `<span class="coupon-pick">${n}</span>`).join('');
+    }
+
+    async function enrichCouponLegNames(legs) {
+      const out = legs.map(l => ({
+        ...l,
+        horseNames: { ...(l.horseNames || {}) },
+      }));
+      await Promise.all(out.map(async (leg) => {
+        if (leg.numbers.length !== 1 || !leg.raceId) return;
+        const n = leg.numbers[0];
+        if (leg.horseNames[n] || leg.horseNames[String(n)]) return;
+        try {
+          const res = await fetch(`/api/race/atg/${encodeURIComponent(leg.raceId)}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const entry = (data.results || []).find(e => e.number === n);
+          if (entry?.horse_name) leg.horseNames[String(n)] = entry.horse_name;
+        } catch (_) { /* best-effort */ }
+      }));
+      return out;
+    }
+
+    const Coupon = {
+      rules: COUPON_GAME_RULES,
+
+      load() {
+        try {
+          const d = JSON.parse(localStorage.getItem(COUPON_DRAFT_KEY));
+          return (d && d.gameId && Array.isArray(d.legs)) ? d : null;
+        } catch (_) { return null; }
+      },
+      store(d) {
+        if (d) localStorage.setItem(COUPON_DRAFT_KEY, JSON.stringify(d));
+        else localStorage.removeItem(COUPON_DRAFT_KEY);
+        window.dispatchEvent(new CustomEvent('coupon:changed'));
+      },
+      clear() { Coupon.store(null); },
+
+      rule(d) { return d ? COUPON_GAME_RULES[d.gameType] : null; },
+      picksFor(d, raceId) { return (d && d.selections[raceId]) || []; },
+      totalPicks(d) {
+        return d.legs.reduce((s, l) => s + Coupon.picksFor(d, l.raceId).length, 0);
+      },
+      filledLegs(d) {
+        return d.legs.filter(l => Coupon.picksFor(d, l.raceId).length > 0).length;
+      },
+      isComplete(d) {
+        return d.legs.length > 0 && Coupon.filledLegs(d) === d.legs.length;
+      },
+      // Running line count: empty legs count as 1 pick (they must eventually
+      // get at least one, and one pick doesn't change the multiplier).
+      lines(d) {
+        return d.legs.reduce((p, l) => p * Math.max(1, Coupon.picksFor(d, l.raceId).length), 1);
+      },
+      cost(d) {
+        const r = Coupon.rule(d);
+        return r ? Coupon.lines(d) * r.linePrice : 0;
+      },
+      isSelected(gameId, raceId, number) {
+        const d = Coupon.load();
+        return !!(d && d.gameId === gameId &&
+                  (d.selections[raceId] || []).includes(number));
+      },
+
+      // Fetch the game's ordered legs and start an empty draft for it.
+      async createDraft(ctx) {
+        const res = await fetch(`/api/atg/game/${encodeURIComponent(ctx.gameId)}`);
+        if (!res.ok) throw new Error('game fetch failed');
+        const data = await res.json();
+        const races = (data.races || []).filter(r => r.atgRaceId);
+        if (!races.length) throw new Error('no legs');
+        return {
+          gameId: ctx.gameId,
+          gameType: ctx.gameType,
+          trackName: ctx.trackName || '',
+          gameDate: ctx.gameDate || '',
+          legs: races.map((r, i) => ({ leg: i + 1, raceId: r.atgRaceId })),
+          selections: {},
+        };
+      },
+
+      // Toggle one horse. Returns true/false for the new selected state, or
+      // null when the user declined to discard a draft for another game.
+      async toggle(ctx, raceId, number, horseName) {
+        let d = Coupon.load();
+        if (!d || d.gameId !== ctx.gameId) {
+          if (d && Coupon.totalPicks(d) > 0) {
+            const ok = confirm(
+              `start a new ${ctx.gameType} coupon?\n` +
+              `your unsaved ${d.gameType} draft will be discarded.`);
+            if (!ok) return null;
+          }
+          d = await Coupon.createDraft(ctx);
+        }
+        const cur = new Set(d.selections[raceId] || []);
+        const selected = !cur.has(number);
+        if (selected) cur.add(number); else cur.delete(number);
+        d.selections[raceId] = [...cur].sort((a, b) => a - b);
+        if (!d.selections[raceId].length) delete d.selections[raceId];
+        d.horseNames = d.horseNames || {};
+        if (selected && horseName) {
+          d.horseNames[raceId] = d.horseNames[raceId] || {};
+          d.horseNames[raceId][number] = horseName;
+        } else if (d.horseNames[raceId]) {
+          delete d.horseNames[raceId][number];
+          if (!Object.keys(d.horseNames[raceId]).length) delete d.horseNames[raceId];
+        }
+        Coupon.store(Coupon.totalPicks(d) > 0 ? d : null);
+        return selected;
+      },
+    };
+
+    /* ---- floating cost sphere ---- */
+
+    function couponSphereEl() {
+      let el = document.getElementById('couponSphere');
+      if (el) return el;
+      el = document.createElement('button');
+      el.id = 'couponSphere';
+      el.type = 'button';
+      el.className = 'coupon-sphere is-hidden';
+      el.setAttribute('aria-label', 'coupon');
+      el.innerHTML = '<span class="coupon-sphere__cost"></span>' +
+                     '<span class="coupon-sphere__meta"></span>';
+      el.addEventListener('click', () => {
+        const d = Coupon.load();
+        if (!d) return;
+        if (!Coupon.isComplete(d)) {
+          el.classList.remove('is-shake');
+          void el.offsetWidth;
+          el.classList.add('is-shake');
+          return;
+        }
+        Coupon.showOverlay();
+      });
+      document.body.appendChild(el);
+      return el;
+    }
+
+    function refreshCouponSphere() {
+      const d = Coupon.load();
+      const el = couponSphereEl();
+      if (!d || Coupon.totalPicks(d) === 0) {
+        el.classList.add('is-hidden');
+        return;
+      }
+      const complete = Coupon.isComplete(d);
+      el.classList.remove('is-hidden');
+      el.classList.toggle('is-incomplete', !complete);
+      el.querySelector('.coupon-sphere__cost').textContent = couponAmount(Coupon.cost(d));
+      el.querySelector('.coupon-sphere__meta').textContent = complete
+        ? d.gameType.toLowerCase()
+        : `${Coupon.filledLegs(d)}/${d.legs.length}`;
+      el.title = complete
+        ? `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`
+        : `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`;
+    }
+
+    /* ---- receipt overlay (draft: save/clear · view: read-only) ---- */
+
+    function closeCouponOverlay() {
+      const ov = document.getElementById('couponOverlay');
+      if (ov) ov.remove();
+      document.removeEventListener('keydown', couponOverlayEsc);
+    }
+    function couponOverlayEsc(e) {
+      if (e.key === 'Escape') closeCouponOverlay();
+    }
+
+    Coupon.showOverlay = async function (opts = {}) {
+      const view = opts.coupon || null;   // saved coupon → read-only
+      const d = view ? null : Coupon.load();
+      if (!view && !d) return;
+      closeCouponOverlay();
+
+      const gameType = view ? view.gameType : d.gameType;
+      const gameId = view ? view.gameId : d.gameId;
+      const rule = COUPON_GAME_RULES[gameType] || { linePrice: 0 };
+      const trackName = view ? view.trackName : d.trackName;
+      const gameDate = view ? view.gameDate : d.gameDate;
+      let legs = view
+        ? (view.selections || []).map(s => ({
+            leg: s.leg,
+            raceId: s.raceId,
+            numbers: s.numbers || [],
+            horseNames: s.horseNames || {},
+          }))
+        : d.legs.map(l => ({
+            leg: l.leg,
+            raceId: l.raceId,
+            numbers: Coupon.picksFor(d, l.raceId),
+            horseNames: (d.horseNames && d.horseNames[l.raceId]) || {},
+          }));
+      legs = await enrichCouponLegNames(legs);
+      const counts = legs.map(l => Math.max(1, l.numbers.length));
+      const lines = view ? view.numLines : counts.reduce((a, b) => a * b, 1);
+      const linePrice = view ? view.linePrice : rule.linePrice;
+      const cost = view ? view.cost : lines * linePrice;
+
+      const symbol = typeof gameTypeSymbolById === 'function'
+        ? gameTypeSymbolById(gameType.toLowerCase(), { size: 'panel' })
+        : `<span>${esc(gameType)}</span>`;
+
+      const rowsHtml = legs.map(l => {
+        const nums = formatCouponPicks(l.numbers, l.horseNames);
+        const href = l.raceId
+          ? ` data-leg-href="/race/atg/${encodeURIComponent(l.raceId)}?game=${encodeURIComponent(gameId)}"`
+          : '';
+        return `<tr${href}>
+          <td class="coupon-receipt__leg">${l.leg}</td>
+          <td><div class="coupon-receipt__nums">${nums}</div></td>
+        </tr>`;
+      }).join('');
+
+      const dateLabel = [trackName, gameDate].filter(Boolean).join(' · ');
+      const defaultName = view ? (view.name || '') :
+        [gameType, trackName, gameDate].filter(Boolean).join(' ');
+
+      const detailsHtml = `
+        <div class="coupon-receipt__details">
+          <div>${counts.join(' × ')} = ${lines.toLocaleString('sv-SE')} lines</div>
+          <div>${lines.toLocaleString('sv-SE')} × ${couponKr(linePrice)} = ${couponKr(lines * linePrice)}</div>
+          <div class="total">total: ${couponKr(cost)}</div>
+          ${view && view.status ? `<div>status: ${esc(view.status)}${view.payout != null ? ` · payout: ${couponKr(view.payout)}` : ''}</div>` : ''}
+        </div>`;
+
+      const actionsHtml = view
+        ? `<div class="coupon-receipt__actions">
+             <button type="button" class="coupon-btn" data-coupon-close>close</button>
+           </div>`
+        : `<input class="coupon-receipt__name" id="couponName" type="text"
+                  placeholder="${esc(defaultName)}" maxlength="80"
+                  aria-label="coupon name">
+           <div class="coupon-receipt__actions">
+             <button type="button" class="coupon-btn coupon-btn--danger" data-coupon-clear>clear</button>
+             <button type="button" class="coupon-btn" data-coupon-close>close</button>
+             <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save>save</button>
+           </div>`;
+
+      const ov = document.createElement('div');
+      ov.id = 'couponOverlay';
+      ov.className = 'coupon-overlay';
+      ov.innerHTML = `
+        <div class="coupon-overlay__backdrop" data-coupon-close></div>
+        <div class="coupon-receipt" role="dialog" aria-label="${esc(gameType)} coupon">
+          <div class="coupon-receipt__head">
+            <div>
+              <div class="coupon-receipt__game">${symbol}</div>
+              <div class="coupon-receipt__track">${esc(dateLabel)}</div>
+            </div>
+            <div class="coupon-receipt__cost">
+              <span class="coupon-receipt__cost-value">${couponAmount(cost)}</span>
+            </div>
+          </div>
+          <table class="coupon-receipt__table">
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          ${detailsHtml}
+          ${actionsHtml}
+        </div>`;
+      document.body.appendChild(ov);
+      document.addEventListener('keydown', couponOverlayEsc);
+
+      ov.querySelectorAll('[data-coupon-close]').forEach(b =>
+        b.addEventListener('click', closeCouponOverlay));
+
+      ov.querySelectorAll('tr[data-leg-href]').forEach(tr =>
+        tr.addEventListener('click', () => {
+          window.location.href = tr.dataset.legHref;
+        }));
+
+      const clearBtn = ov.querySelector('[data-coupon-clear]');
+      if (clearBtn) clearBtn.addEventListener('click', () => {
+        if (!confirm('clear this coupon draft?')) return;
+        Coupon.clear();
+        closeCouponOverlay();
+      });
+
+      const saveBtn = ov.querySelector('[data-coupon-save]');
+      if (saveBtn) saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        try {
+          const name = (ov.querySelector('#couponName').value || '').trim() || defaultName;
+          const res = await fetch('/api/coupons', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name,
+              gameId,
+              gameType,
+              trackName,
+              gameDate,
+              selections: legs.map(l => ({
+                leg: l.leg,
+                raceId: l.raceId,
+                numbers: l.numbers,
+                horseNames: l.horseNames || {},
+              })),
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.error || 'failed to save coupon');
+            saveBtn.disabled = false;
+            return;
+          }
+          Coupon.clear();
+          closeCouponOverlay();
+          window.location.href = '/play/coupons';
+        } catch (_) {
+          alert('failed to save coupon');
+          saveBtn.disabled = false;
+        }
+      });
+    };
+
+    window.addEventListener('coupon:changed', refreshCouponSphere);
+    window.addEventListener('storage', e => {
+      if (e.key === COUPON_DRAFT_KEY) {
+        refreshCouponSphere();
+        window.dispatchEvent(new CustomEvent('coupon:changed'));
+      }
+    });
+    refreshCouponSphere();
+
+    window.Coupon = Coupon;
+    window.COUPON_GAME_RULES = COUPON_GAME_RULES;
+    window.couponKr = couponKr;
   </script>
 
   {% block scripts %}{% endblock %}
+
+  <label class="bg-picker" title="background">
+    <input type="color" id="bgPicker" value="#f1eee5" aria-label="background color">
+  </label>
+  <script>
+    (function () {
+      const DEFAULT_BG = '#f1eee5';
+      const input = document.getElementById('bgPicker');
+      if (!input) return;
+
+      function currentBg() {
+        const inline = document.documentElement.style.getPropertyValue('--bg').trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(inline)) return inline.toLowerCase();
+        const fromCss = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+        return /^#[0-9a-fA-F]{6}$/.test(fromCss) ? fromCss.toLowerCase() : DEFAULT_BG;
+      }
+
+      function applyBg(hex, persist) {
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+        hex = hex.toLowerCase();
+        document.documentElement.style.setProperty('--bg', hex);
+        input.value = hex;
+        if (persist) {
+          try { localStorage.setItem('stable-bg', hex); } catch (_) {}
+        }
+        window.dispatchEvent(new CustomEvent('stable:bg', { detail: { bg: hex } }));
+      }
+
+      applyBg(currentBg(), false);
+      input.addEventListener('input', () => applyBg(input.value, true));
+      input.addEventListener('change', () => applyBg(input.value, true));
+    })();
+  </script>
 
 </body>
 </html>

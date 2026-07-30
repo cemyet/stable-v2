@@ -6,12 +6,10 @@
   .pfilter { position: relative; }
   .pfilter__input {
     width: 100%; box-sizing: border-box;
-    background: var(--panel-bg); border: 1px solid var(--border); border-radius: 6px;
     padding: 7px 26px 7px 10px; font-family: inherit; font-size: 12.5px; color: var(--fg);
-    outline: none; transition: border-color 0.15s;
+    outline: none;
   }
   .pfilter__input::placeholder { color: var(--fg-muted); opacity: 0.7; }
-  .pfilter__input:focus { border-color: var(--fg-muted); }
   .pfilter.is-picked .pfilter__input { color: var(--accent-glow); }
   .pfilter__clear {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
@@ -25,12 +23,9 @@
   .pfilter__menu {
     position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
     max-height: 260px; overflow-y: auto;
-    background: var(--panel-bg); border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.28); display: none;
-  }
-  html.liquid .pfilter__menu {
-    -webkit-backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
-    backdrop-filter: blur(var(--panel-blur)) saturate(var(--panel-saturate));
+    background: var(--bg); border: 1px solid var(--panel-border);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92), 0 8px 24px rgba(0,0,0,0.28);
+    border-radius: 0; display: none;
   }
   .pfilter.is-open .pfilter__menu { display: block; }
   .pfilter__opt {

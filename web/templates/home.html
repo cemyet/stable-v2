@@ -17,7 +17,8 @@
   .section-title {
     color: var(--fg-muted);
     font-size: 11px;
-    letter-spacing: 2px;
+    letter-spacing: 0;
+    font-weight: 600;
     text-transform: lowercase;
   }
 
@@ -36,7 +37,8 @@
   .card-title {
     color: var(--fg-muted);
     font-size: 11px;
-    letter-spacing: 2px;
+    letter-spacing: 0;
+    font-weight: 600;
     text-transform: lowercase;
     margin-bottom: 10px;
   }
@@ -131,10 +133,10 @@
     padding: 28px 4px; text-align: center; width: 100%;
   }
 
-  /* Clean theme — unify section/card titles with form panel titles. */
-  html.liquid.theme-bone .home-page .section-title,
-  html.liquid.theme-bone .home-page .card-title {
-    color: var(--fg-heading);
+  /* Soft label color — weight carries the hierarchy instead of black. */
+  .home-page .section-title,
+  .home-page .card-title {
+    color: var(--fg-muted);
   }
 
 {% endblock %}

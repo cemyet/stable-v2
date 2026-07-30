@@ -238,22 +238,245 @@
   .gal-mid { color: var(--chart-odds, #d97706); }
   .gal-hi  { color: var(--accent-cold, #b00010); }
   .fav { color: var(--fg); font-weight: var(--highlight-weight, 600); }
+
+  /* ── ink upcoming view ───────────────────────────────────────────── */
+  .race-page--loading .race-shell { visibility: hidden; }
+  .race-page--loading .mode-toggle { display: none; }
+
+  .race-shell { width: 100%; }
+  .race-page--upcoming { padding-left: 24px; }
+  .race-page--upcoming .race-shell {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .race-page--upcoming .race-title,
+  .race-page--upcoming .race-sub { text-align: left; }
+  .race-page--upcoming .live-banner { margin-left: 0; margin-right: auto; }
+
+  .race-nav-wrap {
+    display: none;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .ink-upcoming { width: 100%; }
+  .ink-racelist {
+    border-radius: 0; overflow: hidden;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+  }
+  .ink-row {
+    position: relative; overflow: hidden;
+  }
+  .ink-row__canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; display: block;
+  }
+  .ink-row__content {
+    position: absolute; inset: 0;
+    display: flex; align-items: center;
+    gap: 14px; padding: 0 18px;
+  }
+  .ink-row__content--base { color: var(--fg-heading); }
+  .ink-row__content--ink {
+    color: #ffffff;
+    -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 0%);
+    mask-image: linear-gradient(to right, #000 0%, transparent 0%);
+  }
+
+  .ink-row--race {
+    height: 40px; background: transparent; box-shadow: none;
+  }
+  .ink-row--race:hover { transform: none; box-shadow: none; }
+  .ink-row--race + .ink-row--race { border-top: 1px solid var(--list-line, var(--border)); }
+  .ink-row--race .ink-row__content { gap: 12px; padding: 0 16px; font-size: 12px; pointer-events: none; }
+  .ink-row--race .ink-row__content a { pointer-events: auto; }
+  .ink-row--race .rr-num { flex: none; width: 26px; height: 26px; }
+
+  .ink-row--race .ink-row__num-badge {
+    position: absolute; left: 16px; top: 50%;
+    transform: translateY(-50%); z-index: 4;
+    width: 26px; height: 26px;
+    pointer-events: auto; cursor: pointer;
+  }
+  .ink-row--race .ink-row__num-badge .demo-ink-numbadge {
+    width: 100%; height: 100%; cursor: pointer;
+    box-shadow: inset 0 0 0 1px #fff;
+  }
+  .ink-row--race .ink-row__num-badge .demo-ink-numbadge:hover {
+    box-shadow: inset 0 0 0 1px #fff;
+  }
+  .ink-row--race .ink-row__num-badge:focus-visible {
+    outline: 2px solid var(--accent-glow, #86e637);
+    outline-offset: 2px;
+    border-radius: 50%;
+  }
+  .ink-row--race.ink-row--scratched .rr-num {
+    text-align: center; font-size: 16px; font-weight: 700;
+    font-variant-numeric: tabular-nums; line-height: 26px;
+  }
+  .ink-row--race .rr-horse {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600;
+  }
+  .ink-row--race .rr-sa {
+    color: var(--fg-muted); font-size: 10px; letter-spacing: 0.5px; margin-left: 4px;
+  }
+  .ink-row--race .rr-people {
+    flex: 0 0 auto; display: inline-flex; gap: 8px; margin-left: 12px;
+  }
+  .ink-row--race .rr-drv,
+  .ink-row--race .rr-trn {
+    flex: 0 0 96px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--fg-muted);
+  }
+  .ink-row--race .rr-gal,
+  .ink-row--race .rr-winpct,
+  .ink-row--race .rr-cleanpct {
+    flex: 0 0 38px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg-muted);
+  }
+  .ink-row--race .ink-gal-risk { font-variant-numeric: tabular-nums; }
+  .ink-row--race .ink-gal-empty { color: var(--fg-muted); }
+  .ink-row--race .ink-gal-lo  { color: var(--fg-muted); }
+  .ink-row--race .ink-gal-mid { color: var(--chart-odds, #d97706); }
+  .ink-row--race .ink-gal-hi  { color: var(--accent-cold, #b00010); }
+  .ink-row--race .rr-pct {
+    flex: 0 0 52px; text-align: right;
+    font-variant-numeric: tabular-nums; font-weight: 600;
+  }
+  .ink-row--race .rr-odds {
+    flex: 0 0 42px; text-align: right;
+    font-weight: 400; color: var(--fg-muted); font-variant-numeric: tabular-nums;
+  }
+  .ink-row--race .rr-tr { font-size: 9px; margin-right: 2px; }
+  .ink-row--race .rr-tr.up { color: var(--accent-hot, #ff5a5a); }
+  .ink-row--race .rr-tr.dn { color: var(--accent-cold, #5aa6ff); }
+
+  .ink-row--race .rr-eq {
+    flex: 0 0 64px; min-width: 0;
+    display: inline-flex; align-items: center; justify-content: flex-end;
+    gap: 10px; color: var(--fg-muted);
+  }
+  .ink-row--race .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .ink-row--race .shoe-icon { width: 15px; height: 15px; color: currentColor; display: inline-block; }
+  .ink-row--race .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .ink-row--race .rr-sulky { font-size: 11px; letter-spacing: 0.2px; }
+  .ink-row--race .rr-sulky.sulky-changed { color: var(--accent-warn); }
+
+  .ink-row--race .ink-row__content--ink .rr-sa,
+  .ink-row--race .ink-row__content--ink .sex-age,
+  .ink-row--race .ink-row__content--ink .rr-drv,
+  .ink-row--race .ink-row__content--ink .rr-trn,
+  .ink-row--race .ink-row__content--ink .rr-gal,
+  .ink-row--race .ink-row__content--ink .rr-winpct,
+  .ink-row--race .ink-row__content--ink .rr-cleanpct,
+  .ink-row--race .ink-row__content--ink .rr-eq,
+  .ink-row--race .ink-row__content--ink .rr-odds { color: inherit; opacity: 0.78; }
+  .ink-row--race .ink-row__content--ink a { color: inherit; }
+  .ink-row--race .ink-row__content--ink .shoe-icon.shoe-changed {
+    color: #ff5252; filter: drop-shadow(0 0 4px rgba(255, 82, 82, 0.9)); opacity: 1;
+  }
+  .ink-row--race .ink-row__content--ink .rr-sulky.sulky-changed {
+    color: #ff5252; text-shadow: 0 0 6px rgba(255, 82, 82, 0.9); opacity: 1;
+  }
+  .ink-row--race .ink-row__content--ink .ink-gal-lo,
+  .ink-row--race .ink-row__content--ink .ink-gal-empty { color: inherit; }
+  .ink-row--race .ink-row__content--ink .ink-gal-mid { color: #f0a83c; }
+  .ink-row--race .ink-row__content--ink .ink-gal-hi { color: #ff5252; }
+
+  .ink-row--head {
+    height: 22px; cursor: default;
+    color: var(--fg-muted); text-transform: lowercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-row--head .ink-row__content { align-items: center; pointer-events: auto; }
+  .ink-row--head + .ink-row--race { border-top: none; }
+  .ink-row--head .rr-num, .ink-row--head .rr-horse,
+  .ink-row--head .rr-drv, .ink-row--head .rr-trn,
+  .ink-row--head .rr-gal, .ink-row--head .rr-winpct,
+  .ink-row--head .rr-cleanpct, .ink-row--head .rr-pct,
+  .ink-row--head .rr-odds {
+    font-size: 10px; font-weight: 400; color: inherit;
+  }
+  .ink-row--head .rr-num { font-size: 10px; text-align: center; line-height: 26px; }
+
+  .ink-row--tillagg {
+    padding: 5px 16px; font-size: 10px; letter-spacing: 1.5px;
+    text-transform: lowercase; color: var(--fg-muted);
+    background: var(--hover);
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-racelist .empty-section {
+    color: var(--fg-muted); font-size: 12px; padding: 16px; text-align: center;
+  }
+  .ink-row--race.ink-row--scratched { opacity: 1; position: relative; }
+  .ink-row--race.ink-row--scratched .ink-row__content { color: var(--fg-muted); opacity: 0.55; }
+  .ink-row--race.ink-row--scratched::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 50%;
+    height: 1.2px; margin-top: -0.6px;
+    background: rgba(255, 45, 45, 0.7); pointer-events: none;
+  }
+
+  .demo-ink-numbadge {
+    position: relative; border-radius: 50%; overflow: hidden;
+    background: #ffffff;
+    transition: background-color 0.28s ease, box-shadow 0.18s;
+  }
+  .demo-ink-numbadge--simple { box-shadow: inset 0 0 0 1px #fff; }
+  .demo-ink-numbadge--simple.is-active { background: var(--badge-ink, #07bc0c); }
+  .demo-ink-numbadge__digit {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 13px; color: #17171a; transition: color 0.22s;
+  }
+  .demo-ink-numbadge--simple.is-active .demo-ink-numbadge__digit { color: #fff; }
+
+  .race-nav {
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .race-nav__arrow {
+    background: none; border: none; cursor: pointer;
+    color: var(--fg-muted); font-family: inherit; font-size: 18px; line-height: 1;
+    padding: 2px 6px; border-radius: 6px;
+    transition: color 0.15s, background 0.15s, opacity 0.15s;
+  }
+  .race-nav__arrow:hover { color: var(--fg); background: var(--hover); }
+  .race-nav__arrow.is-disabled { opacity: 0.25; pointer-events: none; }
+  .race-nav__label {
+    color: var(--fg); font-size: 12px; letter-spacing: 1px;
+    min-width: 100px; text-align: center; font-variant-numeric: tabular-nums;
+  }
 {% endblock %}
 
 {% block content %}
-  <div class="race-page">
+  <div class="race-page race-page--loading{% if is_atg %} race-page--upcoming{% endif %}" id="racePage">
     <a class="page-back" href="/home" aria-label="Back"></a>
-    <h1 class="race-title" id="raceTitle">race</h1>
-    <div class="race-sub" id="raceSub"></div>
+    <div class="race-shell" id="raceShell">
+      <h1 class="race-title" id="raceTitle">race</h1>
+      <div class="race-sub" id="raceSub"></div>
 
-    <div class="live-banner" id="liveBanner" style="display:none"></div>
+      <div class="live-banner" id="liveBanner" style="display:none"></div>
 
-    <div class="mode-toggle" id="modeToggle">
-      <button id="modeListBtn" class="active">list</button>
-      <button id="modeResultBtn">result</button>
+      <div class="race-nav-wrap" id="raceNavWrap">
+        <div class="race-nav" id="raceNav">
+          <button class="race-nav__arrow" id="racePrev" type="button" aria-label="previous race">‹</button>
+          <span class="race-nav__label" id="raceNavLabel"></span>
+          <button class="race-nav__arrow" id="raceNext" type="button" aria-label="next race">›</button>
+        </div>
+      </div>
+
+      <div class="mode-toggle" id="modeToggle">
+        <button id="modeListBtn" class="active">list</button>
+        <button id="modeResultBtn">result</button>
+      </div>
+
+      <div id="mount"><div class="empty-section"></div></div>
     </div>
-
-    <div id="mount"><div class="empty-section"></div></div>
   </div>
 {% endblock %}
 
@@ -269,6 +492,42 @@
     let liveData = null;
     let mode = 'list';
     let galModelMode = localStorage.getItem('galModelMode') || 'track';
+    let inkSims = [];
+    let couponRows = [];   // [{sim, number}] for coupon state sync
+
+    // Game context for coupon building. Prefer the ?game= query param (set
+    // when navigating from a game page / coupon overlay) so picks attach to
+    // the game the user is actually playing; fall back to the race's
+    // headline game from the live payload. Only multi-leg pool types with
+    // known rules are coupon-eligible.
+    const urlGameId = new URLSearchParams(location.search).get('game');
+    function couponCtx() {
+      if (!isAtg || !raceData?.is_upcoming) return null;
+      const gameId = urlGameId || liveData?.gameId || null;
+      if (!gameId) return null;
+      const gameType = (gameId.split('_')[0] || '').toUpperCase();
+      if (!window.COUPON_GAME_RULES || !COUPON_GAME_RULES[gameType]) return null;
+      return {
+        gameId,
+        gameType,
+        trackName: raceData.track || '',
+        gameDate: raceData.race_date || '',
+      };
+    }
+
+    // Keep number spheres in sync with the coupon draft (restores state on
+    // page load, and reflects clears/changes made from the overlay).
+    function syncCouponBadges() {
+      const ctx = couponCtx();
+      if (!ctx) return;
+      const d = window.Coupon ? Coupon.load() : null;
+      const picks = (d && d.gameId === ctx.gameId)
+        ? (d.selections[raceKey] || []) : [];
+      couponRows.forEach(({ sim, number }) => {
+        sim.setFilled(picks.includes(number));
+      });
+    }
+    window.addEventListener('coupon:changed', syncCouponBadges);
 
     function activeXgal(e) {
       if (galModelMode === 'general')
@@ -423,28 +682,34 @@
 
     // --- loading -----------------------------------------------------------
 
+    function setRacePageReady() {
+      document.getElementById('racePage').classList.remove('race-page--loading');
+    }
+
     async function loadRace() {
+      const page = document.getElementById('racePage');
       const res = await fetch(apiUrl);
       if (!res.ok) {
+        page.classList.remove('race-page--upcoming');
         document.getElementById('mount').innerHTML = '<div class="empty-section">not found</div>';
+        setRacePageReady();
         return;
       }
       raceData = await res.json();
       renderHeader();
+      if (raceData.is_upcoming && isAtg) await loadLive();
       render();
-      if (raceData.is_upcoming && isAtg) loadLive();
+      if (raceData.is_upcoming && isAtg) loadGameNav();
+      setRacePageReady();
     }
 
-    // Live pools (win/place odds + spelprocent) for upcoming races.
     async function loadLive() {
-      document.getElementById('modeToggle').style.display = 'none';
       try {
         const r = await fetch(`/api/race/atg/${encodeURIComponent(raceKey)}/live`);
         if (!r.ok) return;
         liveData = await r.json();
       } catch (_) { return; }
       renderLiveBanner();
-      render();
     }
 
     // index live starts by program number for merge with our entries.
@@ -528,7 +793,11 @@
     function render() {
       if (!raceData) return;
       const mount = document.getElementById('mount');
+      const page = document.getElementById('racePage');
+      const navWrap = document.getElementById('raceNavWrap');
       const entries = raceData.results || [];
+      page.classList.toggle('race-page--upcoming', !!raceData.is_upcoming);
+      if (!raceData.is_upcoming) navWrap.style.display = 'none';
       if (!entries.length) {
         mount.innerHTML = '<div class="empty-section">no entries</div>';
         return;
@@ -537,8 +806,12 @@
         document.getElementById('modeToggle').style.display = 'none';
         renderUpcoming(mount, entries);
       }
-      else if (mode === 'list') renderList(mount, entries);
-      else                      renderResult(mount, entries);
+      else {
+        page.classList.remove('race-page--upcoming');
+        document.getElementById('modeToggle').style.display = '';
+        if (mode === 'list') renderList(mount, entries);
+        else                      renderResult(mount, entries);
+      }
     }
 
     // For volt starts the distance changes between program numbers; insert a
@@ -565,56 +838,151 @@
       return rows;
     }
 
-    // Upcoming-race view: starting list with live betting + model gal-risk.
     function renderUpcoming(mount, entries) {
+      inkSims.forEach(s => s.destroy());
+      inkSims = [];
+
+      const INK_HEX = '#f4ffe5';
+      const NUM_INK_HEX = '#07bc0c';
+      const bgHex = (() => {
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+        return /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+      })();
+
       const live = liveByNumber();
-      const favNum = (liveData?.starts || []).reduce((best, s) =>
-        (s.betDist != null && (best == null || s.betDist > best.betDist)) ? s : best, null)?.number;
-      const sorted = entries.slice().sort((a, b) => (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
-      const head = `
-        <thead><tr>
-          <th class="num-prog">#</th>
-          <th>horse</th>
-          <th class="rowpct" title="share of pool (bet distribution)">row%</th>
-          <th>driver</th>
-          <th>trainer</th>
-          <th class="sform">tΔ</th>
-          <th class="live" title="win odds (live)">odds</th>
-          <th class="winrate" title="career win rate">win%</th>
-          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
-          ${galColHead()}
-          <th class="center">shoes</th>
-          <th class="num">sulky</th>
-        </tr></thead>`;
-      const COLS = 12;
-      const rows = rowsWithTillaggDividers(sorted, COLS, e => {
-        const s = live[e.number];
-        const scratched = e.withdrawn || (s && s.scratched);
-        const cls = scratched ? ' class="scratched"' : '';
-        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+      const sorted = entries.slice().sort((a, b) =>
+        (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
+
+      const galMeta = raceData?.gal_models;
+      const galClickable = !!galMeta?.has_track_model;
+      const galLbl = galClickable ? galColLabel() : 'gal%';
+      const galHint = galClickable ? ' — click to switch model' : '';
+      const galExtra = galClickable ? ' data-gal-toggle tabindex="0" role="button" style="cursor:pointer"' : '';
+      const headHtml = `
+        <div class="ink-row ink-row--race ink-row--head">
+          <div class="ink-row__content">
+            <span class="rr-num">#</span>
+            <span class="rr-horse">horse</span>
+            <span class="rr-people">
+              <span class="rr-drv">driver</span>
+              <span class="rr-trn">trainer</span>
+            </span>
+            <span class="rr-eq"></span>
+            <span class="rr-gal" title="${esc(galModelNote() + galHint)}"${galExtra}>${galLbl}</span>
+            <span class="rr-winpct">win%</span>
+            <span class="rr-cleanpct">clean%</span>
+            <span class="rr-pct">row%</span>
+            <span class="rr-odds">odds</span>
+          </div>
+        </div>`;
+
+      const inkPctCell = s => {
+        if (!s || s.betDist == null) return '';
+        let tr = '';
+        if (s.trend != null && Math.abs(s.trend) > 0.003)
+          tr = s.trend > 0 ? '<span class="rr-tr up">▲</span>' : '<span class="rr-tr dn">▼</span>';
+        return `${tr}${s.betDist.toFixed(1)}%`;
+      };
+      const inkOdds = s => (s && s.winOdds != null) ? s.winOdds.toFixed(2) : '';
+      const inkGal = e => {
+        const risk = activeXgal(e);
+        if (risk == null) return '<span class="ink-gal-empty"></span>';
+        const p = risk * 100;
+        const cls = p >= 25 ? 'ink-gal-hi' : p >= 15 ? 'ink-gal-mid' : 'ink-gal-lo';
+        return `<span class="ink-gal-risk ${cls}">${p.toFixed(0)}%</span>`;
+      };
+      const inkSulky = e => {
+        if (!e.sulky) return '';
+        const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+        return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+      };
+      const inkEq = e => `${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${inkSulky(e)}`;
+
+      const inkRowHtml = (e, s, scratched) => {
+        const sa = sexAge(e);
+        const numSpacer = '<span class="rr-num"></span>';
+        const numBadge = scratched ? '' : `
+          <div class="ink-row__num-badge" role="button" tabindex="0"
+               aria-label="select horse ${esc(e.number)}" aria-pressed="false">
+            <div class="demo-ink-numbadge demo-ink-numbadge--simple" data-num-badge>
+              <span class="demo-ink-numbadge__digit">${e.number || ''}</span>
+            </div>
+          </div>`;
         const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
-        const nameCls = (favNum != null && e.number === favNum) ? ' class="fav"' : '';
+        const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+        const cell = kind => `
+          <div class="ink-row__content ink-row__content--${kind}"${kind === 'ink' ? ' aria-hidden="true"' : ''}>
+            ${scratched ? `<span class="rr-num">${e.number || ''}</span>` : numSpacer}
+            <span class="rr-horse">${horseCell(e)}</span>
+            <span class="rr-people">
+              <span class="rr-drv">${shortCell(e.driver_short, e.driver_name, driverHref)}</span>
+              <span class="rr-trn">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</span>
+            </span>
+            <span class="rr-eq">${inkEq(e)}</span>
+            <span class="rr-gal">${inkGal(e)}</span>
+            <span class="rr-winpct">${winRate(e, 'pre')}</span>
+            <span class="rr-cleanpct">${galAdjWinRate(e, 'pre')}</span>
+            <span class="rr-pct">${inkPctCell(s)}</span>
+            <span class="rr-odds">${inkOdds(s)}</span>
+          </div>`;
         return `
-          <tr${cls}>
-            <td class="num-prog">${e.number || ''}</td>
-            <td${nameCls}>${horseCell(e)}</td>
-            <td class="rowpct">${rowPctCell(s)}</td>
-            <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
-            <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
-            <td class="sform">${deltaCell(e.tf, e.t_wr)}</td>
-            <td class="live muted">${oddsCell(s)}</td>
-            <td class="winrate">${winRate(e, 'pre')}</td>
-            <td class="winrate">${galAdjWinRate(e, 'pre')}</td>
-            <td class="live">${galRiskCell(e)}</td>
-            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
-            <td class="num muted">${sulkyCell(e)}</td>
-          </tr>`;
-      }).join('');
-      mount.innerHTML = `<table class="entries">${head}<tbody>${rows}</tbody></table>`;
-      const galHdr = mount.querySelector('.gal-col-toggle');
-      if (galHdr) {
-        galHdr.addEventListener('click', toggleGalModel);
-        galHdr.addEventListener('keydown', e => {
+          <div class="ink-row ink-row--race${scratched ? ' ink-row--scratched' : ''}"${scratched ? '' : ` data-ink-row data-number="${e.number || ''}"`}>
+            <canvas class="ink-row__canvas"></canvas>
+            ${numBadge}
+            ${cell('base')}${cell('ink')}
+          </div>`;
+      };
+
+      const distances = sorted.map(e => e.distance).filter(d => d != null);
+      const baseDist = distances.length ? Math.min(...distances) : null;
+      let prevDist = null;
+      const rowParts = [];
+      sorted.forEach(e => {
+        if (e.distance != null && baseDist != null && prevDist != null && e.distance !== prevDist) {
+          const offset = e.distance - baseDist;
+          rowParts.push(`<div class="ink-row--tillagg">${offset > 0 ? '+' : ''}${offset}m</div>`);
+        }
+        if (e.distance != null) prevDist = e.distance;
+        const s = live[e.number];
+        const scratched = !!(e.withdrawn || (s && s.scratched));
+        rowParts.push(inkRowHtml(e, s, scratched));
+      });
+
+      mount.innerHTML = `<div class="ink-upcoming"><div class="ink-racelist">${headHtml}${rowParts.join('')}</div></div>`;
+
+      const entryByNumber = {};
+      sorted.forEach(e => {
+        if (e.number != null) entryByNumber[e.number] = e;
+      });
+
+      couponRows = [];
+      mount.querySelectorAll('[data-ink-row]').forEach(rowEl => {
+        const number = parseInt(rowEl.dataset.number, 10);
+        const sim = buildRowFluid(rowEl, INK_HEX, bgHex, NUM_INK_HEX, {
+          // Route the toggle through the coupon draft first; a `null` result
+          // means the user declined to discard another game's draft, in
+          // which case the visual toggle is vetoed too.
+          onBeforeToggle: async () => {
+            const ctx = couponCtx();
+            if (!ctx || !window.Coupon || !Number.isFinite(number)) return true;
+            try {
+              const horseName = entryByNumber[number]?.horse_name || '';
+              const sel = await Coupon.toggle(ctx, raceKey, number, horseName);
+              return sel !== null;
+            } catch (_) { return true; }
+          },
+        });
+        if (sim) {
+          inkSims.push(sim);
+          if (Number.isFinite(number)) couponRows.push({ sim, number });
+        }
+      });
+      syncCouponBadges();
+
+      const galToggle = mount.querySelector('[data-gal-toggle]');
+      if (galToggle) {
+        galToggle.addEventListener('click', toggleGalModel);
+        galToggle.addEventListener('keydown', e => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleGalModel(); }
         });
       }
@@ -846,6 +1214,451 @@
       document.getElementById('modeListBtn').classList.remove('active');
       render();
     });
+
+    /* ── game-level race navigation ── */
+    async function loadGameNav() {
+      const gameId = urlGameId || liveData?.gameId;
+      if (!gameId) return;
+      try {
+        const r = await fetch(`/api/atg/game/${encodeURIComponent(gameId)}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const races = d.races || [];
+        if (races.length <= 1) return;
+        const idx = races.findIndex(r => r.atgRaceId === raceKey);
+        if (idx < 0) return;
+
+        const navWrap = document.getElementById('raceNavWrap');
+        const label = document.getElementById('raceNavLabel');
+        const prevBtn = document.getElementById('racePrev');
+        const nextBtn = document.getElementById('raceNext');
+
+        const gt = (d.gameType || '').toUpperCase();
+        label.textContent = `${gt} · ${idx + 1} / ${races.length}`;
+
+        // Keep the game context in the URL so coupon picks on the next race
+        // attach to the same game.
+        const raceHref = id =>
+          `/race/atg/${encodeURIComponent(id)}?game=${encodeURIComponent(gameId)}`;
+        if (idx === 0) prevBtn.classList.add('is-disabled');
+        else prevBtn.addEventListener('click', () => {
+          window.location.href = raceHref(races[idx - 1].atgRaceId);
+        });
+        if (idx === races.length - 1) nextBtn.classList.add('is-disabled');
+        else nextBtn.addEventListener('click', () => {
+          window.location.href = raceHref(races[idx + 1].atgRaceId);
+        });
+        navWrap.style.display = 'flex';
+      } catch (_) {}
+    }
+
+    /* ── ink row fluid simulation ── */
+    function buildRowFluid(rowEl, inkHex, paperHex, numInkHex, opts = {}) {
+      const canvas = rowEl.querySelector('.ink-row__canvas');
+      const overlay = rowEl.querySelector('.ink-row__content--ink');
+      const numBadge = rowEl.querySelector('[data-num-badge]');
+      const toggleBtn = rowEl.querySelector('.ink-row__num-badge');
+      const numSim = numBadge && numInkHex
+        ? buildNumberBadgeSimple(numBadge, numInkHex) : null;
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cssW = rowEl.clientWidth || 640;
+      const cssH = rowEl.clientHeight || 76;
+      const W = Math.max(2, Math.round(cssW * dpr));
+      const H = Math.max(2, Math.round(cssH * dpr));
+      canvas.width = W; canvas.height = H;
+      const aspect = W / H;
+
+      const REF_H = 76;
+      const densityBoost = Math.min(Math.max(REF_H / cssH, 1), 2.2);
+
+      const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
+      if (!gl || !gl.getExtension('EXT_color_buffer_float')) return null;
+
+      const SIM_H = 56, SIM_W = Math.min(Math.round(SIM_H * aspect), 640);
+      const DYE_H = 200, DYE_W = Math.min(Math.round(DYE_H * aspect), 1600);
+      const PRESSURE_ITER = 20;
+      const VEL_DISSIPATION = 0.1;
+      const CURL = 20;
+
+      function hexRgb01(hex) {
+        return [parseInt(hex.slice(1,3),16)/255, parseInt(hex.slice(3,5),16)/255, parseInt(hex.slice(5,7),16)/255];
+      }
+      function hexAbsorption(hex, str) {
+        return hexRgb01(hex).map(v => -Math.log(Math.max(v, 0.012)) * str);
+      }
+      let absorb = hexAbsorption(inkHex, 1.3 * densityBoost);
+
+      function applyInkColor(hex) {
+        absorb = hexAbsorption(hex, 1.3 * densityBoost);
+        const rgb = hexRgb01(hex);
+        const lum = 0.2126*rgb[0] + 0.7152*rgb[1] + 0.0722*rgb[2];
+        overlay.style.color = lum < 0.5 ? '#ffffff' : '#111114';
+      }
+      applyInkColor(inkHex);
+
+      const VERT = `#version 300 es
+        layout(location=0) in vec2 aPos;
+        out vec2 vUv;
+        void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0,1); }`;
+      const HEAD = `#version 300 es
+        precision highp float; precision highp sampler2D;
+        in vec2 vUv; out vec4 frag;`;
+
+      function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        return s;
+      }
+      const vertShader = compile(gl.VERTEX_SHADER, VERT);
+      function prog(body) {
+        const p = gl.createProgram();
+        gl.attachShader(p, vertShader);
+        gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + body));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+        const u = {};
+        const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+        for (let i = 0; i < n; i++) {
+          const info = gl.getActiveUniform(p, i);
+          u[info.name] = gl.getUniformLocation(p, info.name);
+        }
+        return { p, u };
+      }
+
+      const splatProg = prog(`
+        uniform sampler2D uTarget; uniform vec2 uPoint;
+        uniform vec3 uColor; uniform float uRadius, uAspect;
+        void main(){
+          vec2 d = vUv - uPoint; d.x *= uAspect;
+          frag = vec4(texture(uTarget, vUv).rgb + exp(-dot(d,d)/uRadius)*uColor, 1.0);
+        }`);
+      const advectProg = prog(`
+        uniform sampler2D uVelocity, uSource; uniform vec2 uTexel;
+        uniform float uDt, uDissipation, uWashAmt, uWashX;
+        void main(){
+          vec2 coord = vUv - uDt*texture(uVelocity, vUv).xy*uTexel;
+          float diss = uDissipation + uWashAmt*step(uWashX, vUv.x);
+          frag = vec4(texture(uSource, coord).rgb / (1.0+diss*uDt), 1.0);
+        }`);
+      const curlProg = prog(`
+        uniform sampler2D uVelocity; uniform vec2 uTexel;
+        void main(){
+          float L=texture(uVelocity,vUv-vec2(uTexel.x,0)).y;
+          float R=texture(uVelocity,vUv+vec2(uTexel.x,0)).y;
+          float B=texture(uVelocity,vUv-vec2(0,uTexel.y)).x;
+          float T=texture(uVelocity,vUv+vec2(0,uTexel.y)).x;
+          frag = vec4(0.5*(R-L-T+B), 0,0,1);
+        }`);
+      const vorticityProg = prog(`
+        uniform sampler2D uVelocity, uCurl; uniform vec2 uTexel;
+        uniform float uCurlStrength, uDt;
+        void main(){
+          float L=texture(uCurl,vUv-vec2(uTexel.x,0)).x;
+          float R=texture(uCurl,vUv+vec2(uTexel.x,0)).x;
+          float B=texture(uCurl,vUv-vec2(0,uTexel.y)).x;
+          float T=texture(uCurl,vUv+vec2(0,uTexel.y)).x;
+          float C=texture(uCurl,vUv).x;
+          vec2 force = 0.5*vec2(abs(T)-abs(B), abs(R)-abs(L));
+          force /= length(force)+0.0001;
+          force *= uCurlStrength*C; force.y *= -1.0;
+          vec2 vel = texture(uVelocity,vUv).xy + force*uDt;
+          frag = vec4(clamp(vel,-1000.0,1000.0), 0,1);
+        }`);
+      const divergeProg = prog(`
+        uniform sampler2D uVelocity; uniform vec2 uTexel;
+        void main(){
+          float L=texture(uVelocity,vUv-vec2(uTexel.x,0)).x;
+          float R=texture(uVelocity,vUv+vec2(uTexel.x,0)).x;
+          float B=texture(uVelocity,vUv-vec2(0,uTexel.y)).y;
+          float T=texture(uVelocity,vUv+vec2(0,uTexel.y)).y;
+          vec2 C=texture(uVelocity,vUv).xy;
+          if(vUv.x-uTexel.x<0.0)L=-C.x; if(vUv.x+uTexel.x>1.0)R=-C.x;
+          if(vUv.y-uTexel.y<0.0)B=-C.y; if(vUv.y+uTexel.y>1.0)T=-C.y;
+          frag = vec4(0.5*(R-L+T-B), 0,0,1);
+        }`);
+      const clearProg = prog(`
+        uniform sampler2D uTexture; uniform float uValue;
+        void main(){ frag = uValue*texture(uTexture, vUv); }`);
+      const pressureProg = prog(`
+        uniform sampler2D uPressure, uDivergence; uniform vec2 uTexel;
+        void main(){
+          float L=texture(uPressure,vUv-vec2(uTexel.x,0)).x;
+          float R=texture(uPressure,vUv+vec2(uTexel.x,0)).x;
+          float B=texture(uPressure,vUv-vec2(0,uTexel.y)).x;
+          float T=texture(uPressure,vUv+vec2(0,uTexel.y)).x;
+          float div=texture(uDivergence,vUv).x;
+          frag = vec4((L+R+B+T-div)*0.25, 0,0,1);
+        }`);
+      const gradientProg = prog(`
+        uniform sampler2D uPressure, uVelocity; uniform vec2 uTexel;
+        void main(){
+          float L=texture(uPressure,vUv-vec2(uTexel.x,0)).x;
+          float R=texture(uPressure,vUv+vec2(uTexel.x,0)).x;
+          float B=texture(uPressure,vUv-vec2(0,uTexel.y)).x;
+          float T=texture(uPressure,vUv+vec2(0,uTexel.y)).x;
+          frag = vec4(texture(uVelocity,vUv).xy - vec2(R-L, T-B), 0,1);
+        }`);
+      const displayProg = prog(`
+        uniform sampler2D uDye; uniform vec3 uPaper;
+        void main(){
+          vec3 A=texture(uDye,vUv).rgb;
+          frag = vec4(clamp(uPaper*exp(-A), 0.0, 1.0), 1.0);
+        }`);
+
+      const vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+
+      function makeRT(w, h) {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+        return { tex, fbo, w, h };
+      }
+      function makeDouble(w, h) {
+        return {
+          read: makeRT(w,h), write: makeRT(w,h), texel: [1/w, 1/h],
+          swap() { const t = this.read; this.read = this.write; this.write = t; },
+        };
+      }
+
+      const velocity = makeDouble(SIM_W, SIM_H);
+      const dyeField = makeDouble(DYE_W, DYE_H);
+      const pressure = makeDouble(SIM_W, SIM_H);
+      const curlRT = makeRT(SIM_W, SIM_H);
+      const divergeRT = makeRT(SIM_W, SIM_H);
+
+      function bindTex(tex, unit) { gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, tex); return unit; }
+      function blit(target) {
+        if (target) { gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo); gl.viewport(0,0,target.w,target.h); }
+        else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,W,H); }
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      }
+
+      function splat(field, x, y, color3, radiusMul) {
+        gl.useProgram(splatProg.p);
+        gl.uniform1f(splatProg.u.uAspect, aspect);
+        gl.uniform1i(splatProg.u.uTarget, bindTex(field.read.tex, 0));
+        gl.uniform2f(splatProg.u.uPoint, x, y);
+        gl.uniform3f(splatProg.u.uColor, color3[0], color3[1], color3[2]);
+        gl.uniform1f(splatProg.u.uRadius, 0.0026 * radiusMul);
+        blit(field.write); field.swap();
+      }
+
+      function injectFill(px) {
+        const t = performance.now() * 0.001;
+        const lanes = [0.06, 0.16, 0.50, 0.84, 0.94];
+        for (const y of lanes) {
+          const wob = Math.sin(t*2.6 + y*9.0) * 0.02;
+          const x = Math.min(Math.max(px + wob, 0.0), 1.0);
+          splat(dyeField, x, y, absorb, 6 * densityBoost);
+          const shear = Math.sin(t*4.0 + y*8.0) * (y === 0.5 ? 8 : 16);
+          splat(velocity, x, y, [30, shear, 0], 8);
+        }
+      }
+      function injectDrain(px) {
+        for (let i = 0; i < 5; i++) {
+          const y = (i + 0.5) / 5;
+          splat(velocity, px, y, [-24, (Math.random()-0.5)*18, 0], 8);
+        }
+      }
+
+      function step(dt, washAmt, washX) {
+        gl.useProgram(curlProg.p);
+        gl.uniform1i(curlProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+        gl.uniform2f(curlProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        blit(curlRT);
+
+        gl.useProgram(vorticityProg.p);
+        gl.uniform1i(vorticityProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+        gl.uniform1i(vorticityProg.u.uCurl, bindTex(curlRT.tex, 1));
+        gl.uniform2f(vorticityProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        gl.uniform1f(vorticityProg.u.uCurlStrength, CURL);
+        gl.uniform1f(vorticityProg.u.uDt, dt);
+        blit(velocity.write); velocity.swap();
+
+        gl.useProgram(divergeProg.p);
+        gl.uniform1i(divergeProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+        gl.uniform2f(divergeProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        blit(divergeRT);
+
+        gl.useProgram(clearProg.p);
+        gl.uniform1i(clearProg.u.uTexture, bindTex(pressure.read.tex, 0));
+        gl.uniform1f(clearProg.u.uValue, 0.8);
+        blit(pressure.write); pressure.swap();
+
+        gl.useProgram(pressureProg.p);
+        gl.uniform2f(pressureProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        gl.uniform1i(pressureProg.u.uDivergence, bindTex(divergeRT.tex, 1));
+        for (let i = 0; i < PRESSURE_ITER; i++) {
+          gl.uniform1i(pressureProg.u.uPressure, bindTex(pressure.read.tex, 0));
+          blit(pressure.write); pressure.swap();
+        }
+
+        gl.useProgram(gradientProg.p);
+        gl.uniform1i(gradientProg.u.uPressure, bindTex(pressure.read.tex, 0));
+        gl.uniform1i(gradientProg.u.uVelocity, bindTex(velocity.read.tex, 1));
+        gl.uniform2f(gradientProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        blit(velocity.write); velocity.swap();
+
+        gl.useProgram(advectProg.p);
+        gl.uniform2f(advectProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
+        gl.uniform1f(advectProg.u.uDt, dt);
+        gl.uniform1f(advectProg.u.uWashAmt, 0.0);
+        gl.uniform1f(advectProg.u.uWashX, 0.0);
+        gl.uniform1f(advectProg.u.uDissipation, VEL_DISSIPATION);
+        gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+        gl.uniform1i(advectProg.u.uSource, 0);
+        blit(velocity.write); velocity.swap();
+
+        gl.uniform1f(advectProg.u.uDissipation, 0.0);
+        gl.uniform1f(advectProg.u.uWashAmt, washAmt);
+        gl.uniform1f(advectProg.u.uWashX, washX);
+        gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
+        gl.uniform1i(advectProg.u.uSource, bindTex(dyeField.read.tex, 1));
+        blit(dyeField.write); dyeField.swap();
+      }
+
+      let filled = false, progress = 0, flushT = 0, mergeT = 0;
+      const MERGE_HOLD = 6.5;
+      function setFilled(on) {
+        if (filled === on) return;
+        filled = on;
+        if (on) injectFill(0);
+        if (numSim) numSim.setActive(on);
+        if (toggleBtn) toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        ensureRunning();
+      }
+      const onToggle = async e => {
+        e.stopPropagation();
+        const next = !filled;
+        if (opts.onBeforeToggle) {
+          let ok = true;
+          try { ok = (await opts.onBeforeToggle(next)) !== false; }
+          catch (_) { ok = true; }
+          if (!ok) return;
+        }
+        setFilled(next);
+      };
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', onToggle);
+        toggleBtn.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle(e);
+          }
+        });
+      }
+
+      function updateOverlayMask() {
+        let g;
+        if (progress >= 0.999) g = 'linear-gradient(#000,#000)';
+        else if (progress <= 0.001) g = 'linear-gradient(transparent,transparent)';
+        else {
+          const front = progress * 100;
+          const a = Math.max(0, front - 7);
+          const b = Math.min(100, front + 3);
+          g = `linear-gradient(to right, #000 ${a}%, transparent ${b}%)`;
+        }
+        overlay.style.webkitMaskImage = g;
+        overlay.style.maskImage = g;
+      }
+      updateOverlayMask();
+
+      const PAPER = (paperHex && /^#[0-9a-f]{6}$/i.test(paperHex)) ? hexRgb01(paperHex) : [1,1,1];
+      let rafId = 0, running = false, lastT = performance.now();
+
+      function ensureRunning() {
+        if (running || !canvas.isConnected) return;
+        running = true; lastT = performance.now();
+        rafId = requestAnimationFrame(frame);
+      }
+
+      function frame(now) {
+        if (!canvas.isConnected) { running = false; return; }
+        if (document.hidden) { lastT = now; rafId = requestAnimationFrame(frame); return; }
+
+        let dt = (now - lastT) / 1000; lastT = now;
+        if (dt > 0.1) dt = 1/60;
+        dt = Math.min(dt, 1/30);
+        if (dt <= 0) { rafId = requestAnimationFrame(frame); return; }
+
+        const target = filled ? 1 : 0;
+        let md = 0;
+        if (progress < target) { progress = Math.min(target, progress + dt/0.57); md = 1; }
+        else if (progress > target) { progress = Math.max(target, progress - dt/0.57); md = -1; }
+        updateOverlayMask();
+
+        if (filled && md === 1) injectFill(progress);
+        if (filled) {
+          if (md === 1) mergeT = MERGE_HOLD;
+          else if (progress >= 0.999 && mergeT > 0) mergeT -= dt;
+        } else { mergeT = 0; }
+
+        let washAmt = 0, washX = progress;
+        if (!filled) {
+          if (progress > 0.0001) {
+            washAmt = 7.0; washX = progress; flushT = 1.2;
+            if (md === -1) injectDrain(progress);
+          } else if (flushT > 0) {
+            washAmt = 9.0; washX = 0.0; flushT -= dt;
+          }
+        }
+
+        const settled = (filled && progress >= 0.999 && mergeT <= 0) ||
+                        (!filled && progress <= 0.001 && flushT <= 0);
+        if (!settled) step(dt, washAmt, washX);
+
+        gl.useProgram(displayProg.p);
+        gl.uniform1i(displayProg.u.uDye, bindTex(dyeField.read.tex, 0));
+        gl.uniform3f(displayProg.u.uPaper, PAPER[0], PAPER[1], PAPER[2]);
+        blit(null);
+
+        if (settled) { running = false; return; }
+        rafId = requestAnimationFrame(frame);
+      }
+
+      ensureRunning();
+
+      return {
+        setInk(hex) { applyInkColor(hex); },
+        setFilled,
+        destroy() {
+          running = false; cancelAnimationFrame(rafId);
+          if (numSim) numSim.destroy();
+          const lose = gl.getExtension('WEBGL_lose_context');
+          if (lose) lose.loseContext();
+        },
+      };
+    }
+
+    function buildNumberBadgeSimple(el, hex) {
+      el.style.setProperty('--badge-ink', hex);
+      let active = false;
+      return {
+        setActive(on) {
+          if (active === on) return;
+          active = on;
+          el.classList.toggle('is-active', active);
+        },
+        setActiveInk(h) { el.style.setProperty('--badge-ink', h); },
+        destroy() {},
+      };
+    }
 
     loadRace();
   </script>

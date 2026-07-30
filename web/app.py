@@ -1921,6 +1921,159 @@ def api_watchlist_status(horse_id):
     return jsonify({'horse_id': horse_id, 'watched': on_list})
 
 
+# =====================================================================
+# Play — coupon building against ATG multi-leg pools
+# =====================================================================
+
+# Official ATG rules per bet type (atg.se kundservice, 2026):
+#   line_price  — radpris in SEK. Coupon cost = product of picks per leg
+#                 × line_price ("systemkostnad").
+#   legs        — number of legs (avdelningar) in the pool.
+#   max_systems — ATG's cap on submitted systems per account/competition;
+#                 there is no official per-coupon cost cap, so this is the
+#                 practical upper bound we surface in the UI.
+# Mirrored client-side in _layout.html (COUPON_GAME_RULES) — keep in sync.
+_COUPON_GAME_RULES = {
+    'V86':  {'legs': 8, 'line_price': 0.25, 'max_systems': 5000},
+    'V85':  {'legs': 8, 'line_price': 0.50, 'max_systems': 5000},
+    'V75':  {'legs': 7, 'line_price': 0.50, 'max_systems': 5000},
+    'GS75': {'legs': 7, 'line_price': 1.00, 'max_systems': 5000},
+    'V64':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000},
+    'V65':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000},
+    'V5':   {'legs': 5, 'line_price': 1.00, 'max_systems': 500},
+    'V4':   {'legs': 4, 'line_price': 2.00, 'max_systems': 500},
+}
+
+
+@app.route('/play')
+def play_page():
+    return render_template('play.html', active_tab='stable_play')
+
+
+@app.route('/play/coupons')
+def play_coupons_page():
+    return render_template('play_coupons.html', active_tab='stable_play_coupons')
+
+
+@app.route('/api/coupons', methods=['GET'])
+def api_coupons_list():
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT coupon_id, name, game_type, atg_game_id, track_name,
+                       game_date, selections, line_price, num_lines, cost,
+                       payout, status, created_at
+                FROM coupon
+                ORDER BY created_at DESC, coupon_id DESC
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return jsonify([{
+        'id': r['coupon_id'],
+        'name': r['name'] or '',
+        'gameType': r['game_type'],
+        'gameId': r['atg_game_id'],
+        'trackName': r['track_name'] or '',
+        'gameDate': r['game_date'].isoformat() if r['game_date'] else None,
+        'selections': r['selections'],
+        'linePrice': float(r['line_price']),
+        'numLines': r['num_lines'],
+        'cost': float(r['cost']),
+        'payout': float(r['payout']) if r['payout'] is not None else None,
+        'status': r['status'],
+        'createdAt': r['created_at'].isoformat() if r['created_at'] else None,
+    } for r in rows])
+
+
+@app.route('/api/coupons', methods=['POST'])
+def api_coupons_save():
+    """Persist a coupon draft. The cost is recomputed server-side from the
+    official line price so the client can never save a mispriced coupon."""
+    body = request.get_json(silent=True) or {}
+    game_type = str(body.get('gameType') or '').upper()
+    rule = _COUPON_GAME_RULES.get(game_type)
+    if not rule:
+        return jsonify({'error': f'unsupported game type: {game_type}'}), 400
+
+    game_id = str(body.get('gameId') or '').strip()
+    if not game_id:
+        return jsonify({'error': 'missing gameId'}), 400
+
+    selections = body.get('selections')
+    if not isinstance(selections, list) or len(selections) != rule['legs']:
+        return jsonify({'error': f'{game_type} needs {rule["legs"]} legs'}), 400
+
+    clean = []
+    num_lines = 1
+    for i, leg in enumerate(selections):
+        numbers = sorted({int(n) for n in (leg.get('numbers') or [])})
+        if not numbers or any(n < 1 for n in numbers):
+            return jsonify({'error': f'leg {i + 1} has no horses selected'}), 400
+        horse_names_raw = leg.get('horseNames') or {}
+        horse_names = {}
+        if isinstance(horse_names_raw, dict):
+            for key, name in horse_names_raw.items():
+                try:
+                    num = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if num in numbers and isinstance(name, str) and name.strip():
+                    horse_names[str(num)] = name.strip()
+        clean.append({
+            'leg': i + 1,
+            'raceId': str(leg.get('raceId') or ''),
+            'numbers': numbers,
+            'horseNames': horse_names,
+        })
+        num_lines *= len(numbers)
+
+    cost = round(num_lines * rule['line_price'], 2)
+
+    name = (body.get('name') or '').strip() or None
+    track_name = (body.get('trackName') or '').strip() or None
+    game_date = None
+    raw_date = str(body.get('gameDate') or '')
+    if raw_date:
+        from datetime import datetime as _dt
+        try:
+            game_date = _dt.strptime(raw_date, '%Y-%m-%d').date()
+        except ValueError:
+            game_date = None
+
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO coupon (name, game_type, atg_game_id, track_name,
+                                    game_date, selections, line_price,
+                                    num_lines, cost)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING coupon_id
+            """, (name, game_type, game_id, track_name, game_date,
+                  psycopg2.extras.Json(clean), rule['line_price'],
+                  num_lines, cost))
+            coupon_id = cur.fetchone()[0]
+            conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'status': 'saved', 'id': coupon_id,
+                    'numLines': num_lines, 'cost': cost})
+
+
+@app.route('/api/coupons/<int:coupon_id>', methods=['DELETE'])
+def api_coupons_delete(coupon_id):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM coupon WHERE coupon_id = %s", (coupon_id,))
+            conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'status': 'deleted', 'id': coupon_id})
+
+
 @app.route('/api/search')
 def search():
     """Stable-front-page search.

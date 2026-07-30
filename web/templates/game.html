@@ -109,7 +109,7 @@
           distanceLabel: race.distanceLabel || null,
         });
         return race.atgRaceId
-          ? `<a class="game-race-link" href="/race/atg/${encodeURIComponent(race.atgRaceId)}">${panel}</a>`
+          ? `<a class="game-race-link" href="/race/atg/${encodeURIComponent(race.atgRaceId)}?game=${encodeURIComponent(gameId)}">${panel}</a>`
           : panel;
       }).join('');
     } catch (_) {}
