@@ -1027,8 +1027,9 @@
           <th class="num">sulky</th>
           <th class="center">shoes</th>
           <th title="source(s) that contributed this entry row">src</th>
+          <th title="trotting-press comment for this start">comment</th>
         </tr></thead>`;
-      const COLS = 14;
+      const COLS = 15;
       const rows = rowsWithTillaggDividers(sorted, COLS, e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
         const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
@@ -1052,6 +1053,7 @@
                                 ? e.contributors
                                 : (e.primary_source ? [e.primary_source] : [])
                                ).map(s => ({key: s})), {size: 'sm'})}</td>
+            <td>${commentCell(e.comment, COLS)}</td>
           </tr>`;
       }).join('');
       mount.innerHTML = `<table class="entries">${head}<tbody>${rows}</tbody></table>`;
@@ -1120,7 +1122,11 @@
           <th>time</th>
           ${gpsHeadCells}
           <th title="source(s) that contributed this entry row">src</th>
+          <th title="trotting-press comment for this start">comment</th>
         </tr></thead>`;
+      // pos,#,horse,driver,trainer,t_wr,tΔ,t form,t mkt,odds,w%,clean%,sulky,
+      // shoes,time,src,comment (+3 when the GPS columns are shown).
+      const COL_COUNT = 17 + (showGps ? 3 : 0);
       const body = sorted.map(e => {
         const cls = e.withdrawn ? ' class="scratched"' : '';
         const posCell = posDisplay(e);
@@ -1167,6 +1173,7 @@
                                 ? e.contributors
                                 : (e.primary_source ? [e.primary_source] : [])
                                ).map(s => ({key: s})), {size: 'sm'})}</td>
+            <td>${commentCell(e.comment, COL_COUNT)}</td>
           </tr>`;
       }).join('');
       const footer = raceData.victory_margin

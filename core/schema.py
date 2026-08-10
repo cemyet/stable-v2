@@ -977,6 +977,30 @@ CREATE TABLE IF NOT EXISTS entry_perf (
 CREATE INDEX IF NOT EXISTS idx_entry_perf_date ON entry_perf (race_date);
 
 -- =====================================================================
+-- ENTRY_COMMENT — the trotting-press race comment for a single start
+-- ("Sg, ifatt i 6-inv 1400 kv, blev kvar i kön"). One per entry.
+--
+-- Historic rows come from the travmedia/travfakta bulk export, which keys
+-- horses by the shared Swedish id we store as horse.st_id (the export's
+-- own horse_id/race_id columns are internal to travfakta and collide
+-- meaninglessly with ours — never join on them). See
+-- scripts/import_travfakta_comments.py for the resolution + corroboration
+-- protocol; ongoing rows arrive from the nightly scrape.
+--
+-- source_ref keeps the origin's own start id so a row can be traced back
+-- and re-synced without re-deriving the match.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS entry_comment (
+    entry_id    BIGINT NOT NULL PRIMARY KEY REFERENCES entry(entry_id) ON DELETE CASCADE,
+    comment     TEXT NOT NULL,
+    source      VARCHAR(20) NOT NULL,
+    source_ref  TEXT,
+    race_date   DATE,
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_entry_comment_date ON entry_comment (race_date);
+
+-- =====================================================================
 -- WATCHLIST — user's tracked horses (single-user app, no user_id needed).
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS watchlist (

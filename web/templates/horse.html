@@ -562,8 +562,10 @@
             <th>trainer</th>
             <th class="num">prize</th>
             <th title="source(s) that contributed this entry">src</th>
+            <th title="trotting-press comment for this start">comment</th>
           </tr>
         </thead>`;
+      const COL_COUNT = 15;
       const body = rows.map(r => {
         const date = r.race_date || '';
         const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
@@ -615,6 +617,7 @@
               : esc(fmtName(r.trainer_name))}</td>
             <td class="num">${esc(r.prize_kr || '')}</td>
             <td>${srcPillsList((r.sources || []).map(s => ({key: s})), {size: 'sm'})}</td>
+            <td>${commentCell(r.comment, COL_COUNT)}</td>
           </tr>`;
       }).join('');
       const fold = mountFoldedTable(

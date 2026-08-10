@@ -3515,6 +3515,43 @@
       }
     }
 
+    /* ---- Race comments ----
+       The trotting-press comment for a start ("Sg, ifatt i 6-inv 1400 kv…").
+       Long enough to wreck a table row, so the cell only carries a toggle and
+       the text unfolds into a full-width row beneath. */
+
+    .comment-toggle {
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      font-size: 0.92em;
+      color: var(--fg-muted);
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 1px dotted currentColor;
+      line-height: 1.2;
+    }
+    .comment-toggle:hover {
+      color: var(--fg);
+    }
+    .comment-toggle[aria-expanded="true"] {
+      color: var(--fg);
+    }
+
+    tr.comment-row > td {
+      padding: 0 0 0.55rem;
+    }
+    tr.comment-row .comment-body {
+      color: var(--fg);
+      font-size: 0.92em;
+      line-height: 1.45;
+      padding: 0.5rem 0.7rem;
+      border-left: 2px solid var(--border);
+      background: var(--hover);
+      max-width: 70ch;
+    }
+
     {% block extra_style %}{% endblock %}
 
     /* ---- Fluid segmented / tab toggles ----
@@ -7047,6 +7084,61 @@ window.trackNameHtml = trackNameHtml;
     window.Coupon = Coupon;
     window.COUPON_GAME_RULES = COUPON_GAME_RULES;
     window.couponKr = couponKr;
+  </script>
+
+  <script>
+    /* Race comments: renders the "show comment" cell and unfolds the text into
+       a full-width row under the start it belongs to.
+
+       Delegated from document so it works for tables that are built after load
+       (the horse history and the race result views both render client-side)
+       and survives a re-render. */
+    (function () {
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+      }
+
+      // Cell contents for a start's comment column. `colspan` must cover the
+      // whole table so the unfolded text is not squeezed into one column.
+      window.commentCell = function (comment, colspan) {
+        if (!comment) return '';
+        return `<button type="button" class="comment-toggle" aria-expanded="false"`
+             + ` data-comment="${esc(comment)}" data-colspan="${colspan}">show comment</button>`;
+      };
+
+      // Capture phase: result rows carry their own click listener that
+      // navigates to the race, and it is bound directly to the <tr>. A
+      // bubble-phase listener here would run only after that already fired,
+      // so the page would navigate away before the comment could open.
+      document.addEventListener('click', function (ev) {
+        const btn = ev.target.closest('.comment-toggle');
+        if (!btn) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        const row = btn.closest('tr');
+        if (!row) return;
+        const open = btn.getAttribute('aria-expanded') === 'true';
+
+        if (open) {
+          const next = row.nextElementSibling;
+          if (next && next.classList.contains('comment-row')) next.remove();
+          btn.setAttribute('aria-expanded', 'false');
+          btn.textContent = 'show comment';
+          return;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = 'comment-row';
+        tr.innerHTML = `<td colspan="${btn.dataset.colspan || 99}">`
+                     + `<div class="comment-body">${esc(btn.dataset.comment)}</div></td>`;
+        row.insertAdjacentElement('afterend', tr);
+        btn.setAttribute('aria-expanded', 'true');
+        btn.textContent = 'hide comment';
+      }, true);
+    })();
   </script>
 
   {% block scripts %}{% endblock %}

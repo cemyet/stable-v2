@@ -67,6 +67,10 @@ SERVING_TABLES: list[tuple[str, str | None]] = [
     ("entry_features",        "computed_at"),
     ("entry_outperf",         "race_date"),
     ("entry_perf",            "race_date"),
+    # updated_at, not race_date: the bulk history import stamps 1.58M rows at
+    # load time regardless of how old the race is, and a race_date watermark
+    # would push only the last few days of them.
+    ("entry_comment",         "updated_at"),
     ("trainer_form_exp",      "race_date"),
     ("identity_redirect",     "created_at"),
     ("watchlist",             "added_at"),
@@ -105,10 +109,23 @@ _KEEPALIVE_KW = dict(
 )
 
 
-def _connect(url: str, *, readonly: bool = False):
+# The cloud role's default statement_timeout is 2 min, which is sized for web
+# requests, not for a bulk sync. As the serving set outgrew the instance's
+# cache, single upsert batches and matview refreshes began exceeding it and the
+# publish silently pushed almost nothing night after night. Publish is a
+# maintenance job with the database to itself, so it runs under a timeout
+# generous enough to survive a cold cache while still bounding a true hang.
+_CLOUD_STATEMENT_TIMEOUT = "45min"
+
+
+def _connect(url: str, *, readonly: bool = False, statement_timeout: str | None = None):
     conn = psycopg2.connect(url, **_KEEPALIVE_KW)
     if readonly:
         conn.set_session(readonly=True)
+    if statement_timeout:
+        with conn.cursor() as cur:
+            cur.execute(f"SET statement_timeout = '{statement_timeout}'")
+        conn.commit()
     return conn
 
 
@@ -608,20 +625,28 @@ def reconcile_moved_entry_keys(local_read, state, cloud, *, full: bool,
     if not rows:
         return 0
     want = {(int(r), int(h)): int(e) for e, r, h in rows}
-    races = [r for _, r, _ in rows]
-    horses = [h for _, _, h in rows]
-    with cloud.cursor() as cc:
-        cc.execute(
-            "SELECT e.entry_id, e.race_id, e.horse_id FROM entry e "
-            "JOIN unnest(%s::bigint[], %s::bigint[]) AS p(race_id, horse_id) "
-            "  ON p.race_id = e.race_id AND p.horse_id = e.horse_id",
-            (races, horses),
-        )
-        stale = [int(e) for e, r, h in cc.fetchall()
-                 if want.get((int(r), int(h))) != int(e)]
-        if stale:
-            cc.execute("DELETE FROM entry WHERE entry_id = ANY(%s)", (stale,))
-    cloud.commit()
+    # Chunked for the same reason as reconcile_moved_unique: a backlogged window
+    # can hold hundreds of thousands of entries, and shipping them as one array
+    # makes a single query big enough to exceed the cloud's timeout — which
+    # takes the whole publish with it.
+    stale: list[int] = []
+    for i in range(0, len(rows), _MOVED_UNIQUE_CHUNK):
+        chunk = rows[i: i + _MOVED_UNIQUE_CHUNK]
+        with cloud.cursor() as cc:
+            cc.execute(
+                "SELECT e.entry_id, e.race_id, e.horse_id FROM entry e "
+                "JOIN unnest(%s::bigint[], %s::bigint[]) AS p(race_id, horse_id) "
+                "  ON p.race_id = e.race_id AND p.horse_id = e.horse_id",
+                ([r for _, r, _ in chunk], [h for _, _, h in chunk]),
+            )
+            stale.extend(int(e) for e, r, h in cc.fetchall()
+                         if want.get((int(r), int(h))) != int(e))
+    if stale:
+        with cloud.cursor() as cc:
+            for i in range(0, len(stale), _BATCH):
+                cc.execute("DELETE FROM entry WHERE entry_id = ANY(%s)",
+                           (stale[i: i + _BATCH],))
+        cloud.commit()
     if stale:
         log(f"  reconcile[entry]: dropped {len(stale):,} cloud rows whose "
             f"(race_id, horse_id) moved to a new entry_id")
@@ -834,7 +859,8 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
         raise SystemExit("SUPABASE_DATABASE_URL is not set (env or .env).")
     local_read = _connect(config.DATABASE_URL, readonly=True)   # streaming reads
     state = _connect(config.DATABASE_URL)                       # publish_state rw
-    cloud = _connect(config.SUPABASE_DATABASE_URL)              # upsert target
+    cloud = _connect(config.SUPABASE_DATABASE_URL,               # upsert target
+                     statement_timeout=_CLOUD_STATEMENT_TIMEOUT)
     totals = {"tables": {}, "pushed": 0}
     t0 = time.time()
     try:

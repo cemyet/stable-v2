@@ -18,6 +18,11 @@ logs/
 # One-off analysis / merge review outputs (large, regenerable)
 out/
 
+# Bulk source exports (travfakta race comments is ~230 MB). Loaded once via
+# scripts/import_travfakta_comments.py; the data lives in the database after.
+travfakta_comments_all.csv
+*_comments_all.csv
+
 # Local IDE
 .cursor/
 backups/

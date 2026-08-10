@@ -2407,12 +2407,14 @@ def horse_races(horse_id):
                        e.kmtid_best_100ms                    AS kmtid_best_100ms,
                        e.kmtid_slipstream_distance_m         AS kmtid_slip_m,
                        e.primary_source,
-                       e.source_data->'_contributors'        AS contributors
+                       e.source_data->'_contributors'        AS contributors,
+                       ec.comment                            AS comment
                 FROM entry e
                 JOIN race    r ON r.race_id    = e.race_id
                 LEFT JOIN track   t ON t.track_id   = r.track_id
                 LEFT JOIN person  p ON p.person_id  = e.driver_id
                 LEFT JOIN person  pt ON pt.person_id = e.trainer_id
+                LEFT JOIN entry_comment ec ON ec.entry_id = e.entry_id
                 WHERE e.horse_id = %s
                 ORDER BY r.race_date DESC NULLS LAST, e.race_id DESC NULLS LAST
                 LIMIT 500
@@ -2465,6 +2467,7 @@ def horse_races(horse_id):
                     'kmtid_best_100ms':   float(r['kmtid_best_100ms'])   if r['kmtid_best_100ms']   is not None else None,
                     'kmtid_slip_m':       r['kmtid_slip_m'],
                     'sources':            contribs,
+                    'comment':            r['comment'],
                 })
     finally:
         conn.close()
@@ -3571,12 +3574,14 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                        e.kmtid_slipstream_distance_m   AS kmtid_slip_m,
                        e.primary_source,
                        e.source_data->'_contributors' AS contributors,
+                       ec.comment                      AS comment,
                        pd.name AS driver_name,  pd.short_name AS driver_short_name,  e.driver_id,
                        pt.name AS trainer_name, pt.short_name AS trainer_short_name, e.trainer_id
                 FROM entry e
                 LEFT JOIN horse  h  ON h.horse_id   = e.horse_id
                 LEFT JOIN person pd ON pd.person_id = e.driver_id
                 LEFT JOIN person pt ON pt.person_id = e.trainer_id
+                LEFT JOIN entry_comment ec ON ec.entry_id = e.entry_id
                 WHERE e.race_id = %s
                 ORDER BY COALESCE(e.program_number, 999), e.horse_id
                 """,
@@ -3725,6 +3730,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'kmtid_first_200ms':  float(r['kmtid_first_200ms'])  if r['kmtid_first_200ms']  is not None else None,
                     'kmtid_last_200ms':   float(r['kmtid_last_200ms'])   if r['kmtid_last_200ms']   is not None else None,
                     'kmtid_slip_m':       r['kmtid_slip_m'],
+                    'comment':            r['comment'],
                     'placement': r['placement'],
                     'placement_text': r['placement_text'],
                     'time_text': r['time_text'],
