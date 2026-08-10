@@ -1096,8 +1096,8 @@ def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
         summary["aborted_at"] = "bridge"
         return summary
 
-    _set_phase(conn, run_id, "2/3 LeTrot (yesterday's courses)")
-    _log(conn, run_id, "\n[all] === phase 2/3 — letrot (yesterday's courses) ===")
+    _set_phase(conn, run_id, "2/4 LeTrot (yesterday's courses)")
+    _log(conn, run_id, "\n[all] === phase 2/4 — letrot (yesterday's courses) ===")
     try:
         s_letrot = run_letrot(conn, run_id)
     except Exception as exc:
@@ -1110,8 +1110,26 @@ def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
         summary["aborted_at"] = "letrot"
         return summary
 
-    _set_phase(conn, run_id, "3/3 Cleanup (dedup + heal)")
-    _log(conn, run_id, "\n[all] === phase 3/3 — cleanup (dedup + heal) ===")
+    # Race comments. Runs after ingest because it attaches to entries that
+    # must already exist, and re-walks a trailing window rather than just
+    # yesterday: the comments are written by hand and land 1-3 days after the
+    # race, so yesterday is usually still blank. Never fatal — a missing
+    # comment costs nothing, and the next night picks it up anyway.
+    _set_phase(conn, run_id, "3/4 Race comments (TR Media)")
+    _log(conn, run_id, "\n[all] === phase 3/4 — race comments ===")
+    try:
+        from etl import import_tr_comments
+        s_comments = import_tr_comments.run_recent(
+            conn, log_fn=lambda m: _log(conn, run_id, f"  {m}"))
+    except Exception as exc:
+        conn.rollback()
+        _log(conn, run_id,
+             f"[all] race comments FAILED: {exc!r}\n{traceback.format_exc()}")
+        s_comments = {"error": repr(exc)}
+    summary["phases"].append({"phase": "comments", "result": s_comments})
+
+    _set_phase(conn, run_id, "4/4 Cleanup (dedup + heal)")
+    _log(conn, run_id, "\n[all] === phase 4/4 — cleanup (dedup + heal) ===")
     s_cleanup = run_cleanup(conn, run_id, execute=True,
                             abort_on_error=abort_on_error,
                             since_days=CLEANUP_SINCE_DAYS)

@@ -219,6 +219,43 @@ BREEDLY_HEADERS = {
 }
 
 # ---------------------------------------------------------------------------
+# TR Media ("tr") — race comments
+# ---------------------------------------------------------------------------
+
+# travrondenspel.se is a React SPA over a read-only JSON API. Two things make
+# it the right source for race comments: it is the same TR Media database the
+# historical travfakta export came from (`start_id`, `race_id` and `horse.id`
+# in the responses *are* that export's columns), and a finished race can be
+# addressed directly by track/date/number, so we never have to wait for a
+# horse to start again to learn how its last race went.
+TR_BASE = "https://www.travrondenspel.se/api/v1/public"
+
+# Racedays in a date window. Returns SE + foreign meets; only SE carry comments.
+TR_MEET_LIST_URL = TR_BASE + "/meet/"
+# One race with every start, each carrying its own `comment`.
+TR_RACE_URL = TR_BASE + "/race/{track_slug}-{race_date}-{race_number}/"
+
+# The API keys content off this header; without it the SPA's own endpoints
+# answer but return the wrong site's payload shape.
+TR_HEADERS = {
+    "User-Agent": DEFAULT_USER_AGENT,
+    "Accept": "application/json",
+    "Accept-Language": "sv-SE,sv;q=0.9,en;q=0.8",
+    "SITE": "travronden_spel",
+}
+
+# Comments are written by hand and land 1-3 days after the race, so a nightly
+# that only looked at yesterday would permanently miss most of them. We re-walk
+# this trailing window instead and, within it, only re-fetch races whose
+# comment coverage is still incomplete.
+TR_COMMENT_WINDOW_DAYS = 10
+
+# Serial and deliberately unhurried — the whole nightly pass is a few dozen
+# calls, so there is nothing to gain from hammering.
+TR_REQUEST_DELAY = 0.35
+TR_TIMEOUT = 40.0
+
+# ---------------------------------------------------------------------------
 # Riksbank historical FX (used to convert foreign prize money to SEK)
 # ---------------------------------------------------------------------------
 
