@@ -7,11 +7,49 @@
 
   .design-page {
     width: 100%;
-    max-width: 1100px;
+    max-width: 1180px;
     display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 40px;
+    grid-template-columns: 180px 1fr;
+    gap: 28px;
     min-height: calc(100vh - 160px);
+    transition: max-width 0.2s ease, grid-template-columns 0.2s ease, gap 0.2s ease;
+  }
+  /* Game preview: full-bleed iframe so the page lays out at real size.
+     Design nav floats as a collapsed rail over the preview. */
+  body:has(.design-page.is-game-preview) {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    align-items: stretch;
+  }
+  .design-page.is-game-preview {
+    max-width: none;
+    width: 100%;
+    min-height: calc(100dvh - 80px);
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .design-page.is-game-preview .design-stage {
+    padding: 0;
+    min-height: calc(100dvh - 80px);
+  }
+  .design-page.is-game-preview .design-nav {
+    position: fixed;
+    left: 10px;
+    top: 72px;
+    z-index: 80;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  }
+  .design-page.is-game-preview:not(.is-nav-open) .design-nav {
+    width: 40px;
+  }
+  .design-page.is-game-preview.is-nav-open .design-nav {
+    width: 168px;
   }
 
   .design-nav {
@@ -22,6 +60,21 @@
     flex-direction: column;
     gap: 2px;
   }
+  .design-nav__toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--fg-muted);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1;
+    padding: 6px 8px;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .design-nav__toggle:hover { color: var(--fg); background: var(--hover); }
+  .design-page.is-game-preview .design-nav__toggle { display: block; }
 
   .design-nav button {
     background: none;
@@ -44,6 +97,48 @@
     color: var(--accent-glow);
     font-weight: var(--highlight-weight);
   }
+  .design-nav__short { display: none; }
+  .design-page.is-game-preview:not(.is-nav-open) .design-nav button {
+    padding: 7px 4px;
+    text-align: center;
+    letter-spacing: 0;
+  }
+  .design-page.is-game-preview:not(.is-nav-open) .design-nav__full { display: none; }
+  .design-page.is-game-preview:not(.is-nav-open) .design-nav__short { display: inline; }
+
+  .demo-game-frame {
+    width: 100%;
+    height: calc(100dvh - 80px);
+    border: 0;
+    display: block;
+    background: var(--bg);
+  }
+  .demo-game-meta {
+    position: fixed;
+    top: 14px;
+    right: 18px;
+    z-index: 80;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .demo-game-meta h2 {
+    margin: 0 !important;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .demo-game-meta a {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+  }
+  .demo-game-meta a:hover { color: var(--accent-glow); }
 
   .design-stage {
     padding: 30px 0;
@@ -686,9 +781,12 @@
     gap: 20px;
     flex-wrap: wrap;
   }
+  /* Relative, not static — the sphere's glass, plasma and label layers are all
+     absolutely positioned against it. */
   .demo-coupon-sphere {
-    position: static !important;
-    width: 70px; height: 70px;
+    position: relative !important;
+    right: auto !important;
+    bottom: auto !important;
     flex-shrink: 0;
   }
   .demo-coupon-receipt {
@@ -858,6 +956,13 @@
   }
   .demo-ink-swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
   .demo-ink-swatch input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+  .demo-ink-swatch input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    accent-color: var(--fg, #1a1a1f);
+    cursor: pointer;
+  }
 
   /* row ink presets sit beside the free-form color picker */
   .ink-row-presets {
@@ -957,7 +1062,7 @@
     box-shadow: inset 0 0 0 1px #fff;
   }
   .demo-ink-numbadge--simple.is-active {
-    background: var(--badge-ink, #4c9e29);
+    background: var(--badge-ink, #07bc0c);
   }
   .demo-ink-numbadge__digit {
     position: absolute; inset: 0;
@@ -1229,7 +1334,7 @@
     gap: 10px; color: var(--fg-muted);
   }
   .ink-row--race .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
-  .ink-row--race .shoe-icon { width: 15px; height: 15px; color: currentColor; display: inline-block; }
+  .ink-row--race .shoe-icon { width: 15px; height: 15px; color: currentColor; display: block; }
   .ink-row--race .shoe-icon.shoe-changed { color: var(--accent-warn); }
   .ink-row--race .rr-sulky { font-size: 11px; letter-spacing: 0.2px; }
   .ink-row--race .rr-sulky.sulky-changed { color: var(--accent-warn); }
@@ -1324,6 +1429,325 @@
     pointer-events: none;
   }
 
+  /* ── rows2 — ink rows on the C-treatment list design ───────────────────
+     Same wash fill and hairlines as the regular race lists, borderless
+     header, and rows sized between the dense table and the old ink list. */
+  .ink-race2 { margin-top: 24px; width: 100%; }
+  .ink-racelist2 {
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+  .ink-row--race2 {
+    height: 34px;
+    border-radius: 0;
+    background-color: rgba(255, 255, 255, 0.38);
+    box-shadow: none;
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-row--race2:hover {
+    transform: none;
+    box-shadow: none;
+    background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%);
+  }
+  .ink-row--race2 + .ink-row--race2 { border-top: 0; }
+  .ink-row--race2 .ink-row__content { gap: 12px; padding: 0 12px; font-size: 13px; pointer-events: none; }
+  /* Only the base layer is interactive — the ink overlay sits on top with a
+     mask, so giving its links pointer-events would steal hover while invisible. */
+  .ink-row--race2 .ink-row__content--base a.rr-link {
+    pointer-events: auto;
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
+  }
+  .ink-row--race2 .ink-row__content--ink a.rr-link {
+    pointer-events: none;
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
+  }
+  /* Bold the visible text in both layers when the (base) link is hovered. */
+  .ink-row--race2:has(.ink-row__content--base .rr-horse > a.rr-link:hover) .rr-horse > a.rr-link,
+  .ink-row--race2:has(.ink-row__content--base .rr-drv a.rr-link:hover) .rr-drv a.rr-link,
+  .ink-row--race2:has(.ink-row__content--base .rr-trn a.rr-link:hover) .rr-trn a.rr-link {
+    font-weight: 600;
+  }
+
+  /* borderless header, matching the list tables */
+  .ink-row--head2 {
+    height: 24px;
+    cursor: default;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--fg-muted);
+    letter-spacing: 0.5px;
+  }
+  .ink-row--head2:hover { transform: none; box-shadow: none; background: transparent; }
+  .ink-row--head2 .ink-row__content { align-items: center; pointer-events: auto; }
+  .ink-row--head2 .rr-num,
+  .ink-row--head2 .rr-horse,
+  .ink-row--head2 .rr-drv,
+  .ink-row--head2 .rr-trn,
+  .ink-row--head2 .rr-tform,
+  .ink-row--head2 .rr-gps,
+  .ink-row--head2 .rr-gal,
+  .ink-row--head2 .rr-winpct,
+  .ink-row--head2 .rr-cleanpct,
+  .ink-row--head2 .rr-pct,
+  .ink-row--head2 .rr-odds {
+    font-size: 11px; font-weight: 400; color: inherit;
+  }
+  .ink-row--head2 .rr-gps .gps-toggle { font-size: 11px; }
+  .ink-row--head2 .rr-num { font-size: 11px; text-align: center; line-height: 24px; }
+
+  .ink-row--race2 .rr-num { flex: none; width: 24px; height: 24px; }
+  .ink-row--race2 .ink-row__num-badge {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    margin-top: -12px;
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
+  }
+  .ink-row--race2 .ink-row__num-badge .demo-ink-numbadge {
+    width: 100%; height: 100%; cursor: inherit;
+    box-shadow: inset 0 0 0 1px var(--list-line, var(--border));
+  }
+  .ink-row--race2 .ink-row__num-badge .demo-ink-numbadge:hover {
+    transform: none;
+    box-shadow: inset 0 0 0 1px var(--list-line, var(--border));
+  }
+  .ink-row--race2 .demo-ink-numbadge__digit { font-size: 12px; }
+  .ink-row--race2.ink-row--scratched .rr-num {
+    text-align: center; font-size: 15px; line-height: 24px;
+  }
+  /* Fixed horse width keeps columns aligned across rows. */
+  .ink-row--race2 .rr-horse {
+    flex: 0 0 230px;
+    min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ink-row--race2 .rr-sa {
+    color: var(--fg-muted); font-size: 11px; letter-spacing: 0.5px; margin-left: 6px;
+  }
+  .ink-row--race2 .rr-people {
+    flex: 0 0 auto; display: inline-flex; gap: 10px; margin-left: 20px;
+  }
+  .ink-row--race2 .rr-drv,
+  .ink-row--race2 .rr-trn {
+    flex: 0 0 80px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--fg-muted);
+  }
+  .ink-row--race2 .rr-tform {
+    flex: 0 0 52px; text-align: left; font-variant-numeric: tabular-nums;
+  }
+  .ink-row--race2 .rr-eq {
+    flex: 0 0 62px; min-width: 0;
+    display: inline-flex; align-items: center; justify-content: flex-end;
+    gap: 10px; color: var(--fg-muted);
+  }
+  /* Best previous xLabs sectional — same toggle chrome as the race GPS column. */
+  .ink-row--race2 .rr-gps {
+    flex: 0 0 48px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg-muted);
+  }
+  .ink-row--race2 .rr-gal,
+  .ink-row--race2 .rr-winpct,
+  .ink-row--race2 .rr-cleanpct {
+    flex: 0 0 44px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg-muted);
+  }
+  /* Modest gap before game cols — not a full flex blow-out. */
+  .ink-row--race2 .rr-pct-gap {
+    flex: 1 1 20px;
+    max-width: 32px;
+    min-width: 16px;
+  }
+  .ink-row--race2 .rr-pct {
+    flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    user-select: none;
+    pointer-events: auto;
+    position: relative;
+  }
+
+  /* Eye toggle in the header and per-cell reveal ───────────────────────── */
+  .rr-pct-eye {
+    background: none; border: 0; padding: 0; margin: 0;
+    font: inherit; cursor: pointer;
+    color: var(--fg-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 16px;
+    pointer-events: auto;
+    opacity: 0.55;
+    transition: opacity 0.18s;
+  }
+  .rr-pct-eye:hover { opacity: 1; }
+  .rr-pct-eye svg,
+  .rr-pct__eye svg {
+    width: 16px; height: 16px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .rr-pct__val { display: inline; }
+  .rr-pct__val.is-hidden { display: none; }
+  /* Closed eye stands in for the value while hidden. */
+  .rr-pct__eye {
+    display: none;
+    align-items: center; justify-content: flex-end;
+    width: 100%;
+    color: var(--fg-muted);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .rr-pct:has(.rr-pct__val.is-hidden) .rr-pct__eye { display: inline-flex; }
+  .rr-pct:hover .rr-pct__eye { opacity: 0.8; }
+  .ink-row--race2 .ink-row__content--ink .rr-pct-eye,
+  .ink-row--race2 .ink-row__content--ink .rr-pct__eye { color: inherit; }
+  .ink-row--race2 .rr-odds {
+    flex: 0 0 44px; text-align: right;
+    color: var(--fg-muted); font-variant-numeric: tabular-nums;
+  }
+  /* Odds track row% visibility — blank while the market share is hidden. */
+  .ink-row--race2 .ink-row__content:has(.rr-pct__val.is-hidden) .rr-odds {
+    visibility: hidden;
+  }
+  .ink-row--race2 .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .ink-row--race2 .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
+  .ink-row--race2 .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .ink-row--race2 .rr-sulky { font-size: 11px; letter-spacing: 0.2px; }
+  .ink-row--race2 .rr-sulky.sulky-changed { color: var(--accent-warn); }
+  .ink-row--race2 .rr-tr { font-size: 9px; margin-right: 2px; }
+  .ink-row--race2 .rr-tr.up { color: var(--accent-hot, #ff5a5a); }
+  .ink-row--race2 .rr-tr.dn { color: var(--accent-cold, #5aa6ff); }
+  .ink-row--race2 .gal-empty,
+  .ink-row--race2 .gal-lo { color: var(--fg-muted); }
+  .ink-row--race2 .gal-mid { color: var(--chart-odds, #d97706); }
+  .ink-row--race2 .gal-hi { color: var(--accent-cold, #b00010); }
+  .ink-row--race2 .sform-hot { color: var(--accent-hot); }
+  .ink-row--race2 .sform-cold { color: var(--accent-cold); }
+
+  .ink-row--race2 .ink-row__content--ink .rr-sa,
+  .ink-row--race2 .ink-row__content--ink .rr-drv,
+  .ink-row--race2 .ink-row__content--ink .rr-trn,
+  .ink-row--race2 .ink-row__content--ink .rr-tform,
+  .ink-row--race2 .ink-row__content--ink .rr-gps,
+  .ink-row--race2 .ink-row__content--ink .rr-gal,
+  .ink-row--race2 .ink-row__content--ink .rr-winpct,
+  .ink-row--race2 .ink-row__content--ink .rr-cleanpct,
+  .ink-row--race2 .ink-row__content--ink .rr-eq,
+  .ink-row--race2 .ink-row__content--ink .rr-odds { color: inherit; opacity: 0.78; }
+  .ink-row--race2 .ink-row__content--ink .gal-lo,
+  .ink-row--race2 .ink-row__content--ink .gal-empty,
+  .ink-row--race2 .ink-row__content--ink .sform-hot,
+  .ink-row--race2 .ink-row__content--ink .sform-cold { color: inherit; }
+  .ink-row--race2 .ink-row__content--ink .gal-mid { color: #f0a83c; }
+  .ink-row--race2 .ink-row__content--ink .gal-hi { color: #ff5252; }
+  .ink-row--race2 .ink-row__content--ink .shoe-icon.shoe-changed {
+    color: #ff5252;
+    filter: drop-shadow(0 0 4px rgba(255, 82, 82, 0.9));
+    opacity: 1;
+  }
+  .ink-row--race2 .ink-row__content--ink .rr-sulky.sulky-changed {
+    color: #ff5252;
+    text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
+    opacity: 1;
+  }
+
+  .ink-row--race2.ink-row--scratched { opacity: 1; position: relative; }
+  .ink-row--race2.ink-row--scratched .ink-row__content { color: var(--fg-muted); opacity: 0.55; }
+  .ink-row--race2.ink-row--scratched::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 1.2px;
+    margin-top: -0.6px;
+    background: rgba(255, 45, 45, 0.7);
+    pointer-events: none;
+  }
+
+  /* expansion: last 5 starts, tinted like the race page's expansion row */
+  .ink-prev {
+    background: var(--hover);
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+  .ink-prev__body { padding: 0; }
+  .ink-prev__empty {
+    color: var(--fg-muted); font-size: 12px; padding: 8px 10px;
+  }
+  table.ink-prev-races {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.ink-prev-races tbody tr,
+  table.ink-prev-races tbody tr:hover {
+    background: transparent !important;
+    cursor: pointer;
+  }
+  /* Match ink-row--race2 height so comments can't grow the row. */
+  table.ink-prev-races tbody tr { height: 34px; }
+  table.ink-prev-races td {
+    padding: 0 10px;
+    height: 34px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--list-line, var(--border));
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  table.ink-prev-races tbody tr:last-child td { border-bottom: 0; }
+  table.ink-prev-races td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.ink-prev-races td.center { text-align: center; }
+  table.ink-prev-races td.muted { color: var(--fg-muted); }
+  /* Shoes/sulky styles are scoped to ink rows; redeclare for the expansion table. */
+  table.ink-prev-races .shoes {
+    display: inline-flex; gap: 3px; line-height: 1; align-items: center;
+    color: var(--fg-muted);
+  }
+  table.ink-prev-races .shoe-icon {
+    width: 14px; height: 14px; color: currentColor; display: block;
+  }
+  table.ink-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  table.ink-prev-races .rr-sulky { font-size: 11px; letter-spacing: 0.2px; color: var(--fg-muted); }
+  table.ink-prev-races .rr-sulky.sulky-changed { color: var(--accent-warn); }
+  /* Last column eats leftover width and clips; long comments marquee. */
+  table.ink-prev-races td.ink-prev-comment {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    color: var(--fg-muted);
+    font-size: 11.5px;
+  }
+  .ink-prev-comment__clip {
+    overflow: hidden;
+    width: 100%;
+    container-type: inline-size;
+  }
+  .ink-prev-comment__text {
+    display: inline-block;
+    white-space: nowrap;
+    padding-right: 1.25em;
+    animation: ink-prev-marquee 8s ease-in-out infinite alternate;
+    animation-delay: 0.8s;
+  }
+  /* Hover snaps back to the start so you can re-read without waiting. */
+  .ink-prev-comment__clip:hover .ink-prev-comment__text {
+    animation: none;
+    transform: translateX(0);
+  }
+  @keyframes ink-prev-marquee {
+    from { transform: translateX(0); }
+    /* 100cqw = clip width; if text is shorter, min() keeps it at 0. */
+    to { transform: translateX(min(0px, calc(100cqw - 100%))); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ink-prev-comment__text { animation: none; }
+  }
+  table.ink-prev-races tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
+
 {% endblock %}
 
 {% block content %}
@@ -1412,6 +1836,150 @@
   .nav-bubble-demo .nav-inline-segment.subnav a:hover {
     padding: 8px 18px !important;
     font-weight: 400 !important;
+  }
+
+  /* ---- lists sandbox ----
+     Baseline styles mirror race.html table.entries exactly. */
+  .lists-demo {
+    width: 100%;
+    max-width: none;
+  }
+  .lists-demo__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: baseline;
+    margin-bottom: 18px;
+  }
+  .lists-demo__meta .demo-label { margin-bottom: 0; }
+  .lists-demo__block {
+    margin-bottom: 36px;
+  }
+  .lists-demo__block > .demo-label {
+    margin-bottom: 10px;
+  }
+  .lists-demo__mount {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .lists-demo .lists-empty {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 12px 0;
+  }
+
+  .lists-demo table.entries {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .lists-demo table.entries th {
+    text-align: left;
+    color: var(--fg-muted);
+    font-weight: 400;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px;
+  }
+  .lists-demo table.entries th.num { text-align: right; }
+  .lists-demo table.entries td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .lists-demo table.entries td.num { text-align: right; }
+  .lists-demo table.entries th.num-prog { text-align: left; }
+  .lists-demo table.entries td.num-prog { text-align: left; font-weight: 600; }
+  .lists-demo table.entries td.muted { color: var(--fg-muted); }
+  .lists-demo table.entries th.center,
+  .lists-demo table.entries td.center { text-align: center; }
+  .lists-demo .sex-age {
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+  .lists-demo .short-name {
+    cursor: help;
+    text-decoration: none;
+  }
+  .lists-demo a.short-name { cursor: pointer; }
+  .lists-demo table.entries th.sform,
+  .lists-demo table.entries td.sform,
+  .lists-demo .sform { font-variant-numeric: tabular-nums; text-align: right; }
+  .lists-demo .sform-cold { color: var(--accent-cold); }
+  .lists-demo .sform-hot  { color: var(--accent-hot); }
+  .lists-demo .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .lists-demo .shoe-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--fg);
+    display: block;
+  }
+  .lists-demo .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .lists-demo .sulky-changed { color: var(--accent-warn); }
+  .lists-demo table.entries tr.scratched td { color: var(--fg-muted); opacity: 0.55; }
+  .lists-demo table.entries tr.scratched,
+  .lists-demo table.entries tr.scratched:hover {
+    background-image: linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.6px),
+      rgba(255, 45, 45, 0.7) calc(50% - 0.6px),
+      rgba(255, 45, 45, 0.7) calc(50% + 0.6px),
+      transparent calc(50% + 0.6px)
+    );
+  }
+  .lists-demo table.entries tr.tillagg-row td {
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--hover);
+    color: var(--fg-muted);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: lowercase;
+  }
+  .lists-demo table.entries th.winrate,
+  .lists-demo table.entries td.winrate {
+    text-align: right;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .lists-demo table.entries th.gps,
+  .lists-demo table.entries td.gps {
+    text-align: right;
+    color: var(--fg-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .lists-demo .dq,
+  .lists-demo .withdrew { color: var(--fg-muted); }
+  .lists-demo .gal-mark { font-size: .72em; color: var(--fg-muted); vertical-align: super; }
+  .lists-demo .race-footer {
+    margin-top: 14px;
+    color: var(--fg-muted);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Current list design (former experiment C):
+     wash rest · very slightly darker wash hover. Applied to all table types. */
+  .lists-demo--current table tbody tr:not(.tillagg-row):not(.comment-row) {
+    background-color: rgba(255, 255, 255, 0.38);
+  }
+  .lists-demo--current table tbody tr:hover:not(.tillagg-row):not(.scratched):not(.comment-row) {
+    background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%) !important;
+  }
+  .lists-demo--current table tr.scratched {
+    background-color: rgba(255, 255, 255, 0.38);
+  }
+  .lists-demo--current table tr.scratched:hover {
+    background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%);
+  }
+  .lists-demo--current table tr.comment-row:hover {
+    background: transparent !important;
+  }
+  .lists-demo--current table tr.comment-row:hover > td {
+    background: var(--hover) !important;
   }
 </style>
 <script>
@@ -1939,13 +2507,16 @@ const COMPONENTS = [
       <div class="demo-play-subpanel is-active" data-play-subpanel="sphere">
         <p class="demo-label">Floating cost sphere — saved coupon <em>Blank / Zarajevo Games</em> (792,00 kr).</p>
         <div class="demo-coupon-sphere-wrap">
-          <button type="button" class="coupon-sphere demo-coupon-sphere" aria-label="coupon demo">
-            <span class="coupon-sphere__cost">${designCouponAmount(DESIGN_DEMO_COUPON.cost)}</span>
-            <span class="coupon-sphere__meta">${DESIGN_DEMO_COUPON.gameType.toLowerCase()}</span>
+          <button type="button" class="${COUPON_SPHERE_CLASS} demo-coupon-sphere"
+                  style="${COUPON_SPHERE_PLASMA_STYLE}" aria-label="coupon demo">
+            ${couponSphereInnerHtml(
+              designCouponAmount(DESIGN_DEMO_COUPON.cost),
+              DESIGN_DEMO_COUPON.gameType.toLowerCase(),
+            )}
           </button>
-          <button type="button" class="coupon-sphere demo-coupon-sphere is-incomplete" aria-label="coupon demo incomplete">
-            <span class="coupon-sphere__cost">42,00</span>
-            <span class="coupon-sphere__meta">4/6</span>
+          <button type="button" class="${COUPON_SPHERE_CLASS} demo-coupon-sphere is-incomplete"
+                  style="${COUPON_SPHERE_PLASMA_STYLE}" aria-label="coupon demo incomplete">
+            ${couponSphereInnerHtml('42,00', '4/6')}
           </button>
         </div>
       </div>
@@ -1964,15 +2535,31 @@ const COMPONENTS = [
     `
   },
   {
+    id: 'lists',
+    label: 'lists',
+    render: () => `
+      <h2>lists</h2>
+      <p class="demo-label">Current list design — wash rest · subtle darker wash hover. Example race loads live from ATG.</p>
+      <div class="lists-demo" id="listsDemo">
+        <div class="lists-demo__meta" id="listsMeta">
+          <span class="demo-label">loading…</span>
+        </div>
+        <div class="lists-demo__block">
+          <p class="demo-label">race result view</p>
+          <div class="lists-demo__mount lists-demo--current" id="listsCurrent"></div>
+        </div>
+      </div>
+    `
+  },
+  {
     id: 'ink',
     label: 'ink',
     render: () => `
       <h2>ink</h2>
       <nav class="demo-ink-subtabs" id="inkSubtabs">
         <button type="button" data-ink-subtab="sandbox" class="active">sandbox</button>
-        <button type="button" data-ink-subtab="spheres">spheres</button>
         <button type="button" data-ink-subtab="panels">panels</button>
-        <button type="button" data-ink-subtab="rows">rows</button>
+        <button type="button" data-ink-subtab="rows2">rows2</button>
       </nav>
       <div class="demo-ink-subpanel is-active" data-ink-subpanel="sandbox">
         <p class="demo-label">Suminagashi — GPU fluid sim. Pick two inks, press start. Drag to stir the water, click to drop more ink.</p>
@@ -2011,15 +2598,31 @@ const COMPONENTS = [
           </div>
         </div>
       </div>
-      <div class="demo-ink-subpanel" data-ink-subpanel="spheres"></div>
       <div class="demo-ink-subpanel" data-ink-subpanel="panels"></div>
-      <div class="demo-ink-subpanel" data-ink-subpanel="rows"></div>
+      <div class="demo-ink-subpanel" data-ink-subpanel="rows2"></div>
+    `
+  },
+  {
+    id: 'game',
+    label: 'game',
+    render: () => `
+      <div class="demo-game-meta">
+        <h2 style="margin:0">game</h2>
+        <a href="${DESIGN_GAME_URL}" target="_blank" rel="noopener">open full page ↗</a>
+      </div>
+      <iframe class="demo-game-frame" src="${DESIGN_GAME_EMBED_URL}"
+              title="game page preview" loading="lazy"></iframe>
     `
   },
 ];
 
+const DESIGN_GAME_ID = 'V5_2026-08-15_6_8';
+const DESIGN_GAME_URL = `/game/${DESIGN_GAME_ID}`;
+const DESIGN_GAME_EMBED_URL = `${DESIGN_GAME_URL}?embed=1`;
+
 const nav = document.getElementById('designNav');
 const stage = document.getElementById('designStage');
+const designPage = document.querySelector('.design-page');
 
 const SPHERE_COLLAPSIBLE_STORAGE = 'design-sphere-collapsible';
 
@@ -2169,21 +2772,50 @@ function initSphereCollapsibles(root) {
   });
 }
 
+const navToggle = document.createElement('button');
+navToggle.type = 'button';
+navToggle.className = 'design-nav__toggle';
+navToggle.setAttribute('aria-label', 'expand design nav');
+navToggle.textContent = '›';
+navToggle.addEventListener('click', () => {
+  if (!designPage) return;
+  const open = !designPage.classList.contains('is-nav-open');
+  designPage.classList.toggle('is-nav-open', open);
+  navToggle.textContent = open ? '‹' : '›';
+  navToggle.setAttribute('aria-label', open ? 'collapse design nav' : 'expand design nav');
+});
+nav.appendChild(navToggle);
+
 COMPONENTS.forEach((c, i) => {
   const btn = document.createElement('button');
-  btn.textContent = c.label;
   btn.dataset.idx = i;
+  btn.title = c.label;
+  btn.innerHTML =
+    `<span class="design-nav__full">${c.label}</span>` +
+    `<span class="design-nav__short" aria-hidden="true">${c.label.slice(0, 1)}</span>`;
   if (i === 0) btn.classList.add('active');
   btn.addEventListener('click', () => selectComponent(i));
   nav.appendChild(btn);
 });
 
 function selectComponent(idx) {
-  nav.querySelectorAll('button').forEach((b, i) => {
+  const id = COMPONENTS[idx].id;
+  nav.querySelectorAll('button[data-idx]').forEach((b, i) => {
     b.classList.toggle('active', i === idx);
   });
+  if (designPage) {
+    designPage.classList.toggle('is-game-preview', id === 'game');
+    if (id !== 'game') designPage.classList.remove('is-nav-open');
+    navToggle.textContent = '›';
+    navToggle.setAttribute('aria-label', 'expand design nav');
+  }
+  // Game iframe owns the coupon sphere; hide the parent copy (shared localStorage).
+  document.getElementById('couponSphere')?.classList.toggle('is-hidden', id === 'game');
+  if (location.hash.slice(1) !== id) {
+    history.replaceState(null, '', '#' + id);
+  }
   stage.innerHTML = COMPONENTS[idx].render();
-  afterRender(COMPONENTS[idx].id);
+  afterRender(id);
 }
 
 function afterRender(id) {
@@ -2239,6 +2871,10 @@ function afterRender(id) {
     initDemoPlay(stage);
   }
 
+  if (id === 'lists') {
+    initListsDemo(stage);
+  }
+
   if (id === 'caret') {
     initDemoCaret(stage);
   }
@@ -2247,6 +2883,254 @@ function afterRender(id) {
     initDemoInk(stage);
   }
 
+}
+
+/* ---- lists sandbox ----
+   Current race-list design (former experiment C). Not rolled out yet. */
+const LISTS_DEMO_RACE_ID = '2026-07-28_7_10';
+
+function initListsDemo(root) {
+  const meta = root.querySelector('#listsMeta');
+  const mountRace = root.querySelector('#listsCurrent');
+  if (!meta || !mountRace) return;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const sexAge = e => {
+    const s = (typeof swedishSex === 'function') ? swedishSex(e.sex) : String(e.sex || '').toLowerCase();
+    const a = e.age != null ? e.age : '';
+    if (!s && !a) return '';
+    return `${s}${a}`;
+  };
+
+  const SHOE_ON_PATH =
+    'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+    ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+    'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+    's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+  const SHOE_OFF_PATH =
+    'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+    'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+    'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+    'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+    'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+    '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+    '.22-.04.36-.04.42.12l.42 1.24Z' +
+    'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+
+  const shoeIcon = (has, changed) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/>
+    </svg>`;
+  const shoeCells = (code, frontChanged, backChanged) => {
+    if (!code) return '';
+    const frontHas = code === '3' || code === '4';
+    const backHas = code === '2' || code === '4';
+    return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+  };
+  const sulkyCell = e => {
+    if (!e.sulky) return '';
+    const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+    return e.sulky_changed
+      ? `<span class="sulky-changed" title="changed since last race">${esc(txt)}</span>`
+      : esc(txt);
+  };
+  const shortCell = (short, full, href) => {
+    if (!short) return '';
+    const tag = href ? 'a' : 'span';
+    const attr = href ? ` href="${esc(href)}"` : '';
+    return `<${tag} class="short-name"${attr} title="${esc(full || '')}">${esc(short)}</${tag}>`;
+  };
+  const wrCell = v => (v == null ? '' : `<span class="muted">${(v / 10).toFixed(0)}%</span>`);
+  const deltaCell = (form, wr) => {
+    if (form == null || wr == null) return '';
+    const d = (form - wr) / 10;
+    const sign = d >= 0 ? '+' : '';
+    const cls = d < -3 ? 'sform sform-cold' : d > 3 ? 'sform sform-hot' : 'sform';
+    return `<span class="${cls}">${sign}${d.toFixed(1)}</span>`;
+  };
+  const tfOddsCell = v => {
+    if (v == null) return '';
+    const n = v / 10;
+    const sign = n >= 0 ? '+' : '';
+    const cls = n < -3 ? 'sform sform-cold' : n > 3 ? 'sform sform-hot' : 'sform';
+    return `<span class="${cls}">${sign}${n.toFixed(1)}</span>`;
+  };
+  const tfPerfCell = v => {
+    if (v == null) return '';
+    const n = v / 10;
+    const cls = n >= 65 ? 'sform sform-hot' : n <= 40 ? 'sform sform-cold' : 'sform';
+    return `<span class="${cls}">${n.toFixed(1)}</span>`;
+  };
+  const horseCell = e => {
+    const name = (typeof flagify === 'function') ? flagify(e.horse_name) : esc(e.horse_name || '');
+    const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+    const sa = sexAge(e);
+    return link + (sa ? ` <span class="sex-age">${esc(sa)}</span>` : '');
+  };
+  const winRate = (e, which) => {
+    const s = which === 'pre' ? e.pre_starts : e.post_starts;
+    const w = which === 'pre' ? e.pre_wins : e.post_wins;
+    if (!s) return '';
+    return Math.round((w / s) * 100) + '%';
+  };
+  const galAdjWinRate = (e, which) => {
+    const s = which === 'pre' ? e.pre_galadj_starts : e.post_galadj_starts;
+    const w = which === 'pre' ? e.pre_galadj_wins : e.post_galadj_wins;
+    if (!s) return '';
+    return Math.round((w / s) * 100) + '%';
+  };
+
+  const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
+  const isDq = e => {
+    if (e.dq) return true;
+    if (e.placement_text && DQ_RE.test(e.placement_text)) return true;
+    if (e.gal && e.placement == null) return true;
+    return false;
+  };
+  const resultBucket = e => {
+    if (e.withdrawn) return 3;
+    if (isDq(e)) return 2;
+    if (e.placement != null) return 0;
+    return 1;
+  };
+  const fmtTimeVal = v => {
+    if (v == null || v === 0) return '';
+    const mins = Math.floor(v / 60);
+    const secs = (v - mins * 60).toFixed(1);
+    const secStr = secs.replace('.', ',');
+    return mins <= 1 ? secStr : (mins - 1) + '.' + secStr;
+  };
+  const posDisplay = e => {
+    if (e.withdrawn) {
+      const t = e.placement_text || 'str';
+      return `<span class="withdrew">${esc(t)}</span>`;
+    }
+    if (isDq(e)) {
+      const raw = e.placement_text || '';
+      const label = raw && !/^\d+$/.test(raw) ? raw : (e.gal ? 'g' : 'd');
+      return `<span class="dq">${esc(label)}</span>`;
+    }
+    const galMark = (e.gal && e.placement != null)
+      ? ` <span class="gal-mark" title="galopp">g</span>` : '';
+    const t = (e.gal && e.placement != null)
+      ? String(e.placement)
+      : (e.placement_text || (e.placement != null ? String(e.placement) : ''));
+    return (typeof placementHtml === 'function')
+      ? placementHtml(t, galMark, e.placement)
+      : esc(t) + galMark;
+  };
+
+  // ---- Race result view ----
+  const renderResultHtml = (entries, raceData) => {
+    const sorted = entries.slice().sort((a, b) => {
+      const ba = resultBucket(a);
+      const bb = resultBucket(b);
+      if (ba !== bb) return ba - bb;
+      if (ba === 0 && a.placement !== b.placement) return a.placement - b.placement;
+      if (ba === 1 && a.time_val != null && b.time_val != null) return a.time_val - b.time_val;
+      return (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number);
+    });
+    const showGps = !!raceData.has_kmtid && typeof gpsHead === 'function' && typeof gpsCell === 'function';
+    const gpsCtx = { homeStretchM: raceData.home_stretch_m };
+    const gpsHeadCells = showGps ? gpsHead() : '';
+    const head = `
+      <thead><tr>
+        <th>pos</th>
+        <th class="num-prog">#</th>
+        <th>horse</th>
+        <th>driver</th>
+        <th>trainer</th>
+        <th class="sform" title="trainer form">t form</th>
+        <th class="num">odds</th>
+        <th class="winrate">w%</th>
+        <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
+        <th class="center">shoes</th>
+        <th class="num">sulky</th>
+        <th>time</th>
+        ${gpsHeadCells}
+      </tr></thead>`;
+    const COL_COUNT = 12 + (showGps ? 1 : 0);
+    const body = sorted.map(e => {
+      const clsList = [];
+      if (e.withdrawn) clsList.push('scratched');
+      if (e.comment) clsList.push('has-comment');
+      const clsAttr = clsList.length ? ` class="${clsList.join(' ')}"` : '';
+      const commentAttr = e.comment ? ` data-comment="${esc(e.comment)}"` : '';
+      const time = e.time_text || fmtTimeVal(e.time_val);
+      const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
+      const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
+      const gpsCells = showGps ? gpsCell(e, gpsCtx) : '';
+      return `
+        <tr${clsAttr}${commentAttr} data-colspan="${COL_COUNT}">
+          <td>${posDisplay(e)}</td>
+          <td class="num-prog">${e.number || ''}</td>
+          <td>${horseCell(e)}</td>
+          <td class="muted">${shortCell(e.driver_short, e.driver_name, driverHref)}</td>
+          <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
+          <td class="sform">${tfPerfCell(e.tf_perf)}</td>
+          <td class="num muted">${e.odds != null ? e.odds : ''}</td>
+          <td class="winrate">${winRate(e, 'post')}</td>
+          <td class="winrate">${galAdjWinRate(e, 'post')}</td>
+          <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+          <td class="num muted">${sulkyCell(e)}</td>
+          <td>${esc(time)}</td>
+          ${gpsCells}
+        </tr>`;
+    }).join('');
+    const footer = raceData.victory_margin
+      ? `<div class="race-footer">segermarginal: ${esc(raceData.victory_margin)}</div>`
+      : '';
+    return `<table class="entries">${head}<tbody>${body}</tbody></table>${footer}`;
+  };
+
+  const setMount = (el, html) => {
+    if (!el) return;
+    el.innerHTML = html;
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(el);
+  };
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/race/atg/${encodeURIComponent(LISTS_DEMO_RACE_ID)}`);
+      if (!res.ok) throw new Error('race fetch failed');
+      const data = await res.json();
+      const entries = data.results || [];
+      const sm = data.start_method === 'A' ? 'auto'
+        : data.start_method === 'V' ? 'volt' : (data.start_method || '');
+      const bits = [
+        data.track,
+        data.race_number != null ? `lopp ${data.race_number}` : '',
+        data.race_date,
+        data.distance ? `${data.distance}m` : '',
+        sm,
+      ].filter(Boolean);
+      meta.innerHTML = `
+        <span class="demo-label">${esc(bits.join(' · ').toLowerCase())}</span>
+        <a class="glow-link" href="/race/atg/${esc(LISTS_DEMO_RACE_ID)}">${esc(LISTS_DEMO_RACE_ID)}</a>
+        <span class="demo-label">${entries.length} runners · result view</span>`;
+      if (!entries.length) {
+        setMount(mountRace, '<div class="lists-empty">no entries</div>');
+        return;
+      }
+      setMount(mountRace, renderResultHtml(entries, data));
+      mountRace.querySelectorAll('tr.has-comment').forEach(tr => {
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', e => {
+          if (e.target.closest('a')) return;
+          const next = tr.nextElementSibling;
+          if (next && next.classList.contains('comment-row')) { next.remove(); return; }
+          const cr = document.createElement('tr');
+          cr.className = 'comment-row';
+          cr.innerHTML = `<td colspan="${tr.dataset.colspan || 99}"><div class="comment-body">${esc(tr.dataset.comment)}</div></td>`;
+          tr.insertAdjacentElement('afterend', cr);
+        });
+      });
+    } catch (_) {
+      meta.innerHTML = '<span class="demo-label">failed to load example race</span>';
+      setMount(mountRace, '<div class="lists-empty">race unavailable</div>');
+    }
+  })();
 }
 
 function lerp(a, b, t) {
@@ -2365,9 +3249,11 @@ function initDemoInk(root) {
     initDemoInk._destroy = null;
   }
 
-  const VALID_SUBTABS = ['sandbox', 'spheres', 'panels', 'rows'];
+  const VALID_SUBTABS = ['sandbox', 'panels', 'rows2'];
   const querySub = new URLSearchParams(location.search).get('inksub');
-  let subtab = (VALID_SUBTABS.includes(querySub) ? querySub : null) || initDemoInk._subtab || 'sandbox';
+  let subtab = (VALID_SUBTABS.includes(querySub) ? querySub : null)
+    || (VALID_SUBTABS.includes(initDemoInk._subtab) ? initDemoInk._subtab : null)
+    || 'sandbox';
 
   function destroySandbox() {
     if (initDemoInk._sandboxDestroy) {
@@ -2375,22 +3261,15 @@ function initDemoInk(root) {
       initDemoInk._sandboxDestroy = null;
     }
   }
-  function destroyRows() {
-    if (initDemoInk._rowsDestroy) {
-      initDemoInk._rowsDestroy();
-      initDemoInk._rowsDestroy = null;
-    }
-  }
-  function destroySpheres() {
-    if (initDemoInk._spheresDestroy) {
-      initDemoInk._spheresDestroy();
-      initDemoInk._spheresDestroy = null;
+  function destroyRows2() {
+    if (initDemoInk._rows2Destroy) {
+      initDemoInk._rows2Destroy();
+      initDemoInk._rows2Destroy = null;
     }
   }
   function destroyActive() {
     destroySandbox();
-    destroyRows();
-    destroySpheres();
+    destroyRows2();
   }
 
   function showSubtab(id) {
@@ -2400,8 +3279,7 @@ function initDemoInk(root) {
     root.querySelectorAll('[data-ink-subpanel]').forEach(p =>
       p.classList.toggle('is-active', p.dataset.inkSubpanel === id));
     if (id === 'sandbox') initInkSandbox(root);
-    else if (id === 'rows') initInkRows(root);
-    else if (id === 'spheres') initInkSpheres(root);
+    else if (id === 'rows2') initInkRows2(root);
   }
 
   root.querySelectorAll('[data-ink-subtab]').forEach(b => {
@@ -2474,10 +3352,20 @@ function initInkSandbox(root) {
   function hexRgb01(hex) {
     return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
   }
-  /* display color → Beer-Lambert absorbance vector */
+  /* display color → Beer-Lambert absorbance vector.
+     Near-neutral whites deposit negative absorbance ("lift") so the
+     display shader can scatter toward white — absorbance alone can only
+     darken paper, so #fff was invisible. Threshold is tight so pale
+     yellow/cyan stay on the normal absorb path. */
   function hexAbsorption(hex, strength) {
-    const c = hexRgb01(hex).map(v => Math.max(v, 0.012));
-    return c.map(v => -Math.log(v) * strength);
+    const c = hexRgb01(hex);
+    const minC = Math.min(c[0], c[1], c[2]);
+    const maxC = Math.max(c[0], c[1], c[2]);
+    if (minC > 0.88 && (maxC - minC) < 0.08) {
+      const amount = strength * (0.55 + 0.45 * minC);
+      return [-amount, -amount, -amount];
+    }
+    return c.map(v => -Math.log(Math.max(v, 0.012)) * strength);
   }
 
   /* ── pointer (attached once; delegates to current sim) ── */
@@ -2700,7 +3588,7 @@ function initInkSandbox(root) {
       frag = vec4(texture(uVelocity, vUv).xy - vec2(R - L, T - B), 0.0, 1.0);
     }`);
 
-  /* paper × exp(-absorbance) + paper structure noise */
+  /* paper × exp(-absorb) + scatter from lift (negative dye) + fiber */
   const displayProg = prog(`
     uniform sampler2D uDye;
     uniform vec3 uPaper;
@@ -2717,7 +3605,9 @@ function initInkSandbox(root) {
                    + noise(vUv * 180.0) * 0.022
                    + noise(vUv * 60.0)  * 0.018) * uFiber;
       vec3 A = texture(uDye, vUv).rgb;
-      vec3 col = uPaper * exp(-A) + fiber;
+      vec3 absorb = max(A, 0.0);
+      vec3 lift = max(-A, 0.0);
+      vec3 col = uPaper * exp(-absorb) + (1.0 - exp(-lift)) + fiber;
       col *= 1.0 - 0.06 * smoothstep(-0.10, 0.02, sdShape(vUv));
       frag = vec4(clamp(col, 0.0, 1.0), 1.0);
     }`);
@@ -2926,39 +3816,132 @@ function initInkSandbox(root) {
   rebuild();
 }
 
-/* ── ink rows — list rows that flood-fill with ink on click ──
-   Each row runs its own compact Stable-Fluids sim in a box domain
-   (the texture edges are the walls). A "fill front" is driven
-   left→right by injecting dye + rightward, turbulent velocity at the
-   moving front; dye persists behind it so the row floods with an
-   organic edge. Clicking a filled row reverses: a wash front sweeps
-   back right→left and drains it. A masked white text layer is
-   revealed in lock-step with the front so text stays legible on ink. */
-function initInkRows(root) {
-  const panel = root.querySelector('[data-ink-subpanel="rows"]');
+/* ── rows2 — upcoming race ink list (mirrors live race.html) ──
+   Wash rows, borderless header, t form + prev-GPS + eye-hidden row%,
+   last-5 expansion, centre-lane swipe ink from the number sphere.
+   Badge toggles ink; the rest of the row expands. */
+function initInkRows2(root) {
+  const panel = root.querySelector('[data-ink-subpanel="rows2"]');
   if (!panel) return;
 
-  const INK = '#f4ffe5'; // pale-green row fill — pairs with the green number sphere
-  const NUM_INK = '#4c9e29'; // rgb(76, 158, 41) — sphere ink behind start numbers
-  const INK_PRESETS = [
-    { id: 'favorite', hex: '#f4ffe5', label: 'favorite' },
-  ];
-  const RACES = ['2026-07-15_14_8'];
+  const RACES = ['2026-07-28_7_10'];
+  const INK = '#ffffff';
+  const SPHERE = '#00a500';
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  // Paper matches the live page background so rows blend into the app
-  // instead of sitting in separate white cards.
-  const themeBg = () => {
+  // The canvas covers the row, so its paper has to be the *composited* row
+  // colour — page background under the C-treatment wash — or the fill would
+  // punch the tint back out to the raw background.
+  const ROW_WASH_ALPHA = 0.38;
+  const rowPaper = () => {
     const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    return /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+    const bg = /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+    const mix = i => {
+      const c = parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16);
+      return Math.round(c + (255 - c) * ROW_WASH_ALPHA).toString(16).padStart(2, '0');
+    };
+    return `#${mix(0)}${mix(1)}${mix(2)}`;
   };
 
-  // Header row shares the exact same column markup/classes as data rows so
-  // widths line up without duplicating the flex layout.
+  // Best-previous xLabs sectionals — same click-to-cycle UX as the race GPS
+  // column, but only the four pace metrics (no +m/slip; those need this race).
+  const PREV_GPS_METRICS = [
+    { key: 'peak', label: 'peak', desc: 'fastest 100 m across prior xLabs starts' },
+    { key: 'f100', label: 'f100', desc: 'fastest first 100 m across prior xLabs starts' },
+    { key: 'f200', label: 'f200', desc: 'fastest first 200 m across prior xLabs starts' },
+    { key: 'l200', label: 'l200', desc: 'fastest last 200 m across prior xLabs starts' },
+  ];
+  const PREV_GPS_STORE = 'stable-prev-gps-metric';
+  const prevGpsCurrent = () => {
+    let k;
+    try { k = localStorage.getItem(PREV_GPS_STORE); } catch (_) {}
+    return PREV_GPS_METRICS.some(m => m.key === k) ? k : PREV_GPS_METRICS[0].key;
+  };
+  const prevGpsMeta = () => PREV_GPS_METRICS.find(m => m.key === prevGpsCurrent()) || PREV_GPS_METRICS[0];
+  const kmTimeMs = ms => {
+    if (ms == null || !isFinite(ms) || ms <= 0) return '';
+    const v = ms / 1000;
+    const mins = Math.floor(v / 60);
+    const secs = (v - mins * 60).toFixed(1).replace('.', ',');
+    return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+  };
+  // Distance-weighted mean pace over [lo, hi] from per-100m intervals.
+  const segmentMs = (iv, lo, hi) => {
+    if (!Array.isArray(iv) || !(hi > lo)) return null;
+    let num = 0, den = 0;
+    for (const b of iv) {
+      const s = b && b.start, e = b && b.end, d = b && b.duration;
+      if (typeof s !== 'number' || typeof e !== 'number' || typeof d !== 'number') continue;
+      const a = Math.max(s, lo), z = Math.min(e, hi);
+      if (z <= a) continue;
+      num += d * (z - a);
+      den += (z - a);
+    }
+    return den > 0 ? num / den : null;
+  };
+  const raceMetricMs = (r, key) => {
+    if (key === 'peak') return r.kmtid_best_100ms != null ? +r.kmtid_best_100ms : null;
+    if (key === 'f200') return r.kmtid_first_200ms != null ? +r.kmtid_first_200ms : null;
+    if (key === 'l200') return r.kmtid_last_200ms != null ? +r.kmtid_last_200ms : null;
+    if (key === 'f100') {
+      let iv = r.kmtid_intervals;
+      if (typeof iv === 'string') {
+        try { iv = JSON.parse(iv); } catch (_) { return null; }
+      }
+      return segmentMs(iv, 0, 100);
+    }
+    return null;
+  };
+  // Fastest = lowest km-time across finished starts strictly before this race.
+  const bestPrevGps = (races, beforeDate) => {
+    const best = {};
+    PREV_GPS_METRICS.forEach(m => { best[m.key] = null; });
+    (races || []).forEach(r => {
+      if (!r || (beforeDate && r.race_date && !(r.race_date < beforeDate))) return;
+      PREV_GPS_METRICS.forEach(m => {
+        const v = raceMetricMs(r, m.key);
+        if (v == null || !(v > 0)) return;
+        if (best[m.key] == null || v < best[m.key]) best[m.key] = v;
+      });
+    });
+    const out = {};
+    PREV_GPS_METRICS.forEach(m => { out[m.key] = kmTimeMs(best[m.key]); });
+    return out;
+  };
+  const prevGpsHeadHtml = () => {
+    const m = prevGpsMeta();
+    return `<span class="rr-gps" title="xLabs GPS — ${esc(m.desc)}. Click to switch metric.">`
+      + `<button type="button" class="gps-toggle" data-prev-gps-th>${esc(m.label)}</button></span>`;
+  };
+  const prevGpsCellHtml = vals => {
+    const key = prevGpsCurrent();
+    let attrs = '';
+    PREV_GPS_METRICS.forEach(m => {
+      const v = vals && vals[m.key];
+      if (v) attrs += ` data-gv-${m.key}="${esc(v)}"`;
+    });
+    const shown = (vals && vals[key]) || '';
+    return `<span class="rr-gps" data-prev-gps-cell${attrs}>${esc(shown)}</span>`;
+  };
+  const applyPrevGps = () => {
+    const m = prevGpsMeta();
+    panel.querySelectorAll('[data-prev-gps-th]').forEach(btn => {
+      btn.textContent = m.label;
+      const wrap = btn.closest('.rr-gps');
+      if (wrap) wrap.title = `xLabs GPS — ${m.desc}. Click to switch metric.`;
+    });
+    panel.querySelectorAll('[data-prev-gps-cell]').forEach(el => {
+      el.textContent = el.getAttribute('data-gv-' + m.key) || '';
+    });
+  };
+
+  const eyeOpen = `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const eyeClosed = `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
   const headRowHtml = () => `
-    <div class="ink-row ink-row--race ink-row--head">
+    <div class="ink-row ink-row--race2 ink-row--head2">
       <div class="ink-row__content">
         <span class="rr-num">#</span>
         <span class="rr-horse">horse</span>
@@ -2966,60 +3949,85 @@ function initInkRows(root) {
           <span class="rr-drv">driver</span>
           <span class="rr-trn">trainer</span>
         </span>
+        <span class="rr-tform" title="trainer form">t form</span>
         <span class="rr-eq"></span>
+        ${prevGpsHeadHtml()}
         <span class="rr-gal">gal%</span>
         <span class="rr-winpct">win%</span>
         <span class="rr-cleanpct">clean%</span>
-        <span class="rr-pct">row%</span>
+        <span class="rr-pct-gap" aria-hidden="true"></span>
+        <span class="rr-pct"><button type="button" class="rr-pct-eye" data-pct-toggle title="toggle row% visibility">${eyeClosed}</button></span>
         <span class="rr-odds">odds</span>
       </div>
     </div>`;
 
   panel.innerHTML = `
-    <p class="demo-label">Tap a runner to ink it in, tap again to drain. Fluid floods left→right; the label flips to stay legible.</p>
+    <p class="demo-label">Rows2 — list-style wash rows, borderless header, last-5-starts expansion.
+      Tap the number badge to ink a runner in; tap anywhere else on the row to expand its recent form.</p>
+    <p class="demo-label">Example race:
+      ${RACES.map(id => `<a class="glow-link" href="/race/atg/${esc(id)}">${esc(id)}</a>`).join(', ')}
+    </p>
     <div class="demo-ink-controls" style="margin-bottom:10px">
-      <div class="ink-row-presets" id="inkRowPresets">
-        ${INK_PRESETS.map((p, i) =>
-          `<button type="button" class="ink-row-preset${i === 0 ? ' is-active' : ''}" data-ink="${p.hex}" style="--ink-preset:${p.hex}" title="${p.label}" aria-label="${p.label}"></button>`
-        ).join('')}
-      </div>
-      <label class="demo-ink-swatch">ink <input type="color" id="inkRowColor" value="${INK}"></label>
+      <label class="demo-ink-swatch">ink <input type="color" id="inkRow2Color" value="${INK}"></label>
+      <label class="demo-ink-swatch">sphere <input type="color" id="inkRow2Sphere" value="${SPHERE}"></label>
     </div>
     ${RACES.map((_, i) => `
-      <div class="ink-race">
-        <div class="ink-racelist" id="inkRaceRows-${i}">${headRowHtml()}</div>
+      <div class="ink-race2">
+        <div class="ink-racelist2" id="inkRace2Rows-${i}">${headRowHtml()}</div>
       </div>`).join('')}`;
 
   let activeInk = INK;
+  let activeSphere = SPHERE;
   let aborted = false;
   const sims = [];
 
-  const colorInput = panel.querySelector('#inkRowColor');
-  const presetBtns = [...panel.querySelectorAll('.ink-row-preset')];
-
-  const applyInk = hex => {
-    activeInk = hex;
-    colorInput.value = hex;
-    presetBtns.forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.ink.toLowerCase() === hex.toLowerCase());
-    });
+  const colorInput = panel.querySelector('#inkRow2Color');
+  const sphereInput = panel.querySelector('#inkRow2Sphere');
+  colorInput.addEventListener('input', () => {
+    activeInk = colorInput.value;
     sims.forEach(s => s.setInk(activeInk));
-  };
-
-  presetBtns.forEach(btn => {
-    btn.addEventListener('click', () => applyInk(btn.dataset.ink));
   });
-  colorInput.addEventListener('input', () => applyInk(colorInput.value));
+  sphereInput.addEventListener('input', () => {
+    activeSphere = sphereInput.value;
+    sims.forEach(s => s.setNumInk(activeSphere));
+  });
 
-  // cleanup registered synchronously so a fast subtab switch still tears down
-  initDemoInk._rowsDestroy = () => {
+  // ── row% eye toggle ──────────────────────────────────────────────────
+  // Each row has two stacked content layers (base + ink); toggle both so the
+  // visible value always tracks. Capture phase so the row expander never wins.
+  let pctAllRevealed = false;
+  panel.addEventListener('click', ev => {
+    const toggleBtn = ev.target.closest('[data-pct-toggle]');
+    if (toggleBtn && panel.contains(toggleBtn)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      pctAllRevealed = !pctAllRevealed;
+      toggleBtn.innerHTML = pctAllRevealed ? eyeOpen : eyeClosed;
+      toggleBtn.title = pctAllRevealed ? 'hide all row%' : 'reveal all row%';
+      panel.querySelectorAll('[data-pct-cell] .rr-pct__val').forEach(v => {
+        v.classList.toggle('is-hidden', !pctAllRevealed);
+      });
+      return;
+    }
+    const cell = ev.target.closest('[data-pct-cell]');
+    if (cell && panel.contains(cell)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const row = cell.closest('[data-row], .ink-row--race2');
+      if (!row) return;
+      const vals = row.querySelectorAll('[data-pct-cell] .rr-pct__val');
+      // Flip based on the first layer; keep both in sync.
+      const hide = !vals[0]?.classList.contains('is-hidden');
+      vals.forEach(v => v.classList.toggle('is-hidden', hide));
+    }
+  }, true);
+
+  initDemoInk._rows2Destroy = () => {
     aborted = true;
     sims.forEach(s => s.destroy());
     sims.length = 0;
   };
 
-  // --- dense race-row rendering (mirrors the real race table) -------------
-  // flagify()/swedishSex() are global layout helpers; fall back gracefully.
   const nameHtml = n => (typeof flagify === 'function')
     ? flagify(n)
     : esc(String(n == null ? '' : n).replace(/\*/g, ''));
@@ -3038,9 +4046,6 @@ function initInkRows(root) {
     return `${tr}${l.betDist.toFixed(1)}%`;
   };
   const oddsTxt = l => (l && l.winOdds != null) ? l.winOdds.toFixed(2) : '';
-
-  // gal% (expected galopp risk), win% and clean% (win% over non-galopp/DQ
-  // starts) — same fields/thresholds as the real entries table.
   const galCell = e => {
     const risk = e.xgal_general ?? e.xgal_track;
     if (risk == null) return '<span class="gal-empty"></span>';
@@ -3048,17 +4053,18 @@ function initInkRows(root) {
     const cls = p >= 25 ? 'gal-hi' : p >= 15 ? 'gal-mid' : 'gal-lo';
     return `<span class="gal-risk ${cls}">${p.toFixed(0)}%</span>`;
   };
-  const winRateCell = e => {
-    if (!e.pre_starts) return '';
-    return Math.round((e.pre_wins / e.pre_starts) * 100) + '%';
-  };
-  const cleanRateCell = e => {
-    if (!e.pre_galadj_starts) return '';
-    return Math.round((e.pre_galadj_wins / e.pre_galadj_starts) * 100) + '%';
+  const winRateCell = e => e.pre_starts
+    ? Math.round((e.pre_wins / e.pre_starts) * 100) + '%' : '';
+  const cleanRateCell = e => e.pre_galadj_starts
+    ? Math.round((e.pre_galadj_wins / e.pre_galadj_starts) * 100) + '%' : '';
+  // Same scale/thresholds as the entries table's `t form` column.
+  const tFormCell = e => {
+    if (e.tf_perf == null) return '';
+    const n = e.tf_perf / 10;
+    const cls = n >= 65 ? 'sform-hot' : n <= 40 ? 'sform-cold' : '';
+    return `<span class="${cls}">${n.toFixed(1)}</span>`;
   };
 
-  // Horseshoe icons — same paths/semantics as the real entries table:
-  // shoe_code '1'=none '2'=back only '3'=front only '4'=both; *_changed -> red.
   const SHOE_ON_PATH =
     'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
     ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
@@ -3078,9 +4084,7 @@ function initInkRows(root) {
     </svg>`;
   const shoeCells = (code, frontChanged, backChanged) => {
     if (!code) return '';
-    const frontHas = code === '3' || code === '4';
-    const backHas = code === '2' || code === '4';
-    return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', frontChanged)}${shoeIcon(code === '2' || code === '4', backChanged)}</span>`;
   };
   const sulkyCell = e => {
     if (!e.sulky) return '';
@@ -3088,42 +4092,56 @@ function initInkRows(root) {
     return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
   };
   const eqCell = e => `${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${sulkyCell(e)}`;
+  const shortLink = (short, full, href) => {
+    if (!short) return '';
+    if (!href) return `<span title="${esc(full || '')}">${esc(short)}</span>`;
+    return `<a class="rr-link" href="${esc(href)}" title="${esc(full || '')}">${esc(short)}</a>`;
+  };
+  const horseLink = e => {
+    const name = nameHtml(e.horse_name);
+    return e.horse_id
+      ? `<a class="rr-link" href="/horse/${e.horse_id}">${name}</a>`
+      : name;
+  };
 
   const raceRowHtml = (e, l, scratched) => {
     const sa = sexAge(e);
-    const numSpacer = '<span class="rr-num"></span>';
+    const driverHref = e.driver_id ? `/driver/${e.driver_id}` : null;
+    const trainerHref = e.trainer_id ? `/trainer/${e.trainer_id}` : null;
     const numBadge = scratched ? '' : `
       <div class="ink-row__num-badge">
-        <div class="demo-ink-numbadge demo-ink-numbadge--simple" data-num-badge>
+        <div class="demo-ink-numbadge demo-ink-numbadge--simple" data-num-badge role="button"
+             tabindex="0" aria-label="pick ${esc(e.number)}" style="pointer-events:auto;cursor:pointer">
           <span class="demo-ink-numbadge__digit">${esc(e.number)}</span>
         </div>
       </div>`;
     const cell = kind => `
       <div class="ink-row__content ink-row__content--${kind}"${kind === 'ink' ? ' aria-hidden="true"' : ''}>
-        ${scratched ? `<span class="rr-num">${esc(e.number)}</span>` : numSpacer}
-        <span class="rr-horse">${nameHtml(e.horse_name)}${sa ? ` <span class="rr-sa">${esc(sa)}</span>` : ''}</span>
+        ${scratched ? `<span class="rr-num">${esc(e.number)}</span>` : '<span class="rr-num"></span>'}
+        <span class="rr-horse">${horseLink(e)}${sa ? ` <span class="rr-sa">${esc(sa)}</span>` : ''}</span>
         <span class="rr-people">
-          <span class="rr-drv">${esc(e.driver_short || e.driver_name || '')}</span>
-          <span class="rr-trn">${esc(e.trainer_short || e.trainer_name || '')}</span>
+          <span class="rr-drv">${shortLink(e.driver_short || e.driver_name, e.driver_name, driverHref)}</span>
+          <span class="rr-trn">${shortLink(e.trainer_short || e.trainer_name, e.trainer_name, trainerHref)}</span>
         </span>
+        <span class="rr-tform">${tFormCell(e)}</span>
         <span class="rr-eq">${eqCell(e)}</span>
+        ${prevGpsCellHtml(e._prevGps)}
         <span class="rr-gal">${galCell(e)}</span>
         <span class="rr-winpct">${winRateCell(e)}</span>
         <span class="rr-cleanpct">${cleanRateCell(e)}</span>
-        <span class="rr-pct">${pctCell(l)}</span>
+        <span class="rr-pct-gap" aria-hidden="true"></span>
+        <span class="rr-pct" data-pct-cell><span class="rr-pct__val is-hidden">${pctCell(l)}</span><span class="rr-pct__eye" aria-hidden="true">${eyeClosed}</span></span>
         <span class="rr-odds">${oddsTxt(l)}</span>
       </div>`;
+    const horseAttr = e.horse_id ? ` data-horse-id="${e.horse_id}"` : '';
     return `
-      <div class="ink-row ink-row--race${scratched ? ' ink-row--scratched' : ''}"${scratched ? '' : ' data-row'}>
+      <div class="ink-row ink-row--race2${scratched ? ' ink-row--scratched' : ''}"${scratched ? '' : ' data-row'}${horseAttr}>
         <canvas class="ink-row__canvas"></canvas>
         ${numBadge}
         ${cell('base')}${cell('ink')}
       </div>`;
   };
 
-  // For volt starts the distance changes between program numbers; insert a
-  // small tillägg divider labelled with the offset from the base distance —
-  // same logic/labelling as the real race page.
   const tillaggRowsHtml = sorted => {
     const distances = sorted.map(e => e.distance).filter(d => d != null);
     const baseDist = distances.length ? Math.min(...distances) : null;
@@ -3136,13 +4154,122 @@ function initInkRows(root) {
       }
       if (e.distance != null) prevDist = e.distance;
       const l = e._live || {};
-      const scratched = !!(e.withdrawn || l.scratched);
-      parts.push(raceRowHtml(e, l, scratched));
+      parts.push(raceRowHtml(e, l, !!(e.withdrawn || l.scratched)));
     });
     return parts.join('');
   };
 
-  // fetch a real race (runner list + live win odds) and render its rows
+  /* ---- last-5-starts expansion ---- */
+  const prevCache = {};
+  const fmtTimeVal = v => {
+    if (v == null || v === 0) return '';
+    const mins = Math.floor(v / 60);
+    const secs = (v - mins * 60).toFixed(1).replace('.', ',');
+    return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+  };
+  const prevPlacement = r => {
+    if (r.disqualified) {
+      const t = r.placement_text || (r.placement_num != null ? String(r.placement_num) : '');
+      return `<span class="dq">${esc(t || 'd')}</span>`;
+    }
+    if (r.withdrawn) return `<span class="withdrew">${esc(r.placement_text || 'utg')}</span>`;
+    const classifiedGalopp = r.galopp && r.placement_num != null;
+    const t = classifiedGalopp
+      ? String(r.placement_num)
+      : (r.placement_text || (r.placement_num != null ? String(r.placement_num) : ''));
+    const galMark = classifiedGalopp ? ' <span class="gal-mark" title="galopp">g</span>' : '';
+    let num = null;
+    if (r.placement_num != null) {
+      const pt = r.placement_text || '';
+      if (/^[1-7]/.test(pt) || r.galopp) num = r.placement_num;
+    }
+    return (typeof placementHtml === 'function')
+      ? placementHtml(t, galMark, num)
+      : esc(t) + galMark;
+  };
+  const prevRacesHtml = rows => {
+    const body = rows.map(r => {
+      const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
+      const href = r.atg_id ? `/race/atg/${r.atg_id}` : r.race_id ? `/race/${r.race_id}` : '';
+      return `<tr${r.withdrawn ? ' class="scratched"' : ''}${href ? ` data-href="${esc(href)}"` : ''}>
+        <td class="muted">${esc(r.race_date || '')}</td>
+        <td class="muted">${esc(r.track_label || '')}</td>
+        <td>${prevPlacement(r)}</td>
+        <td>${esc(r.km_time_text || fmtTimeVal(r.time_val))}</td>
+        <td class="muted num">${esc(r.program_number || '')}</td>
+        <td class="muted">${esc(startType)}</td>
+        <td class="muted num">${esc(r.distance || '')}</td>
+        <td class="muted">${esc(r.odds_text || '')}</td>
+        <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
+        <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+        <td class="center">${sulkyCell(r)}</td>
+        <td class="num">${esc(r.prize_kr || '')}</td>
+        <td class="ink-prev-comment"><div class="ink-prev-comment__clip"><span class="ink-prev-comment__text">${esc(r.comment || '')}</span></div></td>
+      </tr>`;
+    }).join('');
+    return `<table class="ink-prev-races"><tbody>${body}</tbody></table>`;
+  };
+
+  const wireExpansion = (rowEl, raceDate) => {
+    rowEl.addEventListener('click', async ev => {
+      // badge = pick; name links = navigate; row% = eye reveal; else expand
+      if (ev.target.closest('a, [data-num-badge], [data-pct-cell], [data-pct-toggle]')) return;
+      const next = rowEl.nextElementSibling;
+      if (next && next.classList.contains('ink-prev')) { next.remove(); return; }
+      const horseId = rowEl.dataset.horseId;
+      if (!horseId) return;
+      const exp = document.createElement('div');
+      exp.className = 'ink-prev';
+      exp.innerHTML = '<div class="ink-prev__body"><div class="ink-prev__empty">loading…</div></div>';
+      rowEl.insertAdjacentElement('afterend', exp);
+      const body = exp.querySelector('.ink-prev__body');
+      try {
+        let rows = prevCache[horseId];
+        if (!rows) {
+          const res = await fetch(`/api/horse/${horseId}/races`);
+          if (!res.ok) throw new Error('fetch failed');
+          rows = await res.json();
+          prevCache[horseId] = rows;
+        }
+        // An upcoming race has no result yet, so anything strictly before
+        // this race's date is a finished start.
+        const before = rows
+          .filter(r => r.race_date && (!raceDate || r.race_date < raceDate))
+          .slice(0, 5);
+        if (!before.length) {
+          body.innerHTML = '<div class="ink-prev__empty">no previous races</div>';
+          return;
+        }
+        body.innerHTML = prevRacesHtml(before);
+        body.querySelectorAll('tr[data-href]').forEach(tr => {
+          tr.addEventListener('click', e2 => {
+            e2.stopPropagation();
+            window.location.href = tr.dataset.href;
+          });
+        });
+      } catch (_) {
+        body.innerHTML = '<div class="ink-prev__empty">failed to load</div>';
+      }
+    });
+  };
+
+  panel.addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-prev-gps-th]');
+    if (!btn || !panel.contains(btn)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const i = PREV_GPS_METRICS.findIndex(m => m.key === prevGpsCurrent());
+    const next = PREV_GPS_METRICS[(i + 1) % PREV_GPS_METRICS.length].key;
+    try { localStorage.setItem(PREV_GPS_STORE, next); } catch (_) {}
+    applyPrevGps();
+    panel.querySelectorAll('[data-prev-gps-th]').forEach(b => {
+      b.classList.remove('flash');
+      void b.offsetWidth;
+      b.classList.add('flash');
+      b.addEventListener('animationend', () => b.classList.remove('flash'), { once: true });
+    });
+  });
+
   const loadRace = async (raceId, mountId) => {
     const j = url => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
     const [detail, live] = await Promise.all([
@@ -3151,80 +4278,105 @@ function initInkRows(root) {
     ]);
     if (aborted) return;
 
-    const raceRows = panel.querySelector(`#${mountId}`);
-    if (!raceRows) return;
+    const mount = panel.querySelector(`#${mountId}`);
+    if (!mount) return;
     if (!detail || !(detail.results || []).length) {
-      raceRows.insertAdjacentHTML('beforeend', '<div class="empty-section">race unavailable</div>');
+      mount.insertAdjacentHTML('beforeend', '<div class="empty-section">race unavailable</div>');
       return;
     }
 
     const liveByNum = {};
-    (live && live.starts || []).forEach(s => { liveByNum[s.number] = s; });
-
+    ((live && live.starts) || []).forEach(s => { liveByNum[s.number] = s; });
     const sorted = detail.results.slice().sort((a, b) =>
       (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
     sorted.forEach(e => { e._live = liveByNum[e.number]; });
 
-    raceRows.insertAdjacentHTML('beforeend', tillaggRowsHtml(sorted));
-    raceRows.querySelectorAll('[data-row]').forEach(rowEl => {
-      const sim = buildRowFluid(rowEl, activeInk, themeBg(), NUM_INK);
+    // Prefetch each horse's history so the GPS column can show best prior
+    // sectionals, and so row expansion can reuse the same cache.
+    const ids = [...new Set(sorted.map(e => e.horse_id).filter(Boolean))];
+    await Promise.all(ids.map(async id => {
+      if (prevCache[id]) return;
+      const rows = await j(`/api/horse/${id}/races`);
+      if (rows) prevCache[id] = rows;
+    }));
+    if (aborted) return;
+    sorted.forEach(e => {
+      e._prevGps = e.horse_id
+        ? bestPrevGps(prevCache[e.horse_id], detail.race_date)
+        : {};
+    });
+
+    mount.insertAdjacentHTML('beforeend', tillaggRowsHtml(sorted));
+    mount.querySelectorAll('[data-row]').forEach(rowEl => {
+      const sim = buildRowSwipe(rowEl, activeInk, rowPaper(), activeSphere);
       if (sim) sims.push(sim);
+      wireExpansion(rowEl, detail.race_date);
     });
   };
 
-  RACES.forEach((raceId, i) => loadRace(raceId, `inkRaceRows-${i}`));
+  RACES.forEach((raceId, i) => loadRace(raceId, `inkRace2Rows-${i}`));
 }
 
-function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
+/* ── rows2 ink: a thin centre-lane swipe ──
+   Dye and velocity land only on a narrow stroke through the middle of the
+   row; curl + advection bloom the ink outward so the swirl stays readable.
+   The stroke is sub-stepped between frames so the front stays continuous. */
+function buildRowSwipe(rowEl, inkHex, paperHex, numInkHex) {
   const canvas = rowEl.querySelector('.ink-row__canvas');
   const overlay = rowEl.querySelector('.ink-row__content--ink');
   const numBadge = rowEl.querySelector('[data-num-badge]');
-  const numSim = numBadge && numInkHex
-    ? buildNumberBadgeSimple(numBadge, numInkHex)
-    : null;
+  const numSim = numBadge && numInkHex ? buildNumberBadgeSimple(numBadge, numInkHex) : null;
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cssW = rowEl.clientWidth || 640;
-  const cssH = rowEl.clientHeight || 76;
+  const cssH = rowEl.clientHeight || 34;
   const W = Math.max(2, Math.round(cssW * dpr));
   const H = Math.max(2, Math.round(cssH * dpr));
   canvas.width = W;
   canvas.height = H;
   const aspect = W / H;
 
-  // Short, wide rows deposit less dye per column (aspect-corrected splats) and
-  // give the swirl no vertical room, so they read pale. Scale ink density and
-  // splat size up as the row falls below the tall demo's height so thin race
-  // rows saturate the same way. Demo (76px) → 1.0, race rows (40px) → ~1.9.
-  const REF_H = 76;
-  const densityBoost = Math.min(Math.max(REF_H / cssH, 1), 2.2);
-
   const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
   if (!gl || !gl.getExtension('EXT_color_buffer_float')) return null;
 
-  const SIM_H = 56, SIM_W = Math.min(Math.round(SIM_H * aspect), 640);
-  const DYE_H = 200, DYE_W = Math.min(Math.round(DYE_H * aspect), 1600);
-  const PRESSURE_ITER = 20;
-  const VEL_DISSIPATION = 0.1;
-  const CURL = 20;
+  const SIM_H = 48, SIM_W = Math.min(Math.round(SIM_H * aspect), 640);
+  const DYE_H = 160, DYE_W = Math.min(Math.round(DYE_H * aspect), 1600);
+  const PRESSURE_ITER = 16;
+  const VEL_DISSIPATION = 0.12;
+  const CURL = 38;             // a bit more swirl so the thin centre stroke spreads
 
-  function hexRgb01(hex) {
-    return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
-  }
+  const FILL_SECONDS = 0.72;
+  const DRAIN_SECONDS = 0.48;
+  const MERGE_HOLD = 4.0;
+
+  const hexRgb01 = hex => [
+    parseInt(hex.slice(1, 3), 16) / 255,
+    parseInt(hex.slice(3, 5), 16) / 255,
+    parseInt(hex.slice(5, 7), 16) / 255,
+  ];
+  const isNearWhite = hex => {
+    const c = hexRgb01(hex);
+    return Math.min(...c) > 0.88 && (Math.max(...c) - Math.min(...c)) < 0.08;
+  };
   function hexAbsorption(hex, strength) {
-    return hexRgb01(hex).map(v => -Math.log(Math.max(v, 0.012)) * strength);
+    const c = hexRgb01(hex);
+    if (isNearWhite(hex)) {
+      const amount = strength * (0.55 + 0.45 * Math.min(...c));
+      return [-amount, -amount, -amount];
+    }
+    return c.map(v => -Math.log(Math.max(v, 0.012)) * strength);
   }
-  let absorb = hexAbsorption(inkHex, 1.3 * densityBoost);
 
+  let absorb, whiteMode;
   function applyInkColor(hex) {
-    absorb = hexAbsorption(hex, 1.3 * densityBoost);
+    whiteMode = isNearWhite(hex);
+    absorb = hexAbsorption(hex, whiteMode ? 0.9 : 1.45);
     const rgb = hexRgb01(hex);
     const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-    overlay.style.color = lum < 0.5 ? '#ffffff' : '#111114';
+    overlay.style.color = (whiteMode || lum >= 0.5) ? '#111114' : '#ffffff';
   }
   applyInkColor(inkHex);
 
-  /* ── shaders ── */
   const VERT = `#version 300 es
     layout(location=0) in vec2 aPos;
     out vec2 vUv;
@@ -3355,10 +4507,11 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
     uniform vec3 uPaper;
     void main(){
       vec3 A = texture(uDye, vUv).rgb;
-      frag = vec4(clamp(uPaper * exp(-A), 0.0, 1.0), 1.0);
+      vec3 absorbAmt = max(A, 0.0);
+      vec3 lift = max(-A, 0.0);
+      frag = vec4(clamp(uPaper * exp(-absorbAmt) + (1.0 - exp(-lift)), 0.0, 1.0), 1.0);
     }`);
 
-  /* ── quad + render targets ── */
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -3423,26 +4576,25 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
     field.swap();
   }
 
-  // Three rails at the front: top edge, centre, bottom edge. Edges get shear
-  // for swirl; the centre lane closes the gap without the flat backfill look.
-  function injectFill(px) {
+  // Thin centre-lane stroke, sub-stepped so the front stays continuous.
+  // Dye/velocity land only near y=0.5; curl + advection bloom them outward.
+  const BAND_STEP = 0.010;
+  function injectFill(fromX, toX) {
     const t = performance.now() * 0.001;
-    const lanes = [0.06, 0.16, 0.50, 0.84, 0.94];
-    for (const y of lanes) {
-      const wob = Math.sin(t * 2.6 + y * 9.0) * 0.02;
-      const x = Math.min(Math.max(px + wob, 0.0), 1.0);
-      splat(dye, x, y, absorb, 6 * densityBoost);
-      const shear = Math.sin(t * 4.0 + y * 8.0) * (y === 0.5 ? 8 : 16);
-      splat(velocity, x, y, [30, shear, 0], 8);
+    const span = Math.max(0, toX - fromX);
+    const steps = Math.max(1, Math.ceil(span / BAND_STEP));
+    // Concentrate dose into the thin stroke — less area, so more per splat.
+    const dose = absorb.map(v => v * 1.8 / Math.max(1, steps * 0.4));
+    for (let i = 1; i <= steps; i++) {
+      const x = fromX + (span * i) / steps;
+      const y = 0.5 + Math.sin(t * 4.5 + x * 10.0) * 0.018;
+      splat(dye, x, y, dose, 5.2);
     }
+    splat(velocity, Math.min(toX, 1), 0.5, [90, Math.sin(t * 6.5) * 48, 0], 7);
   }
 
-  /* DRAIN: no new ink, just nudge the fluid leftward at the receding front */
   function injectDrain(px) {
-    for (let i = 0; i < 5; i++) {
-      const y = (i + 0.5) / 5;
-      splat(velocity, px, y, [-24, (Math.random() - 0.5) * 18, 0], 8);
-    }
+    splat(velocity, px, 0.5, [-90, (Math.random() - 0.5) * 30, 0], 7);
   }
 
   function step(dt, washAmt, washX) {
@@ -3507,29 +4659,53 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
     dye.swap();
   }
 
-  /* ── fill state ── */
   let filled = false;
-  let progress = 0;                      // 0 = empty, 1 = full
-  let flushT = 0;                        // extra wash time so no ink lingers
-  let mergeT = 0;                        // post-fill swirl time before freeze
-  const MERGE_HOLD = 6.5;                // seconds to swirl after sweep ends
-  rowEl.addEventListener('click', () => {
-    const wasFilled = filled;
+  let progress = 0;
+  let flushT = 0;
+  let mergeT = 0;
+
+  // Sweep origin = horizontal centre of the number sphere, not the row edge.
+  const measureStartX = () => {
+    if (!numBadge || !rowEl.clientWidth) return 0.03;
+    const rowR = rowEl.getBoundingClientRect();
+    const badgeR = numBadge.getBoundingClientRect();
+    if (!(rowR.width > 0)) return 0.03;
+    const cx = (badgeR.left + badgeR.right) / 2 - rowR.left;
+    return Math.min(0.35, Math.max(0, cx / rowR.width));
+  };
+  let startX = measureStartX();
+  const mapX = p => startX + Math.max(0, Math.min(1, p)) * (1 - startX);
+
+  const toggle = () => {
     filled = !filled;
-    if (!wasFilled) injectFill(0);
+    if (filled) startX = measureStartX(); // re-measure in case layout shifted
     if (numSim) numSim.setActive(filled);
     ensureRunning();
-  });
+  };
+  // Only the badge picks; the row body is the expander (see wireExpansion).
+  if (numBadge) {
+    numBadge.addEventListener('click', ev => { ev.stopPropagation(); toggle(); });
+    numBadge.addEventListener('keydown', ev => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      toggle();
+    });
+  }
 
   function updateOverlayMask() {
     let g;
-    if (progress >= 0.999) g = 'linear-gradient(#000, #000)';
-    else if (progress <= 0.001) g = 'linear-gradient(transparent, transparent)';
-    else {
-      const front = progress * 100;
-      const a = Math.max(0, front - 7);
-      const b = Math.min(100, front + 3);
-      g = `linear-gradient(to right, #000 ${a}%, transparent ${b}%)`;
+    const s = startX * 100;
+    if (progress >= 0.999) {
+      // Ink text only from the sphere rightward; left of it stays base.
+      g = `linear-gradient(to right, transparent 0%, transparent ${s}%, #000 ${s}%, #000 100%)`;
+    } else if (progress <= 0.001) {
+      g = 'linear-gradient(transparent, transparent)';
+    } else {
+      const front = mapX(progress) * 100;
+      const a = Math.max(s, front - 5);
+      const b = Math.min(100, front + 2);
+      g = `linear-gradient(to right, transparent 0%, transparent ${s}%, #000 ${s}%, #000 ${a}%, transparent ${b}%)`;
     }
     overlay.style.webkitMaskImage = g;
     overlay.style.maskImage = g;
@@ -3541,8 +4717,6 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
   let running = false;
   let lastT = performance.now();
 
-  // Wake the sim on interaction. Idle rows sleep (loop fully stopped) so a page
-  // full of rows costs nothing until one is actually animating.
   function ensureRunning() {
     if (running || !canvas.isConnected) return;
     running = true;
@@ -3552,9 +4726,6 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
 
   function frame(now) {
     if (!canvas.isConnected) { running = false; return; }
-
-    // Tab hidden / low-power throttle: don't let a huge dt gap hose the fluid,
-    // but keep the loop alive so it resumes cleanly when the tab is shown.
     if (document.hidden) {
       lastT = now;
       rafId = requestAnimationFrame(frame);
@@ -3568,14 +4739,19 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
     if (dt <= 0) { rafId = requestAnimationFrame(frame); return; }
 
     const target = filled ? 1 : 0;
+    const prev = progress;
     let mode = 0;
-    if (progress < target) { progress = Math.min(target, progress + dt / 0.57); mode = 1; }
-    else if (progress > target) { progress = Math.max(target, progress - dt / 0.57); mode = -1; }
+    if (progress < target) {
+      progress = Math.min(target, progress + dt / FILL_SECONDS);
+      mode = 1;
+    } else if (progress > target) {
+      progress = Math.max(target, progress - dt / DRAIN_SECONDS);
+      mode = -1;
+    }
     updateOverlayMask();
 
-    if (filled && mode === 1) injectFill(progress);
+    if (filled && mode === 1) injectFill(mapX(prev), mapX(progress));
 
-    // Keep sim alive briefly after the sweep ends so ink can swirl and merge.
     if (filled) {
       if (mode === 1) mergeT = MERGE_HOLD;
       else if (progress >= 0.999 && mergeT > 0) mergeT -= dt;
@@ -3583,21 +4759,17 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
       mergeT = 0;
     }
 
-    // Wash while draining, then keep flushing the whole row briefly after the
-    // front reaches 0 so no residual ink is left behind.
-    let washAmt = 0, washX = progress;
+    let washAmt = 0, washX = mapX(progress);
     if (!filled) {
       if (progress > 0.0001) {
-        washAmt = 7.0; washX = progress; flushT = 1.2;
-        if (mode === -1) injectDrain(progress);
+        washAmt = 9.0; washX = mapX(progress); flushT = 0.9;
+        if (mode === -1) injectDrain(mapX(progress));
       } else if (flushT > 0) {
-        washAmt = 9.0; washX = 0.0; flushT -= dt;
+        // Flush from the sphere origin, not the far left edge.
+        washAmt = 12.0; washX = startX; flushT -= dt;
       }
     }
 
-    // Settled rows (fully filled or fully drained) freeze the fluid solve.
-    // Without this, zero dye dissipation + leftover velocity slowly slosh all
-    // the ink to the left wall — looks fine at first, weird after a minute.
     const settled = (filled && progress >= 0.999 && mergeT <= 0) ||
                     (!filled && progress <= 0.001 && flushT <= 0);
     if (!settled) step(dt, washAmt, washX);
@@ -3607,18 +4779,15 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
     gl.uniform3f(displayProg.u.uPaper, PAPER[0], PAPER[1], PAPER[2]);
     blit(null);
 
-    // We just drew the final frame of a settled row; stop looping (no per-frame
-    // reblits) until a click wakes us again. This is what keeps a list of rows
-    // from all burning GPU time at rest.
     if (settled) { running = false; return; }
     rafId = requestAnimationFrame(frame);
   }
 
-  // Draw the initial (empty) state once, then sleep until interaction.
   ensureRunning();
 
   return {
     setInk(hex) { applyInkColor(hex); },
+    setNumInk(hex) { if (numSim) numSim.setActiveInk(hex); },
     destroy() {
       running = false;
       cancelAnimationFrame(rafId);
@@ -3629,12 +4798,6 @@ function buildRowFluid(rowEl, inkHex, paperHex, numInkHex) {
   };
 }
 
-/* ── number-badge ink (simple, no canvas) ──
-   A real fluid swirl doesn't hold up at 26px (reads as mush) and a GPU
-   context per badge doesn't scale to a full race. This is just a fast CSS
-   colour crossfade — white circle/dark digit <-> ink colour/white digit —
-   driven by toggling one class and one custom property. Zero animation
-   loop, zero draw calls; the transition is pure CSS. */
 function buildNumberBadgeSimple(el, hex) {
   el.style.setProperty('--badge-ink', hex);
   let active = false;
@@ -3646,532 +4809,6 @@ function buildNumberBadgeSimple(el, hex) {
     },
     setActiveInk(h) { el.style.setProperty('--badge-ink', h); },
     destroy() {},
-  };
-}
-
-/* ── ink spheres — start-number badge: ink fills the circle *behind* the
-   digit and toggles between two states on click:
-     inactive → no ink, plain white circle, dark number
-     active   → circle floods with the chosen ink color, number flips white
-   Same Stable-Fluids engine as the row demo, but the domain is a small
-   square (cropped to a circle by CSS) and the "front" is radial instead of
-   left-to-right, since there's no natural sweep direction in a badge. */
-function initInkSpheres(root) {
-  const panel = root.querySelector('[data-ink-subpanel="spheres"]');
-  if (!panel) return;
-
-  const PRESETS = [
-    { hex: '#000000', label: 'default' },
-    { hex: '#f4ffe5', label: 'favorite' },
-  ];
-  let activeHex = PRESETS[0].hex;
-  const insts = [];
-
-  panel.innerHTML = `
-    <p class="demo-label">Click a number to toggle it — the ink swirls in behind the digit from the centre out, and the digit flips to stay legible.</p>
-    <div class="demo-ink-controls" style="margin-bottom:22px">
-      <div class="ink-row-presets" id="numSpherePresets">
-        ${PRESETS.map((p, i) =>
-          `<button type="button" class="ink-row-preset${i === 0 ? ' is-active' : ''}" data-ink="${p.hex}" style="--ink-preset:${p.hex}" title="${p.label}" aria-label="${p.label}"></button>`
-        ).join('')}
-      </div>
-      <label class="demo-ink-swatch">active ink <input type="color" id="numSphereColor" value="${activeHex}"></label>
-    </div>
-    <div class="demo-ink-numsphere-wrap">
-      <div class="demo-ink-numsphere" data-num-toggle>
-        <canvas></canvas>
-        <span class="demo-ink-numsphere__num demo-ink-numsphere__num--base">7</span>
-        <span class="demo-ink-numsphere__num demo-ink-numsphere__num--ink" aria-hidden="true">7</span>
-      </div>
-      <p class="demo-ink-numrow-label">at actual row scale</p>
-      <div class="demo-ink-numrow">
-        ${[1, 2, 3, 4, 5, 6].map(n => `
-          <div class="demo-ink-numbadge" data-num-toggle>
-            <canvas></canvas>
-            <span class="demo-ink-numbadge__num demo-ink-numbadge__num--base">${n}</span>
-            <span class="demo-ink-numbadge__num demo-ink-numbadge__num--ink" aria-hidden="true">${n}</span>
-          </div>`).join('')}
-      </div>
-    </div>`;
-
-  panel.querySelectorAll('[data-num-toggle]').forEach(el => {
-    const inst = buildNumberInk(el, activeHex);
-    insts.push(inst);
-  });
-
-  const colorInput = panel.querySelector('#numSphereColor');
-  const presetBtns = [...panel.querySelectorAll('.ink-row-preset')];
-  const applyActiveColor = hex => {
-    activeHex = hex;
-    colorInput.value = hex;
-    presetBtns.forEach(btn => {
-      btn.classList.toggle('is-active', btn.dataset.ink.toLowerCase() === hex.toLowerCase());
-    });
-    insts.forEach(inst => inst.setActiveInk(activeHex));
-  };
-  presetBtns.forEach(btn => btn.addEventListener('click', () => applyActiveColor(btn.dataset.ink)));
-  colorInput.addEventListener('input', () => applyActiveColor(colorInput.value));
-
-  initDemoInk._spheresDestroy = () => {
-    insts.forEach(inst => inst.destroy());
-    insts.length = 0;
-  };
-}
-
-function buildNumberInk(el, activeHex, opts = {}) {
-  const interactive = opts.interactive !== false;
-  const canvas = el.querySelector('canvas');
-  const baseNum = el.querySelector('[class$="__num--base"]');
-  const inkNum = el.querySelector('[class$="__num--ink"]');
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const cssW = el.clientWidth || 120;
-  const cssH = el.clientHeight || cssW;
-  const W = Math.max(2, Math.round(cssW * dpr));
-  const H = Math.max(2, Math.round(cssH * dpr));
-  canvas.width = W;
-  canvas.height = H;
-  const aspect = W / H;
-
-  // Unlike race rows (elongated, variable aspect ratio, so thinner rows
-  // genuinely dilute dye per splat), every badge here is a plain circle
-  // with aspect === 1 and the same normalized sim/dye resolution regardless
-  // of on-screen pixel size — so absorbance needs no size compensation;
-  // the big preview and the tiny row-scale badges saturate identically.
-  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
-  if (!gl || !gl.getExtension('EXT_color_buffer_float')) return { setActiveInk(){}, destroy(){} };
-
-  const SIM = 40, DYE = 140;
-  const PRESSURE_ITER = 16;
-  const VEL_DISSIPATION = 0.14;
-  const CURL = 12;
-  const FILL_SECONDS = 0.75; // toggle transition duration
-
-  function hexRgb01(hex) {
-    return [parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255];
-  }
-  function hexAbsorption(hex, strength) {
-    return hexRgb01(hex).map(v => -Math.log(Math.max(v, 0.012)) * strength);
-  }
-  let absorb = hexAbsorption(activeHex, 1.3);
-  function applyActiveInk(hex) { activeHex = hex; absorb = hexAbsorption(hex, 1.3); }
-
-  const VERT = `#version 300 es
-    layout(location=0) in vec2 aPos;
-    out vec2 vUv;
-    void main(){ vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
-  const HEAD = `#version 300 es
-    precision highp float; precision highp sampler2D;
-    in vec2 vUv; out vec4 frag;`;
-
-  function compile(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  }
-  const vertShader = compile(gl.VERTEX_SHADER, VERT);
-  function prog(body) {
-    const p = gl.createProgram();
-    gl.attachShader(p, vertShader);
-    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, HEAD + body));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    const u = {};
-    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
-    for (let i = 0; i < n; i++) {
-      const info = gl.getActiveUniform(p, i);
-      u[info.name] = gl.getUniformLocation(p, info.name);
-    }
-    return { p, u };
-  }
-
-  const splatProg = prog(`
-    uniform sampler2D uTarget;
-    uniform vec2 uPoint;
-    uniform vec3 uColor;
-    uniform float uRadius, uAspect;
-    void main(){
-      vec2 d = vUv - uPoint;
-      d.x *= uAspect;
-      frag = vec4(texture(uTarget, vUv).rgb + exp(-dot(d,d)/uRadius) * uColor, 1.0);
-    }`);
-
-  const advectProg = prog(`
-    uniform sampler2D uVelocity, uSource;
-    uniform vec2 uTexel;
-    uniform float uDt, uDissipation, uWashAmt;
-    void main(){
-      vec2 coord = vUv - uDt * texture(uVelocity, vUv).xy * uTexel;
-      float diss = uDissipation + uWashAmt;
-      frag = vec4(texture(uSource, coord).rgb / (1.0 + diss * uDt), 1.0);
-    }`);
-
-  const curlProg = prog(`
-    uniform sampler2D uVelocity;
-    uniform vec2 uTexel;
-    void main(){
-      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).y;
-      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).y;
-      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).x;
-      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).x;
-      frag = vec4(0.5 * (R - L - T + B), 0.0, 0.0, 1.0);
-    }`);
-
-  const vorticityProg = prog(`
-    uniform sampler2D uVelocity, uCurl;
-    uniform vec2 uTexel;
-    uniform float uCurlStrength, uDt;
-    void main(){
-      float L = texture(uCurl, vUv - vec2(uTexel.x, 0.0)).x;
-      float R = texture(uCurl, vUv + vec2(uTexel.x, 0.0)).x;
-      float B = texture(uCurl, vUv - vec2(0.0, uTexel.y)).x;
-      float T = texture(uCurl, vUv + vec2(0.0, uTexel.y)).x;
-      float C = texture(uCurl, vUv).x;
-      vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
-      force /= length(force) + 0.0001;
-      force *= uCurlStrength * C;
-      force.y *= -1.0;
-      vec2 vel = texture(uVelocity, vUv).xy + force * uDt;
-      frag = vec4(clamp(vel, -1000.0, 1000.0), 0.0, 1.0);
-    }`);
-
-  const divergeProg = prog(`
-    uniform sampler2D uVelocity;
-    uniform vec2 uTexel;
-    void main(){
-      float L = texture(uVelocity, vUv - vec2(uTexel.x, 0.0)).x;
-      float R = texture(uVelocity, vUv + vec2(uTexel.x, 0.0)).x;
-      float B = texture(uVelocity, vUv - vec2(0.0, uTexel.y)).y;
-      float T = texture(uVelocity, vUv + vec2(0.0, uTexel.y)).y;
-      vec2 C = texture(uVelocity, vUv).xy;
-      if (vUv.x - uTexel.x < 0.0) L = -C.x;
-      if (vUv.x + uTexel.x > 1.0) R = -C.x;
-      if (vUv.y - uTexel.y < 0.0) B = -C.y;
-      if (vUv.y + uTexel.y > 1.0) T = -C.y;
-      frag = vec4(0.5 * (R - L + T - B), 0.0, 0.0, 1.0);
-    }`);
-
-  const clearProg = prog(`
-    uniform sampler2D uTexture;
-    uniform float uValue;
-    void main(){ frag = uValue * texture(uTexture, vUv); }`);
-
-  const pressureProg = prog(`
-    uniform sampler2D uPressure, uDivergence;
-    uniform vec2 uTexel;
-    void main(){
-      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
-      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
-      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
-      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
-      float div = texture(uDivergence, vUv).x;
-      frag = vec4((L + R + B + T - div) * 0.25, 0.0, 0.0, 1.0);
-    }`);
-
-  const gradientProg = prog(`
-    uniform sampler2D uPressure, uVelocity;
-    uniform vec2 uTexel;
-    void main(){
-      float L = texture(uPressure, vUv - vec2(uTexel.x, 0.0)).x;
-      float R = texture(uPressure, vUv + vec2(uTexel.x, 0.0)).x;
-      float B = texture(uPressure, vUv - vec2(0.0, uTexel.y)).x;
-      float T = texture(uPressure, vUv + vec2(0.0, uTexel.y)).x;
-      frag = vec4(texture(uVelocity, vUv).xy - vec2(R - L, T - B), 0.0, 1.0);
-    }`);
-
-  const displayProg = prog(`
-    uniform sampler2D uDye;
-    uniform vec3 uPaper;
-    void main(){
-      vec3 A = texture(uDye, vUv).rgb;
-      frag = vec4(clamp(uPaper * exp(-A), 0.0, 1.0), 1.0);
-    }`);
-
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-  gl.disable(gl.DEPTH_TEST);
-  gl.disable(gl.BLEND);
-
-  function makeRT(w, h) {
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
-    const fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    gl.clearColor(0, 0, 0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    return { tex, fbo, w, h };
-  }
-  function makeDouble(w, h) {
-    return {
-      read: makeRT(w, h), write: makeRT(w, h), texel: [1 / w, 1 / h],
-      swap() { const t = this.read; this.read = this.write; this.write = t; },
-    };
-  }
-
-  const velocity = makeDouble(SIM, SIM);
-  const dye = makeDouble(DYE, DYE);
-  const pressure = makeDouble(SIM, SIM);
-  const curlRT = makeRT(SIM, SIM);
-  const divergeRT = makeRT(SIM, SIM);
-
-  function bindTex(tex, unit) {
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    return unit;
-  }
-  function blit(target) {
-    if (target) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
-      gl.viewport(0, 0, target.w, target.h);
-    } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, W, H);
-    }
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  }
-
-  function splat(field, x, y, color3, radiusMul) {
-    gl.useProgram(splatProg.p);
-    gl.uniform1f(splatProg.u.uAspect, aspect);
-    gl.uniform1i(splatProg.u.uTarget, bindTex(field.read.tex, 0));
-    gl.uniform2f(splatProg.u.uPoint, x, y);
-    gl.uniform3f(splatProg.u.uColor, color3[0], color3[1], color3[2]);
-    gl.uniform1f(splatProg.u.uRadius, 0.01 * radiusMul);
-    blit(field.write);
-    field.swap();
-  }
-
-  // No sweep direction in a badge — ink blooms outward from a near-fixed
-  // cluster of points instead of a moving front. Unlike the row demo (where
-  // dissipation is 0 while filling but the injection point keeps sweeping
-  // into fresh dye, so absorbance never piles up at one spot), a stationary
-  // point would accumulate pigment for the whole transition regardless of
-  // how pale the target color is — a black fill and a near-white fill would
-  // both end up fully saturated. Dose by dt/FILL_SECONDS so the total ink
-  // deposited over the whole transition approximates `absorb` once, however
-  // long the transition takes or however fast the frame rate runs.
-  function injectActivate(dt) {
-    const t = performance.now() * 0.001;
-    const pts = [[0.5, 0.5], [0.32, 0.5], [0.68, 0.5], [0.5, 0.32], [0.5, 0.68]];
-    const dose = Math.min(dt / FILL_SECONDS, 1);
-    const doseColor = absorb.map(v => v * dose);
-    for (const [px, py] of pts) {
-      const wob = 0.03;
-      const x = px + Math.sin(t * 3.1 + py * 11) * wob;
-      const y = py + Math.cos(t * 2.7 + px * 11) * wob;
-      splat(dye, x, y, doseColor, 6.5);
-      const ang = t * 5 + (px + py) * 14;
-      splat(velocity, x, y, [Math.cos(ang) * 22, Math.sin(ang) * 22, 0], 6);
-    }
-  }
-
-  // No new ink — just a little turbulence while the uniform wash (below)
-  // dissolves everything back to plain paper.
-  function injectDeactivate() {
-    for (let i = 0; i < 4; i++) {
-      const a = (performance.now() * 0.001) * 3 + i * 1.6;
-      splat(velocity, 0.5 + Math.cos(a) * 0.18, 0.5 + Math.sin(a) * 0.18, [Math.cos(a) * -18, Math.sin(a) * -18, 0], 6);
-    }
-  }
-
-  function step(dt, washAmt) {
-    gl.useProgram(curlProg.p);
-    gl.uniform1i(curlProg.u.uVelocity, bindTex(velocity.read.tex, 0));
-    gl.uniform2f(curlProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    blit(curlRT);
-
-    gl.useProgram(vorticityProg.p);
-    gl.uniform1i(vorticityProg.u.uVelocity, bindTex(velocity.read.tex, 0));
-    gl.uniform1i(vorticityProg.u.uCurl, bindTex(curlRT.tex, 1));
-    gl.uniform2f(vorticityProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    gl.uniform1f(vorticityProg.u.uCurlStrength, CURL);
-    gl.uniform1f(vorticityProg.u.uDt, dt);
-    blit(velocity.write);
-    velocity.swap();
-
-    gl.useProgram(divergeProg.p);
-    gl.uniform1i(divergeProg.u.uVelocity, bindTex(velocity.read.tex, 0));
-    gl.uniform2f(divergeProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    blit(divergeRT);
-
-    gl.useProgram(clearProg.p);
-    gl.uniform1i(clearProg.u.uTexture, bindTex(pressure.read.tex, 0));
-    gl.uniform1f(clearProg.u.uValue, 0.8);
-    blit(pressure.write);
-    pressure.swap();
-
-    gl.useProgram(pressureProg.p);
-    gl.uniform2f(pressureProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    gl.uniform1i(pressureProg.u.uDivergence, bindTex(divergeRT.tex, 1));
-    for (let i = 0; i < PRESSURE_ITER; i++) {
-      gl.uniform1i(pressureProg.u.uPressure, bindTex(pressure.read.tex, 0));
-      blit(pressure.write);
-      pressure.swap();
-    }
-
-    gl.useProgram(gradientProg.p);
-    gl.uniform1i(gradientProg.u.uPressure, bindTex(pressure.read.tex, 0));
-    gl.uniform1i(gradientProg.u.uVelocity, bindTex(velocity.read.tex, 1));
-    gl.uniform2f(gradientProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    blit(velocity.write);
-    velocity.swap();
-
-    gl.useProgram(advectProg.p);
-    gl.uniform2f(advectProg.u.uTexel, velocity.texel[0], velocity.texel[1]);
-    gl.uniform1f(advectProg.u.uDt, dt);
-    gl.uniform1f(advectProg.u.uWashAmt, 0.0);
-    gl.uniform1f(advectProg.u.uDissipation, VEL_DISSIPATION);
-    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
-    gl.uniform1i(advectProg.u.uSource, 0);
-    blit(velocity.write);
-    velocity.swap();
-
-    gl.uniform1f(advectProg.u.uDissipation, 0.0);
-    gl.uniform1f(advectProg.u.uWashAmt, washAmt);
-    gl.uniform1i(advectProg.u.uVelocity, bindTex(velocity.read.tex, 0));
-    gl.uniform1i(advectProg.u.uSource, bindTex(dye.read.tex, 1));
-    blit(dye.write);
-    dye.swap();
-  }
-
-  /* ── toggle state ── */
-  let active = false;
-  let progress = 0;                 // 0 = plain white, 1 = fully inked
-  let flushT = 0;                   // extra wash time so no tint lingers
-  let mergeT = 0;                   // post-fill swirl time before freeze
-  const MERGE_HOLD = 3.2;
-  const RATE = FILL_SECONDS;         // seconds for a full transition
-  const MASK_SPEEDUP = 1.7;          // digit flips faster than the ink itself finishes filling/draining
-
-  function updateMask() {
-    const maskP = Math.min(progress * MASK_SPEEDUP, 1);
-    let g;
-    if (maskP >= 0.999) g = 'radial-gradient(circle, #000 100%, #000 100%)';
-    else if (maskP <= 0.001) g = 'radial-gradient(circle, transparent 100%, transparent 100%)';
-    else {
-      const r = maskP * 62;
-      const a = Math.max(0, r - 12);
-      const b = Math.min(75, r + 6);
-      g = `radial-gradient(circle, #000 ${a}%, transparent ${b}%)`;
-    }
-    inkNum.style.webkitMaskImage = g;
-    inkNum.style.maskImage = g;
-  }
-  updateMask();
-
-  if (interactive) {
-    el.addEventListener('click', () => {
-      active = !active;
-      ensureRunning();
-    });
-  }
-
-  const PAPER = [1, 1, 1]; // forced true white — see comment above buildNumberInk
-  let rafId = 0;
-  let running = false;
-  let lastT = performance.now();
-  let cooling = false, coolT = 0;
-  const COOL_TIME = 0.5; // ease the sim to a stop instead of cutting it off mid-swirl
-
-  function ensureRunning() {
-    if (running || !canvas.isConnected) return;
-    running = true;
-    lastT = performance.now();
-    rafId = requestAnimationFrame(frame);
-  }
-
-  function frame(now) {
-    if (!canvas.isConnected) { running = false; return; }
-
-    if (document.hidden) {
-      lastT = now;
-      rafId = requestAnimationFrame(frame);
-      return;
-    }
-
-    let dt = (now - lastT) / 1000;
-    lastT = now;
-    if (dt > 0.1) dt = 1 / 60;
-    dt = Math.min(dt, 1 / 30);
-    if (dt <= 0) { rafId = requestAnimationFrame(frame); return; }
-
-    const target = active ? 1 : 0;
-    let mode = 0;
-    if (progress < target) { progress = Math.min(target, progress + dt / RATE); mode = 1; }
-    else if (progress > target) { progress = Math.max(target, progress - dt / RATE); mode = -1; }
-    updateMask();
-
-    if (active && mode === 1) injectActivate(dt);
-
-    if (active) {
-      if (mode === 1) mergeT = MERGE_HOLD;
-      else if (progress >= 0.999 && mergeT > 0) mergeT -= dt;
-    } else {
-      mergeT = 0;
-    }
-
-    let washAmt = 0;
-    if (!active) {
-      if (progress > 0.0001) {
-        washAmt = 9.0; flushT = 0.7;
-        if (mode === -1) injectDeactivate();
-      } else if (flushT > 0) {
-        washAmt = 11.0; flushT -= dt;
-      }
-    }
-
-    const settled = (active && progress >= 0.999 && mergeT <= 0) ||
-                    (!active && progress <= 0.001 && flushT <= 0);
-
-    // Ease into the freeze rather than cutting the sim off mid-swirl: once
-    // settled, keep stepping with a shrinking dt so velocity/vorticity decay
-    // smoothly to rest instead of an abrupt last-frame stop.
-    if (settled) {
-      if (!cooling) { cooling = true; coolT = 0; }
-      coolT += dt;
-    } else {
-      cooling = false; coolT = 0;
-    }
-    const coolFrac = cooling ? Math.min(coolT / COOL_TIME, 1) : 0;
-    const frozen = cooling && coolFrac >= 1;
-    if (!frozen) step(dt * (1 - coolFrac), washAmt);
-
-    gl.useProgram(displayProg.p);
-    gl.uniform1i(displayProg.u.uDye, bindTex(dye.read.tex, 0));
-    gl.uniform3f(displayProg.u.uPaper, PAPER[0], PAPER[1], PAPER[2]);
-    blit(null);
-
-    if (frozen) { running = false; return; }
-    rafId = requestAnimationFrame(frame);
-  }
-
-  ensureRunning();
-
-  return {
-    setActive(on) {
-      if (active === on) return;
-      active = on;
-      ensureRunning();
-    },
-    setActiveInk: applyActiveInk,
-    destroy() {
-      running = false;
-      cancelAnimationFrame(rafId);
-      const lose = gl.getExtension('WEBGL_lose_context');
-      if (lose) lose.loseContext();
-    },
   };
 }
 

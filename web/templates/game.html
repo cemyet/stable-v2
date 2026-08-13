@@ -3,116 +3,494 @@
 {% block title %}{{ game_type_label }} {{ track_name }} — stable{% endblock %}
 
 {% block extra_style %}
-  body { padding: 80px 20px 60px; }
+  body { padding: 80px 24px 60px; }
+  /* Design-tab iframe: match live page geometry (1000px centered). */
+  body.is-embed {
+    padding: 80px 24px 60px;
+  }
 
+  /* Wide enough for a full start list to sit under a panel without the
+     columns floating away from the pill's right edge. Vertically centered
+     when the stack fits; `safe` falls back to top once a leg expands past
+     the viewport. */
   .game-page {
     width: 100%;
-    max-width: 760px;
+    max-width: 1000px;
     margin: 0 auto;
+    min-height: calc(100dvh - 140px);
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: safe center;
   }
 
-  .game-header {
-    text-align: center;
+  /* ── Ambient background plasma — dual pool, game sphere style ──
+     Two pools of the same game-type colour (e.g. V64 = orange+orange).
+     Jackpot replaces pool B with warm gold.
+     Technique: large radial-gradient divs with heavy gaussian blur +
+     transform-only animation (GPU-composited). The massive blur radius
+     + oversized layers ensure perfectly soft organic edges — no arcs. */
+  .game-bg-plasma {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+  /* Soft white bloom from center — lifts mud and frames the panels. */
+  .game-bg-plasma__glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse 85% 75% at 50% 48%,
+      rgb(255, 255, 255) 0%,
+      rgba(255, 255, 255, 0.78) 28%,
+      rgba(255, 255, 255, 0.38) 52%,
+      rgba(255, 255, 255, 0.12) 72%,
+      transparent 88%
+    );
+  }
+  .game-bg-plasma__layer {
+    position: absolute;
+    inset: -50%;
+    border-radius: 50%;
+    filter: blur(80px);
+    will-change: transform;
+    transform: translateZ(0);
+  }
+  .game-bg-plasma__layer--a {
+    opacity: 0.38;
+    animation: gp-drift-a 20s ease-in-out infinite alternate;
+  }
+  .game-bg-plasma__layer--b {
+    opacity: 0.30;
+    animation: gp-drift-b 26s ease-in-out infinite alternate;
+    animation-delay: -7s;
+  }
+  @keyframes gp-drift-a {
+    0%   { transform: translate(2%, -3%) scale(1.0); }
+    33%  { transform: translate(-4%, 5%) scale(1.08); }
+    66%  { transform: translate(3%, 2%) scale(0.96); }
+    100% { transform: translate(-2%, -4%) scale(1.04); }
+  }
+  @keyframes gp-drift-b {
+    0%   { transform: translate(-3%, 4%) scale(1.04); }
+    50%  { transform: translate(4%, -3%) scale(0.94); }
+    100% { transform: translate(-1%, 2%) scale(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .game-bg-plasma__layer { animation: none !important; }
   }
 
-  .game-title {
+  /* One block per leg: the panel is the handle, the start list lives under it. */
+  .game-legs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .game-leg {
+    /* Muted tokens (same recipe as .glass-panel--hybrid) — available on the
+       leg so bridge/tillägg fills can use them outside the panel element. */
+    --panel-muted: color-mix(in srgb, white 78%, rgb(var(--panel-hybrid-from-rgb)) 22%);
+    --panel-muted-to: color-mix(in srgb, white 78%, rgb(var(--panel-hybrid-to-rgb)) 22%);
+    --panel-muted-bright: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-from-rgb)) 4%);
+    --panel-muted-bright-to: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-to-rgb)) 4%);
+    --panel-ink: color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 62%, black);
+    /* Bridge under the panel / column header / foot. */
+    --leg-bridge: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      var(--panel-muted) 0%,
+      var(--panel-muted-to) 100%
+    );
+    /* Brighter muted — tillägg distance bars. */
+    --leg-bright: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      var(--panel-muted-bright) 0%,
+      var(--panel-muted-bright-to) 100%
+    );
+    display: flex;
+    flex-direction: column;
+  }
+
+  .game-leg__head {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .game-leg__head:focus-visible {
+    outline: 2px solid var(--accent-glow, #86e637);
+    outline-offset: 3px;
+    border-radius: 999px;
+  }
+  .game-leg .glass-panel--hybrid { width: 100%; }
+
+  /* An open leg keeps the panel in its lit state so the pill reads as the
+     header of the list below it. */
+  .game-leg__head:hover .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only,
+  .game-leg.is-open .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
+    background: linear-gradient(
+      var(--panel-hybrid-angle),
+      color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 80%, white) 0%,
+      color-mix(in srgb, rgb(var(--panel-hybrid-to-rgb)) 80%, white) 100%
+    );
+  }
+
+  .game-leg__body {
+    height: 0;
+    overflow: hidden;
+    transition: height 0.4s cubic-bezier(0.3, 0.72, 0.32, 1);
+  }
+  .game-leg__body[hidden] { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .game-leg__body { transition-duration: 0.01s; }
+  }
+
+  .game-leg__scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Gap under the panel + column title row — one continuous soft bridge. */
+  .game-leg .sl-row--head {
+    height: 34px;
+    padding-top: 10px;
+    box-sizing: border-box;
+    background: var(--leg-bridge);
+  }
+  .game-leg .sl-row--head:hover {
+    background: var(--leg-bridge);
+  }
+
+  .game-leg__foot {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 10px 14px;
-    margin: 0 0 8px;
-    line-height: 1;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 14px 12px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: lowercase;
+    background: var(--leg-bridge);
   }
-
-  .game-title .track-name {
-    display: inline-flex;
-    align-items: center;
+  /* Volt tillägg bars — first-step muted (same as bridge/foot). */
+  .game-leg .sl-tillagg {
+    background: var(--leg-bridge);
   }
-
-  .game-meta {
-    font-size: 12px;
+  /* Entry rows: lightest muted game-type tint. History: bone-white paper. */
+  .game-leg .sl-row:not(.sl-row--head) {
+    background: var(--leg-bright);
+  }
+  .game-leg .sl-row:not(.sl-row--head):hover,
+  .game-leg .sl-row:not(.sl-row--head).is-picked {
+    /* Lift within the tint — don't jump to bone paper. */
+    background: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      color-mix(in srgb, var(--panel-muted-bright) 68%, white) 0%,
+      color-mix(in srgb, var(--panel-muted-bright-to) 68%, white) 100%
+    );
+  }
+  .game-leg .sl-prev {
+    background: var(--sl-paper-rest);
+  }
+  .game-leg__clear {
     color: var(--fg-muted);
-    opacity: 0.48;
-    letter-spacing: 0.2px;
-  }
-
-  .game-panels {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    width: 100%;
-    margin-top: 80px;
-  }
-
-  .game-panels .glass-panel--hybrid {
-    width: 100%;
-  }
-
-  a.game-race-link {
-    display: block;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
     text-decoration: none;
-    color: inherit;
-    transition: transform 0.12s ease;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0.72;
+    transition: opacity 0.15s, color 0.15s;
   }
-  a.game-race-link:hover { transform: translateY(-2px); }
+  .game-leg__clear:hover { opacity: 1; color: var(--accent-warn); }
+  .game-leg__clear[hidden] { display: none; }
 {% endblock %}
 
 {% block content %}
   <a href="/home" class="page-back" aria-label="Back"></a>
+  <div class="game-bg-plasma" id="gameBgPlasma" aria-hidden="true">
+    <div class="game-bg-plasma__layer game-bg-plasma__layer--a"></div>
+    <div class="game-bg-plasma__layer game-bg-plasma__layer--b"></div>
+    <div class="game-bg-plasma__glow"></div>
+  </div>
   <div class="game-page">
-    <div class="game-header">
-      <h1 class="game-title">
-        <span class="track-name track-name--lg">{{ game_type_label }}</span>
-        {% if track_name %}
-        <span class="track-name track-name--lg">{{ track_name }}</span>
-        {% endif %}
-      </h1>
-      {% if time_display %}
-      <div class="game-meta">{{ time_display }}</div>
-      {% endif %}
-    </div>
-    <div class="game-panels" id="gamePanels"
+    <div class="game-legs" id="gameLegs"
          data-game-type-id="{{ game_type_id }}"
          data-game-id="{{ game_id }}"
-         data-race-count="{{ race_count }}">
+         data-race-count="{{ race_count }}"
+         data-is-jackpot="{{ 'true' if is_jackpot else '' }}">
     </div>
   </div>
 {% endblock %}
 
 {% block scripts %}
+{% include "partials/start_list.html" %}
 <script>
-  const panelsEl = document.getElementById('gamePanels');
-  const gameTypeId = panelsEl.dataset.gameTypeId;
-  const gameId = panelsEl.dataset.gameId;
+  /* ── Background plasma — dual pool, game sphere colour logic.
+     Standard = both pools use the game-type colour.
+     Jackpot = pool A = game colour, pool B = warm gold. */
+  (function initBgPlasma() {
+    const el = document.getElementById('gameBgPlasma');
+    if (!el || typeof PLASMA_PALETTE === 'undefined') return;
+    const legsEl = document.getElementById('gameLegs');
+    const gtId = legsEl && legsEl.dataset.gameTypeId;
+    const isJackpot = legsEl && legsEl.dataset.isJackpot === 'true';
+    const gt = typeof gameTypeById === 'function' ? gameTypeById(gtId) : null;
+    const primaryKey = gt && gt.plasma ? gt.plasma : 'purple';
+    const secondaryKey = isJackpot ? 'gold' : primaryKey;
+    const a = PLASMA_PALETTE[primaryKey] || PLASMA_PALETTE.purple;
+    const b = PLASMA_PALETTE[secondaryKey] || a;
+
+    function vibrant(rgb, lift) {
+      return rgb.split(',').map(s => {
+        const c = parseInt(s.trim(), 10);
+        return Math.round(c + (255 - c) * lift);
+      }).join(', ');
+    }
+
+    const layerA = el.querySelector('.game-bg-plasma__layer--a');
+    const layerB = el.querySelector('.game-bg-plasma__layer--b');
+
+    if (layerA) layerA.style.background = [
+      `radial-gradient(ellipse 60% 55% at 35% 40%, rgba(${vibrant(a.shine, 0.25)}, 0.9) 0%, rgba(${vibrant(a.glow, 0.3)}, 0.5) 35%, transparent 65%)`,
+      `radial-gradient(ellipse 45% 50% at 70% 65%, rgba(${vibrant(a.glow, 0.2)}, 0.6) 0%, transparent 55%)`,
+    ].join(', ');
+
+    if (layerB) layerB.style.background = [
+      `radial-gradient(ellipse 55% 60% at 65% 55%, rgba(${vibrant(b.shine, 0.2)}, 0.85) 0%, rgba(${vibrant(b.glow, 0.25)}, 0.45) 35%, transparent 60%)`,
+      `radial-gradient(ellipse 40% 45% at 30% 70%, rgba(${vibrant(b.glow, 0.15)}, 0.55) 0%, transparent 50%)`,
+    ].join(', ');
+  })();
+
+  /* Game page — every leg of the game on one page. Clicking a race panel
+     unfolds its start list underneath, so a coupon gets built by opening and
+     closing legs instead of walking from race page to race page. The picks for
+     each leg ride along on the panel, and the floating sphere keeps the
+     running cost. */
+  const legsRoot = document.getElementById('gameLegs');
+  const gameId = legsRoot.dataset.gameId;
+  const gameTypeId = legsRoot.dataset.gameTypeId;
+  // Coupon rules are keyed off the ATG game id prefix (V64, GS75, …).
+  const couponGameType = (gameId.split('_')[0] || '').toUpperCase();
+
+  let races = [];
+
+  function hhmm(iso) {
+    const t = String(iso || '').slice(11, 16);
+    return /^\d\d:\d\d$/.test(t) ? t : '';
+  }
+
+  function legHtml(gt, race, i) {
+    const raceId = race.atgRaceId || '';
+    const time = hhmm(race.startTime);
+    const meta = [race.distanceLabel, time].filter(Boolean).join(' · ');
+    // Scratched horses are still in the field list but cannot be picked.
+    const starters = race.starters != null
+      ? race.starters - (race.scratched || 0)
+      : null;
+    const panel = hybridPanelRowHtml(gt, {
+      xp: true,
+      demo: false,
+      raceNumber: race.raceNumber ?? (i + 1),
+      starters,
+      raceName: race.name || null,
+      distanceLabel: meta || null,
+      picksSlot: true,
+      caret: !!raceId,
+    });
+    const hybridCls = gt.hybrid ? ` glass-panel--hybrid-${gt.hybrid}` : '';
+    if (!raceId) return `<div class="game-leg${hybridCls}">${panel}</div>`;
+    return `<div class="game-leg${hybridCls}" data-leg data-race-id="${esc(raceId)}">
+      <div class="game-leg__head" role="button" tabindex="0" aria-expanded="false"
+           aria-label="${esc(gt.label)} leg ${race.raceNumber ?? (i + 1)}">${panel}</div>
+      <div class="game-leg__body" hidden>
+        <div class="game-leg__scroll"><div class="game-leg__list"></div></div>
+        <div class="game-leg__foot">
+          <button type="button" class="game-leg__clear" data-clear hidden>clear leg</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── open / close ── */
+
+  // Height is animated from whatever it is now to whatever the content needs,
+  // so the same call works for the first open, for content arriving late and
+  // for closing.
+  function slideTo(body, target) {
+    const from = body.getBoundingClientRect().height;
+    body.style.height = from + 'px';
+    void body.offsetHeight;
+    body.style.height = target + 'px';
+  }
+
+  function contentHeight(body) {
+    const prev = body.style.height;
+    body.style.height = 'auto';
+    const h = body.getBoundingClientRect().height;
+    body.style.height = prev;
+    return h;
+  }
+
+  function settleOpen(body) {
+    body.style.height = 'auto';
+  }
+
+  // A leg opened low on the screen would unfold below the fold, so the panel
+  // pulls up to just under the top of the viewport instead.
+  function keepInView(head) {
+    const top = head.getBoundingClientRect().top;
+    if (top < 60 || top > window.innerHeight * 0.5) {
+      window.scrollBy({ top: top - 90, behavior: 'smooth' });
+    }
+  }
+
+  function openLeg(leg, { scroll = false } = {}) {
+    const body = leg.querySelector('.game-leg__body');
+    const head = leg.querySelector('.game-leg__head');
+    leg.classList.add('is-open');
+    head.setAttribute('aria-expanded', 'true');
+    body.hidden = false;
+    leg._scrollOnSettle = scroll;
+
+    if (!leg._list) {
+      const mountEl = body.querySelector('.game-leg__list');
+      leg._list = StartList.mount(mountEl, {
+        raceId: leg.dataset.raceId,
+        gameId,
+        gameType: couponGameType,
+      });
+      leg._list.load().then(() => {
+        leg._loaded = true;
+        if (leg.classList.contains('is-open')) growOpen(leg);
+        renderPicks();
+      });
+    }
+    growOpen(leg);
+  }
+
+  function growOpen(leg) {
+    const body = leg.querySelector('.game-leg__body');
+    slideTo(body, contentHeight(body));
+    body.addEventListener('transitionend', function done(ev) {
+      if (ev.propertyName !== 'height') return;
+      body.removeEventListener('transitionend', done);
+      // The leg may have been closed again mid-slide.
+      if (!leg.classList.contains('is-open')) return;
+      settleOpen(body);
+      // Scroll once the list is in place — until then the page is too short
+      // to scroll to where the panel is headed.
+      if (leg._scrollOnSettle && leg._loaded) {
+        leg._scrollOnSettle = false;
+        keepInView(leg.querySelector('.game-leg__head'));
+      }
+    });
+  }
+
+  function closeLeg(leg) {
+    const body = leg.querySelector('.game-leg__body');
+    const head = leg.querySelector('.game-leg__head');
+    leg.classList.remove('is-open');
+    head.setAttribute('aria-expanded', 'false');
+    slideTo(body, 0);
+    body.addEventListener('transitionend', function done(ev) {
+      if (ev.propertyName !== 'height') return;
+      body.removeEventListener('transitionend', done);
+      if (!leg.classList.contains('is-open')) body.hidden = true;
+    });
+  }
+
+  function toggleLeg(leg) {
+    if (leg.classList.contains('is-open')) closeLeg(leg);
+    else openLeg(leg, { scroll: true });
+  }
+
+  /* ── picks on the panels ── */
+
+  function draftForThisGame() {
+    const d = window.Coupon ? Coupon.load() : null;
+    return (d && d.gameId === gameId) ? d : null;
+  }
+
+  function pickChips(numbers) {
+    return numbers.map(n => `<span class="hybrid-panel__pick">${n}</span>`).join('');
+  }
+
+  function renderPicks() {
+    const d = draftForThisGame();
+    legsRoot.querySelectorAll('[data-leg]').forEach(leg => {
+      const picks = (d && d.selections[leg.dataset.raceId]) || [];
+      const slot = leg.querySelector('[data-panel-picks]');
+      if (slot) {
+        slot.innerHTML = picks.length ? pickChips(picks) : '';
+        slot.classList.toggle('is-dense', picks.length > 5);
+      }
+      const clear = leg.querySelector('[data-clear]');
+      if (clear) clear.hidden = !picks.length;
+    });
+  }
+
+  function clearLeg(leg) {
+    const d = draftForThisGame();
+    if (!d) return;
+    delete d.selections[leg.dataset.raceId];
+    if (d.horseNames) delete d.horseNames[leg.dataset.raceId];
+    Coupon.store(Coupon.totalPicks(d) > 0 ? d : null);
+  }
+
+  /* ── wiring ── */
+
+  function wire() {
+    legsRoot.querySelectorAll('[data-leg]').forEach(leg => {
+      const head = leg.querySelector('.game-leg__head');
+      head.addEventListener('click', () => toggleLeg(leg));
+      head.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        toggleLeg(leg);
+      });
+      const clear = leg.querySelector('[data-clear]');
+      if (clear) clear.addEventListener('click', () => clearLeg(leg));
+    });
+    window.addEventListener('coupon:changed', renderPicks);
+  }
+
+  // A leg can be linked to directly (?race=… or #race-…) — e.g. from a coupon
+  // receipt. Failing that, a draft in progress opens at its first empty leg and
+  // a fresh visit opens at leg one, so there is always something on screen.
+  function initialLeg() {
+    const wanted = new URLSearchParams(location.search).get('race')
+      || (location.hash.startsWith('#race-') ? decodeURIComponent(location.hash.slice(6)) : '');
+    const legs = [...legsRoot.querySelectorAll('[data-leg]')];
+    if (wanted) {
+      const hit = legs.find(l => l.dataset.raceId === wanted);
+      if (hit) return hit;
+    }
+    const d = draftForThisGame();
+    if (d) {
+      const empty = legs.find(l => !(d.selections[l.dataset.raceId] || []).length);
+      if (empty) return empty;
+    }
+    return legs[0] || null;
+  }
 
   (async () => {
-    if (!gameId || typeof hybridPanelRowHtml !== 'function' || typeof gameTypeById !== 'function') return;
     const gt = gameTypeById(gameTypeId);
-    if (!gt) return;
-
+    if (!gameId || !gt) return;
     try {
       const res = await fetch(`/api/atg/game/${encodeURIComponent(gameId)}`);
       if (!res.ok) return;
       const data = await res.json();
-      const races = data.races || [];
-      panelsEl.innerHTML = races.map((race, i) => {
-        const panel = hybridPanelRowHtml(gt, {
-          xp: true,
-          demo: false,
-          raceNumber: race.raceNumber ?? (i + 1),
-          starters: race.starters ?? null,
-          raceName: race.name || null,
-          distanceLabel: race.distanceLabel || null,
-        });
-        return race.atgRaceId
-          ? `<a class="game-race-link" href="/race/atg/${encodeURIComponent(race.atgRaceId)}?game=${encodeURIComponent(gameId)}">${panel}</a>`
-          : panel;
-      }).join('');
-    } catch (_) {}
+      races = data.races || [];
+      legsRoot.innerHTML = races.map((race, i) => legHtml(gt, race, i)).join('');
+      wire();
+      renderPicks();
+      const first = initialLeg();
+      if (first) openLeg(first, { scroll: first !== legsRoot.querySelector('[data-leg]') });
+    } catch (_) { /* leave the page empty rather than half-built */ }
   })();
 </script>
 {% endblock %}

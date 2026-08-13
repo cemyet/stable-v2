@@ -1,0 +1,1290 @@
+{# ---------------------------------------------------------------------------
+   Upcoming start list — the block that unfolds under a race panel on the
+   game page. One instance per race (leg): it fetches the start list plus the
+   live market, renders one 34px row per starter, and turns the number sphere
+   into a coupon pick.
+
+   Everything a leg needs is self-contained so several can live on the same
+   page at once. Cross-leg state (which GPS metric is shown, whether the
+   market share is revealed, which galopp model is active) is module-level and
+   broadcast, so all open legs stay in lockstep.
+
+   Selecting a horse wipes the row with soft green ink (#f4fff4) from the
+   sphere outwards — a CSS wipe rather than the race page's WebGL fluid,
+   because a game page can have every leg open at once and browsers cap
+   live WebGL contexts.
+   --------------------------------------------------------------------------- #}
+<style>
+  .sl {
+    width: 100%;
+    min-width: 840px;
+    /* Bone-white paper — shared by entry rows and (on game) history. */
+    --sl-paper: color-mix(in srgb, var(--bg, #f1eee5) 32%, white);
+    --sl-paper-rest: color-mix(in srgb, var(--sl-paper) 99%, black 1%);
+  }
+
+  /* Rest state slightly darker; hover lifts to lighter cream. */
+  .sl-row {
+    position: relative;
+    height: 34px;
+    overflow: hidden;
+    background-color: var(--sl-paper-rest);
+    border-bottom: 1px solid var(--list-line, var(--border));
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .sl-row:not(.sl-row--head):hover,
+  .sl-row:not(.sl-row--head).is-picked {
+    overflow: visible;
+    z-index: 1;
+    background-color: var(--sl-paper);
+    --sl-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
+    --sl-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
+    --sl-ink-num: color-mix(in srgb, #17171a 68%, white);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.9),
+      0 0 12px rgba(255, 255, 255, 0.55),
+      0 0 24px rgba(255, 255, 255, 0.28);
+  }
+
+  /* Ink wipe — a soft green front that runs from the sphere to the right edge.
+     The ::before layer is the solid fill; ::after is a feathered leading
+     wave that overshoots slightly, giving the impression of ink soaking
+     outward with an organic, turbulent edge. */
+  .sl-row__ink {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .sl-row__ink::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(244, 255, 244, 0.97);
+    transform: translateX(-100%);
+    transition: transform 0.42s cubic-bezier(0.4, 0, 0.7, 0.2);
+  }
+  .sl-row__ink::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    left: 0;
+    width: calc(100% + 60px);
+    background: linear-gradient(
+      to right,
+      rgba(244, 255, 244, 0.96) 0%,
+      rgba(244, 255, 244, 0.72) 40%,
+      rgba(244, 255, 244, 0.32) 68%,
+      rgba(244, 255, 244, 0) 100%
+    );
+    filter: url(#sl-ink-turb);
+    transform: translateX(-102%);
+    transition: transform 0.36s cubic-bezier(0.4, 0, 0.7, 0.2);
+  }
+  .sl-row.is-picked .sl-row__ink::before {
+    transform: translateX(0);
+    transition: transform 0.68s cubic-bezier(0.16, 0.82, 0.26, 1);
+  }
+  .sl-row.is-picked .sl-row__ink::after {
+    transform: translateX(0);
+    transition: transform 0.58s cubic-bezier(0.08, 0.72, 0.22, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sl-row__ink::before, .sl-row__ink::after,
+    .sl-row.is-picked .sl-row__ink::before,
+    .sl-row.is-picked .sl-row__ink::after { transition-duration: 0.01s; }
+  }
+
+  .sl-row:not(.sl-row--head) {
+    --sl-ink: var(--fg-heading);
+    --sl-ink-muted: var(--fg-muted);
+    --sl-ink-num: #17171a;
+  }
+
+  .sl-row__cells {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    gap: 12px;
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--sl-ink);
+    transition: color 0.15s ease;
+  }
+  .sl-row__cells a {
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
+  }
+  .sl-row__cells a:hover { font-weight: 600; }
+
+  /* Dim/blur sibling rows while a horse history panel is open. */
+  .sl.is-prev-open .sl-row:not(.sl-row--head):not(.is-prev-active) .sl-row__cells,
+  .sl.is-prev-open .sl-row:not(.sl-row--head):not(.is-prev-active) .sl-row__badge {
+    filter: blur(0.7px) saturate(0.52);
+    opacity: 0.82;
+    transition: filter 0.22s ease, opacity 0.22s ease;
+  }
+  .sl.is-prev-open .sl-tillagg {
+    opacity: 0.76;
+    transition: opacity 0.22s ease;
+  }
+
+  /* Number sphere — the pick target. Everything else in the row expands the
+     horse's last starts, so the sphere keeps its own hit area. */
+  .sl-row__badge {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    margin-top: -12px;
+    width: 24px;
+    height: 24px;
+    z-index: 3;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: filter 0.28s ease;
+  }
+  .sl-row__badge:focus-visible {
+    outline: 2px solid var(--accent-glow, #86e637);
+    outline-offset: 2px;
+  }
+  .sl-badge {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #ffffff;
+    transition: background-color 0.28s ease;
+  }
+  .sl-badge__digit {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-ink-num);
+    transition: color 0.15s ease;
+  }
+  .sl-row.is-picked .sl-row__badge {
+    filter:
+      drop-shadow(0 0 1px rgb(196, 255, 140))
+      drop-shadow(0 0 3px rgba(130, 248, 80, 0.4));
+  }
+  .sl-row.is-picked .sl-badge {
+    background: var(--sl-badge-ink, #00a500);
+  }
+  .sl-row.is-picked .sl-badge__digit { color: #fff; }
+
+  /* Columns — fixed widths so every open leg lines up vertically. */
+  .sl-c-num { flex: none; width: 24px; text-align: center; }
+  .sl-row--head .sl-c-num {
+    width: auto;
+    min-width: 34px;
+    text-align: left;
+  }
+  .sl-pick-toggle {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .sl-pick-toggle:hover { font-weight: 700; }
+  /* The horse name takes the slack, so the odds column always lands on the
+     panel's right edge no matter how wide the page is. */
+  .sl-c-horse {
+    flex: 1 1 200px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sl-row:not(.sl-row--head):hover .sl-c-horse > a,
+  .sl-row:not(.sl-row--head).is-picked .sl-c-horse > a {
+    color: var(--fg-heading);
+  }
+  .sl-c-sa {
+    color: var(--sl-ink-muted);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+    transition: color 0.15s ease;
+  }
+  .sl-c-people {
+    flex: 0 0 auto;
+    display: inline-flex;
+    gap: 10px;
+    margin-left: 16px;
+  }
+  .sl-c-drv,
+  .sl-c-trn {
+    flex: 0 0 78px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sl-ink-muted);
+    transition: color 0.15s ease;
+  }
+  .sl-c-tform {
+    flex: 0 0 48px;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+  }
+  .sl-c-eq {
+    flex: 0 0 60px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    color: var(--sl-ink-muted);
+    transition: color 0.15s ease;
+  }
+  .sl-c-gps {
+    flex: 0 0 46px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-ink-muted);
+    transition: color 0.15s ease;
+  }
+  .sl-c-gal,
+  .sl-c-win,
+  .sl-c-clean {
+    flex: 0 0 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-ink-muted);
+    transition: color 0.15s ease;
+  }
+  .sl-c-gap {
+    flex: 0 1 24px;
+    min-width: 0;
+  }
+  .sl-c-pct {
+    flex: 0 0 52px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+  .sl-c-odds {
+    flex: 0 0 44px;
+    text-align: right;
+    color: var(--sl-ink-muted);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s ease;
+  }
+
+  .sl-row:not(.sl-row--head):hover .sl-gal-mid {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 75%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-gal-hi {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot {
+    color: color-mix(in srgb, var(--accent-hot) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-cold {
+    color: color-mix(in srgb, var(--accent-cold) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-tr.up {
+    color: color-mix(in srgb, var(--accent-hot, #ff5a5a) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-tr.dn {
+    color: color-mix(in srgb, var(--accent-cold, #5aa6ff) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .shoe-icon.shoe-changed,
+  .sl-row:not(.sl-row--head):hover .sl-sulky.sulky-changed {
+    color: color-mix(in srgb, var(--accent-warn) 72%, white);
+  }
+
+  .sl-tr { font-size: 9px; margin-right: 2px; }
+  .sl-tr.up { color: var(--accent-hot, #ff5a5a); }
+  .sl-tr.dn { color: var(--accent-cold, #5aa6ff); }
+  .sl-row .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .sl-row .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
+  .sl-row .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .sl-sulky { font-size: 11px; letter-spacing: 0.2px; }
+  .sl-sulky.sulky-changed { color: var(--accent-warn); }
+  /* Picked row — red glow on changed shoe/sulky (same as race-page ink overlay). */
+  .sl-row:not(.sl-row--head).is-picked .shoe-icon.shoe-changed,
+  .sl-row:not(.sl-row--head).is-picked:hover .shoe-icon.shoe-changed {
+    color: #ff5252;
+    filter: drop-shadow(0 0 4px rgba(255, 82, 82, 0.9));
+    opacity: 1;
+  }
+  .sl-row:not(.sl-row--head).is-picked .sl-sulky.sulky-changed,
+  .sl-row:not(.sl-row--head).is-picked:hover .sl-sulky.sulky-changed {
+    color: #ff5252;
+    text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
+    opacity: 1;
+  }
+  .sl-gal-lo, .sl-gal-empty { color: var(--sl-ink-muted); transition: color 0.15s ease; }
+  .sl-gal-mid { color: color-mix(in srgb, var(--accent-cold, #b00010) 62%, white); }
+  .sl-gal-hi { color: var(--accent-cold, #b00010); }
+  .sl-c-tform .sform-hot { color: var(--accent-hot); }
+  .sl-c-tform .sform-cold { color: var(--accent-cold); }
+
+  /* Market share is hidden until asked for — an eye reveals one row, the
+     header eye reveals the whole card. Odds follow the same veil. */
+  .sl-pct__val.is-hidden { display: none; }
+  .sl-pct__eye {
+    display: none;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    color: var(--fg-muted);
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .sl-c-pct:has(.sl-pct__val.is-hidden) .sl-pct__eye { display: inline-flex; }
+  .sl-c-pct:hover .sl-pct__eye { opacity: 0.8; }
+  .sl-row__cells:has(.sl-pct__val.is-hidden) .sl-c-odds { visibility: hidden; }
+  .sl-pct-eye {
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    color: var(--fg-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    opacity: 0.55;
+    transition: opacity 0.18s;
+  }
+  .sl-pct-eye:hover { opacity: 1; }
+  .sl-pct-eye svg,
+  .sl-pct__eye svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* Header row */
+  .sl-row--head {
+    height: 24px;
+    background: transparent;
+    border: 0;
+    color: var(--fg-muted);
+    letter-spacing: 0.5px;
+    overflow: visible;
+  }
+  .sl-row--head:hover { background: transparent; }
+  .sl-row--head .sl-row__cells { color: inherit; font-size: 11px; }
+  .sl-row--head .sl-row__cells span { color: inherit; }
+  .sl-row--head .sl-c-gps .gps-toggle,
+  .sl-row--head .sl-c-gal[data-gal-toggle],
+  .sl-row--head .sl-pick-toggle { cursor: pointer; }
+  .sl-row--head .sl-c-pct { cursor: default; }
+
+  .sl-row--scratched .sl-row__cells { color: var(--fg-muted); opacity: 0.55; }
+  .sl-row--scratched::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1.2px;
+    margin-top: -0.6px;
+    background: rgba(255, 45, 45, 0.7);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .sl-row--scratched .sl-c-num {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Volt starts run in distance groups — mark where the tillägg begins. */
+  .sl-tillagg {
+    padding: 5px 12px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: lowercase;
+    color: var(--fg-muted);
+    background: var(--hover);
+    border-bottom: 1px solid var(--list-line, var(--border));
+  }
+
+  .sl-empty {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+
+  /* Horse history — unfolds under the row it belongs to.
+     On the game page, fill is swapped with entry rows (paper here, tint on entries). */
+  .sl-prev {
+    --sl-prev-paper: color-mix(in srgb, var(--bg, #f1eee5) 95%, black);
+    --sl-prev-line: var(--fluid-toggle-fg, rgba(0, 0, 0, 0.34));
+    background: var(--sl-prev-paper);
+  }
+  .sl-prev__empty {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+  table.sl-prev-races {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  /* Game-page history hover — lift toward lighter paper + softened ink. */
+  .game-leg table.sl-prev-races tbody tr {
+    --sl-prev-ink: var(--fg-heading);
+    --sl-prev-ink-muted: var(--fg-muted);
+    background-color: transparent !important;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .game-leg table.sl-prev-races tbody tr:hover {
+    background-color: var(--sl-paper) !important;
+    --sl-prev-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
+    --sl-prev-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
+  }
+  table.sl-prev-races tbody tr,
+  table.sl-prev-races tbody tr:hover {
+    cursor: pointer;
+  }
+  table.sl-prev-races td {
+    padding: 0 10px;
+    height: 34px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--sl-prev-line, var(--fluid-toggle-fg, rgba(0, 0, 0, 0.34)));
+    white-space: nowrap;
+    line-height: 1.2;
+    transition: color 0.15s ease;
+  }
+  .game-leg table.sl-prev-races td { color: var(--sl-prev-ink-muted); }
+  .game-leg table.sl-prev-races td:not(.muted) { color: var(--sl-prev-ink); }
+  table.sl-prev-races tbody tr:last-child td { border-bottom: 0; }
+  table.sl-prev-races td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.sl-prev-races td.center { text-align: center; }
+  table.sl-prev-races td.muted { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
+  table.sl-prev-races tr.scratched td { color: var(--sl-prev-ink-muted, var(--fg-muted)); opacity: 0.55; }
+  table.sl-prev-races .shoes {
+    display: inline-flex;
+    gap: 3px;
+    line-height: 1;
+    align-items: center;
+    color: var(--sl-prev-ink-muted, var(--fg-muted));
+  }
+  table.sl-prev-races .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
+  table.sl-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
+  table.sl-prev-races .dq,
+  table.sl-prev-races .withdrew { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
+  table.sl-prev-races .gal-mark {
+    font-size: 0.72em;
+    color: var(--sl-prev-ink-muted, var(--fg-muted));
+    vertical-align: super;
+  }
+  table.sl-prev-races td.sl-prev-comment {
+    width: 100%;
+    max-width: 0;
+    overflow: hidden;
+    color: var(--sl-prev-ink-muted, var(--fg-muted));
+    font-size: 11.5px;
+  }
+  .sl-prev-comment__clip {
+    overflow: hidden;
+    width: 100%;
+    container-type: inline-size;
+  }
+  .sl-prev-comment__text {
+    display: inline-block;
+    white-space: nowrap;
+    padding-right: 1.25em;
+    animation: sl-prev-marquee 8s ease-in-out infinite alternate;
+    animation-delay: 0.8s;
+  }
+  .sl-prev-comment__clip:hover .sl-prev-comment__text {
+    animation: none;
+    transform: translateX(0);
+  }
+  @keyframes sl-prev-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(min(0px, calc(100cqw - 100%))); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sl-prev-comment__text { animation: none; }
+  }
+</style>
+
+<!-- SVG turbulence filter for ink edge — keeps the wipe organic rather than a straight bar. -->
+<svg width="0" height="0" style="position:absolute;pointer-events:none" aria-hidden="true">
+  <defs>
+    <filter id="sl-ink-turb" x="-5%" y="-15%" width="110%" height="130%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.018 0.06" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<script>
+(function () {
+  'use strict';
+
+  const EYE_OPEN = `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+  const EYE_CLOSED = `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+
+  // Ink colours match the race page: white ink in the row, green in the sphere.
+  const BADGE_INK = '#00a500';
+
+  /* ── cross-leg state ─────────────────────────────────────────────────── */
+
+  const instances = new Set();
+  const prevRacesCache = {};          // horseId -> last starts (shared by all legs)
+  let pctRevealed = false;            // market share veil, page-wide
+  let galMode = localStorage.getItem('galModelMode') || 'track';
+
+  const PREV_GPS_STORE = 'stable-prev-gps-metric';
+  const PREV_GPS_METRICS = [
+    { key: 'peak', label: 'peak', desc: 'fastest 100 m across prior xLabs starts' },
+    { key: 'f100', label: 'f100', desc: 'fastest first 100 m across prior xLabs starts' },
+    { key: 'f200', label: 'f200', desc: 'fastest first 200 m across prior xLabs starts' },
+    { key: 'l200', label: 'l200', desc: 'fastest last 200 m across prior xLabs starts' },
+  ];
+
+  function gpsMetric() {
+    let k;
+    try { k = localStorage.getItem(PREV_GPS_STORE); } catch (_) {}
+    return PREV_GPS_METRICS.find(m => m.key === k) || PREV_GPS_METRICS[0];
+  }
+
+  /* ── formatters ──────────────────────────────────────────────────────── */
+
+  const SHOE_ON_PATH =
+    'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+    ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+    'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+    's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+  const SHOE_OFF_PATH =
+    'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+    'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+    'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+    'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+    'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+    '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+    '.22-.04.36-.04.42.12l.42 1.24Z' +
+    'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+
+  function shoeIcon(has, changed) {
+    return `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">`
+      + `<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/></svg>`;
+  }
+
+  // shoe_code: '1' none, '2' back only, '3' front only, '4' both.
+  function shoeCells(code, frontChanged, backChanged) {
+    if (!code) return '';
+    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', frontChanged)}`
+      + `${shoeIcon(code === '2' || code === '4', backChanged)}</span>`;
+  }
+
+  function sulkyCell(e) {
+    if (!e.sulky) return '';
+    const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+    return `<span class="sl-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+  }
+
+  function sexAge(e) {
+    const s = typeof swedishSex === 'function' ? swedishSex(e.sex) : (e.sex || '');
+    const a = e.age != null ? e.age : '';
+    return `${s || ''}${a}`;
+  }
+
+  function horseCell(e) {
+    const name = flagify(e.horse_name);
+    const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+    const sa = sexAge(e);
+    return link + (sa ? ` <span class="sl-c-sa">${esc(sa)}</span>` : '');
+  }
+
+  function personCell(short, full, href) {
+    if (!short) return '';
+    if (!href) return `<span title="${esc(full || '')}">${esc(short)}</span>`;
+    return `<a href="${esc(href)}" title="${esc(full || '')}">${esc(short)}</a>`;
+  }
+
+  // Trainer form: avg finishing percentile of recent runners (100 = wins).
+  function tformCell(v) {
+    if (v == null) return '';
+    const n = v / 10;
+    const cls = n >= 65 ? 'sform-hot' : n <= 40 ? 'sform-cold' : '';
+    return `<span class="${cls}">${n.toFixed(1)}</span>`;
+  }
+
+  function winPct(e, which) {
+    const s = which === 'post' ? e.post_starts : e.pre_starts;
+    const w = which === 'post' ? e.post_wins : e.pre_wins;
+    if (!s) return '';
+    return Math.round((w / s) * 100) + '%';
+  }
+
+  function cleanPct(e, which) {
+    const s = which === 'post' ? e.post_galadj_starts : e.pre_galadj_starts;
+    const w = which === 'post' ? e.post_galadj_wins : e.pre_galadj_wins;
+    if (!s) return '';
+    return Math.round((w / s) * 100) + '%';
+  }
+
+  function activeXgal(e) {
+    if (galMode === 'general') return e.xgal_general ?? e.xgal_track;
+    return e.xgal_track ?? e.xgal_general;
+  }
+
+  function galCell(e) {
+    const risk = activeXgal(e);
+    if (risk == null) return '<span class="sl-gal-empty"></span>';
+    const p = risk * 100;
+    const cls = p >= 25 ? 'sl-gal-hi' : p >= 15 ? 'sl-gal-mid' : 'sl-gal-lo';
+    return `<span class="${cls}">${p.toFixed(0)}%</span>`;
+  }
+
+  function pctCell(s) {
+    if (!s || s.betDist == null) return '';
+    let tr = '';
+    if (s.trend != null && Math.abs(s.trend) > 0.003) {
+      tr = s.trend > 0 ? '<span class="sl-tr up">▲</span>' : '<span class="sl-tr dn">▼</span>';
+    }
+    return `${tr}${s.betDist.toFixed(1)}%`;
+  }
+
+  function oddsCell(s) {
+    return (s && s.winOdds != null) ? s.winOdds.toFixed(2) : '';
+  }
+
+  function kmTime(ms) {
+    if (ms == null || !isFinite(ms) || ms <= 0) return '';
+    const v = ms / 1000;
+    const mins = Math.floor(v / 60);
+    const secs = (v - mins * 60).toFixed(1).replace('.', ',');
+    return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+  }
+
+  function timeVal(v) {
+    if (v == null || v === 0) return '';
+    const mins = Math.floor(v / 60);
+    const secs = (v - mins * 60).toFixed(1).replace('.', ',');
+    return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+  }
+
+  /* ── best previous xLabs sectionals ──────────────────────────────────── */
+
+  function segmentMs(iv, lo, hi) {
+    if (typeof iv === 'string') {
+      try { iv = JSON.parse(iv); } catch (_) { return null; }
+    }
+    if (!Array.isArray(iv) || !(hi > lo)) return null;
+    let num = 0, den = 0;
+    for (const b of iv) {
+      const s = b && b.start, e = b && b.end, d = b && b.duration;
+      if (typeof s !== 'number' || typeof e !== 'number' || typeof d !== 'number') continue;
+      const a = Math.max(s, lo), z = Math.min(e, hi);
+      if (z <= a) continue;
+      num += d * (z - a);
+      den += (z - a);
+    }
+    return den > 0 ? num / den : null;
+  }
+
+  function raceMetricMs(r, key) {
+    if (key === 'peak') return r.kmtid_best_100ms != null ? +r.kmtid_best_100ms : null;
+    if (key === 'f200') return r.kmtid_first_200ms != null ? +r.kmtid_first_200ms : null;
+    if (key === 'l200') return r.kmtid_last_200ms != null ? +r.kmtid_last_200ms : null;
+    if (key === 'f100') return segmentMs(r.kmtid_intervals, 0, 100);
+    return null;
+  }
+
+  function bestPrevGps(races, beforeDate) {
+    const best = {};
+    PREV_GPS_METRICS.forEach(m => { best[m.key] = null; });
+    (races || []).forEach(r => {
+      if (!r || (beforeDate && r.race_date && !(r.race_date < beforeDate))) return;
+      PREV_GPS_METRICS.forEach(m => {
+        const v = raceMetricMs(r, m.key);
+        if (v == null || !(v > 0)) return;
+        if (best[m.key] == null || v < best[m.key]) best[m.key] = v;
+      });
+    });
+    const out = {};
+    PREV_GPS_METRICS.forEach(m => { out[m.key] = kmTime(best[m.key]); });
+    return out;
+  }
+
+  function gpsCellAttrs(vals) {
+    let attrs = '';
+    PREV_GPS_METRICS.forEach(m => {
+      const v = vals && vals[m.key];
+      if (v) attrs += ` data-gv-${m.key}="${esc(v)}"`;
+    });
+    return attrs;
+  }
+
+  /* ── horse history rows ──────────────────────────────────────────────── */
+
+  function prevPlacement(r) {
+    if (r.disqualified) {
+      const t = r.placement_text || (r.placement_num != null ? String(r.placement_num) : '');
+      return `<span class="dq">${esc(t || 'd')}</span>`;
+    }
+    if (r.withdrawn) return `<span class="withdrew">${esc(r.placement_text || 'utg')}</span>`;
+    const classifiedGalopp = r.galopp && r.placement_num != null;
+    const t = classifiedGalopp
+      ? String(r.placement_num)
+      : (r.placement_text || (r.placement_num != null ? String(r.placement_num) : ''));
+    const galMark = classifiedGalopp ? ' <span class="gal-mark" title="galopp">g</span>' : '';
+    let num = null;
+    if (r.placement_num != null) {
+      const pt = r.placement_text || '';
+      if (/^[1-7]/.test(pt) || r.galopp) num = r.placement_num;
+    }
+    return placementHtml(t, galMark, num);
+  }
+
+  function prevRacesHtml(rows) {
+    const body = rows.map(r => {
+      const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
+      const href = r.atg_id ? `/race/atg/${r.atg_id}` : r.race_id ? `/race/${r.race_id}` : '';
+      return `<tr${r.withdrawn ? ' class="scratched"' : ''}${href ? ` data-href="${esc(href)}"` : ''}>
+        <td class="muted">${esc(r.race_date || '')}</td>
+        <td class="muted">${esc(r.track_label || '')}</td>
+        <td>${prevPlacement(r)}</td>
+        <td>${esc(r.km_time_text || timeVal(r.time_val))}</td>
+        <td class="muted num">${esc(r.program_number || '')}</td>
+        <td class="muted">${esc(startType)}</td>
+        <td class="muted num">${esc(r.distance || '')}</td>
+        <td class="muted">${esc(r.odds_text || '')}</td>
+        <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
+        <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+        <td class="center">${sulkyCell(r)}</td>
+        <td class="num">${esc(r.prize_kr || '')}</td>
+        <td class="sl-prev-comment"><div class="sl-prev-comment__clip"><span class="sl-prev-comment__text">${esc(r.comment || '')}</span></div></td>
+      </tr>`;
+    }).join('');
+    return `<table class="sl-prev-races"><tbody>${body}</tbody></table>`;
+  }
+
+  async function horseRaces(horseId) {
+    if (prevRacesCache[horseId]) return prevRacesCache[horseId];
+    const res = await fetch(`/api/horse/${horseId}/races`);
+    if (!res.ok) throw new Error('history fetch failed');
+    const rows = await res.json();
+    prevRacesCache[horseId] = rows;
+    return rows;
+  }
+
+  /* ── instance ────────────────────────────────────────────────────────── */
+
+  function mount(container, opts = {}) {
+    const raceId = opts.raceId;
+    const gameId = opts.gameId || null;
+    const gameType = (opts.gameType || '').toUpperCase() || null;
+
+    let raceData = null;
+    let live = {};
+    let entries = [];
+    let upcoming = false;
+    let destroyed = false;
+
+    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct };
+    instances.add(inst);
+
+    function couponCtx() {
+      if (!upcoming || !gameId || !gameType) return null;
+      if (!window.COUPON_GAME_RULES || !COUPON_GAME_RULES[gameType]) return null;
+      return {
+        gameId,
+        gameType,
+        trackName: raceData?.track || '',
+        gameDate: raceData?.race_date || '',
+      };
+    }
+
+    async function load() {
+      container.innerHTML = '<div class="sl-empty">loading…</div>';
+      let data;
+      try {
+        const res = await fetch(`/api/race/atg/${encodeURIComponent(raceId)}`);
+        if (!res.ok) throw new Error('not found');
+        data = await res.json();
+      } catch (_) {
+        container.innerHTML = '<div class="sl-empty">could not load this race</div>';
+        return null;
+      }
+      if (destroyed) return null;
+      raceData = data;
+      upcoming = !!data.is_upcoming;
+      entries = (data.results || []).slice().sort((a, b) =>
+        (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
+
+      if (upcoming) await loadLive();
+      if (destroyed) return null;
+      render();
+      loadGpsInBackground();
+      if (opts.onLoaded) opts.onLoaded(raceData);
+      return raceData;
+    }
+
+    async function loadLive() {
+      try {
+        const r = await fetch(`/api/race/atg/${encodeURIComponent(raceId)}/live`);
+        if (!r.ok) return;
+        const d = await r.json();
+        (d.starts || []).forEach(s => { if (s.number != null) live[s.number] = s; });
+      } catch (_) { /* market is a bonus, not a requirement */ }
+    }
+
+    function headHtml() {
+      const m = gpsMetric();
+      const galMeta = raceData?.gal_models;
+      const galClickable = !!galMeta?.has_track_model;
+      const galLabel = galClickable ? (galMode === 'general' ? 'xgal' : 'xgal*') : 'gal%';
+      const numHead = pickableEntries().length
+        ? `<button type="button" class="sl-pick-toggle" data-sl-pick-toggle>${esc(pickToggleLabel())}</button>`
+        : '#';
+      return `<div class="sl-row sl-row--head">
+        <div class="sl-row__cells">
+          <span class="sl-c-num">${numHead}</span>
+          <span class="sl-c-horse"></span>
+          <span class="sl-c-people">
+            <span class="sl-c-drv">driver</span>
+            <span class="sl-c-trn">trainer</span>
+          </span>
+          <span class="sl-c-tform" title="trainer form">form</span>
+          <span class="sl-c-eq"></span>
+          <span class="sl-c-gps" title="xLabs GPS — ${esc(m.desc)}. Click to switch metric.">
+            <button type="button" class="gps-toggle" data-prev-gps-th>${esc(m.label)}</button>
+          </span>
+          <span class="sl-c-gal"${galClickable ? ' data-gal-toggle role="button" tabindex="0" title="click to switch galopp model"' : ''}>${galLabel}</span>
+          <span class="sl-c-win">win%</span>
+          <span class="sl-c-clean">clean%</span>
+          <span class="sl-c-gap" aria-hidden="true"></span>
+          <span class="sl-c-pct"><button type="button" class="sl-pct-eye" data-pct-toggle title="toggle row% visibility">${pctRevealed ? EYE_OPEN : EYE_CLOSED}</button></span>
+          <span class="sl-c-odds">odds</span>
+        </div>
+      </div>`;
+    }
+
+    function rowHtml(e) {
+      const s = live[e.number];
+      const scratched = !!(e.withdrawn || (s && s.scratched));
+      const pickable = upcoming && !scratched && e.number != null;
+      const which = upcoming ? 'pre' : 'post';
+      const lead = pickable
+        ? `<span class="sl-c-num"></span>`
+        : `<span class="sl-c-num">${upcoming ? (e.number || '') : placementHtml(
+              e.placement_text || (e.placement != null ? String(e.placement) : ''), '', e.placement)}</span>`;
+      const badge = pickable
+        ? `<div class="sl-row__badge" role="button" tabindex="0" aria-pressed="false"
+                aria-label="select horse ${esc(e.number)}">
+             <span class="sl-badge"><span class="sl-badge__digit">${e.number}</span></span>
+           </div>`
+        : '';
+      const hidden = pctRevealed ? '' : ' is-hidden';
+      return `<div class="sl-row${scratched ? ' sl-row--scratched' : ''}"
+                   ${pickable ? `data-sl-pick="${e.number}"` : ''}
+                   ${e.horse_id ? `data-horse-id="${e.horse_id}"` : ''}>
+        ${pickable ? '<span class="sl-row__ink" aria-hidden="true"></span>' : ''}
+        ${badge}
+        <div class="sl-row__cells">
+          ${lead}
+          <span class="sl-c-horse">${horseCell(e)}</span>
+          <span class="sl-c-people">
+            <span class="sl-c-drv">${personCell(e.driver_short || e.driver_name, e.driver_name, e.driver_id ? `/driver/${e.driver_id}` : null)}</span>
+            <span class="sl-c-trn">${personCell(e.trainer_short || e.trainer_name, e.trainer_name, e.trainer_id ? `/trainer/${e.trainer_id}` : null)}</span>
+          </span>
+          <span class="sl-c-tform">${tformCell(e.tf_perf)}</span>
+          <span class="sl-c-eq">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${sulkyCell(e)}</span>
+          <span class="sl-c-gps" data-prev-gps-cell${gpsCellAttrs(e._gps)}>${esc((e._gps && e._gps[gpsMetric().key]) || '')}</span>
+          <span class="sl-c-gal" data-gal-cell>${galCell(e)}</span>
+          <span class="sl-c-win">${winPct(e, which)}</span>
+          <span class="sl-c-clean">${cleanPct(e, which)}</span>
+          <span class="sl-c-gap" aria-hidden="true"></span>
+          <span class="sl-c-pct" data-pct-cell><span class="sl-pct__val${hidden}">${pctCell(s)}</span><span class="sl-pct__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
+          <span class="sl-c-odds">${oddsCell(s)}</span>
+        </div>
+      </div>`;
+    }
+
+    function render() {
+      if (!entries.length) {
+        container.innerHTML = '<div class="sl-empty">no starters yet</div>';
+        return;
+      }
+      const distances = entries.map(e => e.distance).filter(d => d != null);
+      const base = distances.length ? Math.min(...distances) : null;
+      let prev = null;
+      const parts = [headHtml()];
+      entries.forEach(e => {
+        if (e.distance != null && base != null && prev != null && e.distance !== prev) {
+          const offset = e.distance - base;
+          parts.push(`<div class="sl-tillagg">${offset > 0 ? '+' : ''}${offset}m</div>`);
+        }
+        if (e.distance != null) prev = e.distance;
+        parts.push(rowHtml(e));
+      });
+      container.innerHTML = `<div class="sl" style="--sl-badge-ink:${BADGE_INK}">${parts.join('')}</div>`;
+      wire();
+      sync();
+      syncPrevFocus();
+    }
+
+    function wire() {
+      container.querySelectorAll('[data-sl-pick]').forEach(row => {
+        const number = parseInt(row.dataset.slPick, 10);
+        const badge = row.querySelector('.sl-row__badge');
+        if (badge) {
+          const toggle = async ev => {
+            ev.stopPropagation();
+            ev.preventDefault();
+            await pick(row, number);
+          };
+          badge.addEventListener('click', toggle);
+          badge.addEventListener('keydown', ev => {
+            if (ev.key !== 'Enter' && ev.key !== ' ') return;
+            toggle(ev);
+          });
+        }
+      });
+
+      container.querySelectorAll('.sl-row[data-horse-id]').forEach(row => {
+        row.addEventListener('click', ev => {
+          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle]')) return;
+          toggleHistory(row);
+        });
+      });
+
+      // Market share: the header eye reveals every leg, a cell reveals its row.
+      container.addEventListener('click', ev => {
+        const btn = ev.target.closest('[data-pct-toggle]');
+        if (btn) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          setPctRevealed(!pctRevealed);
+          return;
+        }
+        const cell = ev.target.closest('[data-pct-cell]');
+        if (cell) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const val = cell.querySelector('.sl-pct__val');
+          if (val) val.classList.toggle('is-hidden');
+        }
+      }, true);
+
+      const gpsBtn = container.querySelector('[data-prev-gps-th]');
+      if (gpsBtn) gpsBtn.addEventListener('click', ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const i = PREV_GPS_METRICS.findIndex(m => m.key === gpsMetric().key);
+        const next = PREV_GPS_METRICS[(i + 1) % PREV_GPS_METRICS.length].key;
+        try { localStorage.setItem(PREV_GPS_STORE, next); } catch (_) {}
+        instances.forEach(x => x.refreshGps());
+      });
+
+      const galBtn = container.querySelector('[data-gal-toggle]');
+      if (galBtn) {
+        const cycle = () => {
+          galMode = galMode === 'track' ? 'general' : 'track';
+          try { localStorage.setItem('galModelMode', galMode); } catch (_) {}
+          instances.forEach(x => x.refreshGal());
+        };
+        galBtn.addEventListener('click', ev => { ev.stopPropagation(); cycle(); });
+        galBtn.addEventListener('keydown', ev => {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); cycle(); }
+        });
+      }
+
+      const pickToggle = container.querySelector('[data-sl-pick-toggle]');
+      if (pickToggle) {
+        pickToggle.addEventListener('click', ev => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          setLegPicks(pickToggleLabel() === 'clear' ? [] : pickableNumbers());
+        });
+      }
+    }
+
+    function pickableEntries() {
+      return entries.filter(e => {
+        const s = live[e.number];
+        return upcoming && !e.withdrawn && !(s && s.scratched) && e.number != null;
+      });
+    }
+
+    function pickableNumbers() {
+      return pickableEntries().map(e => e.number).sort((a, b) => a - b);
+    }
+
+    function currentPicks() {
+      const ctx = couponCtx();
+      const draft = window.Coupon ? Coupon.load() : null;
+      if (ctx && draft && draft.gameId === ctx.gameId) {
+        return draft.selections[raceId] || [];
+      }
+      return [...container.querySelectorAll('[data-sl-pick].is-picked')]
+        .map(row => parseInt(row.dataset.slPick, 10));
+    }
+
+    function pickToggleLabel() {
+      const pickable = pickableNumbers();
+      if (!pickable.length) return 'all';
+      const picks = new Set(currentPicks());
+      return pickable.every(n => picks.has(n)) ? 'clear' : 'all';
+    }
+
+    function refreshPickToggle() {
+      const btn = container.querySelector('[data-sl-pick-toggle]');
+      if (btn) btn.textContent = pickToggleLabel();
+    }
+
+    async function ensureDraft(ctx) {
+      let d = Coupon.load();
+      if (d && d.gameId === ctx.gameId) return d;
+      if (d && Coupon.totalPicks(d) > 0) {
+        const ok = confirm(
+          `start a new ${ctx.gameType} coupon?\n` +
+          `your unsaved ${d.gameType} draft will be discarded.`);
+        if (!ok) return null;
+      }
+      return Coupon.createDraft(ctx);
+    }
+
+    async function setLegPicks(numbers) {
+      const pickable = pickableNumbers();
+      if (!pickable.length) return;
+      const want = new Set(numbers);
+      const ctx = couponCtx();
+
+      if (ctx && window.Coupon) {
+        const d = await ensureDraft(ctx);
+        if (!d) return;
+        if (want.size) {
+          d.selections[raceId] = pickable.filter(n => want.has(n));
+          d.horseNames = d.horseNames || {};
+          d.horseNames[raceId] = {};
+          pickableEntries().forEach(e => {
+            if (want.has(e.number)) d.horseNames[raceId][e.number] = e.horse_name || '';
+          });
+        } else {
+          delete d.selections[raceId];
+          if (d.horseNames) delete d.horseNames[raceId];
+        }
+        Coupon.store(Coupon.totalPicks(d) > 0 ? d : null);
+      } else {
+        container.querySelectorAll('[data-sl-pick]').forEach(row => {
+          const n = parseInt(row.dataset.slPick, 10);
+          setPicked(row, want.has(n));
+        });
+      }
+      refreshPickToggle();
+    }
+
+    async function pick(row, number) {
+      const ctx = couponCtx();
+      const wanted = !row.classList.contains('is-picked');
+      if (ctx && window.Coupon) {
+        let res;
+        try {
+          const entry = entries.find(e => e.number === number);
+          res = await Coupon.toggle(ctx, raceId, number, entry?.horse_name || '');
+        } catch (_) { res = wanted; }
+        if (res === null) return;          // user kept an existing draft
+        setPicked(row, !!res);
+        refreshPickToggle();
+        return;
+      }
+      setPicked(row, wanted);              // no coupon context — local scratch pad
+      refreshPickToggle();
+    }
+
+    function setPicked(row, on) {
+      row.classList.toggle('is-picked', on);
+      const badge = row.querySelector('.sl-row__badge');
+      if (badge) badge.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+
+    function syncPrevFocus() {
+      const root = container.querySelector('.sl');
+      if (!root) return;
+      root.querySelectorAll('.sl-row.is-prev-active').forEach(r => {
+        const n = r.nextElementSibling;
+        if (!n || !n.classList.contains('sl-prev')) r.classList.remove('is-prev-active');
+      });
+      root.querySelectorAll('.sl-prev').forEach(prev => {
+        const row = prev.previousElementSibling;
+        if (row && row.classList.contains('sl-row')) row.classList.add('is-prev-active');
+      });
+      root.classList.toggle('is-prev-open', !!root.querySelector('.sl-prev'));
+    }
+
+    async function toggleHistory(row) {
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains('sl-prev')) {
+        next.remove();
+        row.classList.remove('is-prev-active');
+        syncPrevFocus();
+        return;
+      }
+      const horseId = row.dataset.horseId;
+      if (!horseId) return;
+      const exp = document.createElement('div');
+      exp.className = 'sl-prev';
+      exp.innerHTML = '<div class="sl-prev__empty">loading…</div>';
+      row.classList.add('is-prev-active');
+      row.insertAdjacentElement('afterend', exp);
+      syncPrevFocus();
+      try {
+        const rows = await horseRaces(horseId);
+        const date = raceData?.race_date;
+        const before = rows
+          .filter(r => r.race_date && (!date || r.race_date < date))
+          .slice(0, 5);
+        if (!before.length) {
+          exp.innerHTML = '<div class="sl-prev__empty">no previous races</div>';
+          return;
+        }
+        exp.innerHTML = prevRacesHtml(before);
+        exp.querySelectorAll('tr[data-href]').forEach(tr => {
+          tr.addEventListener('click', ev => {
+            ev.stopPropagation();
+            window.location.href = tr.dataset.href;
+          });
+        });
+      } catch (_) {
+        exp.innerHTML = '<div class="sl-prev__empty">failed to load</div>';
+      }
+    }
+
+    // Histories are only needed for the sectional column, so they load after
+    // the rows are on screen and fill in when they arrive.
+    async function loadGpsInBackground() {
+      const ids = [...new Set(entries.map(e => e.horse_id).filter(Boolean))];
+      await Promise.all(ids.map(async id => {
+        try { await horseRaces(id); } catch (_) {}
+      }));
+      if (destroyed) return;
+      const date = raceData?.race_date;
+      entries.forEach(e => {
+        e._gps = e.horse_id ? bestPrevGps(prevRacesCache[e.horse_id], date) : {};
+      });
+      const cells = container.querySelectorAll('[data-prev-gps-cell]');
+      entries.forEach((e, i) => {
+        const cell = cells[i];
+        if (!cell) return;
+        PREV_GPS_METRICS.forEach(m => {
+          const v = e._gps && e._gps[m.key];
+          if (v) cell.setAttribute(`data-gv-${m.key}`, v);
+        });
+      });
+      refreshGps();
+    }
+
+    function refreshGps() {
+      const m = gpsMetric();
+      const head = container.querySelector('[data-prev-gps-th]');
+      if (head) {
+        head.textContent = m.label;
+        const wrap = head.closest('.sl-c-gps');
+        if (wrap) wrap.title = `xLabs GPS — ${m.desc}. Click to switch metric.`;
+      }
+      container.querySelectorAll('[data-prev-gps-cell]').forEach(cell => {
+        cell.textContent = cell.getAttribute('data-gv-' + m.key) || '';
+      });
+    }
+
+    function refreshGal() {
+      const galClickable = !!raceData?.gal_models?.has_track_model;
+      const head = container.querySelector('.sl-row--head .sl-c-gal');
+      if (head && galClickable) head.textContent = galMode === 'general' ? 'xgal' : 'xgal*';
+      const cells = container.querySelectorAll('[data-gal-cell]');
+      entries.forEach((e, i) => {
+        if (cells[i]) cells[i].innerHTML = galCell(e);
+      });
+    }
+
+    function refreshPct() {
+      const head = container.querySelector('[data-pct-toggle]');
+      if (head) {
+        head.innerHTML = pctRevealed ? EYE_OPEN : EYE_CLOSED;
+        head.title = pctRevealed ? 'hide all row%' : 'reveal all row%';
+      }
+      container.querySelectorAll('[data-pct-cell] .sl-pct__val').forEach(v => {
+        v.classList.toggle('is-hidden', !pctRevealed);
+      });
+    }
+
+    // Reflect the stored draft — restores picks on load and follows changes
+    // made from another leg or the receipt overlay.
+    function sync() {
+      const ctx = couponCtx();
+      const draft = window.Coupon ? Coupon.load() : null;
+      const picks = (ctx && draft && draft.gameId === ctx.gameId)
+        ? (draft.selections[raceId] || []) : [];
+      container.querySelectorAll('[data-sl-pick]').forEach(row => {
+        const n = parseInt(row.dataset.slPick, 10);
+        setPicked(row, picks.includes(n));
+      });
+      refreshPickToggle();
+      return picks;
+    }
+
+    function destroy() {
+      destroyed = true;
+      instances.delete(inst);
+      container.innerHTML = '';
+    }
+
+    return {
+      load,
+      sync,
+      destroy,
+      get raceData() { return raceData; },
+    };
+  }
+
+  function setPctRevealed(on) {
+    pctRevealed = !!on;
+    instances.forEach(x => x.refreshPct());
+  }
+
+  window.addEventListener('coupon:changed', () => instances.forEach(x => x.sync()));
+
+  window.StartList = { mount, prevRacesCache };
+})();
+</script>

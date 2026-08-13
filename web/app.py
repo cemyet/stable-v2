@@ -794,6 +794,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         'is_upcoming': is_upcoming,
         'gal_models': None,
         'has_kmtid': False,
+        'home_stretch_m': None,
         'primary_source': 'atg',
         'contributors': ['atg'],
         'source_pills': source_pills,
@@ -830,13 +831,16 @@ def _parse_atg_game_races(data: dict) -> list[dict]:
     for i, race in enumerate(races_raw):
         if isinstance(race, str):
             continue
-        starts = race.get('starts') or []
+        starts = [s for s in (race.get('starts') or []) if isinstance(s, dict)]
         raw_name = (race.get('name') or '').strip()
         panels.append({
             'raceNumber': i + 1,
             'atgRaceId': race.get('id'),
             'name': _format_atg_race_display_name(raw_name),
             'starters': len(starts),
+            'scratched': sum(1 for s in starts if s.get('scratched')),
+            'startTime': race.get('startTime') or race.get('scheduledStartTime'),
+            'status': race.get('status'),
             'distanceLabel': _format_atg_race_distance_label(
                 race.get('distance'),
                 race.get('startMethod'),
@@ -899,8 +903,17 @@ def _atg_game_has_jackpot(game: dict | None) -> bool:
     """True when ATG reports a rollover jackpot on this headline game."""
     if not game:
         return False
-    amount = game.get('jackpotAmount')
-    return isinstance(amount, (int, float)) and amount > 0
+    for key in ('jackpotAmount', 'estimatedJackpot'):
+        amount = game.get(key)
+        if isinstance(amount, (int, float)) and amount > 0:
+            return True
+        if isinstance(amount, str):
+            try:
+                if float(amount) > 0:
+                    return True
+            except ValueError:
+                pass
+    return False
 
 
 def _build_upcoming_tracks(data: dict) -> list[dict]:
@@ -1043,6 +1056,107 @@ def home_upcoming():
     return jsonify(_build_upcoming_tracks(data))
 
 
+@app.route('/api/home/watchlist-upcoming')
+def home_watchlist_upcoming():
+    """Upcoming starts for watchlisted horses, soonest first.
+
+    An entry counts as upcoming when its race_date is today-or-later and it
+    has no placement yet (not finished). Sorted by start_time when known,
+    otherwise race_date → race_number → program_number. Win odds come from
+    ATG live pools (entry.odds is empty until results land).
+    """
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT e.entry_id,
+                       e.horse_id,
+                       h.name                                 AS horse_name,
+                       e.age,
+                       e.sex,
+                       e.program_number,
+                       e.odds,
+                       e.withdrawn,
+                       COALESCE(e.distance, r.distance)       AS distance,
+                       e.driver_id,
+                       pd.name                                AS driver_name,
+                       e.trainer_id,
+                       pt.name                                AS trainer_name,
+                       r.race_id,
+                       r.race_date,
+                       r.start_time,
+                       r.race_number,
+                       r.start_method,
+                       r.atg_race_id,
+                       r.track_id,
+                       t.name                                 AS track_name
+                FROM watchlist w
+                JOIN entry  e  ON e.horse_id = w.horse_id
+                JOIN horse  h  ON h.horse_id = e.horse_id
+                JOIN race   r  ON r.race_id  = e.race_id
+                LEFT JOIN track  t  ON t.track_id  = r.track_id
+                LEFT JOIN person pd ON pd.person_id = e.driver_id
+                LEFT JOIN person pt ON pt.person_id = e.trainer_id
+                WHERE e.race_date >= CURRENT_DATE
+                  AND e.placement IS NULL
+                  AND COALESCE(r.status, '') <> 'cancelled'
+                ORDER BY COALESCE(r.start_time, e.race_date::timestamptz) ASC,
+                         r.race_number ASC NULLS LAST,
+                         e.program_number ASC NULLS LAST
+            """)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    # Live win odds by (atg_race_id, program_number) — DB odds are NULL pre-result.
+    live_odds: dict[tuple[str, int], float] = {}
+    for atg_id in {r['atg_race_id'] for r in rows if r.get('atg_race_id')}:
+        pools = _atg_live_pools(atg_id)
+        if not pools:
+            continue
+        for s in pools.get('starts') or []:
+            num = s.get('number')
+            win = s.get('winOdds')
+            if num is not None and win is not None:
+                live_odds[(atg_id, int(num))] = win
+
+    out = []
+    for r in rows:
+        start_time = r['start_time']
+        race_date = r['race_date']
+        atg_id = r['atg_race_id']
+        prog = r['program_number']
+        odds = float(r['odds']) if r['odds'] is not None else None
+        if odds is None and atg_id and prog is not None:
+            odds = live_odds.get((atg_id, int(prog)))
+        sm = r['start_method']
+        out.append({
+            'entry_id': r['entry_id'],
+            'horse_id': r['horse_id'],
+            'horse_name': r['horse_name'] or '',
+            'age': r['age'],
+            'sex': (r['sex'] or '').lower() or None,
+            'program_number': prog,
+            'odds': odds,
+            'distance': r['distance'],
+            'start_method': sm,
+            'withdrawn': bool(r['withdrawn']),
+            'driver_id': r['driver_id'],
+            'driver_name': r['driver_name'],
+            'trainer_id': r['trainer_id'],
+            'trainer_name': r['trainer_name'],
+            'race_id': r['race_id'],
+            'race_date': race_date.isoformat() if race_date else None,
+            'start_time': start_time.isoformat() if start_time else None,
+            'race_number': r['race_number'],
+            'atg_race_id': atg_id,
+            'track_id': r['track_id'],
+            'track': (r['track_name'] or '').strip().title(),
+            'href': _upcoming_race_game_href(atg_id) if atg_id else None,
+        })
+    return jsonify(out)
+
+
 @app.route('/api/atg/game/<game_id>')
 def atg_game_panels(game_id):
     """Return race panel fields for a game (names, starter counts).
@@ -1143,6 +1257,8 @@ def game_page(game_id):
 
     game_type_id = _atg_game_id_to_internal(game_type_raw)
 
+    is_jackpot = _atg_game_has_jackpot(game_info)
+
     return render_template('game.html',
                            active_tab='home',
                            game_id=game_id,
@@ -1151,7 +1267,8 @@ def game_page(game_id):
                            track_name=track_name or '',
                            race_count=race_count,
                            time_display=time_display,
-                           date_str=date_str)
+                           date_str=date_str,
+                           is_jackpot=is_jackpot)
 
 
 _leaderboard_cache: dict[str, tuple[float, object]] = {}
@@ -2396,16 +2513,23 @@ def horse_races(horse_id):
                        e.odds,
                        e.prize_kr                            AS prize_money_kr,
                        p.name                                AS driver_name,
+                       p.short_name                          AS driver_short_name,
                        e.driver_id,
                        pt.name                               AS trainer_name,
                        e.trainer_id,
+                       e.sulky, e.sulky_changed,
+                       e.shoe_code, e.shoe_front_changed, e.shoe_back_changed,
                        e.disqualified                        AS dq,
                        e.galopp                              AS gal,
                        e.withdrawn,
                        e.kmtid_actual_distance_m             AS kmtid_actual_m,
                        e.kmtid_actual_km_time_ms             AS kmtid_actual_km_ms,
                        e.kmtid_best_100ms                    AS kmtid_best_100ms,
+                       e.kmtid_first_200ms                   AS kmtid_first_200ms,
+                       e.kmtid_last_200ms                    AS kmtid_last_200ms,
                        e.kmtid_slipstream_distance_m         AS kmtid_slip_m,
+                       e.kmtid_intervals                     AS kmtid_intervals,
+                       t.home_stretch_m                      AS home_stretch_m,
                        e.primary_source,
                        e.source_data->'_contributors'        AS contributors,
                        ec.comment                            AS comment
@@ -2456,16 +2580,28 @@ def horse_races(horse_id):
                     'odds_text': str(r['odds']) if r['odds'] else '',
                     'prize_kr': _kr(r['prize_money_kr']) if r['prize_money_kr'] else '',
                     'driver_name': r['driver_name'],
+                    'driver_short': r['driver_short_name'],
                     'driver_id': r['driver_id'],
                     'trainer_name': r['trainer_name'],
                     'trainer_id': r['trainer_id'],
+                    'sulky': r['sulky'],
+                    'sulky_changed': r['sulky_changed'],
+                    'shoe_code': r['shoe_code'],
+                    'shoe_front_changed': r['shoe_front_changed'],
+                    'shoe_back_changed': r['shoe_back_changed'],
                     'disqualified': r['dq'],
                     'galopp': r['gal'],
                     'withdrawn': r['withdrawn'],
                     'kmtid_actual_m':     r['kmtid_actual_m'],
                     'kmtid_actual_km_ms': float(r['kmtid_actual_km_ms']) if r['kmtid_actual_km_ms'] is not None else None,
                     'kmtid_best_100ms':   float(r['kmtid_best_100ms'])   if r['kmtid_best_100ms']   is not None else None,
+                    'kmtid_first_200ms':  float(r['kmtid_first_200ms'])  if r['kmtid_first_200ms']  is not None else None,
+                    'kmtid_last_200ms':   float(r['kmtid_last_200ms'])   if r['kmtid_last_200ms']   is not None else None,
                     'kmtid_slip_m':       r['kmtid_slip_m'],
+                    # Per-100m sectionals, needed to derive the segments xLabs
+                    # does not pre-compute (first/last 100, home stretch).
+                    'kmtid_intervals':    r['kmtid_intervals'],
+                    'home_stretch_m':     r['home_stretch_m'],
                     'sources':            contribs,
                     'comment':            r['comment'],
                 })
@@ -3450,14 +3586,62 @@ def horse_siblings(horse_id):
 # Race (single)
 # =====================================================================
 
+def _upcoming_race_game_href(atg_race_id):
+    """Build /game/...?race=... URL for an upcoming ATG race."""
+    if not atg_race_id:
+        return None
+    leg = _atg_find_game_leg(atg_race_id)
+    game_id = leg['game_id'] if leg else f"vinnare_{atg_race_id}"
+    return f'/game/{game_id}?race={atg_race_id}'
+
+
+def _upcoming_race_game_redirect(atg_race_id):
+    """If the race is upcoming, return a redirect response to the game page.
+    Returns None when the race is past or cannot be resolved."""
+    from datetime import date as _d
+    if not atg_race_id:
+        return None
+    parts = atg_race_id.split('_')
+    if len(parts) < 3:
+        return None
+    date_str = parts[0]
+    try:
+        race_date = _d.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        return None
+    if race_date < _d.today():
+        return None
+    leg = _atg_find_game_leg(atg_race_id)
+    if leg:
+        game_id = leg['game_id']
+    else:
+        game_id = f"vinnare_{atg_race_id}"
+    return redirect(f'/game/{game_id}?race={atg_race_id}', code=302)
+
+
 @app.route('/race/<int:race_id>')
 def race_page_by_id(race_id):
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT atg_race_id, race_date FROM race WHERE race_id = %s LIMIT 1",
+                        (race_id,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if row and row[0]:
+        redir = _upcoming_race_game_redirect(row[0])
+        if redir:
+            return redir
     return render_template('race.html', active_tab='race',
                            race_key=str(race_id), is_atg=False)
 
 
 @app.route('/race/atg/<path:atg_race_id>')
 def race_page_by_atg(atg_race_id):
+    redir = _upcoming_race_game_redirect(atg_race_id)
+    if redir:
+        return redir
     return render_template('race.html', active_tab='race',
                            race_key=atg_race_id, is_atg=True)
 
@@ -3467,13 +3651,17 @@ def race_by_st(st_race_id):
     conn = get_db()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT race_id FROM race WHERE st_race_id = %s LIMIT 1",
+            cur.execute("SELECT race_id, atg_race_id FROM race WHERE st_race_id = %s LIMIT 1",
                         (st_race_id,))
             row = cur.fetchone()
     finally:
         conn.close()
     if not row:
         return 'not found', 404
+    if row[1]:
+        redir = _upcoming_race_game_redirect(row[1])
+        if redir:
+            return redir
     return redirect(url_for('race_page_by_id', race_id=row[0]), code=302)
 
 
@@ -3531,6 +3719,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                        r.track_id,
                        t.name    AS track_name,
                        t.country AS track_country,
+                       t.home_stretch_m,
                        r.atg_race_id, r.atg_race_day_id, r.st_race_id,
                        r.letrot_race_id,
                        r.kmtid_id,
@@ -3572,6 +3761,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                        e.kmtid_first_200ms             AS kmtid_first_200ms,
                        e.kmtid_last_200ms              AS kmtid_last_200ms,
                        e.kmtid_slipstream_distance_m   AS kmtid_slip_m,
+                       e.kmtid_intervals               AS kmtid_intervals,
                        e.primary_source,
                        e.source_data->'_contributors' AS contributors,
                        ec.comment                      AS comment,
@@ -3730,6 +3920,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'kmtid_first_200ms':  float(r['kmtid_first_200ms'])  if r['kmtid_first_200ms']  is not None else None,
                     'kmtid_last_200ms':   float(r['kmtid_last_200ms'])   if r['kmtid_last_200ms']   is not None else None,
                     'kmtid_slip_m':       r['kmtid_slip_m'],
+                    # Per-100m sectionals, needed to derive the segments xLabs
+                    # does not pre-compute (first/last 100, home stretch).
+                    'kmtid_intervals':    r['kmtid_intervals'],
                     'comment':            r['comment'],
                     'placement': r['placement'],
                     'placement_text': r['placement_text'],
@@ -3812,6 +4005,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
         'is_upcoming': is_upcoming,
         'gal_models': gal_models if is_upcoming else None,
         'has_kmtid': head.get('kmtid_id') is not None,
+        # Length of this track's home stretch, so the GPS column can show the
+        # upplopp sectional over the distance the stretch actually is here.
+        'home_stretch_m': head.get('home_stretch_m'),
         'primary_source': head.get('primary_source'),
         'contributors': contributors,
         'source_pills': source_pills,

@@ -133,6 +133,71 @@
     padding: 28px 4px; text-align: center; width: 100%;
   }
 
+  /* Liked horses — upcoming starts (C-treatment list under heart title) */
+  .section-title--heart {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
+  .section-title--heart svg {
+    display: block;
+    width: 13px;
+    height: 13px;
+  }
+  .section-title--heart .heart-icon {
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+  }
+  table.watch-upcoming {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    font-size: 12.5px;
+  }
+  table.watch-upcoming td {
+    padding: 7px 24px 7px 0;
+    border-top: 1px solid var(--list-line, #ffffff);
+    border-bottom: 1px solid var(--list-line, #ffffff);
+    white-space: nowrap;
+    width: 1%;
+    vertical-align: baseline;
+  }
+  table.watch-upcoming td.wu-gap-lg { padding-right: 48px; }
+  table.watch-upcoming td.num-prog { font-weight: 600; }
+  table.watch-upcoming td.num {
+    font-variant-numeric: tabular-nums;
+  }
+  table.watch-upcoming td.wu-when {
+    padding-left: 10px;
+  }
+  table.watch-upcoming td.wu-odds {
+    width: auto;
+    text-align: right;
+    padding-left: 24px;
+    padding-right: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  table.watch-upcoming td.muted { color: var(--fg-muted); }
+  table.watch-upcoming .sex-age {
+    color: var(--fg-muted);
+    font-size: 11px;
+    margin-left: 4px;
+    text-transform: lowercase;
+  }
+  table.watch-upcoming tr.scratched td {
+    color: var(--fg-muted);
+    opacity: 0.55;
+  }
+  table.watch-upcoming tr.clickable { cursor: pointer; }
+  .watch-upcoming-empty {
+    color: var(--fg-muted);
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 16px 0;
+  }
+
   /* Soft label color — weight carries the hierarchy instead of black. */
   .home-page .section-title,
   .home-page .card-title {
@@ -157,6 +222,15 @@
         <div class="game-type-row" id="gameTypeRow" aria-label="Upcoming race tracks"></div>
       </div>
     </div>
+
+    <div class="section-header">
+      <div class="section-title section-title--heart" aria-label="liked">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="heart-icon" d="M12 20.25l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.54L12 20.25z"/>
+        </svg>
+      </div>
+    </div>
+    <div id="watchUpcomingMount"></div>
 
     <div class="section-header">
       <div class="section-title">form</div>
@@ -617,6 +691,116 @@
 
     loadUpcoming();
 
+    /* ---- liked horses: upcoming starts ---- */
+    function watchWhenCell(r) {
+      if (!r.race_date) return '';
+      // Parse as local calendar day (avoid UTC shift from Date('YYYY-MM-DD')).
+      const parts = String(r.race_date).split('-').map(Number);
+      if (parts.length !== 3 || parts.some(n => !Number.isFinite(n))) return esc(r.race_date);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      d.setHours(0, 0, 0, 0);
+      const off = Math.round((d - upcomingToday) / 86400000);
+      let label;
+      if (off === 0) label = 'today';
+      else if (off === 1) label = 'tomorrow';
+      else label = WEEKDAYS[d.getDay()];
+      if (r.start_time) {
+        try {
+          const t = new Date(r.start_time);
+          if (!Number.isNaN(t.getTime())) {
+            const hh = String(t.getHours()).padStart(2, '0');
+            const mm = String(t.getMinutes()).padStart(2, '0');
+            label += ` ${hh}:${mm}`;
+          }
+        } catch (_) {}
+      }
+      return esc(label);
+    }
+
+    function watchHorseCell(r) {
+      const name = flagify(r.horse_name || '');
+      const sex = (r.sex || '').toLowerCase();
+      const sa = [sex, r.age != null ? r.age : ''].join('').trim();
+      const saSpan = sa ? ` <span class="sex-age">${esc(sa)}</span>` : '';
+      const inner = r.horse_id
+        ? `<a href="/horse/${r.horse_id}" onclick="event.stopPropagation()">${name}</a>${saSpan}`
+        : `${name}${saSpan}`;
+      return inner;
+    }
+
+    function watchPersonCell(fullName, href) {
+      const label = fullName ? fmtName(fullName) : '';
+      if (!label) return '';
+      if (href) {
+        return `<a href="${href}" onclick="event.stopPropagation()">${esc(label)}</a>`;
+      }
+      return esc(label);
+    }
+
+    function watchMethodCell(sm) {
+      if (sm === 'A') return 'auto';
+      if (sm === 'V') return 'volt';
+      return '';
+    }
+
+    function watchOddsCell(odds) {
+      if (odds == null || odds === '') return '';
+      const n = Number(odds);
+      if (!Number.isFinite(n)) return esc(odds);
+      return n.toFixed(2);
+    }
+
+    function renderWatchUpcoming(rows) {
+      const mount = document.getElementById('watchUpcomingMount');
+      if (!mount) return;
+      if (!rows.length) {
+        mount.innerHTML = '<div class="watch-upcoming-empty">no upcoming starts</div>';
+        return;
+      }
+      const body = rows.map(r => {
+        const cls = [];
+        if (r.withdrawn) cls.push('scratched');
+        if (r.href) cls.push('clickable');
+        const clsAttr = cls.length ? ` class="${cls.join(' ')}"` : '';
+        const hrefAttr = r.href ? ` data-href="${esc(r.href)}"` : '';
+        const trackCell = r.track_id
+          ? `<a href="/track/${r.track_id}" onclick="event.stopPropagation()">${esc(r.track || '')}</a>`
+          : esc(r.track || '');
+        return `<tr${clsAttr}${hrefAttr}>
+          <td class="wu-when muted">${watchWhenCell(r)}</td>
+          <td class="num-prog">${r.program_number != null ? esc(r.program_number) : ''}</td>
+          <td class="wu-gap-lg">${watchHorseCell(r)}</td>
+          <td class="muted">${watchPersonCell(r.driver_name, r.driver_id ? `/driver/${r.driver_id}` : null)}</td>
+          <td class="muted wu-gap-lg">${watchPersonCell(r.trainer_name, r.trainer_id ? `/trainer/${r.trainer_id}` : null)}</td>
+          <td class="muted">${trackCell}</td>
+          <td class="num muted">${r.distance != null ? esc(r.distance) : ''}</td>
+          <td class="muted">${esc(watchMethodCell(r.start_method))}</td>
+          <td class="wu-odds muted">${watchOddsCell(r.odds)}</td>
+        </tr>`;
+      }).join('');
+      mount.innerHTML = `<table class="watch-upcoming"><tbody>${body}</tbody></table>`;
+      mount.querySelectorAll('tr.clickable').forEach(tr => {
+        tr.addEventListener('click', (ev) => {
+          if (ev.target.closest('a')) return;
+          if (tr.dataset.href) window.location.href = tr.dataset.href;
+        });
+      });
+      if (typeof initFluidHighlights === 'function') initFluidHighlights(mount);
+    }
+
+    async function loadWatchUpcoming() {
+      const mount = document.getElementById('watchUpcomingMount');
+      if (!mount) return;
+      try {
+        const res = await fetch('/api/home/watchlist-upcoming');
+        if (!res.ok) throw new Error('fetch failed');
+        renderWatchUpcoming(await res.json());
+      } catch (_) {
+        mount.innerHTML = '<div class="watch-upcoming-empty">failed to load</div>';
+      }
+    }
+
+    loadWatchUpcoming();
     loadForm();
     loadAllBoards();
     loadOffspring();

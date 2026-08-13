@@ -193,13 +193,32 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  table.history tr:hover, table.offspring tr:hover, table.siblings tr:hover {
+  table.offspring tr:hover,
+  table.siblings tr:hover {
     background: var(--hover);
   }
   table.history tr.clickable { cursor: pointer; }
   table.history td.num, table.offspring td.num, table.siblings td.num { text-align: right; }
   table.history th.num, table.offspring th.num, table.siblings th.num { text-align: right; }
   table.history td.muted { color: var(--fg-muted); }
+  table.history th.center,
+  table.history td.center { text-align: center; }
+
+  .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .shoe-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--fg);
+    display: block;
+  }
+  .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .sulky-changed { color: var(--accent-warn); }
+
+  /* xLabs GPS column — same treatment as the race page's. */
+  table.history th.gps, table.history td.gps {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* sibling relationship tag */
   .rel-tag {
@@ -518,6 +537,41 @@
       return null;
     }
 
+    function sulkyCell(e) {
+      if (!e.sulky) return '';
+      const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
+      return e.sulky_changed
+        ? `<span class="sulky-changed" title="changed since last race">${esc(txt)}</span>`
+        : esc(txt);
+    }
+    const SHOE_ON_PATH =
+      'M18.27 17.68c.08.2.1.3.1.44.82.58-3.98.92-5.42.92-4.04 0-6.98-2.22-6.98-7.02' +
+      ' 0-4.8 2.88-7 6.92-7 1.44 0 4.58.32 5.42.88.2.12.18.22.1.44l-.46 1.26' +
+      'c-.08.22-.2.22-.42.18-.6-.14-3.34-.4-4.56-.4-2.3 0-4.22.56-4.22 4.66' +
+      's1.98 4.68 4.4 4.68c1.12 0 3.9-.22 4.48-.4.22-.04.36-.04.42.12l.42 1.24Z';
+    const SHOE_OFF_PATH =
+      'M18.27 17.68c.08.2.1.3-.1.44-.82.58-3.98.92-5.42.92-.537 0-1.055-.04-1.549-.119' +
+      'L10.09 21.82c-.04.12-.2.2-.32.14l-1.8-.7c-.12-.04-.2-.2-.14-.32l1.067-2.782' +
+      'C6.973 17.105 5.77 15.09 5.77 12.02c0-4.8 2.88-7 6.92-7 .334 0 .758.017 1.224.05' +
+      'l1.116-2.91c.04-.12.2-.2.32-.14l1.82.7c.12.06.18.2.12.32l-.895 2.334' +
+      'c.756.138 1.399.315 1.715.526.2.12.18.22.1.44l-.46 1.26c-.08.22-.2.22-.42.18' +
+      '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
+      '.22-.04.36-.04.42.12l.42 1.24Z' +
+      'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
+    function shoeIcon(has, changed) {
+      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '');
+      const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
+      </svg>`;
+    }
+    function shoeCells(code, frontChanged, backChanged) {
+      if (!code) return '';
+      const frontHas = code === '3' || code === '4';
+      const backHas  = code === '2' || code === '4';
+      return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+    }
+
     function placementCell(p) {
       if (p.disqualified) {
         const t = p.placement_text || (p.placement_num != null ? String(p.placement_num) : '');
@@ -552,20 +606,21 @@
             <th>track</th>
             <th>result</th>
             <th>time</th>
+            ${gpsHead()}
             <th class="num">#</th>
             <th>start</th>
             <th class="num">dist</th>
-            <th class="num" title="extra distance ran beyond nominal (xLabs GPS)">+m</th>
-            <th class="num" title="best 100m km-time-equivalent (xLabs GPS)">peak</th>
             <th>odds</th>
             <th>driver</th>
             <th>trainer</th>
+            <th class="center">shoes</th>
+            <th class="num">sulky</th>
             <th class="num">prize</th>
             <th title="source(s) that contributed this entry">src</th>
-            <th title="trotting-press comment for this start">comment</th>
+            <th class="comment-col" title="trotting-press comment for this start">comment</th>
           </tr>
         </thead>`;
-      const COL_COUNT = 15;
+      const COL_COUNT = 16;
       const body = rows.map(r => {
         const date = r.race_date || '';
         const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
@@ -573,21 +628,11 @@
         // Show time_text when available; otherwise convert time_val (seconds) to display format.
         const timeDisp = r.km_time_text || fmtTimeVal(r.time_val);
 
-        // xLabs GPS sectionals (kmtid). Only present on recent SE races with coverage.
-        // `+m` = actual distance ran beyond the nominal distance (positive = ran wide).
-        // `peak` = best 100m segment expressed as km-time, so it's directly comparable
-        //         to the headline `time` column.
-        let extraStr = '', peakStr = '';
-        if (r.kmtid_actual_m != null && r.distance) {
-          // Only show "+m" for completed runs (positive delta). Negative
-          // values indicate the horse broke or was withdrawn mid-race —
-          // the field has no meaningful interpretation in that case.
-          const delta = r.kmtid_actual_m - r.distance;
-          if (delta > 0) extraStr = '+' + delta;
-        }
-        if (r.kmtid_best_100ms != null) {
-          peakStr = fmtTimeVal(r.kmtid_best_100ms / 1000);
-        }
+        // xLabs GPS sectionals (kmtid), only present on recent SE races with
+        // coverage. One column carries them all; clicking its header switches
+        // which metric is shown. The stretch length is per-row because a
+        // horse's starts are spread across tracks.
+        const gpsTd = gpsCell(r, { homeStretchM: r.home_stretch_m }, 'gps muted num');
         // ATG races take precedence as the canonical race id.
         const raceHref = r.atg_id  ? `/race/atg/${encodeURIComponent(r.atg_id)}`
                        : r.race_id ? `/race/${r.race_id}`
@@ -603,11 +648,10 @@
               : esc(r.track_label || '')}</td>
             <td>${placementCell(r)}</td>
             <td>${esc(timeDisp)}</td>
+            ${gpsTd}
             <td class="muted num">${esc(progNum)}</td>
             <td class="muted">${esc(startType)}</td>
             <td class="muted num">${esc(r.distance || '')}</td>
-            <td class="gps muted num">${esc(extraStr)}</td>
-            <td class="gps muted num">${esc(peakStr)}</td>
             <td class="muted">${esc(r.odds_text || '')}</td>
             <td class="muted">${r.driver_id
               ? `<a href="/driver/${r.driver_id}">${esc(fmtName(r.driver_name))}</a>`
@@ -615,6 +659,8 @@
             <td class="muted">${r.trainer_id
               ? `<a href="/trainer/${r.trainer_id}">${esc(fmtName(r.trainer_name))}</a>`
               : esc(fmtName(r.trainer_name))}</td>
+            <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+            <td class="num muted">${sulkyCell(r)}</td>
             <td class="num">${esc(r.prize_kr || '')}</td>
             <td>${srcPillsList((r.sources || []).map(s => ({key: s})), {size: 'sm'})}</td>
             <td>${commentCell(r.comment, COL_COUNT)}</td>

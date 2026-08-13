@@ -121,6 +121,12 @@
       z-index: 1;
     }
 
+    /* iframe embed (?embed=1) — hide site chrome for design previews */
+    body.is-embed .nav-inline-row,
+    body.is-embed .bg-picker {
+      display: none !important;
+    }
+
     /* Dev/design: live background picker (bottom-left) */
     .bg-picker {
       position: fixed;
@@ -184,6 +190,14 @@
       --plasma-deep-rgb: 0, 85, 145;
       --plasma-glow-rgb: 79, 177, 238;
       --plasma-shine-rgb: 120, 200, 245;
+      /* Muted: white @ ~0.78 over the panel (distance text / bridge fills). */
+      --panel-muted: color-mix(in srgb, white 78%, rgb(var(--panel-hybrid-from-rgb)) 22%);
+      --panel-muted-to: color-mix(in srgb, white 78%, rgb(var(--panel-hybrid-to-rgb)) 22%);
+      /* Brighter muted: near-white tint — race name, tillägg bars. */
+      --panel-muted-bright: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-from-rgb)) 4%);
+      --panel-muted-bright-to: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-to-rgb)) 4%);
+      /* Darker than the panel colour — game-type logo on the pill. */
+      --panel-ink: color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 62%, black);
       position: relative;
       overflow: hidden;
       isolation: isolate;
@@ -285,12 +299,12 @@
       --plasma-shine-rgb: 100, 180, 230;
     }
     .glass-panel--hybrid-purple {
-      --panel-hybrid-from-rgb: 158, 74, 156;
-      --panel-hybrid-to-rgb: 185, 110, 183;
-      --plasma-hot-rgb: 158, 74, 156;
-      --plasma-deep-rgb: 130, 55, 128;
-      --plasma-glow-rgb: 180, 100, 178;
-      --plasma-shine-rgb: 200, 130, 198;
+      --panel-hybrid-from-rgb: 128, 44, 126;
+      --panel-hybrid-to-rgb: 155, 80, 153;
+      --plasma-hot-rgb: 128, 44, 126;
+      --plasma-deep-rgb: 105, 32, 103;
+      --plasma-glow-rgb: 160, 85, 158;
+      --plasma-shine-rgb: 185, 120, 183;
     }
     .glass-panel--hybrid-cyan {
       --panel-hybrid-from-rgb: 79, 177, 238;
@@ -345,12 +359,16 @@
     }
 
     /* Hybrid panel — race detail layout (head / lead+meta / center / trail) */
+    /* Lead | trail share the row; race name is absolutely centered on the
+       panel itself so it lines up with the page title (asymmetric panel
+       padding would otherwise nudge a flex/grid center a few px left). */
     .glass-panel--hybrid .hybrid-panel__head {
-      position: relative;
+      /* No position:relative — race name centers against the panel, not the head. */
       z-index: 1;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       align-items: center;
-      gap: 12px;
+      column-gap: 12px;
       width: 100%;
       min-width: 0;
     }
@@ -358,7 +376,8 @@
       display: flex;
       align-items: center;
       gap: 14px;
-      flex: 0 0 auto;
+      justify-self: start;
+      min-width: 0;
     }
     .glass-panel--hybrid .hybrid-panel__meta {
       display: flex;
@@ -381,34 +400,106 @@
       letter-spacing: 0.02em;
     }
     .glass-panel--hybrid .hybrid-panel__center {
-      flex: 1 1 auto;
-      min-width: 0;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      max-width: min(42%, 440px);
       display: flex;
       justify-content: center;
-      padding: 0 10px;
+      pointer-events: none;
     }
     .glass-panel--hybrid .hybrid-panel__race-name {
-      flex: 0 1 auto;
-      max-width: min(100%, 440px);
+      max-width: 100%;
       padding: 0;
-      text-align: left;
+      text-align: center;
       font-family: var(--font-mono);
       font-weight: 900;
       font-size: 15px;
       line-height: 1.25;
       letter-spacing: 0.02em;
-      color: #fff;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+      color: var(--panel-muted-bright);
+      text-shadow: none;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      pointer-events: auto;
+    }
+    /* Panel logos use the darker ink tone, softly blurred into the pill. */
+    .glass-panel--hybrid-xp .game-type-symbol--panel {
+      color: var(--panel-ink);
+      filter: blur(0.4px);
     }
     .glass-panel--hybrid .hybrid-panel__trail {
-      flex: 0 0 auto;
+      grid-column: 2;
+      justify-self: end;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      min-width: 32px;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    /* Coupon picks — fixed strip sized for five full chips. Past five, chips
+       shrink and wrap onto a second row inside that same width (no "+n"). */
+    .glass-panel--hybrid .hybrid-panel__picks {
+      --pick-h: 19px;
+      --pick-pad-x: 5px;
+      --pick-gap: 4px;
+      /* Reserve width for five full-size chips, even when dense. */
+      --picks-row-w: calc(5 * (19px + 2 * 5px) + 4 * 4px);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-content: center;
+      align-items: center;
+      gap: 3px var(--pick-gap);
+      width: var(--picks-row-w);
+      flex: 0 0 var(--picks-row-w);
+      max-height: calc(2 * var(--pick-h) + 3px);
+      overflow: hidden;
+    }
+    .glass-panel--hybrid .hybrid-panel__picks.is-dense {
+      --pick-h: 15px;
+      --pick-pad-x: 3px;
+      --pick-gap: 3px;
+      gap: 2px 3px;
+      max-height: calc(2 * var(--pick-h) + 2px);
+    }
+    .glass-panel--hybrid .hybrid-panel__pick {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: var(--pick-h, 19px);
+      height: var(--pick-h, 19px);
+      padding: 0 var(--pick-pad-x, 5px);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.24);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .glass-panel--hybrid .hybrid-panel__picks.is-dense .hybrid-panel__pick {
+      font-size: 9px;
+    }
+
+    /* Open/closed caret for expandable panels. */
+    .glass-panel--hybrid .hybrid-panel__caret {
+      flex: 0 0 auto;
+      width: 9px;
+      height: 9px;
+      margin-left: 2px;
+      border-right: 1.6px solid rgba(255, 255, 255, 0.9);
+      border-bottom: 1.6px solid rgba(255, 255, 255, 0.9);
+      transform: rotate(45deg) translate(-1px, -1px);
+      transition: transform 0.32s cubic-bezier(0.34, 1.1, 0.64, 1);
+    }
+    [aria-expanded="true"] .hybrid-panel__caret {
+      transform: rotate(225deg) translate(-1px, -1px);
     }
     .glass-panel--hybrid .hybrid-panel__race-distance {
       font-size: 11px;
@@ -419,6 +510,7 @@
     }
 
     .glass-panel--hybrid-xp {
+      position: relative;
       display: flex;
       align-items: center;
       min-height: 52px;
@@ -467,10 +559,10 @@
       --panel-outline-shine-rgb: 100, 180, 230;
     }
     .glass-panel--hybrid-race.glass-panel--hybrid-purple {
-      --panel-outline-hot-rgb: 158, 74, 156;
-      --panel-outline-deep-rgb: 130, 55, 128;
-      --panel-outline-glow-rgb: 180, 100, 178;
-      --panel-outline-shine-rgb: 200, 130, 198;
+      --panel-outline-hot-rgb: 128, 44, 126;
+      --panel-outline-deep-rgb: 105, 32, 103;
+      --panel-outline-glow-rgb: 160, 85, 158;
+      --panel-outline-shine-rgb: 185, 120, 183;
     }
     .glass-panel--hybrid-race.glass-panel--hybrid-cyan {
       --panel-outline-hot-rgb: 79, 177, 238;
@@ -2483,10 +2575,10 @@
     --plasma-shine-rgb: 100, 180, 230;
   }
   .sphere-btn--var-plasma-purple {
-    --plasma-hot-rgb: 158, 74, 156;
-    --plasma-deep-rgb: 130, 55, 128;
-    --plasma-glow-rgb: 180, 100, 178;
-    --plasma-shine-rgb: 200, 130, 198;
+    --plasma-hot-rgb: 128, 44, 126;
+    --plasma-deep-rgb: 105, 32, 103;
+    --plasma-glow-rgb: 160, 85, 158;
+    --plasma-shine-rgb: 185, 120, 183;
   }
   .sphere-btn--var-plasma-cyan {
     --plasma-hot-rgb: 79, 177, 238;
@@ -3520,6 +3612,10 @@
        Long enough to wreck a table row, so the cell only carries a toggle and
        the text unfolds into a full-width row beneath. */
 
+    th.comment-col,
+    td:has(> .comment-toggle) {
+      text-align: center;
+    }
     .comment-toggle {
       background: none;
       border: 0;
@@ -3541,15 +3637,48 @@
 
     tr.comment-row > td {
       padding: 0 0 0.55rem;
+      background: var(--hover);
+      text-align: center;
     }
     tr.comment-row .comment-body {
+      display: inline-block;
+      text-align: left;
       color: var(--fg);
       font-size: 0.92em;
       line-height: 1.45;
       padding: 0.5rem 0.7rem;
-      border-left: 2px solid var(--border);
-      background: var(--hover);
       max-width: 70ch;
+    }
+
+    /* ---- xLabs GPS column ----
+       One narrow column standing in for every GPS metric. Clicking the header
+       cycles which metric the whole column shows, so the sectionals are
+       reachable without widening the table by eight columns. */
+
+    th.gps-head {
+      white-space: nowrap;
+    }
+    .gps-toggle {
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      font-weight: 400;
+      color: var(--source-xlabs);
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1.2;
+    }
+    .gps-toggle:hover {
+      font-weight: 700;
+    }
+    /* Brief white flash when the metric switches, so the click lands. */
+    .gps-toggle.flash {
+      animation: gps-flash 420ms ease-out;
+    }
+    @keyframes gps-flash {
+      0%, 40% { color: #fff; }
+      100%    { color: var(--source-xlabs); }
     }
 
     {% block extra_style %}{% endblock %}
@@ -4045,8 +4174,50 @@
     .home-page .form-panel__list td {
       border-bottom: none !important;
     }
-    table tbody tr:hover {
-      background: rgba(255, 255, 255, 0.38) !important;
+    /* C treatment — wash rest + subtle darker hover.
+       Excludes home page, offspring, siblings, top-horses, coupons,
+       coupon-receipt (keep previous design) and prev-races, which sits
+       inside an expansion row and takes its tint.
+       Use background-color (not shorthand) to preserve background-image
+       (e.g. the strikethrough gradient on scratched rows). */
+    table:not(.offspring):not(.siblings):not(.prev-races):not(.sl-prev-races):not(.top-horses):not(.coupons):not(.coupon-receipt__table) tbody tr:not(.tillagg-row):not(.comment-row) {
+      background-color: rgba(255, 255, 255, 0.38);
+    }
+    table:not(.offspring):not(.siblings):not(.prev-races):not(.sl-prev-races):not(.top-horses):not(.coupons):not(.coupon-receipt__table) tbody tr:hover:not(.tillagg-row):not(.scratched):not(.comment-row) {
+      background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%) !important;
+    }
+    table:not(.offspring):not(.siblings):not(.prev-races):not(.sl-prev-races):not(.top-horses):not(.coupons):not(.coupon-receipt__table) tr.scratched {
+      background-color: rgba(255, 255, 255, 0.38);
+    }
+    table:not(.offspring):not(.siblings):not(.prev-races):not(.sl-prev-races):not(.top-horses):not(.coupons):not(.coupon-receipt__table) tr.scratched:hover {
+      background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%);
+    }
+    table tbody tr.comment-row:hover {
+      background: transparent !important;
+    }
+    table tbody tr.comment-row:hover > td {
+      background: var(--hover) !important;
+    }
+    /* Home page panels — same wash fill as C treatment list rows. */
+    .home-page .glass-panel--form.glass-panel--form-frosted,
+    .home-page .card.glass-panel,
+    .home-page .home-headlines-glass.glass-panel {
+      background-color: rgba(255, 255, 255, 0.38) !important;
+    }
+    /* Home page lists — transparent rest (inherits panel wash); C darker hover.
+       watch-upcoming keeps the global C-treatment row wash (not panel-hosted). */
+    .home-page table:not(.watch-upcoming) tbody tr:not(.tillagg-row):not(.comment-row),
+    .home-page table:not(.watch-upcoming) tr.scratched {
+      background-color: transparent !important;
+    }
+    .home-page table tbody tr:hover:not(.tillagg-row):not(.scratched):not(.comment-row),
+    .home-page table tr.scratched:hover {
+      background-color: color-mix(in srgb, rgba(255, 255, 255, 0.38) 98.5%, black 1.5%) !important;
+    }
+    /* Offspring / siblings — previous design: transparent rest, subtle hover. */
+    table.offspring tbody tr:hover,
+    table.siblings tbody tr:hover {
+      background-color: var(--hover);
     }
 
     /* Horse page — passport divider: darker bone, not black. */
@@ -4369,30 +4540,78 @@
     }
     /* ---------- coupon (stable / play) ---------- */
 
-    /* Floating cost sphere — bottom right, same fill as selected number spheres. */
-    .coupon-sphere {
-      position: fixed; right: 26px; bottom: 26px; z-index: 90;
-      width: 70px; height: 70px; border-radius: 50%;
-      background: #07bc0c;
-      color: #fff; border: none; font-family: inherit;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 2px; cursor: pointer;
-      box-shadow: 0 12px 30px rgba(7, 188, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.2s ease;
+    /* Floating cost sphere — identical to a track sphere (glass body + plasma
+       pools) but larger and fixed to the viewport corner. Bright lime plasma
+       on both blobs. */
+    .coupon-sphere.sphere-btn {
+      --size: 120px;
+      position: fixed;
+      right: 26px;
+      bottom: 26px;
+      z-index: 90;
+      background: transparent;
+      border-color: var(--glass-fill-border);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      box-shadow: none;
+      transition:
+        transform 0.4s cubic-bezier(0.34, 1.2, 0.64, 1),
+        right 0.32s cubic-bezier(0.22, 0.9, 0.28, 1),
+        filter 0.45s ease;
     }
-    .coupon-sphere:hover {
-      transform: translateY(-2px) scale(1.04);
-      box-shadow: 0 16px 34px rgba(7, 188, 12, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    .coupon-sphere.sphere-btn::before {
+      display: block;
+      z-index: 0;
+      background: var(--glass-fill-gradient);
+      -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+      box-shadow: var(--glass-fill-shadow);
+      -webkit-mask-image: radial-gradient(
+        circle at 50% 50%,
+        transparent 50%,
+        rgba(0, 0, 0, 0.45) 58%,
+        #000 70%
+      );
+      mask-image: radial-gradient(
+        circle at 50% 50%,
+        transparent 50%,
+        rgba(0, 0, 0, 0.45) 58%,
+        #000 70%
+      );
+    }
+    .coupon-sphere.sphere-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: none;
     }
     .coupon-sphere.is-hidden { display: none; }
-    .coupon-sphere.is-incomplete { filter: saturate(0.72); }
+    /* Playable — soft lime glow when every leg is filled. */
+    .coupon-sphere:not(.is-incomplete) {
+      filter:
+        drop-shadow(0 0 8px rgba(64, 230, 40, 0.42))
+        drop-shadow(0 0 22px rgba(64, 230, 40, 0.28))
+        drop-shadow(0 0 40px rgba(64, 230, 40, 0.16));
+    }
+    .coupon-sphere .sphere-btn__label {
+      flex-direction: column;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      z-index: 2;
+      font-size: 14px;
+      letter-spacing: 0;
+      color: #fff;
+      text-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.32),
+        0 0 12px rgba(0, 0, 0, 0.18);
+    }
     .coupon-sphere__cost {
-      font-size: 12px; font-weight: 700; letter-spacing: 0.2px;
+      font-size: 17px; font-weight: 700; letter-spacing: 0.2px;
       font-variant-numeric: tabular-nums; line-height: 1.05;
-      max-width: 62px; text-align: center;
+      max-width: 92px; text-align: center;
     }
     .coupon-sphere__meta {
-      font-size: 9px; letter-spacing: 1.2px; opacity: 0.88; text-transform: lowercase;
+      font-size: 10px; letter-spacing: 1.4px; opacity: 0.9; text-transform: lowercase;
     }
     .coupon-sphere.is-shake { animation: coupon-shake 0.4s ease; }
     @keyframes coupon-shake {
@@ -4511,7 +4730,7 @@
     .coupon-btn--danger:hover { color: #b00010; background: none; }
   </style>
 </head>
-<body>
+<body{% if request.args.get('embed') %} class="is-embed"{% endif %}>
 
   <svg class="fluid-goo-defs" aria-hidden="true" width="0" height="0" focusable="false">
     <defs>
@@ -5103,6 +5322,8 @@ function hybridPanelRowHtml(gameType, opts = {}) {
     symbolPlasma = false,
     raceStyle = false,
     noPlasmaFill: noPlasmaFillOpt,
+    picksSlot = false,
+    caret = false,
   } = opts;
   const noPlasmaFill = noPlasmaFillOpt ?? (xp && !raceStyle);
   const xpClass = xp ? ' glass-panel--hybrid-xp' : '';
@@ -5117,6 +5338,15 @@ function hybridPanelRowHtml(gameType, opts = {}) {
     plasmaId: gameType.id,
   });
   const raceNameHtml = `<span class="hybrid-panel__race-name${raceName ? '' : ' is-empty'}">${raceName ? esc(raceName) : ''}</span>`;
+  // The trail carries the starter count plus, on the game page, the coupon
+  // picks for this leg and the open/closed caret.
+  const trailInner = [
+    picksSlot ? '<span class="hybrid-panel__picks" data-panel-picks></span>' : '',
+    starters != null
+      ? `<span class="hybrid-panel__starters" aria-label="${starters} starters">${starters}</span>`
+      : '',
+    caret ? '<span class="hybrid-panel__caret" aria-hidden="true"></span>' : '',
+  ].filter(Boolean).join('');
   const inner = xp && raceNumber != null
     ? `<div class="hybrid-panel__head">
         <div class="hybrid-panel__lead">
@@ -5129,11 +5359,7 @@ function hybridPanelRowHtml(gameType, opts = {}) {
           </div>
         </div>
         <div class="hybrid-panel__center">${raceNameHtml}</div>
-        ${starters != null
-          ? `<div class="hybrid-panel__trail">
-              <span class="hybrid-panel__starters" aria-label="${starters} starters">${starters}</span>
-            </div>`
-          : ''}
+        ${trailInner ? `<div class="hybrid-panel__trail">${trailInner}</div>` : ''}
       </div>`
     : symbol;
   const plasmaLayer = noPlasmaFill
@@ -5861,9 +6087,13 @@ function emptySphereBubblesRowHtml(count = 5) {
 const PLASMA_PALETTE = {
   orange: { hot: '249, 131, 20', deep: '249, 90, 0', glow: '255, 160, 50', shine: '255, 200, 100' },
   blue: { hot: '0, 109, 182', deep: '0, 85, 150', glow: '40, 140, 210', shine: '100, 180, 230' },
-  purple: { hot: '158, 74, 156', deep: '130, 55, 128', glow: '180, 100, 178', shine: '200, 130, 198' },
+  purple: { hot: '128, 44, 126', deep: '105, 32, 103', glow: '160, 85, 158', shine: '185, 120, 183' },
   cyan: { hot: '79, 177, 238', deep: '50, 150, 210', glow: '120, 200, 250', shine: '150, 210, 255' },
   green: { hot: '0, 129, 92', deep: '0, 105, 75', glow: '40, 160, 120', shine: '80, 180, 150' },
+  /* Green's satellite pool — plays the role cyan plays for blue. */
+  lime: { hot: '132, 216, 64', deep: '96, 184, 40', glow: '170, 232, 104', shine: '212, 248, 160' },
+  /* Coupon sphere — bright yellow-green, no teal/blue cast. */
+  bright: { hot: '64, 230, 40', deep: '36, 198, 18', glow: '130, 248, 80', shine: '196, 255, 140' },
   red: { hot: '212, 49, 64', deep: '180, 35, 50', glow: '230, 80, 95', shine: '240, 120, 130' },
   gold: { hot: '255, 214, 0', deep: '255, 168, 0', glow: '255, 232, 64', shine: '255, 250, 120' },
 };
@@ -6870,17 +7100,43 @@ window.trackNameHtml = trackNameHtml;
 
     /* ---- floating cost sphere ---- */
 
+    const COUPON_SPHERE_CLASS = 'coupon-sphere sphere-btn sphere-btn--no-outline'
+                              + ' sphere-btn--dual-plasma';
+    const COUPON_SPHERE_PLASMA_STYLE = dualPlasmaStyle(['bright', 'bright']);
+
+    function couponSphereInnerHtml(cost = '', meta = '') {
+      return '<span class="sphere-btn__glint-orbit" aria-hidden="true">' +
+        '<span class="sphere-btn__glint sphere-btn__glint--1"></span>' +
+        '<span class="sphere-btn__glint sphere-btn__glint--2"></span></span>' +
+        '<span class="sphere-btn__rim"></span>' +
+        '<span class="sphere-btn__caustic"></span>' +
+        '<span class="sphere-btn__plasma sphere-btn__plasma--a"></span>' +
+        '<span class="sphere-btn__plasma sphere-btn__plasma--b"></span>' +
+        '<span class="sphere-btn__plasma-hotspot sphere-btn__plasma-hotspot--a"></span>' +
+        '<span class="sphere-btn__plasma-hotspot sphere-btn__plasma-hotspot--b"></span>' +
+        '<span class="sphere-btn__label">' +
+          `<span class="coupon-sphere__cost">${cost}</span>` +
+          `<span class="coupon-sphere__meta">${meta}</span>` +
+        '</span>' +
+        '<span class="sphere-btn__click-flash" aria-hidden="true"></span>';
+    }
+
+    window.COUPON_SPHERE_CLASS = COUPON_SPHERE_CLASS;
+    window.COUPON_SPHERE_PLASMA_STYLE = COUPON_SPHERE_PLASMA_STYLE;
+    window.couponSphereInnerHtml = couponSphereInnerHtml;
+
     function couponSphereEl() {
       let el = document.getElementById('couponSphere');
       if (el) return el;
       el = document.createElement('button');
       el.id = 'couponSphere';
       el.type = 'button';
-      el.className = 'coupon-sphere is-hidden';
+      el.className = `${COUPON_SPHERE_CLASS} is-hidden`;
       el.setAttribute('aria-label', 'coupon');
-      el.innerHTML = '<span class="coupon-sphere__cost"></span>' +
-                     '<span class="coupon-sphere__meta"></span>';
+      el.setAttribute('style', COUPON_SPHERE_PLASMA_STYLE);
+      el.innerHTML = couponSphereInnerHtml();
       el.addEventListener('click', () => {
+        triggerSphereClickFlash(el);
         const d = Coupon.load();
         if (!d) return;
         if (!Coupon.isComplete(d)) {
@@ -6893,6 +7149,23 @@ window.trackNameHtml = trackNameHtml;
       });
       document.body.appendChild(el);
       return el;
+    }
+
+    /* Sit the sphere in the right gutter so the gap to the content column
+       equals the gap to the viewport edge. Falls back to a fixed margin when
+       the gutter is narrower than the sphere. */
+    function positionCouponSphere(el) {
+      const MIN_RIGHT = 26;
+      const col = document.querySelector('.game-page')
+        || document.querySelector('.race-page--upcoming .race-shell')
+        || document.querySelector('.race-shell');
+      if (!col) {
+        el.style.right = MIN_RIGHT + 'px';
+        return;
+      }
+      const gutter = Math.max(0, window.innerWidth - col.getBoundingClientRect().right);
+      const size = el.offsetWidth || parseFloat(getComputedStyle(el).getPropertyValue('--size')) || 116;
+      el.style.right = Math.max(MIN_RIGHT, (gutter - size) / 2) + 'px';
     }
 
     function refreshCouponSphere() {
@@ -6912,7 +7185,13 @@ window.trackNameHtml = trackNameHtml;
       el.title = complete
         ? `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`
         : `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`;
+      requestAnimationFrame(() => positionCouponSphere(el));
     }
+
+    window.addEventListener('resize', () => {
+      const el = document.getElementById('couponSphere');
+      if (el && !el.classList.contains('is-hidden')) positionCouponSphere(el);
+    });
 
     /* ---- receipt overlay (draft: save/clear · view: read-only) ---- */
 
@@ -6961,8 +7240,9 @@ window.trackNameHtml = trackNameHtml;
 
       const rowsHtml = legs.map(l => {
         const nums = formatCouponPicks(l.numbers, l.horseNames);
+        // Back to the leg on the game page, where the picks were made.
         const href = l.raceId
-          ? ` data-leg-href="/race/atg/${encodeURIComponent(l.raceId)}?game=${encodeURIComponent(gameId)}"`
+          ? ` data-leg-href="/game/${encodeURIComponent(gameId)}?race=${encodeURIComponent(l.raceId)}"`
           : '';
         return `<tr${href}>
           <td class="coupon-receipt__leg">${l.leg}</td>
@@ -7087,7 +7367,7 @@ window.trackNameHtml = trackNameHtml;
   </script>
 
   <script>
-    /* Race comments: renders the "show comment" cell and unfolds the text into
+    /* Race comments: renders the "show" cell and unfolds the text into
        a full-width row under the start it belongs to.
 
        Delegated from document so it works for tables that are built after load
@@ -7105,7 +7385,7 @@ window.trackNameHtml = trackNameHtml;
       window.commentCell = function (comment, colspan) {
         if (!comment) return '';
         return `<button type="button" class="comment-toggle" aria-expanded="false"`
-             + ` data-comment="${esc(comment)}" data-colspan="${colspan}">show comment</button>`;
+             + ` data-comment="${esc(comment)}" data-colspan="${colspan}">show</button>`;
       };
 
       // Capture phase: result rows carry their own click listener that
@@ -7126,7 +7406,7 @@ window.trackNameHtml = trackNameHtml;
           const next = row.nextElementSibling;
           if (next && next.classList.contains('comment-row')) next.remove();
           btn.setAttribute('aria-expanded', 'false');
-          btn.textContent = 'show comment';
+          btn.textContent = 'show';
           return;
         }
 
@@ -7136,7 +7416,197 @@ window.trackNameHtml = trackNameHtml;
                      + `<div class="comment-body">${esc(btn.dataset.comment)}</div></td>`;
         row.insertAdjacentElement('afterend', tr);
         btn.setAttribute('aria-expanded', 'true');
-        btn.textContent = 'hide comment';
+        btn.textContent = 'hide';
+      }, true);
+    })();
+
+    /* ---- xLabs (kmtid) GPS column ----
+       The GPS data has far more in it than a table has room for, so instead of
+       one column per metric there is a single column whose header is a button:
+       clicking it cycles which metric every row in that column shows. The pick
+       is remembered so it survives navigation.
+
+       Each cell carries every metric's value in a data-attribute, so toggling
+       is a text swap and never needs the page to re-render or refetch. */
+    (function () {
+      const STORE_KEY = 'stable-gps-metric';
+
+      // The page-level esc() escapes for text nodes and leaves quotes alone;
+      // these values go into attributes, so they need the stricter form.
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+      }
+
+      // Order is the cycle order. `stored` names a figure xLabs computes for
+      // us on the raw trace; `win` derives the value from the per-100m
+      // intervals, returning the [from, to] metre window to average over.
+      // `atFinish` marks windows that end at the line, which is where the
+      // interval grid stops lining up (see calibrate below).
+      const METRICS = [
+        { key: 'plusm', label: '+m',
+          desc: 'extra metres ran beyond the nominal distance (wide trips cost metres)' },
+        { key: 'slip', label: 'slip',
+          desc: 'metres ran in slipstream, i.e. covered up behind another horse' },
+        { key: 'peak', label: 'peak', stored: 'kmtid_best_100ms',
+          desc: 'fastest 100 m of the run, as km-time' },
+        { key: 'f100', label: 'f100', win: () => [0, 100],
+          desc: 'first 100 m out of the gate, as km-time' },
+        { key: 'f200', label: 'f200', stored: 'kmtid_first_200ms', win: () => [0, 200],
+          desc: 'first 200 m out of the gate, as km-time' },
+        { key: 'l100', label: 'l100', atFinish: true, win: fin => [fin - 100, fin],
+          desc: 'last 100 m to the line, as km-time' },
+        { key: 'l200', label: 'l200', stored: 'kmtid_last_200ms', atFinish: true,
+          win: fin => [fin - 200, fin],
+          desc: 'last 200 m to the line, as km-time' },
+        { key: 'uppl', label: 'uppl', atFinish: true,
+          win: (fin, ctx) => {
+            const hs = ctx && ctx.homeStretchM;
+            return hs > 0 ? [fin - hs, fin] : null;
+          },
+          desc: 'the home stretch (upploppet), as km-time, over this track\u2019s own stretch length' },
+      ];
+      const BY_KEY = {};
+      METRICS.forEach(m => { BY_KEY[m.key] = m; });
+
+      function current() {
+        let k;
+        try { k = localStorage.getItem(STORE_KEY); } catch (_) {}
+        return BY_KEY[k] ? k : METRICS[0].key;
+      }
+
+      // km-time equivalents come off xLabs in milliseconds; show them the same
+      // way as the `time` column so the two are directly comparable.
+      function kmTime(ms) {
+        if (ms == null || !isFinite(ms) || ms <= 0) return '';
+        const v = ms / 1000;
+        const mins = Math.floor(v / 60);
+        const secs = (v - mins * 60).toFixed(1).replace('.', ',');
+        return mins <= 1 ? secs : (mins - 1) + '.' + secs;
+      }
+
+      // Distance-weighted mean pace over [lo, hi]. Because each interval is a
+      // pace rather than a duration, segments combine by weighting on the
+      // metres each one contributes. Partial overlap is prorated, which is
+      // exact on bin boundaries and an interpolation inside a bin.
+      function segment(iv, lo, hi) {
+        if (!Array.isArray(iv) || !(hi > lo)) return null;
+        let num = 0, den = 0;
+        for (const b of iv) {
+          const s = b && b.start, e = b && b.end, d = b && b.duration;
+          if (typeof s !== 'number' || typeof e !== 'number' || typeof d !== 'number') continue;
+          const a = Math.max(s, lo), z = Math.min(e, hi);
+          if (z <= a) continue;
+          num += d * (z - a);
+          den += (z - a);
+        }
+        return den > 0 ? num / den : null;
+      }
+
+      // The finish line, per the intervals themselves. Entry `distance` can
+      // disagree (handicap tillägg is not always reflected in the GPS axis),
+      // and it is the finish that every "last N metres" window hangs off.
+      function finishM(iv) {
+        if (!Array.isArray(iv)) return null;
+        let d = null;
+        for (const b of iv) {
+          if (b && typeof b.end === 'number' && (d == null || b.end > d)) d = b.end;
+        }
+        return d;
+      }
+
+      function valueFor(m, e, ctx) {
+        if (m.key === 'plusm') {
+          if (e.kmtid_actual_m == null || !e.distance) return '';
+          // Negative deltas mean the horse broke or was pulled up, so the
+          // figure is not the "ran wide" cost the column is claiming to show.
+          const d = e.kmtid_actual_m - e.distance;
+          return d > 0 ? '+' + d : '';
+        }
+        if (m.key === 'slip') {
+          return e.kmtid_slip_m > 0 ? String(e.kmtid_slip_m) : '';
+        }
+        if (m.stored && e[m.stored] != null) return kmTime(e[m.stored]);
+        if (!m.win) return '';
+
+        const iv = e.kmtid_intervals;
+        const fin = finishM(iv);
+        if (fin == null) return '';
+        const w = m.win(fin, ctx);
+        if (!w) return '';
+        const raw = segment(iv, Math.max(0, w[0]), w[1]);
+        if (raw == null) return '';
+        return kmTime(m.atFinish ? raw * calibrate(e, iv, fin) : raw);
+      }
+
+      // Races rarely end on a 100 m boundary, so windows measured back from
+      // the line cut through a partial bin and the prorating inside it can be
+      // off by up to ~0.6s. xLabs' own last-200 is computed on the raw trace,
+      // so the ratio between it and the same window read off the bins is the
+      // error this grid introduces at the finish — scale the other
+      // finish-anchored windows by it. Without this, `uppl` over a ~195 m
+      // stretch would disagree with `l200` by more than the 5 m between them.
+      function calibrate(e, iv, fin) {
+        if (e.kmtid_last_200ms == null) return 1;
+        const raw = segment(iv, fin - 200, fin);
+        return raw > 0 ? e.kmtid_last_200ms / raw : 1;
+      }
+
+      function title(m) {
+        return 'xLabs GPS \u2014 ' + m.desc + '. Click to switch metric.';
+      }
+
+      // Header for the column. Pages render this once; the label and tooltip
+      // are kept in sync by the click handler below.
+      window.gpsHead = function () {
+        const m = BY_KEY[current()];
+        return `<th class="gps gps-head" title="${esc(title(m))}">`
+             + `<button type="button" class="gps-toggle" data-gps-th>${esc(m.label)}</button></th>`;
+      };
+
+      // One cell, preloaded with every metric so switching is instant.
+      // `ctx` supplies race-level facts the entry itself does not carry.
+      window.gpsCell = function (e, ctx, cls) {
+        const key = current();
+        let attrs = '', shown = '';
+        for (const m of METRICS) {
+          const v = valueFor(m, e || {}, ctx);
+          if (v) attrs += ` data-gv-${m.key}="${esc(v)}"`;
+          if (m.key === key) shown = v;
+        }
+        return `<td class="${cls || 'gps'}" data-gps-cell${attrs}>${esc(shown)}</td>`;
+      };
+
+      function apply() {
+        const m = BY_KEY[current()];
+        document.querySelectorAll('[data-gps-th]').forEach(btn => {
+          btn.textContent = m.label;
+          const th = btn.closest('th');
+          if (th) th.title = title(m);
+        });
+        document.querySelectorAll('[data-gps-cell]').forEach(td => {
+          td.textContent = td.getAttribute('data-gv-' + m.key) || '';
+        });
+      }
+
+      // Capture phase for the same reason the comment toggle uses it: result
+      // rows bind their own navigation handler.
+      document.addEventListener('click', function (ev) {
+        const btn = ev.target.closest('[data-gps-th]');
+        if (!btn) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+        const i = METRICS.findIndex(m => m.key === current());
+        const next = METRICS[(i + 1) % METRICS.length].key;
+        try { localStorage.setItem(STORE_KEY, next); } catch (_) {}
+        apply();
+        document.querySelectorAll('[data-gps-th]').forEach(b => {
+          b.classList.remove('flash');
+          void b.offsetWidth;
+          b.classList.add('flash');
+          b.addEventListener('animationend', () => b.classList.remove('flash'), { once: true });
+        });
       }, true);
     })();
   </script>
