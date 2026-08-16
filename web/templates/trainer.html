@@ -556,9 +556,11 @@
     function sulkyCell(e) {
       if (!e.sulky) return '';
       const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-      return e.sulky_changed
-        ? `<span class="sulky-changed" title="changed">${esc(txt)}</span>`
-        : esc(txt);
+      const cls = (e.sulky_changed ? ' sulky-changed' : '') + (e.sulky_debut ? ' sulky-debut' : '');
+      const title = e.sulky_debut ? 'first American sulky'
+        : e.sulky_changed ? 'changed' : '';
+      if (!cls) return esc(txt);
+      return `<span class="${cls.trim()}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
     }
 
     const SHOE_ON_PATH =
@@ -576,19 +578,22 @@
       '.22-.04.36-.04.42.12l.42 1.24Z' +
       'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
 
-    function shoeIcon(has, changed) {
-      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '');
+    function shoeIcon(has, changed, debut) {
+      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '') + (debut ? ' shoe-debut' : '');
       const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
-      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+      const title = debut ? ' title="first time without shoes"'
+        : changed ? ' title="changed"' : '';
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"${title}>
         <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
       </svg>`;
     }
 
-    function shoeCells(code, frontChanged, backChanged) {
+    function shoeCells(e) {
+      const code = e && e.shoe_code;
       if (!code) return '';
       const frontHas = code === '3' || code === '4';
       const backHas  = code === '2' || code === '4';
-      return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+      return `<span class="shoes">${shoeIcon(frontHas, e.shoe_front_changed, e.shoe_front_debut)}${shoeIcon(backHas, e.shoe_back_changed, e.shoe_back_debut)}</span>`;
     }
 
     const DQ_RE = /^(gdk|ejg|ejp|d$|dq)/i;
@@ -665,7 +670,7 @@
           <td class="sform">${tfOddsCell(e.tf_odds)}</td>
           <td class="num muted">${e.odds != null ? e.odds : ''}</td>
           <td class="num muted">${sulkyCell(e)}</td>
-          <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+          <td class="center">${shoeCells(e)}</td>
           <td class="muted">${esc(time)}</td>
           <td>${srcPillsList((e.contributors || []).map(s => ({key: s})), {size: 'sm'})}</td>
         </tr>`;

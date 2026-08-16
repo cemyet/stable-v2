@@ -1031,6 +1031,14 @@ CREATE TABLE IF NOT EXISTS coupon (
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_coupon_created ON coupon (created_at DESC);
+
+-- The weighted / reduced system behind the selections, as the game page's
+-- Reduced.plan() emits it: per leg the picks' weights, the caps that reduce
+-- them, the resulting coverage, and the user's full ranked order (unpicked
+-- horses included, since the best of those become ATG's r1/r2 reserves).
+-- Without it a saved coupon reopens as a flat, unweighted system and
+-- num_lines/cost would be priced against the full system.
+ALTER TABLE coupon ADD COLUMN IF NOT EXISTS reduction JSONB;
 """
 
 # Per-source rolling buffer DDL is generated from KNOWN_SOURCES so we don't

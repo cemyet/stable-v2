@@ -1,0 +1,505 @@
+{% extends "_layout.html" %}
+
+{#
+Summary of a finished weighted / reduced coupon, and the handoff to ATG.
+
+The system itself lives in the browser: the coupon draft plus the weights,
+caps and rank order the game page stored. This page reads them, asks
+/api/reduced/solve to turn the per-horse coverage into mathematical
+sub-coupons, and offers three ways out — the ATG file (exact), typing the
+sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
+(one coupon, approximate).
+#}
+
+{% block title %}summary - {{ game_type_label }} - stable{% endblock %}
+
+{% block extra_style %}
+  .sum-wrap { width: 100%; max-width: 900px; margin: 0 auto; }
+
+  .sum-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .sum-head__symbol .game-type-symbol svg { height: 38px; width: auto; }
+  .sum-head__where {
+    margin-top: 10px; font-size: 12px; color: var(--fg-muted);
+    letter-spacing: 0.5px;
+  }
+  .sum-head__figures { text-align: right; font-variant-numeric: tabular-nums; }
+  .sum-head__cost { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .sum-head__rows { font-size: 11px; color: var(--fg-muted); margin-top: 6px; }
+  .sum-head__saved {
+    font-size: 11px; font-weight: 600; margin-top: 4px;
+    color: var(--accent-reduce, #d29b00);
+  }
+
+  .sum-section { margin-top: 26px; }
+  .sum-section__title {
+    font-size: 11px; letter-spacing: 0.5px; font-weight: 600;
+    color: var(--fg-muted); margin-bottom: 10px;
+  }
+
+  .sum-note {
+    font-size: 11.5px; color: var(--fg-muted); line-height: 1.7;
+    letter-spacing: 0.2px;
+  }
+  .sum-note a { color: inherit; }
+
+  .sum-warn {
+    margin-top: 16px; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid #b00010; color: #b00010; font-size: 11.5px;
+    line-height: 1.7;
+  }
+
+  table.sum-legs { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.sum-legs th {
+    text-align: left; font-weight: 400; color: var(--fg-muted);
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  table.sum-legs td {
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.sum-legs td.num, table.sum-legs th.num {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  table.sum-legs tr.sum-leg-first td { border-top: 1px solid var(--border); }
+  table.sum-legs td.sum-legno {
+    font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
+    vertical-align: top;
+  }
+  table.sum-legs td.muted { color: var(--fg-muted); }
+  .sum-name { text-transform: uppercase; letter-spacing: 0.3px; }
+  .sum-letter {
+    display: inline-block; min-width: 15px; text-align: center;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--fg-muted);
+  }
+  .sum-cut { color: var(--accent-reduce, #d29b00); font-weight: 600; }
+  .sum-reserve td { color: var(--fg-muted); font-style: italic; }
+  .sum-reserve .sum-name { font-style: normal; }
+  /* Rounding pushes a horse a fraction off what was drawn; show it rather
+     than let it pass silently. */
+  .sum-drift { color: #b00010; }
+
+  .sum-boxes {
+    font-size: 12px; font-variant-numeric: tabular-nums;
+    max-height: 340px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  .sum-box {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 5px 12px; border-bottom: 1px solid var(--border);
+  }
+  .sum-box:last-child { border-bottom: none; }
+  .sum-box__no { color: var(--fg-muted); min-width: 38px; }
+  .sum-box__legs { flex: 1; letter-spacing: 0.3px; }
+  .sum-box__legs b { font-weight: 600; }
+  .sum-box__mult {
+    color: var(--accent-reduce, #d29b00); font-weight: 700; min-width: 26px;
+    text-align: right;
+  }
+  .sum-box__rows { color: var(--fg-muted); min-width: 60px; text-align: right; }
+
+  .sum-actions { display: grid; gap: 14px; margin-top: 8px; }
+  .sum-action {
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+  }
+  .sum-action--primary { border-color: var(--accent-reduce, #d29b00); }
+  .sum-action__title {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.3px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sum-action__body { margin-top: 8px; }
+  .sum-action ol { margin: 8px 0 0; padding-left: 20px; }
+  .sum-action li { margin-bottom: 4px; }
+
+  .sum-btn {
+    font-family: inherit; font-size: 11px; letter-spacing: 1.5px;
+    text-transform: lowercase; padding: 9px 20px; cursor: pointer;
+    border: 1px solid var(--border); background: none; color: inherit;
+    border-radius: 999px; text-decoration: none; display: inline-block;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .sum-btn:hover { background: var(--hover); }
+  .sum-btn--primary {
+    background: var(--accent-reduce, #d29b00); border-color: transparent;
+    color: #1a1400; font-weight: 600;
+  }
+  .sum-btn--primary:hover { background: var(--accent-reduce-bright, #ffe89a); }
+  .sum-btn[disabled] { opacity: 0.4; cursor: default; }
+
+  .sum-back {
+    display: inline-block; margin-bottom: 18px; font-size: 11px;
+    letter-spacing: 0.5px; color: var(--fg-muted); text-decoration: none;
+  }
+  .sum-back:hover { color: inherit; }
+
+  .sum-empty {
+    margin-top: 40px; text-align: center; font-size: 12.5px;
+    color: var(--fg-muted); line-height: 2;
+  }
+{% endblock %}
+
+{% block content %}
+  <div class="sum-wrap">
+    <a class="sum-back" href="/game/{{ game_id }}">← back to {{ game_type_label }}</a>
+    <div id="sumMount"></div>
+    <div class="sum-empty" id="sumEmpty">reading your coupon…</div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const GAME_ID = {{ game_id | tojson }};
+  const GAME_TYPE = {{ game_type_id | tojson }};
+  const TRACK_NAME = {{ track_name | tojson }};
+  const TRACK_CODE = {{ track_code | tojson }};
+  const GAME_DATE = {{ date_str | tojson }};
+  const UPLOAD_URL = {{ atg_upload_url | tojson }};
+
+  const mount = document.getElementById('sumMount');
+  const empty = document.getElementById('sumEmpty');
+
+  const nf = n => Number(n).toLocaleString('sv-SE');
+  const pct = n => `${Math.round(n * 10) / 10}%`;
+
+  function bail(html) {
+    mount.innerHTML = '';
+    empty.innerHTML = html;
+  }
+
+  /* ── gathering ───────────────────────────────────────────────────────── */
+
+  // Program number -> horse name per leg, plus how many starters the leg has
+  // (ATG's file format only has room for 15, so the solver wants to know).
+  async function legDetails(legs) {
+    const out = {};
+    await Promise.all(legs.map(async (leg) => {
+      out[leg.raceId] = { names: {}, starters: 0 };
+      try {
+        const res = await fetch(`/api/race/atg/${encodeURIComponent(leg.raceId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const entries = data.results || [];
+        out[leg.raceId].starters = entries.length;
+        entries.forEach(e => {
+          if (e.number != null && e.horse_name) {
+            out[leg.raceId].names[e.number] = e.horse_name;
+          }
+        });
+      } catch (_) { /* names are a nicety, the system is not */ }
+    }));
+    return out;
+  }
+
+  function payload(plan, details) {
+    return {
+      gameId: GAME_ID,
+      gameType: GAME_TYPE,
+      gameDate: GAME_DATE,
+      trackName: TRACK_NAME,
+      trackCode: TRACK_CODE,
+      legs: plan.legs.map(l => ({
+        leg: l.leg,
+        raceId: l.raceId,
+        picks: l.picks,
+        coverage: l.coverage,
+        reserves: l.reserves,
+        starters: (details[l.raceId] || {}).starters || 0,
+      })),
+    };
+  }
+
+  /* ── rendering ───────────────────────────────────────────────────────── */
+
+  function headHtml(solved) {
+    const symbol = typeof gameTypeSymbolById === 'function'
+      ? gameTypeSymbolById(GAME_TYPE.toLowerCase(), { size: 'panel' })
+      : `<span>${esc(GAME_TYPE)}</span>`;
+    const where = [TRACK_NAME, GAME_DATE].filter(Boolean).join(' · ');
+    const off = solved.fullRows - solved.rows;
+    return `
+      <div class="sum-head">
+        <div>
+          <div class="sum-head__symbol">${symbol}</div>
+          <div class="sum-head__where">${esc(where)}</div>
+        </div>
+        <div class="sum-head__figures">
+          <div class="sum-head__cost">${couponKr(solved.cost)}</div>
+          <div class="sum-head__rows">${nf(solved.rows)} rows
+            in ${nf(solved.couponCount)} coupon${solved.couponCount === 1 ? '' : 's'}</div>
+          ${off > 0 ? `<div class="sum-head__saved">−${nf(off)} rows
+            · ${couponKr(solved.fullCost - solved.cost)} saved</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function legsHtml(solved, details, recipeByLeg, capsByRace) {
+    // Rounding to whole rows cannot land closer than one row, so only call it
+    // drift when a horse is further off its weight than that.
+    const grain = Math.max(0.5, 100 / Math.max(1, solved.rows));
+    const rows = [];
+
+    solved.legs.forEach((leg) => {
+      const names = (details[leg.raceId] || {}).names || {};
+      const letters = recipeByLeg[leg.leg] || {};
+      const caps = capsByRace[leg.raceId] || {};
+
+      leg.picks.forEach((n, j) => {
+        const horse = leg.horses[String(n)] || {};
+        // `wanted` is the horse's share of its own leg — what the thumb was
+        // dragged to. `coverage` is the share it ended up with. They differ
+        // from the leg's coverage whenever the leg itself is reduced.
+        const wanted = horse.wanted ?? 0;
+        const built = horse.coverage ?? 0;
+        rows.push(`
+          <tr class="${j === 0 ? 'sum-leg-first' : ''}">
+            <td class="sum-legno">${j === 0 ? leg.leg : ''}</td>
+            <td><span class="sum-letter">${esc(letters[n] || '')}</span></td>
+            <td class="num">${n}</td>
+            <td class="sum-name">${esc(names[n] || '')}</td>
+            <td class="num">${pct(wanted)}</td>
+            <td class="num${caps[n] != null ? ' sum-cut' : ' muted'}">${
+              pct(leg.coverage[String(n)] ?? 0)}</td>
+            <td class="num${Math.abs(built - wanted) > grain ? ' sum-drift' : ' muted'}">${pct(built)}</td>
+            <td class="num muted">${nf(horse.actual ?? 0)}</td>
+          </tr>`);
+      });
+
+      (leg.reserves || []).forEach((n, j) => {
+        rows.push(`
+          <tr class="sum-reserve">
+            <td></td>
+            <td><span class="sum-letter">r${j + 1}</span></td>
+            <td class="num">${n}</td>
+            <td class="sum-name">${esc(names[n] || '')}</td>
+            <td class="num" colspan="4">reserve</td>
+          </tr>`);
+      });
+
+      if (!(leg.reserves || []).length) {
+        rows.push(`
+          <tr class="sum-reserve">
+            <td></td><td colspan="7">no reserves — rank this leg on the game
+              page and the two best unpicked horses become r1 / r2</td>
+          </tr>`);
+      }
+    });
+
+    return `
+      <table class="sum-legs">
+        <thead>
+          <tr>
+            <th></th><th></th><th class="num">no</th><th>horse</th>
+            <th class="num">weight</th><th class="num">of system</th>
+            <th class="num">built</th><th class="num">rows</th>
+          </tr>
+        </thead>
+        <tbody>${rows.join('')}</tbody>
+      </table>`;
+  }
+
+  function boxesHtml(solved) {
+    const items = solved.coupons.map((c, i) => `
+      <div class="sum-box">
+        <span class="sum-box__no">${i + 1}</span>
+        <span class="sum-box__legs">${c.legs.map(l =>
+          `<b>${l.numbers.join(',')}</b>`).join(' — ')}</span>
+        <span class="sum-box__mult">${c.multiplier > 1 ? '×' + c.multiplier : ''}</span>
+        <span class="sum-box__rows">${nf(c.units)} rows</span>
+      </div>`).join('');
+    return `<div class="sum-boxes">${items}</div>`;
+  }
+
+  function recipeHtml(recipe, solved) {
+    if (!recipe || !recipe.letters.length) return '';
+    const groups = recipe.letters.map(l => {
+      const byLetter = {};
+      l.horses.forEach(h => {
+        (byLetter[h.letter] = byLetter[h.letter] || []).push(h.number);
+      });
+      const parts = Object.entries(byLetter)
+        .map(([letter, nums]) => `${letter}: ${nums.join(', ')}`).join(' · ');
+      return `<div>leg ${l.leg} — ${esc(parts)}</div>`;
+    }).join('');
+
+    const conds = recipe.conditions.length
+      ? recipe.conditions.map(c => c.min > 0
+          ? `at least ${c.min} ${c.letter}-winner${c.min === 1 ? '' : 's'}`
+          : `at most ${c.max} ${c.letter}-winner${c.max === 1 ? '' : 's'}`).join(', ')
+      : 'no conditions come close — the file is the only faithful route here';
+
+    const diff = recipe.rows - solved.rows;
+    return `
+      <div class="sum-note" style="margin-bottom:10px">
+        rank the horses like this on ATG's page:
+      </div>
+      <div class="sum-note">${groups}</div>
+      <div class="sum-note" style="margin-top:10px">
+        then set <b>${esc(conds)}</b> — ${nf(recipe.rows)} rows,
+        ${diff === 0 ? 'the same as' : (diff > 0 ? `${nf(diff)} more than` : `${nf(-diff)} fewer than`)}
+        your system.
+        ${recipe.points ? `Or use points, 1 for A up to 4 for D, capped at
+          ${recipe.points.max} — ${nf(recipe.points.rows)} rows.` : ''}
+      </div>`;
+  }
+
+  function actionsHtml(solved) {
+    const tooMany = solved.couponCount > 200;
+    return `
+      <div class="sum-actions">
+        <div class="sum-action sum-action--primary">
+          <div class="sum-action__title">download the ATG file</div>
+          <div class="sum-action__body sum-note">
+            Your system exactly as built — every coupon, every reserve.
+            <ol>
+              <li>download the file below</li>
+              <li>open <a href="${esc(UPLOAD_URL)}" target="_blank"
+                  rel="noopener">atg.se/spel/reducerat</a> and choose
+                  filinlämning</li>
+              <li>upload it and check the total before paying</li>
+            </ol>
+            The four characters before <code>.xml</code> are a checksum ATG
+            uses to spot an edited file, so keep the name as it downloads.
+          </div>
+          <div style="margin-top:14px">
+            <button type="button" class="sum-btn sum-btn--primary"
+                    data-download>download ${esc(GAME_TYPE)} file</button>
+          </div>
+        </div>
+
+        <div class="sum-action">
+          <div class="sum-action__title">enter the coupons by hand</div>
+          <div class="sum-action__body sum-note">
+            The same ${nf(solved.couponCount)} coupons, typed in one by one.
+            ${tooMany ? 'At this many that is a long evening — the file is the sane route.' : ''}
+            A coupon marked ×2 is played twice, which is how a horse gets more
+            than its even share of the rows.
+          </div>
+          <div style="margin-top:12px">${boxesHtml(solved)}</div>
+        </div>
+
+        <div class="sum-action">
+          <div class="sum-action__title">use ATG's own reduction</div>
+          <div class="sum-action__body">
+            <div class="sum-note" style="margin-bottom:10px">
+              One coupon instead of ${nf(solved.couponCount)}, but ATG's
+              conditions work on whole rows, not on individual horses — this
+              lands near the same size and shape, not on the same system.
+            </div>
+            ${recipeHtml(solved.recipe, solved)}
+            <div style="margin-top:14px">
+              <a class="sum-btn" href="${esc(UPLOAD_URL)}" target="_blank"
+                 rel="noopener">open ATG reducerat</a>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function reserveNote() {
+    return `
+      <div class="sum-note" style="margin-top:14px">
+        Reserves are set per leg in the file, so pick “egna reserver” on ATG
+        rather than “topprankad” — otherwise ATG replaces a scratched horse by
+        betting percentage instead of by your ranking.
+      </div>`;
+  }
+
+  /* ── go ──────────────────────────────────────────────────────────────── */
+
+  async function run() {
+    const d = window.Coupon ? Coupon.load() : null;
+    if (!d || d.gameId !== GAME_ID) {
+      bail(`no coupon for this game in the builder.<br>
+            <a href="/game/${encodeURIComponent(GAME_ID)}">go back and pick some horses</a>`);
+      return;
+    }
+    if (!Coupon.isComplete(d)) {
+      bail(`this coupon still has empty legs.<br>
+            <a href="/game/${encodeURIComponent(GAME_ID)}">go back and finish it</a>`);
+      return;
+    }
+
+    const plan = Reduced.plan(d);
+    const details = await legDetails(plan.legs);
+    const body = payload(plan, details);
+
+    let solved;
+    try {
+      const res = await fetch('/api/reduced/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      solved = await res.json();
+      if (!res.ok) throw new Error(solved.error || 'solve failed');
+    } catch (e) {
+      bail(`could not build the system: ${esc(e.message || e)}`);
+      return;
+    }
+
+    const recipeByLeg = {};
+    (solved.recipe?.letters || []).forEach(l => {
+      recipeByLeg[l.leg] = {};
+      l.horses.forEach(h => { recipeByLeg[l.leg][h.number] = h.letter; });
+    });
+    // Which picks were actually capped — only the builder knows, the solver
+    // sees a coverage and cannot tell a cap from a low weight.
+    const capsByRace = {};
+    plan.legs.forEach(l => { capsByRace[l.raceId] = l.caps || {}; });
+
+    empty.textContent = '';
+    mount.innerHTML = `
+      ${headHtml(solved)}
+      ${solved.warnings.length ? `<div class="sum-warn">${
+        solved.warnings.slice(0, 6).map(esc).join('<br>')}</div>` : ''}
+      <div class="sum-section">
+        <div class="sum-section__title">your system</div>
+        ${legsHtml(solved, details, recipeByLeg, capsByRace)}
+        ${reserveNote()}
+      </div>
+      <div class="sum-section">
+        <div class="sum-section__title">play it</div>
+        ${actionsHtml(solved)}
+      </div>`;
+
+    const dl = mount.querySelector('[data-download]');
+    if (dl) dl.addEventListener('click', async () => {
+      dl.disabled = true;
+      try {
+        const res = await fetch('/api/reduced/atg-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'could not build the file');
+          return;
+        }
+        // The checksum ATG validates is part of the filename, so take the
+        // one the server put in Content-Disposition rather than inventing one.
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = /filename="([^"]+)"/.exec(cd);
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = match ? match[1] : `${GAME_TYPE}.xml`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      } finally {
+        dl.disabled = false;
+      }
+    });
+  }
+
+  run();
+})();
+</script>
+{% endblock %}

@@ -1,17 +1,6 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-  <script>
-    // Restore saved background before first paint to avoid a flash.
-    (function () {
-      try {
-        var saved = localStorage.getItem('stable-bg');
-        if (saved && /^#[0-9a-fA-F]{6}$/.test(saved)) {
-          document.documentElement.style.setProperty('--bg', saved);
-        }
-      } catch (_) {}
-    })();
-  </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}stable{% endblock %}</title>
@@ -21,7 +10,7 @@
   {% block extra_head %}{% endblock %}
   <style>
     :root {
-      --bg: #f1eee5;
+      --bg: #f4f3ec;
       --ink-rgb: 0, 0, 0;
       --ink-mid-rgb: 0, 0, 0;
       --ink-soft-rgb: 60, 60, 60;
@@ -87,9 +76,25 @@
       --font-mono: "Source Code Pro", "SF Mono", "Menlo", "Consolas", monospace;
       --accent-first: #f0c020;
       --accent-first-glow: 0 0 10px rgba(240, 192, 32, 0.58), 0 0 3px rgba(255, 220, 100, 0.4);
+      /* Picked-row gold shoe: white hairline + tight yellow bloom. */
+      --accent-first-bloom:
+        drop-shadow(-0.35px 0 0 rgba(255, 255, 255, 1))
+        drop-shadow(0.35px 0 0 rgba(255, 255, 255, 1))
+        drop-shadow(0 -0.35px 0 rgba(255, 255, 255, 1))
+        drop-shadow(0 0.35px 0 rgba(255, 255, 255, 1))
+        drop-shadow(0 0 0.5px rgba(255, 241, 118, 0.95))
+        drop-shadow(0 0 1.5px rgba(255, 241, 118, 0.85))
+        drop-shadow(0 0 3px rgba(255, 241, 118, 0.65));
       --accent-second: #c2c6d0;
       --accent-second-glow: 0 0 8px rgba(190, 196, 210, 0.38);
       --accent-third: #c8793a;
+      /* Reducing a system — gold a touch brighter than a debut shoe, so
+         it reads on the yellow fill. `bright` is the row fill, `mute` the
+         band between cap and weight. */
+      --accent-reduce: color-mix(in srgb, var(--accent-first) 85%, white);
+      --accent-reduce-bright: #ffe89a;
+      --accent-reduce-deep: color-mix(in srgb, var(--accent-first) 85%, white);
+      --accent-reduce-mute: #f2e6c2;
     }
 
     html {
@@ -120,43 +125,6 @@
       position: relative;
       z-index: 1;
     }
-
-    /* iframe embed (?embed=1) — hide site chrome for design previews */
-    body.is-embed .nav-inline-row,
-    body.is-embed .bg-picker {
-      display: none !important;
-    }
-
-    /* Dev/design: live background picker (bottom-left) */
-    .bg-picker {
-      position: fixed;
-      left: 14px;
-      bottom: 14px;
-      z-index: 10000;
-      width: 28px;
-      height: 28px;
-      margin: 0;
-      padding: 0;
-      border-radius: 0;
-      overflow: hidden;
-      border: 1px solid #ffffff;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
-      background: var(--bg);
-      cursor: pointer;
-    }
-    .bg-picker input[type="color"] {
-      display: block;
-      width: 44px;
-      height: 44px;
-      margin: -8px;
-      padding: 0;
-      border: none;
-      background: none;
-      cursor: pointer;
-    }
-    .bg-picker input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-    .bg-picker input[type="color"]::-webkit-color-swatch { border: none; }
-    .bg-picker input[type="color"]::-moz-color-swatch { border: none; }
 
     /* ---------- panels (leaderboards, charts, etc.) ---------- */
 
@@ -340,8 +308,7 @@
     /* Hybrid race bars — pill gradient, lighter fill on hover */
     .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
       border-radius: 999px;
-      border-color: transparent;
-      background-clip: padding-box;
+      border: none;
       box-shadow: none;
       transition:
         background 0.28s ease,
@@ -349,7 +316,7 @@
     }
     a.game-race-link:hover .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only,
     .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only:hover {
-      border-color: transparent;
+      border: none;
       box-shadow: none;
       background: linear-gradient(
         var(--panel-hybrid-angle),
@@ -1694,6 +1661,20 @@
       text-shadow: var(--accent-first-glow, none);
       font-weight: var(--highlight-weight, 600);
     }
+    /* First-time gear-up: barefoot debut on that hoof, or first American sulky.
+       Beats .shoe-changed / .sulky-changed when both apply. */
+    .shoe-icon.shoe-debut,
+    .shoe-icon.shoe-changed.shoe-debut {
+      color: var(--accent-first);
+      filter: drop-shadow(0 0 4px rgba(240, 192, 32, 0.58));
+    }
+    .sulky-debut,
+    .sulky-changed.sulky-debut,
+    .sl-sulky.sulky-debut,
+    .rr-sulky.sulky-debut {
+      color: var(--accent-first);
+      text-shadow: var(--accent-first-glow);
+    }
     .pos-2 {
       color: var(--accent-second);
       text-shadow: var(--accent-second-glow, none);
@@ -2755,6 +2736,10 @@
     --plasma-b-deep-rgb: 50, 150, 210;
     --plasma-b-glow-rgb: 120, 200, 250;
     --plasma-b-shine-rgb: 150, 210, 255;
+    --plasma-c-hot-rgb: 255, 214, 0;
+    --plasma-c-deep-rgb: 255, 168, 0;
+    --plasma-c-glow-rgb: 255, 232, 64;
+    --plasma-c-shine-rgb: 255, 250, 120;
   }
 
   .sphere-btn--dual-plasma .sphere-btn__plasma {
@@ -2877,6 +2862,56 @@
     animation-delay: -4s;
   }
 
+  /* Optional third pool — used by reduced coupon spheres. */
+  .sphere-btn--dual-plasma .sphere-btn__plasma--c {
+    display: none;
+    background:
+      radial-gradient(
+        ellipse 58% 52% at 38% 32%,
+        rgba(var(--plasma-c-hot-rgb), 0.56) 0%,
+        rgba(var(--plasma-c-deep-rgb), 0.30) 28%,
+        rgba(var(--plasma-c-deep-rgb), 0.10) 50%,
+        rgba(var(--plasma-c-deep-rgb), 0.03) 64%,
+        transparent 88%
+      ),
+      radial-gradient(
+        ellipse 44% 50% at 62% 38%,
+        rgba(var(--plasma-c-glow-rgb), 0.40) 0%,
+        rgba(var(--plasma-c-glow-rgb), 0.14) 38%,
+        rgba(var(--plasma-c-glow-rgb), 0.05) 52%,
+        transparent 84%
+      ),
+      radial-gradient(
+        ellipse 32% 28% at 48% 28%,
+        rgba(var(--plasma-c-shine-rgb), 0.26) 0%,
+        rgba(var(--plasma-c-shine-rgb), 0.07) 42%,
+        transparent 78%
+      );
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 36%, rgba(0, 0, 0, 0.62) 56%, transparent 78%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 0%, #000 36%, rgba(0, 0, 0, 0.62) 56%, transparent 78%);
+    filter: blur(0.75px);
+    animation: plasma-morph-dual-c 19s ease-in-out infinite alternate;
+    animation-delay: -7s;
+  }
+
+  .sphere-btn--dual-plasma .sphere-btn__plasma-hotspot--c {
+    display: none;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(var(--plasma-c-hot-rgb), 0.62) 0%,
+      rgba(var(--plasma-c-hot-rgb), 0.32) 16%,
+      rgba(var(--plasma-c-hot-rgb), 0.10) 30%,
+      transparent 42%
+    );
+    animation: plasma-hotspot-dual-c 19s ease-in-out infinite alternate;
+    animation-delay: -7s;
+  }
+
+  .coupon-sphere.is-reduced .sphere-btn__plasma--c,
+  .coupon-sphere.is-reduced .sphere-btn__plasma-hotspot--c {
+    display: block;
+  }
+
   .sphere-btn--dual-plasma .sphere-btn__caustic {
     background:
       radial-gradient(
@@ -2888,6 +2923,11 @@
         ellipse 48% 52% at 66% 62%,
         rgba(var(--plasma-b-glow-rgb), 0.12) 0%,
         transparent 68%
+      ),
+      radial-gradient(
+        ellipse 40% 44% at 48% 28%,
+        rgba(var(--plasma-c-glow-rgb, var(--plasma-a-glow-rgb)), 0.10) 0%,
+        transparent 70%
       );
   }
 
@@ -4584,12 +4624,20 @@
       box-shadow: none;
     }
     .coupon-sphere.is-hidden { display: none; }
-    /* Playable — soft lime glow when every leg is filled. */
+    /* Playable — soft lime glow when every leg is filled. A reduced
+       coupon swaps that for the yellow plasma, so the halo matches
+       the sphere instead of staying green. */
     .coupon-sphere:not(.is-incomplete) {
       filter:
         drop-shadow(0 0 8px rgba(64, 230, 40, 0.42))
         drop-shadow(0 0 22px rgba(64, 230, 40, 0.28))
         drop-shadow(0 0 40px rgba(64, 230, 40, 0.16));
+    }
+    .coupon-sphere.is-reduced:not(.is-incomplete) {
+      filter:
+        drop-shadow(0 0 8px rgba(246, 200, 16, 0.48))
+        drop-shadow(0 0 22px rgba(253, 224, 90, 0.32))
+        drop-shadow(0 0 40px rgba(255, 244, 160, 0.18));
     }
     .coupon-sphere .sphere-btn__label {
       flex-direction: column;
@@ -4700,6 +4748,7 @@
       letter-spacing: 0.5px; line-height: 1.7; font-variant-numeric: tabular-nums;
     }
     .coupon-receipt__details .total { font-weight: 700; color: var(--coupon-ink); }
+    .coupon-receipt__reduced { color: var(--accent-reduce); font-weight: 600; }
     .coupon-receipt__name {
       width: 100%; margin-top: 14px;
       font-family: inherit; font-size: 13px; color: var(--coupon-ink);
@@ -4728,9 +4777,16 @@
     }
     .coupon-btn--save:hover { background: #06a80b; }
     .coupon-btn--danger:hover { color: #b00010; background: none; }
+    /* The step past saving: on to the summary and the ATG handoff. Carries
+       the reduce accent so it reads as the end of that flow. */
+    .coupon-btn--continue {
+      background: var(--accent-reduce, #d29b00); border: none; color: #1a1400;
+      border-radius: 999px; font-weight: 600;
+    }
+    .coupon-btn--continue:hover { background: var(--accent-reduce-bright, #ffe89a); }
   </style>
 </head>
-<body{% if request.args.get('embed') %} class="is-embed"{% endif %}>
+<body>
 
   <svg class="fluid-goo-defs" aria-hidden="true" width="0" height="0" focusable="false">
     <defs>
@@ -4743,6 +4799,8 @@
     </defs>
   </svg>
 
+  {# The cloud build is the coupon builder alone, so there is nowhere to navigate to. #}
+  {% if not BUILDER_ONLY %}
   {% set subnav_play = active_tab in ['stable_play','stable_play_coupons'] %}
   {% set subnav_stable = active_tab in ['stable','stable_search','stable_watchlist'] or subnav_play %}
   {% set subnav_stats = active_tab in ['stats','stats_horse','stats_driver','stats_trainer','stats_track'] %}
@@ -4805,10 +4863,15 @@
     {% endif %}
     {% endif %}
   </div>
+  {% endif %}
 
   {% block content %}{% endblock %}
 
   <script>
+    // The cloud build ships the coupon builder on its own: no saving, and
+    // nothing in a start list links anywhere, because there is nowhere to go.
+    window.BUILDER_ONLY = {{ 'true' if BUILDER_ONLY else 'false' }};
+
     // Shared helpers reused across pages.
     function esc(s) {
       const el = document.createElement('span');
@@ -6094,6 +6157,9 @@ const PLASMA_PALETTE = {
   lime: { hot: '132, 216, 64', deep: '96, 184, 40', glow: '170, 232, 104', shine: '212, 248, 160' },
   /* Coupon sphere — bright yellow-green, no teal/blue cast. */
   bright: { hot: '64, 230, 40', deep: '36, 198, 18', glow: '130, 248, 80', shine: '196, 255, 140' },
+  /* Reduced coupon sphere — warm yellow pools; optional third blob uses
+     `gold` for a more vibrant accent. */
+  yellow: { hot: '246, 200, 16', deep: '222, 166, 0', glow: '253, 224, 90', shine: '255, 244, 160' },
   red: { hot: '212, 49, 64', deep: '180, 35, 50', glow: '230, 80, 95', shine: '240, 120, 130' },
   gold: { hot: '255, 214, 0', deep: '255, 168, 0', glow: '255, 232, 64', shine: '255, 250, 120' },
 };
@@ -6101,7 +6167,12 @@ const PLASMA_PALETTE = {
 function dualPlasmaStyle(colors = ['blue', 'cyan']) {
   const a = PLASMA_PALETTE[colors[0]] || PLASMA_PALETTE.blue;
   const b = PLASMA_PALETTE[colors[1]] || PLASMA_PALETTE.cyan;
-  return `--plasma-a-hot-rgb: ${a.hot}; --plasma-a-deep-rgb: ${a.deep}; --plasma-a-glow-rgb: ${a.glow}; --plasma-a-shine-rgb: ${a.shine}; --plasma-b-hot-rgb: ${b.hot}; --plasma-b-deep-rgb: ${b.deep}; --plasma-b-glow-rgb: ${b.glow}; --plasma-b-shine-rgb: ${b.shine};`;
+  let style = `--plasma-a-hot-rgb: ${a.hot}; --plasma-a-deep-rgb: ${a.deep}; --plasma-a-glow-rgb: ${a.glow}; --plasma-a-shine-rgb: ${a.shine}; --plasma-b-hot-rgb: ${b.hot}; --plasma-b-deep-rgb: ${b.deep}; --plasma-b-glow-rgb: ${b.glow}; --plasma-b-shine-rgb: ${b.shine};`;
+  if (colors[2]) {
+    const c = PLASMA_PALETTE[colors[2]] || PLASMA_PALETTE.gold;
+    style += ` --plasma-c-hot-rgb: ${c.hot}; --plasma-c-deep-rgb: ${c.deep}; --plasma-c-glow-rgb: ${c.glow}; --plasma-c-shine-rgb: ${c.shine};`;
+  }
+  return style;
 }
 
 /** Headline pool (V64/V85/V86/GS75/V65) + cyan — track sphere dual plasma. */
@@ -6484,8 +6555,10 @@ function sphereBehaviorAnchorPlasmaLayers(btn) {
 const SPHERE_BEHAVIOR_PLASMA_MORPH = [
   { match: 'sphere-btn__plasma--a', name: 'plasma-morph-dual-a', duration: 13, delay: 0 },
   { match: 'sphere-btn__plasma--b', name: 'plasma-morph-dual-b', duration: 16.5, delay: -4 },
+  { match: 'sphere-btn__plasma--c', name: 'plasma-morph-dual-c', duration: 19, delay: -7 },
   { match: 'sphere-btn__plasma-hotspot--a', name: 'plasma-hotspot-dual-a', duration: 13, delay: 0 },
   { match: 'sphere-btn__plasma-hotspot--b', name: 'plasma-hotspot-dual-b', duration: 16.5, delay: -4 },
+  { match: 'sphere-btn__plasma-hotspot--c', name: 'plasma-hotspot-dual-c', duration: 19, delay: -7 },
   { match: 'sphere-btn__caustic', name: 'caustic-drift', duration: 11, delay: 0, easing: 'cubic-bezier(0.37, 0.12, 0.63, 0.88)' },
 ];
 
@@ -7040,7 +7113,41 @@ window.trackNameHtml = trackNameHtml;
       lines(d) {
         return d.legs.reduce((p, l) => p * Math.max(1, Coupon.picksFor(d, l.raceId).length), 1);
       },
+
+      /* Rows actually paid for once reduction is taken off the full system.
+         Every leg's retention multiplies, because the caps in different legs
+         cut through the row list independently. */
+      reduction(d) {
+        const full = Coupon.lines(d);
+        const blank = { fullRows: full, rows: full, retention: 1, reduced: false };
+        if (!d || !window.Reduced || !Reduced.isOn()) return blank;
+        if (!Reduced.isReducible(d.gameType)) return blank;
+        let retention = 1;
+        let reduced = false;
+        d.legs.forEach(l => {
+          const picks = Coupon.picksFor(d, l.raceId);
+          if (!picks.length) return;
+          const weights = Reduced.normalize(
+            picks, Reduced.weightsFor(l.raceId), Reduced.locksFor(l.raceId));
+          const caps = Reduced.activeCapsFor(l.raceId);
+          if (!Reduced.isLegReduced(picks, weights, caps)) return;
+          reduced = true;
+          retention *= Reduced.legRetention(picks, weights, caps);
+        });
+        if (!reduced) return blank;
+        return {
+          fullRows: full,
+          rows: Math.max(1, Math.round(full * retention)),
+          retention,
+          reduced: true,
+        };
+      },
+      isReduced(d) { return Coupon.reduction(d).reduced; },
       cost(d) {
+        const r = Coupon.rule(d);
+        return r ? Coupon.reduction(d).rows * r.linePrice : 0;
+      },
+      fullCost(d) {
         const r = Coupon.rule(d);
         return r ? Coupon.lines(d) * r.linePrice : 0;
       },
@@ -7065,6 +7172,38 @@ window.trackNameHtml = trackNameHtml;
           legs: races.map((r, i) => ({ leg: i + 1, raceId: r.atgRaceId })),
           selections: {},
         };
+      },
+
+      /* Load a saved coupon back into the builder — selections, the weights
+         and caps behind them, and the ranked order. Without the second part
+         a saved reduced system would reopen as a flat one and quietly lose
+         both its discount and its reserves. */
+      restore(saved) {
+        if (!saved || !saved.gameId) return null;
+        const legs = (saved.selections || []).map(s => ({
+          leg: s.leg, raceId: s.raceId,
+        }));
+        const selections = {};
+        const horseNames = {};
+        (saved.selections || []).forEach(s => {
+          const numbers = (s.numbers || []).slice().sort((a, b) => a - b);
+          if (numbers.length) selections[s.raceId] = numbers;
+          if (s.horseNames && Object.keys(s.horseNames).length) {
+            horseNames[s.raceId] = { ...s.horseNames };
+          }
+        });
+        const draft = {
+          gameId: saved.gameId,
+          gameType: saved.gameType,
+          trackName: saved.trackName || '',
+          gameDate: saved.gameDate || '',
+          legs,
+          selections,
+          horseNames,
+        };
+        Coupon.store(draft);
+        if (window.Reduced) Reduced.restore(saved.reduction);
+        return draft;
       },
 
       // Toggle one horse. Returns true/false for the new selected state, or
@@ -7098,11 +7237,403 @@ window.trackNameHtml = trackNameHtml;
       },
     };
 
+    /* ---- reduced system ----------------------------------------------
+       A reduced coupon spreads its stake unevenly: every pick carries a
+       weight (percent of the lines it appears on) instead of all picks
+       sharing the lines equally. The mode is a property of the coupon as
+       a whole — turning it on in one leg turns it on everywhere — so it
+       lives next to Coupon rather than inside a single start list.
+       Weights and locks are kept per race so leaving and re-entering
+       reduced mode restores what the user built.
+
+       WEIGHTING vs REDUCING — the two are different operations:
+
+       Weighting moves lines between the picks in a leg. Every row of a
+       multi-leg bet carries exactly one horse per leg, so the picks'
+       shares always add up to the whole: sum(weights) = 100. Re-weighting
+       is free — the coupon costs the same, the lines just sit on different
+       horses.
+
+       Reducing throws lines away. A pick gets a `cap` below its weight and
+       the others do NOT absorb the difference, so the leg's coverage adds
+       up to less than 100. That missing slice is exactly the slice of the
+       system we no longer pay for:
+
+         rho_leg = sum over picks of min(weight, cap) / 100      (0..1]
+         rows    = full rows * product of rho_leg over all legs
+         cost    = rows * linePrice
+
+       Because each row occupies one slot in *every* leg, the coverage in
+       every leg sums to the same row count — so the discount is a property
+       of the whole coupon, not of the leg it was dialled in. Each leg's
+       fills are drawn against its own rho_leg (what the user did there);
+       the coupon sphere carries the combined figure. */
+
+    /* raceId -> ranked row keys (program numbers), strongest first. The
+       game page writes it whenever rank mode commits an order; it survives
+       re-render, leg close/open and reload.
+
+       Unpicked horses stay in the list on purpose. A reduced coupon handed
+       to ATG carries two reserves per leg — r1/r2 — which take over if a
+       picked horse is scratched, and the obvious candidates are the best
+       horses the user left off. Drop them and ATG picks the reserves by
+       betting percentage instead, which is nobody's opinion. */
+    const RANK_ORDER_KEY = 'stable-rank-order.v1';
+
+    const RankOrders = {
+      all() {
+        try {
+          const d = JSON.parse(localStorage.getItem(RANK_ORDER_KEY));
+          return (d && typeof d === 'object') ? d : {};
+        } catch (_) { return {}; }
+      },
+      get(raceId) {
+        const v = RankOrders.all()[raceId];
+        return Array.isArray(v) ? v : null;
+      },
+      set(raceId, keys) {
+        const all = RankOrders.all();
+        if (keys && keys.length) all[raceId] = keys.map(String);
+        else delete all[raceId];
+        try { localStorage.setItem(RANK_ORDER_KEY, JSON.stringify(all)); } catch (_) {}
+        window.dispatchEvent(new CustomEvent('rankorder:changed'));
+      },
+    };
+    window.RankOrders = RankOrders;
+
+    const REDUCED_KEY = 'stable-reduced-system.v1';
+    const REDUCED_MIN = 1;              // a pick never drops to a 0% share
+
+    // ATG's reduction tool covers the multi-race pools only (V-pools plus
+    // Dagens/Lunch Dubbel). Single-race pools — vinnare, plats, tvilling,
+    // komb, trio, V&P, top 7 — have no rows to reduce across legs.
+    const REDUCIBLE_GAME_TYPES = new Set(
+      ['V86', 'V85', 'V75', 'GS75', 'V65', 'V64', 'V5', 'V4', 'V3', 'DD', 'LD']);
+
+    function reducedBlank() {
+      return { on: false, reduce: false, weights: {}, locks: {}, caps: {} };
+    }
+
+    const Reduced = {
+      MIN: REDUCED_MIN,
+      REDUCIBLE: REDUCIBLE_GAME_TYPES,
+
+      isReducible(gameType) {
+        return REDUCIBLE_GAME_TYPES.has(String(gameType || '').toUpperCase());
+      },
+
+      load() {
+        try {
+          const d = JSON.parse(localStorage.getItem(REDUCED_KEY));
+          if (!d || typeof d !== 'object') return reducedBlank();
+          return {
+            on: !!d.on,
+            reduce: !!d.reduce,
+            weights: d.weights || {},
+            locks: d.locks || {},
+            caps: d.caps || {},
+          };
+        } catch (_) { return reducedBlank(); }
+      },
+      store(d) {
+        localStorage.setItem(REDUCED_KEY, JSON.stringify(d));
+        window.dispatchEvent(new CustomEvent('reduced:changed'));
+      },
+      isOn() { return Reduced.load().on; },
+      setOn(on) {
+        const d = Reduced.load();
+        d.on = !!on;
+        // Caps and the reduce flag stay put so toggling the header (or the
+        // footer reduce button) off and on restores what was built.
+        Reduced.store(d);
+      },
+
+      // Reduce mode: while on, dragging a thumb below its weight parks a cap
+      // there instead of pushing the slack onto the other picks. Caps are
+      // kept when the mode is off — they just stop applying until it is on
+      // again.
+      isReducing() { return Reduced.load().reduce; },
+      setReducing(on) {
+        const d = Reduced.load();
+        d.reduce = !!on;
+        Reduced.store(d);
+      },
+
+      weightsFor(raceId) { return Reduced.load().weights[raceId] || {}; },
+      locksFor(raceId) { return Reduced.load().locks[raceId] || []; },
+      capsFor(raceId) { return Reduced.load().caps[raceId] || {}; },
+      // Caps the UI and the cost should honour right now. Empty while
+      // reduce mode is off, so a parked cut does not keep discounting
+      // (or painting yellow) after the toggle is released.
+      activeCapsFor(raceId) {
+        return Reduced.isReducing() ? Reduced.capsFor(raceId) : {};
+      },
+
+      setRace(raceId, weights, locks, caps) {
+        const d = Reduced.load();
+        const empty = !weights || !Object.keys(weights).length;
+        if (!empty) d.weights[raceId] = weights;
+        else delete d.weights[raceId];
+        if (locks && locks.length) d.locks[raceId] = locks.slice().sort((a, b) => a - b);
+        else delete d.locks[raceId];
+        // `caps` omitted means "leave what's there"; an empty object clears.
+        if (caps !== undefined) {
+          if (caps && Object.keys(caps).length) d.caps[raceId] = caps;
+          else delete d.caps[raceId];
+        }
+        if (empty) delete d.caps[raceId];
+        Reduced.store(d);
+      },
+      clearRace(raceId) {
+        const d = Reduced.load();
+        delete d.weights[raceId];
+        delete d.locks[raceId];
+        delete d.caps[raceId];
+        Reduced.store(d);
+      },
+
+      /* Put a saved system back — the mirror of `plan()`. Locks are not
+         stored and do not need to be: the saved weights already add up to
+         100, so `normalize` hands them straight back unchanged. */
+      restore(saved) {
+        const d = reducedBlank();
+        const legs = (saved && saved.legs) || [];
+        legs.forEach(leg => {
+          if (!leg || !leg.raceId) return;
+          const weights = {};
+          Object.entries(leg.weights || {}).forEach(([n, v]) => {
+            const num = Number(n);
+            if (Number.isFinite(num) && Number(v) > 0) weights[num] = Number(v);
+          });
+          const caps = {};
+          Object.entries(leg.caps || {}).forEach(([n, v]) => {
+            const num = Number(n);
+            if (Number.isFinite(num) && Number(v) > 0) caps[num] = Number(v);
+          });
+          if (Object.keys(weights).length) d.weights[leg.raceId] = weights;
+          if (Object.keys(caps).length) d.caps[leg.raceId] = caps;
+          if (window.RankOrders && (leg.rankOrder || []).length) {
+            window.RankOrders.set(leg.raceId, leg.rankOrder);
+          }
+        });
+        d.on = !!(saved && (saved.weighted || saved.reduced));
+        d.reduce = !!(saved && saved.reduced);
+        Reduced.store(d);
+      },
+
+      /* Weights for the current picks, reusing whatever the user already
+         set. Locked picks keep their share; the rest split what's left in
+         proportion to their old shares, so adding or removing a horse
+         nudges the others instead of resetting the whole race. */
+      normalize(picks, prev = {}, locks = []) {
+        const out = {};
+        if (!picks.length) return out;
+        const locked = new Set((locks || []).filter(n => picks.includes(n)));
+        const equal = 100 / picks.length;
+
+        let lockedSum = 0;
+        locked.forEach(n => {
+          const v = Number(prev[n]);
+          out[n] = Number.isFinite(v) && v > 0 ? v : equal;
+          lockedSum += out[n];
+        });
+
+        const free = picks.filter(n => !locked.has(n));
+        if (!free.length) return reducedScaleTo100(out, picks);
+
+        const pool = Math.max(free.length * REDUCED_MIN, 100 - lockedSum);
+        const priors = free.map(n => {
+          const v = Number(prev[n]);
+          return Number.isFinite(v) && v > 0 ? v : null;
+        });
+        const known = priors.filter(v => v != null);
+        // A horse picked just now inherits the average of the existing
+        // shares, so it lands mid-field rather than at a extreme.
+        const fresh = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+        const raw = priors.map(v => (v == null ? fresh : v));
+        const sum = raw.reduce((a, b) => a + b, 0) || 1;
+        free.forEach((n, i) => { out[n] = Math.max(REDUCED_MIN, raw[i] / sum * pool); });
+
+        return reducedScaleTo100(out, picks);
+      },
+
+      /* One pick dragged to `target`. Locked picks hold, the remaining
+         ones absorb the difference in proportion to their current share:
+         three horses at 33 with one pulled to 50 leaves 25 and 25. */
+      applyDrag(picks, weights, locks, number, target) {
+        const locked = new Set((locks || []).filter(n => picks.includes(n) && n !== number));
+        const out = {};
+        let lockedSum = 0;
+        locked.forEach(n => {
+          out[n] = Number(weights[n]) || 0;
+          lockedSum += out[n];
+        });
+
+        const others = picks.filter(n => n !== number && !locked.has(n));
+        const headroom = 100 - lockedSum - others.length * REDUCED_MIN;
+        const self = Math.min(Math.max(target, REDUCED_MIN), Math.max(REDUCED_MIN, headroom));
+        out[number] = self;
+
+        const pool = Math.max(0, 100 - lockedSum - self);
+        if (others.length) {
+          const raw = others.map(n => Math.max(0.0001, Number(weights[n]) || 0));
+          const sum = raw.reduce((a, b) => a + b, 0);
+          others.forEach((n, i) => { out[n] = Math.max(REDUCED_MIN, raw[i] / sum * pool); });
+        }
+        return reducedScaleTo100(out, picks);
+      },
+
+      /* ---- reducing ---- */
+
+      // Caps trimmed to the live picks and never above the pick's weight —
+      // a cap at (or over) the weight is just "not reduced".
+      cleanCaps(picks, weights, caps) {
+        const out = {};
+        (picks || []).forEach(n => {
+          const w = Number(weights[n]);
+          const c = Number((caps || {})[n]);
+          if (!Number.isFinite(w) || !Number.isFinite(c)) return;
+          if (c >= w - 0.05) return;
+          out[n] = Math.max(REDUCED_MIN, Math.min(c, w));
+        });
+        return out;
+      },
+
+      // What each pick actually covers, in percent of the leg's unreduced
+      // whole: its weight, or its cap when one is parked below it.
+      coverage(picks, weights, caps) {
+        const clean = Reduced.cleanCaps(picks, weights, caps);
+        const out = {};
+        (picks || []).forEach(n => {
+          const w = Number(weights[n]) || 0;
+          out[n] = clean[n] != null ? clean[n] : w;
+        });
+        return out;
+      },
+
+      // Share of this leg's rows still being paid for (1 = nothing reduced).
+      legRetention(picks, weights, caps) {
+        if (!picks || !picks.length) return 1;
+        const cov = Reduced.coverage(picks, weights, caps);
+        const total = picks.reduce((s, n) => s + (cov[n] || 0), 0);
+        if (!(total > 0)) return 1;
+        return Math.max(0, Math.min(1, total / 100));
+      },
+
+      isLegReduced(picks, weights, caps) {
+        return Object.keys(Reduced.cleanCaps(picks, weights, caps)).length > 0;
+      },
+
+      /* Reserves for one leg: the best-ranked horses the user left off the
+         coupon. ATG's file format carries two per leg (r1/r2) and swaps one
+         in if a picked horse is scratched — without them ATG picks by
+         betting percentage, which is nobody's opinion. */
+      reservesFor(raceId, picks) {
+        const order = window.RankOrders ? window.RankOrders.get(raceId) : null;
+        if (!order) return [];
+        const out = [];
+        order.forEach(key => {
+          const n = Number(key);
+          if (!Number.isInteger(n) || n <= 0) return;
+          if (picks.includes(n) || out.includes(n)) return;
+          if (out.length < 2) out.push(n);
+        });
+        return out;
+      },
+
+      /* ---- reduction plan ----
+         The bridge to the solver: a normalised description of the system the
+         user has drawn. `POST /api/reduced/solve` turns it into mathematical
+         sub-coupons; `groups` ranks the picks by coverage so an A/B/C-style
+         spec can be generated straight off it. */
+      plan(d) {
+        const gameType = String((d && d.gameType) || '').toUpperCase();
+        const on = Reduced.isOn();
+        const legs = ((d && d.legs) || []).map(l => {
+          const picks = (d.selections[l.raceId] || []).slice().sort((a, b) => a - b);
+          // Parked weights stop applying while the mode is off, the same way
+          // parked caps do — otherwise the plan would price a system the
+          // coupon sphere is not showing.
+          const weights = Reduced.normalize(
+            picks,
+            on ? Reduced.weightsFor(l.raceId) : {},
+            on ? Reduced.locksFor(l.raceId) : []);
+          const caps = Reduced.cleanCaps(picks, weights, Reduced.activeCapsFor(l.raceId));
+          const coverage = Reduced.coverage(picks, weights, caps);
+          const retention = Reduced.legRetention(picks, weights, caps);
+          return {
+            leg: l.leg,
+            raceId: l.raceId,
+            picks,
+            weights,
+            caps,
+            coverage,
+            retention,
+            reduced: Object.keys(caps).length > 0,
+            groups: reducedRankGroups(picks, coverage),
+            reserves: Reduced.reservesFor(l.raceId, picks),
+            rankOrder: (window.RankOrders && window.RankOrders.get(l.raceId)) || [],
+          };
+        });
+        const fullRows = legs.reduce((p, l) => p * Math.max(1, l.picks.length), 1);
+        const retention = legs.reduce((p, l) => p * l.retention, 1);
+        const rows = Math.max(1, Math.round(fullRows * retention));
+        return {
+          gameId: (d && d.gameId) || '',
+          gameType,
+          gameDate: (d && d.gameDate) || '',
+          trackName: (d && d.trackName) || '',
+          reducible: Reduced.isReducible(gameType),
+          reducing: Reduced.isReducing(),
+          weighted: Reduced.isOn(),
+          legs,
+          fullRows,
+          retention,
+          rows,
+          removedRows: Math.max(0, fullRows - rows),
+        };
+      },
+    };
+
+    // Picks bucketed by coverage, strongest first — the raw material for an
+    // ABC / points ranking on the ATG side. Equal coverage shares a group.
+    function reducedRankGroups(picks, coverage) {
+      const seen = [];
+      const sorted = picks.slice().sort(
+        (a, b) => (coverage[b] || 0) - (coverage[a] || 0) || a - b);
+      sorted.forEach(n => {
+        const cov = coverage[n] || 0;
+        const last = seen[seen.length - 1];
+        if (last && Math.abs(last.coverage - cov) < 0.5) last.numbers.push(n);
+        else seen.push({ coverage: cov, numbers: [n] });
+      });
+      return seen.map((g, i) => ({
+        rank: i + 1,
+        letter: String.fromCharCode(65 + Math.min(i, 25)),
+        coverage: g.coverage,
+        numbers: g.numbers,
+      }));
+    }
+
+    // Floors and locks can push the total off 100 — rescale so the shares
+    // always read as percentages of the same whole.
+    function reducedScaleTo100(map, picks) {
+      const total = picks.reduce((s, n) => s + (map[n] || 0), 0);
+      if (total > 0 && Math.abs(total - 100) > 0.001) {
+        const k = 100 / total;
+        picks.forEach(n => { map[n] = (map[n] || 0) * k; });
+      }
+      return map;
+    }
+
+    window.Reduced = Reduced;
+
     /* ---- floating cost sphere ---- */
 
     const COUPON_SPHERE_CLASS = 'coupon-sphere sphere-btn sphere-btn--no-outline'
                               + ' sphere-btn--dual-plasma';
     const COUPON_SPHERE_PLASMA_STYLE = dualPlasmaStyle(['bright', 'bright']);
+    const COUPON_SPHERE_REDUCED_PLASMA_STYLE = dualPlasmaStyle(['yellow', 'yellow', 'gold']);
 
     function couponSphereInnerHtml(cost = '', meta = '') {
       return '<span class="sphere-btn__glint-orbit" aria-hidden="true">' +
@@ -7112,8 +7643,10 @@ window.trackNameHtml = trackNameHtml;
         '<span class="sphere-btn__caustic"></span>' +
         '<span class="sphere-btn__plasma sphere-btn__plasma--a"></span>' +
         '<span class="sphere-btn__plasma sphere-btn__plasma--b"></span>' +
+        '<span class="sphere-btn__plasma sphere-btn__plasma--c"></span>' +
         '<span class="sphere-btn__plasma-hotspot sphere-btn__plasma-hotspot--a"></span>' +
         '<span class="sphere-btn__plasma-hotspot sphere-btn__plasma-hotspot--b"></span>' +
+        '<span class="sphere-btn__plasma-hotspot sphere-btn__plasma-hotspot--c"></span>' +
         '<span class="sphere-btn__label">' +
           `<span class="coupon-sphere__cost">${cost}</span>` +
           `<span class="coupon-sphere__meta">${meta}</span>` +
@@ -7176,15 +7709,27 @@ window.trackNameHtml = trackNameHtml;
         return;
       }
       const complete = Coupon.isComplete(d);
+      const red = Coupon.reduction(d);
       el.classList.remove('is-hidden');
       el.classList.toggle('is-incomplete', !complete);
+      // A reduced system swings the sphere from lime to yellow, and trades the
+      // game-type label for how much of the full system is left.
+      el.classList.toggle('is-reduced', red.reduced);
+      el.setAttribute('style', red.reduced
+        ? COUPON_SPHERE_REDUCED_PLASMA_STYLE
+        : COUPON_SPHERE_PLASMA_STYLE);
       el.querySelector('.coupon-sphere__cost').textContent = couponAmount(Coupon.cost(d));
-      el.querySelector('.coupon-sphere__meta').textContent = complete
-        ? d.gameType.toLowerCase()
-        : `${Coupon.filledLegs(d)}/${d.legs.length}`;
-      el.title = complete
-        ? `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`
-        : `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`;
+      const cut = Math.round((1 - red.retention) * 100);
+      el.querySelector('.coupon-sphere__meta').textContent = !complete
+        ? `${Coupon.filledLegs(d)}/${d.legs.length}`
+        : red.reduced ? `−${cut}%` : d.gameType.toLowerCase();
+      el.title = !complete
+        ? `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`
+        : red.reduced
+          ? `${d.gameType} reduced — ${couponKr(Coupon.cost(d))}`
+            + ` · ${red.rows} of ${red.fullRows} rows (−${cut}%)`
+            + ` · full system ${couponKr(Coupon.fullCost(d))}`
+          : `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`;
       requestAnimationFrame(() => positionCouponSphere(el));
     }
 
@@ -7230,9 +7775,21 @@ window.trackNameHtml = trackNameHtml;
           }));
       legs = await enrichCouponLegNames(legs);
       const counts = legs.map(l => Math.max(1, l.numbers.length));
-      const lines = view ? view.numLines : counts.reduce((a, b) => a * b, 1);
+      const lines = counts.reduce((a, b) => a * b, 1);
       const linePrice = view ? view.linePrice : rule.linePrice;
-      const cost = view ? view.cost : lines * linePrice;
+      // A reduced coupon pays for fewer rows than the full system spans.
+      // Saved ones carry the system they were built with; drafts read it
+      // straight off the live reduced state.
+      const saved = view && view.reduction;
+      const red = view
+        ? (saved && saved.reduced
+            ? { reduced: true, retention: saved.retention, rows: view.numLines }
+            : null)
+        : Coupon.reduction(d);
+      const rows = red && red.reduced ? red.rows : (view ? view.numLines : lines);
+      const cost = view ? view.cost : rows * linePrice;
+      const complete = view ? true : Coupon.isComplete(d);
+      const reducible = window.Reduced && Reduced.isReducible(gameType);
 
       const symbol = typeof gameTypeSymbolById === 'function'
         ? gameTypeSymbolById(gameType.toLowerCase(), { size: 'panel' })
@@ -7257,22 +7814,37 @@ window.trackNameHtml = trackNameHtml;
       const detailsHtml = `
         <div class="coupon-receipt__details">
           <div>${counts.join(' × ')} = ${lines.toLocaleString('sv-SE')} lines</div>
-          <div>${lines.toLocaleString('sv-SE')} × ${couponKr(linePrice)} = ${couponKr(lines * linePrice)}</div>
+          ${red && red.reduced ? `<div class="coupon-receipt__reduced">reduced to
+            ${rows.toLocaleString('sv-SE')} rows
+            (−${Math.round((1 - red.retention) * 100)}%)</div>` : ''}
+          <div>${rows.toLocaleString('sv-SE')} × ${couponKr(linePrice)} = ${couponKr(rows * linePrice)}</div>
           <div class="total">total: ${couponKr(cost)}</div>
           ${view && view.status ? `<div>status: ${esc(view.status)}${view.payout != null ? ` · payout: ${couponKr(view.payout)}` : ''}</div>` : ''}
         </div>`;
 
+      // Only a finished system can be handed to ATG, and only the pool types
+      // ATG lets you reduce are worth a summary at all.
+      const continueHtml = (complete && reducible)
+        ? `<button type="button" class="coupon-btn coupon-btn--continue"
+                   data-coupon-continue>continue</button>`
+        : '';
+
       const actionsHtml = view
         ? `<div class="coupon-receipt__actions">
+             ${saved ? `<button type="button" class="coupon-btn" data-coupon-restore>open in builder</button>` : ''}
              <button type="button" class="coupon-btn" data-coupon-close>close</button>
+             ${continueHtml}
            </div>`
-        : `<input class="coupon-receipt__name" id="couponName" type="text"
+        : `${window.BUILDER_ONLY ? '' : `
+           <input class="coupon-receipt__name" id="couponName" type="text"
                   placeholder="${esc(defaultName)}" maxlength="80"
-                  aria-label="coupon name">
+                  aria-label="coupon name">`}
            <div class="coupon-receipt__actions">
              <button type="button" class="coupon-btn coupon-btn--danger" data-coupon-clear>clear</button>
              <button type="button" class="coupon-btn" data-coupon-close>close</button>
-             <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save>save</button>
+             ${window.BUILDER_ONLY ? '' : `
+             <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save>save</button>`}
+             ${continueHtml}
            </div>`;
 
       const ov = document.createElement('div');
@@ -7314,6 +7886,22 @@ window.trackNameHtml = trackNameHtml;
         closeCouponOverlay();
       });
 
+      const summaryHref = `/game/${encodeURIComponent(gameId)}/summary`;
+
+      const continueBtn = ov.querySelector('[data-coupon-continue]');
+      if (continueBtn) continueBtn.addEventListener('click', () => {
+        // A saved coupon has to become the live draft first, otherwise the
+        // summary page would solve whatever happens to be in the builder.
+        if (view) Coupon.restore(view);
+        window.location.href = summaryHref;
+      });
+
+      const restoreBtn = ov.querySelector('[data-coupon-restore]');
+      if (restoreBtn) restoreBtn.addEventListener('click', () => {
+        Coupon.restore(view);
+        window.location.href = `/game/${encodeURIComponent(gameId)}`;
+      });
+
       const saveBtn = ov.querySelector('[data-coupon-save]');
       if (saveBtn) saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
@@ -7334,6 +7922,9 @@ window.trackNameHtml = trackNameHtml;
                 numbers: l.numbers,
                 horseNames: l.horseNames || {},
               })),
+              // Weights, caps and the ranked order, so the coupon reopens as
+              // the system it was built as instead of a flat one.
+              reduction: window.Reduced ? Reduced.plan(d) : null,
             }),
           });
           if (!res.ok) {
@@ -7353,6 +7944,7 @@ window.trackNameHtml = trackNameHtml;
     };
 
     window.addEventListener('coupon:changed', refreshCouponSphere);
+    window.addEventListener('reduced:changed', refreshCouponSphere);
     window.addEventListener('storage', e => {
       if (e.key === COUPON_DRAFT_KEY) {
         refreshCouponSphere();
@@ -7612,39 +8204,6 @@ window.trackNameHtml = trackNameHtml;
   </script>
 
   {% block scripts %}{% endblock %}
-
-  <label class="bg-picker" title="background">
-    <input type="color" id="bgPicker" value="#f1eee5" aria-label="background color">
-  </label>
-  <script>
-    (function () {
-      const DEFAULT_BG = '#f1eee5';
-      const input = document.getElementById('bgPicker');
-      if (!input) return;
-
-      function currentBg() {
-        const inline = document.documentElement.style.getPropertyValue('--bg').trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(inline)) return inline.toLowerCase();
-        const fromCss = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-        return /^#[0-9a-fA-F]{6}$/.test(fromCss) ? fromCss.toLowerCase() : DEFAULT_BG;
-      }
-
-      function applyBg(hex, persist) {
-        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
-        hex = hex.toLowerCase();
-        document.documentElement.style.setProperty('--bg', hex);
-        input.value = hex;
-        if (persist) {
-          try { localStorage.setItem('stable-bg', hex); } catch (_) {}
-        }
-        window.dispatchEvent(new CustomEvent('stable:bg', { detail: { bg: hex } }));
-      }
-
-      applyBg(currentBg(), false);
-      input.addEventListener('input', () => applyBg(input.value, true));
-      input.addEventListener('change', () => applyBg(input.value, true));
-    })();
-  </script>
 
 </body>
 </html>

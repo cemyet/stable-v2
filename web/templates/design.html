@@ -12,44 +12,6 @@
     grid-template-columns: 180px 1fr;
     gap: 28px;
     min-height: calc(100vh - 160px);
-    transition: max-width 0.2s ease, grid-template-columns 0.2s ease, gap 0.2s ease;
-  }
-  /* Game preview: full-bleed iframe so the page lays out at real size.
-     Design nav floats as a collapsed rail over the preview. */
-  body:has(.design-page.is-game-preview) {
-    padding-left: 0;
-    padding-right: 0;
-    padding-bottom: 0;
-    align-items: stretch;
-  }
-  .design-page.is-game-preview {
-    max-width: none;
-    width: 100%;
-    min-height: calc(100dvh - 80px);
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-  .design-page.is-game-preview .design-stage {
-    padding: 0;
-    min-height: calc(100dvh - 80px);
-  }
-  .design-page.is-game-preview .design-nav {
-    position: fixed;
-    left: 10px;
-    top: 72px;
-    z-index: 80;
-    padding: 4px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  }
-  .design-page.is-game-preview:not(.is-nav-open) .design-nav {
-    width: 40px;
-  }
-  .design-page.is-game-preview.is-nav-open .design-nav {
-    width: 168px;
   }
 
   .design-nav {
@@ -60,21 +22,6 @@
     flex-direction: column;
     gap: 2px;
   }
-  .design-nav__toggle {
-    display: none;
-    background: none;
-    border: none;
-    color: var(--fg-muted);
-    font-family: inherit;
-    font-size: 14px;
-    line-height: 1;
-    padding: 6px 8px;
-    text-align: center;
-    cursor: pointer;
-    border-radius: 6px;
-  }
-  .design-nav__toggle:hover { color: var(--fg); background: var(--hover); }
-  .design-page.is-game-preview .design-nav__toggle { display: block; }
 
   .design-nav button {
     background: none;
@@ -97,48 +44,6 @@
     color: var(--accent-glow);
     font-weight: var(--highlight-weight);
   }
-  .design-nav__short { display: none; }
-  .design-page.is-game-preview:not(.is-nav-open) .design-nav button {
-    padding: 7px 4px;
-    text-align: center;
-    letter-spacing: 0;
-  }
-  .design-page.is-game-preview:not(.is-nav-open) .design-nav__full { display: none; }
-  .design-page.is-game-preview:not(.is-nav-open) .design-nav__short { display: inline; }
-
-  .demo-game-frame {
-    width: 100%;
-    height: calc(100dvh - 80px);
-    border: 0;
-    display: block;
-    background: var(--bg);
-  }
-  .demo-game-meta {
-    position: fixed;
-    top: 14px;
-    right: 18px;
-    z-index: 80;
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-  }
-  .demo-game-meta h2 {
-    margin: 0 !important;
-    font-size: 12px;
-    letter-spacing: 0.5px;
-  }
-  .demo-game-meta a {
-    color: var(--fg-muted);
-    font-size: 11px;
-    letter-spacing: 0.5px;
-    text-decoration: none;
-  }
-  .demo-game-meta a:hover { color: var(--accent-glow); }
 
   .design-stage {
     padding: 30px 0;
@@ -1360,6 +1265,16 @@
     text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
     opacity: 1;
   }
+  .ink-row--race .ink-row__content--ink .shoe-icon.shoe-debut {
+    color: var(--accent-first);
+    filter: drop-shadow(0 0 6px rgba(240, 192, 32, 0.85));
+    opacity: 1;
+  }
+  .ink-row--race .ink-row__content--ink .rr-sulky.sulky-debut {
+    color: var(--accent-first);
+    text-shadow: var(--accent-first-glow);
+    opacity: 1;
+  }
   /* gal% used its own fixed colors (lo = muted grey, mid/hi = fixed hues) that
      ignored the ink layer's white-on-dark flip and vanished once filled. */
   .ink-row--race .ink-row__content--ink .gal-lo,
@@ -1654,6 +1569,16 @@
   .ink-row--race2 .ink-row__content--ink .rr-sulky.sulky-changed {
     color: #ff5252;
     text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
+    opacity: 1;
+  }
+  .ink-row--race2 .ink-row__content--ink .shoe-icon.shoe-debut {
+    color: var(--accent-first);
+    filter: drop-shadow(0 0 6px rgba(240, 192, 32, 0.85));
+    opacity: 1;
+  }
+  .ink-row--race2 .ink-row__content--ink .rr-sulky.sulky-debut {
+    color: var(--accent-first);
+    text-shadow: var(--accent-first-glow);
     opacity: 1;
   }
 
@@ -2602,27 +2527,10 @@ const COMPONENTS = [
       <div class="demo-ink-subpanel" data-ink-subpanel="rows2"></div>
     `
   },
-  {
-    id: 'game',
-    label: 'game',
-    render: () => `
-      <div class="demo-game-meta">
-        <h2 style="margin:0">game</h2>
-        <a href="${DESIGN_GAME_URL}" target="_blank" rel="noopener">open full page ↗</a>
-      </div>
-      <iframe class="demo-game-frame" src="${DESIGN_GAME_EMBED_URL}"
-              title="game page preview" loading="lazy"></iframe>
-    `
-  },
 ];
-
-const DESIGN_GAME_ID = 'V5_2026-08-15_6_8';
-const DESIGN_GAME_URL = `/game/${DESIGN_GAME_ID}`;
-const DESIGN_GAME_EMBED_URL = `${DESIGN_GAME_URL}?embed=1`;
 
 const nav = document.getElementById('designNav');
 const stage = document.getElementById('designStage');
-const designPage = document.querySelector('.design-page');
 
 const SPHERE_COLLAPSIBLE_STORAGE = 'design-sphere-collapsible';
 
@@ -2772,27 +2680,10 @@ function initSphereCollapsibles(root) {
   });
 }
 
-const navToggle = document.createElement('button');
-navToggle.type = 'button';
-navToggle.className = 'design-nav__toggle';
-navToggle.setAttribute('aria-label', 'expand design nav');
-navToggle.textContent = '›';
-navToggle.addEventListener('click', () => {
-  if (!designPage) return;
-  const open = !designPage.classList.contains('is-nav-open');
-  designPage.classList.toggle('is-nav-open', open);
-  navToggle.textContent = open ? '‹' : '›';
-  navToggle.setAttribute('aria-label', open ? 'collapse design nav' : 'expand design nav');
-});
-nav.appendChild(navToggle);
-
 COMPONENTS.forEach((c, i) => {
   const btn = document.createElement('button');
+  btn.textContent = c.label;
   btn.dataset.idx = i;
-  btn.title = c.label;
-  btn.innerHTML =
-    `<span class="design-nav__full">${c.label}</span>` +
-    `<span class="design-nav__short" aria-hidden="true">${c.label.slice(0, 1)}</span>`;
   if (i === 0) btn.classList.add('active');
   btn.addEventListener('click', () => selectComponent(i));
   nav.appendChild(btn);
@@ -2800,17 +2691,9 @@ COMPONENTS.forEach((c, i) => {
 
 function selectComponent(idx) {
   const id = COMPONENTS[idx].id;
-  nav.querySelectorAll('button[data-idx]').forEach((b, i) => {
+  nav.querySelectorAll('button').forEach((b, i) => {
     b.classList.toggle('active', i === idx);
   });
-  if (designPage) {
-    designPage.classList.toggle('is-game-preview', id === 'game');
-    if (id !== 'game') designPage.classList.remove('is-nav-open');
-    navToggle.textContent = '›';
-    navToggle.setAttribute('aria-label', 'expand design nav');
-  }
-  // Game iframe owns the coupon sphere; hide the parent copy (shared localStorage).
-  document.getElementById('couponSphere')?.classList.toggle('is-hidden', id === 'game');
   if (location.hash.slice(1) !== id) {
     history.replaceState(null, '', '#' + id);
   }
@@ -2919,21 +2802,22 @@ function initListsDemo(root) {
     '.22-.04.36-.04.42.12l.42 1.24Z' +
     'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
 
-  const shoeIcon = (has, changed) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">
+  const shoeIcon = (has, changed, debut) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}${debut ? ' shoe-debut' : ''}" viewBox="0 0 24 24" aria-hidden="true">
       <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/>
     </svg>`;
-  const shoeCells = (code, frontChanged, backChanged) => {
+  const shoeCells = (e) => {
+    const code = e && e.shoe_code;
     if (!code) return '';
     const frontHas = code === '3' || code === '4';
     const backHas = code === '2' || code === '4';
-    return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+    return `<span class="shoes">${shoeIcon(frontHas, e.shoe_front_changed, e.shoe_front_debut)}${shoeIcon(backHas, e.shoe_back_changed, e.shoe_back_debut)}</span>`;
   };
   const sulkyCell = e => {
     if (!e.sulky) return '';
     const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-    return e.sulky_changed
-      ? `<span class="sulky-changed" title="changed since last race">${esc(txt)}</span>`
-      : esc(txt);
+    const cls = (e.sulky_changed ? ' sulky-changed' : '') + (e.sulky_debut ? ' sulky-debut' : '');
+    if (!cls) return esc(txt);
+    return `<span class="${cls.trim()}">${esc(txt)}</span>`;
   };
   const shortCell = (short, full, href) => {
     if (!short) return '';
@@ -3072,7 +2956,7 @@ function initListsDemo(root) {
           <td class="num muted">${e.odds != null ? e.odds : ''}</td>
           <td class="winrate">${winRate(e, 'post')}</td>
           <td class="winrate">${galAdjWinRate(e, 'post')}</td>
-          <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+          <td class="center">${shoeCells(e)}</td>
           <td class="num muted">${sulkyCell(e)}</td>
           <td>${esc(time)}</td>
           ${gpsCells}
@@ -3837,7 +3721,7 @@ function initInkRows2(root) {
   const ROW_WASH_ALPHA = 0.38;
   const rowPaper = () => {
     const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    const bg = /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+      const bg = /^#[0-9a-f]{6}$/i.test(v) ? v : '#f4f3ec';
     const mix = i => {
       const c = parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16);
       return Math.round(c + (255 - c) * ROW_WASH_ALPHA).toString(16).padStart(2, '0');
@@ -4079,19 +3963,20 @@ function initInkRows2(root) {
     '-.27-.063-.97-.15-1.77-.227l-3.502 9.133c.288.025.587.034.892.034 1.12 0 3.9-.22 4.48-.4' +
     '.22-.04.36-.04.42.12l.42 1.24Z' +
     'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
-  const shoeIcon = (has, changed) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">
+  const shoeIcon = (has, changed, debut) => `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}${debut ? ' shoe-debut' : ''}" viewBox="0 0 24 24" aria-hidden="true">
       <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/>
     </svg>`;
-  const shoeCells = (code, frontChanged, backChanged) => {
+  const shoeCells = (e) => {
+    const code = e && e.shoe_code;
     if (!code) return '';
-    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', frontChanged)}${shoeIcon(code === '2' || code === '4', backChanged)}</span>`;
+    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', e.shoe_front_changed, e.shoe_front_debut)}${shoeIcon(code === '2' || code === '4', e.shoe_back_changed, e.shoe_back_debut)}</span>`;
   };
   const sulkyCell = e => {
     if (!e.sulky) return '';
     const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-    return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+    return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}${e.sulky_debut ? ' sulky-debut' : ''}">${esc(txt)}</span>`;
   };
-  const eqCell = e => `${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${sulkyCell(e)}`;
+  const eqCell = e => `${shoeCells(e)}${sulkyCell(e)}`;
   const shortLink = (short, full, href) => {
     if (!short) return '';
     if (!href) return `<span title="${esc(full || '')}">${esc(short)}</span>`;
@@ -4201,7 +4086,7 @@ function initInkRows2(root) {
         <td class="muted num">${esc(r.distance || '')}</td>
         <td class="muted">${esc(r.odds_text || '')}</td>
         <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
-        <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+        <td class="center">${shoeCells(r)}</td>
         <td class="center">${sulkyCell(r)}</td>
         <td class="num">${esc(r.prize_kr || '')}</td>
         <td class="ink-prev-comment"><div class="ink-prev-comment__clip"><span class="ink-prev-comment__text">${esc(r.comment || '')}</span></div></td>

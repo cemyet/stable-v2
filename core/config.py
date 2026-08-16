@@ -82,6 +82,14 @@ USE_V1_BRIDGE = _env_bool("USE_V1_BRIDGE", False)
 
 WEB_PORT = int(os.environ.get("WEB_PORT", "5002"))
 
+# Cloud deployment serves the coupon builder alone: the /play track picker, the
+# game pages and the coupon summary. Everything else — the horse/person/race
+# pages, the stats browsers, admin, saved coupons — is a personal-use tool that
+# has no business being reachable there. The web app enforces this as an
+# endpoint allowlist rather than by deleting routes, so a route added later is
+# hidden in the cloud until it is deliberately allowed.
+BUILDER_ONLY = _env_bool("BUILDER_ONLY", False)
+
 # ---------------------------------------------------------------------------
 # Generic HTTP knobs
 # ---------------------------------------------------------------------------

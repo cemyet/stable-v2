@@ -59,6 +59,16 @@
     transition: color 0.15s, background 0.15s;
   }
   .coupon-delete:hover { color: #b00010; background: var(--hover); }
+  .coupon-system {
+    font-size: 10px; letter-spacing: 0.5px; padding: 1px 6px;
+    border-radius: 999px; border: 1px solid var(--border);
+    color: var(--fg-muted); margin-left: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-system--reduced {
+    color: var(--accent-reduce, #d29b00);
+    border-color: var(--accent-reduce, #d29b00);
+  }
   .coupons-empty {
     color: var(--fg-muted);
     margin-top: 24px;
@@ -98,11 +108,23 @@
     return `<span class="coupon-status${cls}">${esc(s || 'saved')}</span>`;
   }
 
+  // Weighted and reduced coupons are a different thing to reopen than a flat
+  // one, so say which before the row is clicked.
+  function systemHtml(c) {
+    const r = c.reduction;
+    if (!r) return '';
+    if (r.reduced) {
+      return ` <span class="coupon-system coupon-system--reduced">−${
+        Math.round((1 - r.retention) * 100)}%</span>`;
+    }
+    return ' <span class="coupon-system">ω</span>';
+  }
+
   function renderRow(c) {
     return `
       <tr data-coupon-id="${c.id}">
         <td class="muted num">${c.id}</td>
-        <td>${esc(c.name || '')}</td>
+        <td>${esc(c.name || '')}${systemHtml(c)}</td>
         <td class="muted">${esc(c.gameType)}${c.trackName ? ' · ' + esc(c.trackName) : ''}${c.gameDate ? ' · ' + esc(c.gameDate) : ''}</td>
         <td class="num">${couponKr(c.cost)}</td>
         <td class="num muted">${c.payout != null ? couponKr(c.payout) : '–'}</td>

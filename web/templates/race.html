@@ -537,6 +537,16 @@
     text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
     opacity: 1;
   }
+  .ink-row--race2 .ink-row__content--ink .shoe-icon.shoe-debut {
+    color: var(--accent-first);
+    filter: drop-shadow(0 0 6px rgba(240, 192, 32, 0.85));
+    opacity: 1;
+  }
+  .ink-row--race2 .ink-row__content--ink .rr-sulky.sulky-debut {
+    color: var(--accent-first);
+    text-shadow: var(--accent-first-glow);
+    opacity: 1;
+  }
 
   .ink-row--race2.ink-row--scratched { opacity: 1; position: relative; }
   .ink-row--race2.ink-row--scratched .ink-row__content { color: var(--fg-muted); opacity: 0.55; }
@@ -599,8 +609,10 @@
     width: 14px; height: 14px; color: currentColor; display: block;
   }
   table.ink-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  table.ink-prev-races .shoe-icon.shoe-debut { color: var(--accent-first); }
   table.ink-prev-races .rr-sulky { font-size: 11px; letter-spacing: 0.2px; color: var(--fg-muted); }
   table.ink-prev-races .rr-sulky.sulky-changed { color: var(--accent-warn); }
+  table.ink-prev-races .rr-sulky.sulky-debut { color: var(--accent-first); }
   table.ink-prev-races td.ink-prev-comment {
     width: 100%;
     max-width: 0;
@@ -805,9 +817,11 @@
     function sulkyCell(e) {
       if (!e.sulky) return '';
       const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-      return e.sulky_changed
-        ? `<span class="sulky-changed" title="changed since last race">${esc(txt)}</span>`
-        : esc(txt);
+      const cls = (e.sulky_changed ? ' sulky-changed' : '') + (e.sulky_debut ? ' sulky-debut' : '');
+      const title = e.sulky_debut ? 'first American sulky'
+        : e.sulky_changed ? 'changed since last race' : '';
+      if (!cls) return esc(txt);
+      return `<span class="${cls.trim()}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
     }
 
     // Horseshoe icons matching ATG's style: rotated 90° clockwise so the
@@ -832,21 +846,24 @@
       '.22-.04.36-.04.42.12l.42 1.24Z' +
       'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
 
-    function shoeIcon(has, changed) {
-      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '');
+    function shoeIcon(has, changed, debut) {
+      const cls = 'shoe-icon' + (changed ? ' shoe-changed' : '') + (debut ? ' shoe-debut' : '');
       const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
-      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">
+      const title = debut ? ' title="first time without shoes"'
+        : changed ? ' title="changed since last race"' : '';
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"${title}>
         <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
       </svg>`;
     }
 
     // Two horseshoes side-by-side: front, back.
     // shoe_code: '1' = none, '2' = back only, '3' = front only, '4' = both.
-    function shoeCells(code, frontChanged, backChanged) {
+    function shoeCells(e) {
+      const code = e && e.shoe_code;
       if (!code) return '';
       const frontHas = code === '3' || code === '4';
       const backHas  = code === '2' || code === '4';
-      return `<span class="shoes">${shoeIcon(frontHas, frontChanged)}${shoeIcon(backHas, backChanged)}</span>`;
+      return `<span class="shoes">${shoeIcon(frontHas, e.shoe_front_changed, e.shoe_front_debut)}${shoeIcon(backHas, e.shoe_back_changed, e.shoe_back_debut)}</span>`;
     }
 
     // Trainer/driver short with full name on hover. If `href` is given the
@@ -899,9 +916,31 @@
     }
 
     // Horse cell: name + flag + small sex/age.
+    function stripPedigreeName(name) {
+      if (!name) return '';
+      return String(name).replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').trim().toLowerCase();
+    }
+
+    function pedigreeTitle(e) {
+      const father = stripPedigreeName(e.father);
+      const mother = stripPedigreeName(e.mother);
+      const mf = stripPedigreeName(e.mother_father);
+      if (!father && !mother && !mf) return '';
+      let s = '';
+      if (father && mother) s = `${father} \u2013 ${mother}`;
+      else if (father) s = father;
+      else if (mother) s = mother;
+      if (mf) s = s ? `${s} (${mf})` : mf;
+      return s;
+    }
+
     function horseCell(e) {
       const name = flagify(e.horse_name);
-      const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+      const ped = pedigreeTitle(e);
+      const titleAttr = ped ? ` title="${esc(ped)}"` : '';
+      const link = e.horse_id
+        ? `<a href="/horse/${e.horse_id}"${titleAttr}>${name}</a>`
+        : (ped ? `<span${titleAttr}>${name}</span>` : name);
       const sa = sexAge(e);
       const saSpan = sa ? ` <span class="sex-age">${esc(sa)}</span>` : '';
       return link + saSpan;
@@ -1154,7 +1193,7 @@
     function rowPaper() {
       const ROW_WASH_ALPHA = 0.38;
       const v = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-      const bg = /^#[0-9a-f]{6}$/i.test(v) ? v : '#f1eee5';
+      const bg = /^#[0-9a-f]{6}$/i.test(v) ? v : '#f4f3ec';
       const mix = i => {
         const c = parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16);
         return Math.round(c + (255 - c) * ROW_WASH_ALPHA).toString(16).padStart(2, '0');
@@ -1165,7 +1204,12 @@
     function inkSulky(e) {
       if (!e.sulky) return '';
       const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-      return `<span class="rr-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+      const cls = 'rr-sulky'
+        + (e.sulky_changed ? ' sulky-changed' : '')
+        + (e.sulky_debut ? ' sulky-debut' : '');
+      const title = e.sulky_debut ? 'first American sulky'
+        : e.sulky_changed ? 'changed since last race' : '';
+      return `<span class="${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
     }
 
     function inkHorseCell(e) {
@@ -1197,7 +1241,7 @@
           <td class="muted num">${esc(r.distance || '')}</td>
           <td class="muted">${esc(r.odds_text || '')}</td>
           <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
-          <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+          <td class="center">${shoeCells(r)}</td>
           <td class="center">${inkSulky(r)}</td>
           <td class="num">${esc(r.prize_kr || '')}</td>
           <td class="ink-prev-comment"><div class="ink-prev-comment__clip"><span class="ink-prev-comment__text">${esc(r.comment || '')}</span></div></td>
@@ -1324,7 +1368,7 @@
         const cls = p >= 25 ? 'gal-hi' : p >= 15 ? 'gal-mid' : 'gal-lo';
         return `<span class="gal-risk ${cls}">${p.toFixed(0)}%</span>`;
       };
-      const inkEq = e => `${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${inkSulky(e)}`;
+      const inkEq = e => `${shoeCells(e)}${inkSulky(e)}`;
 
       const inkRowHtml = (e, s, scratched) => {
         const numSpacer = '<span class="rr-num"></span>';
@@ -1517,7 +1561,7 @@
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
             <td class="winrate">${winRate(e, 'pre')}</td>
             <td class="winrate">${galAdjWinRate(e, 'pre')}</td>
-            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+            <td class="center">${shoeCells(e)}</td>
             <td class="num muted">${sulkyCell(e)}</td>
           </tr>`;
       }).join('');
@@ -1614,7 +1658,7 @@
           <td class="muted num">${esc(r.distance || '')}</td>
           <td class="muted">${esc(r.odds_text || '')}</td>
           <td class="muted">${esc(driver)}</td>
-          <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+          <td class="center">${shoeCells(r)}</td>
           <td class="num muted">${sulkyCell(r)}</td>
           <td class="num">${esc(r.prize_kr || '')}</td>
           <td class="prev-race-comment">${esc(r.comment || '')}</td>
@@ -1701,7 +1745,7 @@
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
             <td class="winrate">${winRate(e, 'post')}</td>
             <td class="winrate">${galAdjWinRate(e, 'post')}</td>
-            <td class="center">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}</td>
+            <td class="center">${shoeCells(e)}</td>
             <td class="num muted">${sulkyCell(e)}</td>
             <td>${esc(time)}</td>
             ${gpsCells}

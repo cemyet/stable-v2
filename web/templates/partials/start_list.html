@@ -9,7 +9,7 @@
    market share is revealed, which galopp model is active) is module-level and
    broadcast, so all open legs stay in lockstep.
 
-   Selecting a horse wipes the row with soft green ink (#f4fff4) from the
+   Selecting a horse wipes the row with soft green ink (#dbffc8) from the
    sphere outwards — a CSS wipe rather than the race page's WebGL fluid,
    because a game page can have every leg open at once and browsers cap
    live WebGL contexts.
@@ -19,8 +19,12 @@
     width: 100%;
     min-width: 840px;
     /* Bone-white paper — shared by entry rows and (on game) history. */
-    --sl-paper: color-mix(in srgb, var(--bg, #f1eee5) 32%, white);
+    --sl-paper: color-mix(in srgb, var(--bg, #f4f3ec) 32%, white);
     --sl-paper-rest: color-mix(in srgb, var(--sl-paper) 99%, black 1%);
+    /* Soft green wipe fill — both full and partial picks share this. */
+    --sl-ink-fill: #dbffc8;
+    /* Coupon-sphere plasma bright (PLASMA_PALETTE.bright hot). */
+    --sl-thumb-fill: rgb(64, 230, 40);
   }
 
   /* Rest state slightly darker; hover lifts to lighter cream. */
@@ -68,7 +72,24 @@
     bottom: 0;
     left: 0;
     width: 100%;
-    background: rgba(244, 255, 244, 0.97);
+    /* Soft white bloom over the fill so full and partial rows match. */
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.58) 0%,
+        rgba(255, 255, 255, 0.16) 38%,
+        rgba(255, 255, 255, 0) 72%
+      ),
+      radial-gradient(
+        ellipse 85% 140% at 30% 50%,
+        rgba(255, 255, 255, 0.38) 0%,
+        rgba(255, 255, 255, 0.08) 45%,
+        rgba(255, 255, 255, 0) 72%
+      ),
+      color-mix(in srgb, var(--sl-ink-fill, #dbffc8) 97%, transparent);
+    box-shadow:
+      inset 0 0 10px rgba(255, 255, 255, 0.42),
+      inset 0 0 22px rgba(255, 255, 255, 0.18);
     transform: translateX(-100%);
     transition: transform 0.42s cubic-bezier(0.4, 0, 0.7, 0.2);
   }
@@ -81,10 +102,10 @@
     width: calc(100% + 60px);
     background: linear-gradient(
       to right,
-      rgba(244, 255, 244, 0.96) 0%,
-      rgba(244, 255, 244, 0.72) 40%,
-      rgba(244, 255, 244, 0.32) 68%,
-      rgba(244, 255, 244, 0) 100%
+      color-mix(in srgb, var(--sl-ink-fill, #dbffc8) 96%, transparent) 0%,
+      color-mix(in srgb, var(--sl-ink-fill, #dbffc8) 72%, transparent) 40%,
+      color-mix(in srgb, var(--sl-ink-fill, #dbffc8) 32%, transparent) 68%,
+      transparent 100%
     );
     filter: url(#sl-ink-turb);
     transform: translateX(-102%);
@@ -102,6 +123,332 @@
     .sl-row__ink::before, .sl-row__ink::after,
     .sl-row.is-picked .sl-row__ink::before,
     .sl-row.is-picked .sl-row__ink::after { transition-duration: 0.01s; }
+  }
+
+  /* ── reduced system ───────────────────────────────────────────────────
+     A classic coupon shares its lines equally, so a picked row fills all
+     the way. A reduced coupon weights each pick, so the fill only runs as
+     far as that horse's share of the lines. Same green ink / sphere /
+     coupon plasma as a regular system — the partial fill + thumb are what
+     mark it as weighted.
+
+     --sl-fill (0–1) is the share. Registering it lets the fill glide when
+     weights are redistributed; during a drag the transition is cut so the
+     edge tracks the pointer exactly. */
+  @property --sl-fill {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+  }
+  /* Where the weight sat before it was reduced — the locked edge. Equal to
+     --sl-fill on every row that isn't cut. */
+  @property --sl-weight {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+  }
+  /* Cap ÷ weight, i.e. how much of this pick's own slice survives. Drives the
+     pie cut on the number sphere. */
+  @property --sl-cut {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+  }
+
+  /* --sl-track-l: left edge of the weight scale. 0 when unranked; the
+     all/clear (#) column edge once rank mode expands the left gutter. */
+  .sl-row {
+    --sl-fill: 1;
+    --sl-weight: 1;
+    --sl-cut: 1;
+    --sl-thumb-half: 2px;
+    --sl-track-l: 0px;
+  }
+  .sl.is-ranked .sl-row { --sl-track-l: var(--sl-side-l, 0px); }
+  .sl-row.is-weighting { --sl-thumb-half: 5px; }
+  /* Kept off .sl-row so the row's own margin/width expand transitions stay
+     intact; the ink and the handle are the only things that read the share. */
+  .sl.is-reduced .sl-row__ink {
+    transition: --sl-fill 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-reduced .sl-system-handle {
+    transition: --sl-fill 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-reduced .sl-row__cutband,
+  .sl.is-reduced .sl-row__cutveil,
+  .sl.is-reduced .sl-system-lock {
+    transition: --sl-fill 0.42s cubic-bezier(0.2, 0.72, 0.3, 1),
+                --sl-weight 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-reduced .sl-badge {
+    transition: background-color 0.28s ease,
+                --sl-cut 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-weighting .sl-row__ink,
+  .sl.is-weighting .sl-system-handle,
+  .sl.is-weighting .sl-row__cutband,
+  .sl.is-weighting .sl-row__cutveil,
+  .sl.is-weighting .sl-system-lock,
+  .sl.is-weighting .sl-badge,
+  .sl-row.is-weighting-lock .sl-row__ink,
+  .sl-row.is-weighting-lock .sl-row__cutband,
+  .sl-row.is-weighting-lock .sl-row__cutveil,
+  .sl-row.is-weighting-lock .sl-system-lock,
+  .sl-row.is-weighting-lock .sl-badge,
+  .sl-row.is-fill-jump .sl-row__ink,
+  .sl-row.is-fill-jump .sl-row__cutband,
+  .sl-row.is-fill-jump .sl-row__cutveil,
+  .sl-row.is-fill-jump .sl-system-lock,
+  .sl-row.is-fill-jump .sl-badge,
+  .sl-row.is-fill-jump .sl-system-handle {
+    transition: none;
+  }
+
+  /* Rank mode — green ink starts at the all/clear column, not in the gutter. */
+  .sl.is-ranked .sl-row.is-picked .sl-row__ink,
+  .sl.is-ranked .sl-row.is-unfilling .sl-row__ink {
+    clip-path: inset(0 0 0 var(--sl-track-l, 0px));
+  }
+
+  /* Clip the ink to the thumb so the fill cannot leak under the bar, and
+     keep it inside the weight track: 0% at --sl-track-l (all/clear when
+     ranked), 100% at the border before the reduced gutter (--sl-side-r). */
+  .sl.is-reduced .sl-row.is-picked .sl-row__ink,
+  .sl.is-reduced .sl-row.is-unfilling .sl-row__ink {
+    clip-path: inset(
+      0
+      calc(
+        (1 - var(--sl-fill))
+          * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+        + var(--sl-side-r, 0px)
+        + var(--sl-thumb-half)
+      )
+      0
+      var(--sl-track-l, 0px)
+    );
+  }
+
+  /* Weight thumb — coupon plasma lime. Never mask the handle (system gutter
+     fade was washing it out into a muted gradient). */
+  .sl-system-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Track: --sl-track-l → content/reduced border. Hit target may spill
+       a little past either edge, which is fine. */
+    left: clamp(
+      calc(var(--sl-track-l, 0px) + 11px),
+      calc(
+        var(--sl-track-l, 0px)
+        + var(--sl-fill) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      ),
+      calc(100% - var(--sl-side-r, 0px))
+    );
+    width: 22px;
+    margin: 0 0 0 -11px;
+    padding: 0;
+    border: 0;
+    background: none;
+    display: none;
+    cursor: ew-resize;
+    touch-action: none;
+    overflow: visible;
+    z-index: 5;
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked .sl-system-handle {
+    display: block;
+  }
+  .sl-system-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 0;
+    background-color: var(--sl-thumb-fill, rgb(64, 230, 40));
+    border: 0;
+    transition: width 0.14s ease, margin-left 0.14s ease, box-shadow 0.14s ease;
+  }
+  .sl-row.is-weighting .sl-system-handle::before {
+    width: 8px;
+    margin-left: -4px;
+    box-shadow:
+      inset 0 0 6px rgba(255, 255, 255, 0.55),
+      inset 0 0 14px rgba(255, 255, 255, 0.28);
+  }
+
+  /* ── reducing ──────────────────────────────────────────────────────────
+     Weighting moves lines between the picks in a leg and always adds up to
+     the whole. Reducing gives lines up: the pick is capped below its weight
+     and nothing else grows to fill the hole, so the leg buys fewer rows.
+
+     A cut row reads in three parts, left to right:
+       · yellow ink out to the cap        — rows still paid for
+       · muted hatched band               — rows released, the saving
+       · locked bar at the old weight     — same yellow as the row fill
+     Same shapes as the green weighted row, swung to yellow. */
+  .sl-row.is-cut {
+    --sl-ink-fill: var(--accent-reduce-bright, #ffe89a);
+    --sl-thumb-fill: var(--accent-reduce-deep, var(--accent-first));
+    --sl-badge-cut: var(--accent-reduce, var(--accent-first));
+    /* Unfilled pie — the brightest game-type row tint, not grey. */
+    --sl-badge-cut-gone: var(--panel-muted-bright, #eef4fa);
+    --sl-lock-fill: var(--accent-reduce-bright, #ffe89a);
+  }
+
+  .sl-row__cutband {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Same track as the thumb. */
+    left: calc(
+      var(--sl-track-l, 0px)
+      + var(--sl-fill) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    right: calc(
+      100% - var(--sl-track-l, 0px)
+      - var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    display: none;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      repeating-linear-gradient(
+        -45deg,
+        var(--panel-muted-bright, #eef4fa) 0 2px,
+        transparent 2px 6px
+      ),
+      color-mix(in srgb, var(--accent-reduce-bright, #ffe89a) 58%, white);
+    opacity: 0.5;
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutband {
+    display: block;
+  }
+
+  /* Wash over the striped band so row ink (shoes, gal%, names) recedes
+     against the yellow fill instead of sitting full-strength on the hatch. */
+  .sl-row__cutveil {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(
+      var(--sl-track-l, 0px)
+      + var(--sl-fill) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    right: calc(
+      100% - var(--sl-track-l, 0px)
+      - var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    display: none;
+    pointer-events: none;
+    z-index: 2;
+    background: color-mix(in srgb, var(--accent-reduce-bright, #ffe89a) 42%, white);
+    opacity: 0.38;
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutveil {
+    display: block;
+  }
+
+  /* Locked bar — same yellow as the row fill. Draggable: moving it
+     changes the weight; the yellow cap thumb stays put. */
+  .sl-system-lock {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: clamp(
+      calc(var(--sl-track-l, 0px) + 1px),
+      calc(
+        var(--sl-track-l, 0px)
+        + var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      ),
+      calc(100% - var(--sl-side-r, 0px))
+    );
+    width: 22px;
+    margin: 0 0 0 -11px;
+    padding: 0;
+    border: 0;
+    background: none;
+    display: none;
+    cursor: ew-resize;
+    touch-action: none;
+    z-index: 4;
+  }
+  .sl-system-lock::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background-color: var(--sl-lock-fill, var(--accent-reduce-bright, #ffe89a));
+  }
+  .sl-row.is-weighting-lock .sl-system-lock::before {
+    width: 8px;
+    margin-left: -4px;
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-system-lock {
+    display: block;
+  }
+
+  /* Number sphere — deep yellow, cut like a pie chart. The whole circle is
+     the pick's weight; the filled sector is what survived the cap, so the
+     wedge grows and shrinks as the thumb is dragged. */
+  .sl-row.is-picked.is-cut .sl-badge {
+    /* Missing piece starts at 12 o'clock and runs clockwise — upper right,
+       same orientation as the footer reduce pie. */
+    background: conic-gradient(
+      from 0turn,
+      var(--sl-badge-cut-gone, var(--panel-muted-bright, #eef4fa)) 0turn
+        calc((1 - var(--sl-cut)) * 1turn),
+      var(--sl-badge-cut, var(--accent-reduce)) calc((1 - var(--sl-cut)) * 1turn) 1turn
+    );
+  }
+  /* No gold (or green) bloom on the pie — the wedge is the treatment. */
+  .sl-row.is-picked.is-cut .sl-row__badge {
+    filter: none;
+  }
+  /* Digit hairline matches the gold pie wedge, not a separate ink. */
+  .sl-row.is-picked.is-cut .sl-badge__digit {
+    text-shadow:
+      -0.85px 0 0 var(--sl-badge-cut, var(--accent-reduce)),
+      0.85px 0 0 var(--sl-badge-cut, var(--accent-reduce)),
+      0 -0.85px 0 var(--sl-badge-cut, var(--accent-reduce)),
+      0 0.85px 0 var(--sl-badge-cut, var(--accent-reduce));
+  }
+  /* Cut thumb — white outer bloom, no gold. */
+  .sl-row.is-cut .sl-system-handle::before,
+  .sl-row.is-cut.is-weighting .sl-system-handle::before {
+    filter:
+      drop-shadow(-0.35px 0 0 rgba(255, 255, 255, 1))
+      drop-shadow(0.35px 0 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 -0.35px 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 0.35px 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9))
+      drop-shadow(0 0 3px rgba(255, 255, 255, 0.7));
+    box-shadow: none;
+  }
+  /* The share number turns gold too — it now reads the cap, not the weight. */
+  .sl .sl-system-share.is-cut {
+    color: var(--accent-reduce, var(--accent-first));
+  }
+
+  /* Reduce mode on: the thumbs advertise that they now cut rather than
+     re-weight. */
+  .sl.is-reducing .sl-row.is-picked .sl-system-handle { cursor: w-resize; }
+
+  /* While dragging, the row text steps back so the fill edges and the
+     share numbers are what you read. */
+  .sl.is-weighting .sl-row__cells {
+    opacity: 0.3;
+    transition: opacity 0.16s ease;
+  }
+  .sl.is-weighting .sl-row:not(.is-picked) .sl-row__badge,
+  .sl.is-weighting .sl-row.is-picked:not(.is-weighting) .sl-row__badge {
+    opacity: 0.55;
+    transition: opacity 0.16s ease;
   }
 
   .sl-row:not(.sl-row--head) {
@@ -221,8 +568,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .sl-row:not(.sl-row--head):hover .sl-c-horse > a,
-  .sl-row:not(.sl-row--head).is-picked .sl-c-horse > a {
+  /* Keyed off the name element rather than `> a`, so the name still lifts on
+     hover and pick where it is a span instead of a link. */
+  .sl-row:not(.sl-row--head):hover .sl-c-horse__name,
+  .sl-row:not(.sl-row--head).is-picked .sl-c-horse__name {
     color: var(--fg-heading);
   }
   .sl-c-sa {
@@ -300,10 +649,10 @@
   }
 
   .sl-row:not(.sl-row--head):hover .sl-gal-mid {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 75%, white);
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 48%, white);
   }
   .sl-row:not(.sl-row--head):hover .sl-gal-hi {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 72%, white);
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
   }
   .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot {
     color: color-mix(in srgb, var(--accent-hot) 72%, white);
@@ -321,6 +670,10 @@
   .sl-row:not(.sl-row--head):hover .sl-sulky.sulky-changed {
     color: color-mix(in srgb, var(--accent-warn) 72%, white);
   }
+  .sl-row:not(.sl-row--head):hover .shoe-icon.shoe-debut,
+  .sl-row:not(.sl-row--head):hover .sl-sulky.sulky-debut {
+    color: color-mix(in srgb, var(--accent-first) 72%, white);
+  }
 
   .sl-tr { font-size: 9px; margin-right: 2px; }
   .sl-tr.up { color: var(--accent-hot, #ff5a5a); }
@@ -328,24 +681,60 @@
   .sl-row .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
   .sl-row .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
   .sl-row .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  .sl-row .shoe-icon.shoe-debut,
+  .sl-row .shoe-icon.shoe-changed.shoe-debut { color: var(--accent-first); }
   .sl-sulky { font-size: 11px; letter-spacing: 0.2px; }
   .sl-sulky.sulky-changed { color: var(--accent-warn); }
-  /* Picked row — red glow on changed shoe/sulky (same as race-page ink overlay). */
+  .sl-sulky.sulky-debut,
+  .sl-sulky.sulky-changed.sulky-debut {
+    color: var(--accent-first);
+    text-shadow: var(--accent-first-glow);
+  }
+  /* Picked row — brighter red on changed shoe/sulky, no outer glow. */
   .sl-row:not(.sl-row--head).is-picked .shoe-icon.shoe-changed,
   .sl-row:not(.sl-row--head).is-picked:hover .shoe-icon.shoe-changed {
     color: #ff5252;
-    filter: drop-shadow(0 0 4px rgba(255, 82, 82, 0.9));
+    filter: none;
     opacity: 1;
   }
   .sl-row:not(.sl-row--head).is-picked .sl-sulky.sulky-changed,
   .sl-row:not(.sl-row--head).is-picked:hover .sl-sulky.sulky-changed {
     color: #ff5252;
-    text-shadow: 0 0 6px rgba(255, 82, 82, 0.9);
+    text-shadow: none;
     opacity: 1;
   }
-  .sl-gal-lo, .sl-gal-empty { color: var(--sl-ink-muted); transition: color 0.15s ease; }
-  .sl-gal-mid { color: color-mix(in srgb, var(--accent-cold, #b00010) 62%, white); }
-  .sl-gal-hi { color: var(--accent-cold, #b00010); }
+  /* Picked row — gold glyph, yellow bloom, white hairline. */
+  .sl-row:not(.sl-row--head).is-picked .shoe-icon.shoe-debut,
+  .sl-row:not(.sl-row--head).is-picked:hover .shoe-icon.shoe-debut,
+  .sl-row:not(.sl-row--head).is-picked .shoe-icon.shoe-changed.shoe-debut,
+  .sl-row:not(.sl-row--head).is-picked:hover .shoe-icon.shoe-changed.shoe-debut {
+    color: var(--accent-first);
+    filter: var(--accent-first-bloom);
+    opacity: 1;
+  }
+  .sl-row:not(.sl-row--head).is-picked .sl-sulky.sulky-debut,
+  .sl-row:not(.sl-row--head).is-picked:hover .sl-sulky.sulky-debut,
+  .sl-row:not(.sl-row--head).is-picked .sl-sulky.sulky-changed.sulky-debut,
+  .sl-row:not(.sl-row--head).is-picked:hover .sl-sulky.sulky-changed.sulky-debut {
+    color: var(--accent-first);
+    /* Same filter stack as shoe-debut — text-shadow reads weaker on small type. */
+    text-shadow: none;
+    filter: var(--accent-first-bloom);
+    opacity: 1;
+  }
+  .sl-gal-lo, .sl-gal-empty {
+    color: var(--sl-ink-muted);
+    font-weight: 400;
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
+  .sl-gal-mid {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
+    font-weight: 600;
+  }
+  .sl-gal-hi {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
+    font-weight: 700;
+  }
   .sl-c-tform .sform-hot { color: var(--accent-hot); }
   .sl-c-tform .sform-cold { color: var(--accent-cold); }
 
@@ -449,7 +838,7 @@
   /* Horse history — unfolds under the row it belongs to.
      On the game page, fill is swapped with entry rows (paper here, tint on entries). */
   .sl-prev {
-    --sl-prev-paper: color-mix(in srgb, var(--bg, #f1eee5) 95%, black);
+    --sl-prev-paper: color-mix(in srgb, var(--bg, #f4f3ec) 95%, black);
     --sl-prev-line: var(--fluid-toggle-fg, rgba(0, 0, 0, 0.34));
     background: var(--sl-prev-paper);
   }
@@ -505,7 +894,10 @@
   }
   table.sl-prev-races .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
   table.sl-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
+  table.sl-prev-races .shoe-icon.shoe-debut { color: var(--accent-first); }
   table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
+  table.sl-prev-races .sl-sulky.sulky-changed { color: var(--accent-warn); }
+  table.sl-prev-races .sl-sulky.sulky-debut { color: var(--accent-first); }
   table.sl-prev-races .dq,
   table.sl-prev-races .withdrew { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
   table.sl-prev-races .gal-mark {
@@ -572,6 +964,14 @@
   let pctRevealed = false;            // market share veil, page-wide
   let galMode = localStorage.getItem('galModelMode') || 'track';
 
+  /* raceId -> ranked row keys, strongest first. The store lives in
+     _layout.html (see RankOrders) so a saved coupon can restore an order
+     from any page; it is defined after this partial, hence the forwarding. */
+  const rankOrders = {
+    get(raceId) { return window.RankOrders ? window.RankOrders.get(raceId) : null; },
+    set(raceId, keys) { if (window.RankOrders) window.RankOrders.set(raceId, keys); },
+  };
+
   const PREV_GPS_STORE = 'stable-prev-gps-metric';
   const PREV_GPS_METRICS = [
     { key: 'peak', label: 'peak', desc: 'fastest 100 m across prior xLabs starts' },
@@ -579,6 +979,12 @@
     { key: 'f200', label: 'f200', desc: 'fastest first 200 m across prior xLabs starts' },
     { key: 'l200', label: 'l200', desc: 'fastest last 200 m across prior xLabs starts' },
   ];
+
+  // Stable per-entry identity for remembering a ranked order.
+  function rankKeyFor(e) {
+    if (e.number != null) return String(e.number);
+    return e.horse_id ? `h${e.horse_id}` : (e.horse_name || '');
+  }
 
   function gpsMetric() {
     let k;
@@ -603,22 +1009,33 @@
     '.22-.04.36-.04.42.12l.42 1.24Z' +
     'm-9.72-5.64c0-4.1 1.92-4.66 4.22-4.66l.258.003-3.251 8.479c-.759-.668-1.227-1.829-1.227-3.822Z';
 
-  function shoeIcon(has, changed) {
-    return `<svg class="shoe-icon${changed ? ' shoe-changed' : ''}" viewBox="0 0 24 24" aria-hidden="true">`
+  function shoeIcon(has, changed, debut) {
+    const cls = 'shoe-icon'
+      + (changed ? ' shoe-changed' : '')
+      + (debut ? ' shoe-debut' : '');
+    const title = debut ? ' title="first time without shoes"'
+      : changed ? ' title="changed since last race"' : '';
+    return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"${title}>`
       + `<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${has ? SHOE_ON_PATH : SHOE_OFF_PATH}"/></svg>`;
   }
 
   // shoe_code: '1' none, '2' back only, '3' front only, '4' both.
-  function shoeCells(code, frontChanged, backChanged) {
+  function shoeCells(e) {
+    const code = e && e.shoe_code;
     if (!code) return '';
-    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', frontChanged)}`
-      + `${shoeIcon(code === '2' || code === '4', backChanged)}</span>`;
+    return `<span class="shoes">${shoeIcon(code === '3' || code === '4', e.shoe_front_changed, e.shoe_front_debut)}`
+      + `${shoeIcon(code === '2' || code === '4', e.shoe_back_changed, e.shoe_back_debut)}</span>`;
   }
 
   function sulkyCell(e) {
     if (!e.sulky) return '';
     const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
-    return `<span class="sl-sulky${e.sulky_changed ? ' sulky-changed' : ''}">${esc(txt)}</span>`;
+    const cls = 'sl-sulky'
+      + (e.sulky_changed ? ' sulky-changed' : '')
+      + (e.sulky_debut ? ' sulky-debut' : '');
+    const title = e.sulky_debut ? 'first American sulky'
+      : e.sulky_changed ? 'changed since last race' : '';
+    return `<span class="${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
   }
 
   function sexAge(e) {
@@ -627,9 +1044,33 @@
     return `${s || ''}${a}`;
   }
 
+  function stripPedigreeName(name) {
+    if (!name) return '';
+    return String(name).replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').trim().toLowerCase();
+  }
+
+  function pedigreeTitle(e) {
+    const father = stripPedigreeName(e.father);
+    const mother = stripPedigreeName(e.mother);
+    const mf = stripPedigreeName(e.mother_father);
+    if (!father && !mother && !mf) return '';
+    let s = '';
+    if (father && mother) s = `${father} \u2013 ${mother}`;
+    else if (father) s = father;
+    else if (mother) s = mother;
+    if (mf) s = s ? `${s} (${mf})` : mf;
+    return s;
+  }
+
   function horseCell(e) {
     const name = flagify(e.horse_name);
-    const link = e.horse_id ? `<a href="/horse/${e.horse_id}">${name}</a>` : name;
+    const ped = pedigreeTitle(e);
+    const titleAttr = ped ? ` title="${esc(ped)}"` : '';
+    // No horse page to link to in the cloud build, but the pedigree hover is
+    // the point of this cell, so the tooltip moves onto a plain span.
+    const link = (e.horse_id && !window.BUILDER_ONLY)
+      ? `<a class="sl-c-horse__name" href="/horse/${e.horse_id}"${titleAttr}>${name}</a>`
+      : `<span class="sl-c-horse__name"${titleAttr}>${name}</span>`;
     const sa = sexAge(e);
     return link + (sa ? ` <span class="sl-c-sa">${esc(sa)}</span>` : '');
   }
@@ -790,7 +1231,7 @@
         <td class="muted num">${esc(r.distance || '')}</td>
         <td class="muted">${esc(r.odds_text || '')}</td>
         <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
-        <td class="center">${shoeCells(r.shoe_code, r.shoe_front_changed, r.shoe_back_changed)}</td>
+        <td class="center">${shoeCells(r)}</td>
         <td class="center">${sulkyCell(r)}</td>
         <td class="num">${esc(r.prize_kr || '')}</td>
         <td class="sl-prev-comment"><div class="sl-prev-comment__clip"><span class="sl-prev-comment__text">${esc(r.comment || '')}</span></div></td>
@@ -799,9 +1240,12 @@
     return `<table class="sl-prev-races"><tbody>${body}</tbody></table>`;
   }
 
-  async function horseRaces(horseId) {
+  // The race is named so the server can check the horse is actually in that
+  // field before handing over a career history.
+  async function horseRaces(horseId, raceId) {
     if (prevRacesCache[horseId]) return prevRacesCache[horseId];
-    const res = await fetch(`/api/horse/${horseId}/races`);
+    const q = raceId ? `?race=${encodeURIComponent(raceId)}` : '';
+    const res = await fetch(`/api/horse/${horseId}/races${q}`);
     if (!res.ok) throw new Error('history fetch failed');
     const rows = await res.json();
     prevRacesCache[horseId] = rows;
@@ -821,7 +1265,7 @@
     let upcoming = false;
     let destroyed = false;
 
-    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct };
+    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct, syncReduced };
     instances.add(inst);
 
     function couponCtx() {
@@ -878,6 +1322,12 @@
         ? `<button type="button" class="sl-pick-toggle" data-sl-pick-toggle>${esc(pickToggleLabel())}</button>`
         : '#';
       return `<div class="sl-row sl-row--head">
+        <button type="button" class="sl-rank-toggle" data-rank-toggle title="ranking mode" aria-label="ranking mode">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h4v5H2v-5Zm7-5h4v10H9V12Zm7-5h4v15h-4V7ZM2 20h4v1H2v-1Zm7 0h4v1H9v-1Zm7 0h4v1h-4v-1Z"/></svg>
+        </button>
+        <button type="button" class="sl-system-toggle" data-system-toggle title="weights" aria-label="weights">
+          <span class="sl-system-toggle__omega" aria-hidden="true">ω</span>
+        </button>
         <div class="sl-row__cells">
           <span class="sl-c-num">${numHead}</span>
           <span class="sl-c-horse"></span>
@@ -917,10 +1367,25 @@
         : '';
       const hidden = pctRevealed ? '' : ' is-hidden';
       return `<div class="sl-row${scratched ? ' sl-row--scratched' : ''}"
+                   data-rank-key="${esc(rankKeyFor(e))}"
                    ${pickable ? `data-sl-pick="${e.number}"` : ''}
                    ${e.horse_id ? `data-horse-id="${e.horse_id}"` : ''}>
         ${pickable ? '<span class="sl-row__ink" aria-hidden="true"></span>' : ''}
         ${badge}
+        <button type="button" class="sl-rank-handle" data-rank-handle tabindex="-1"
+                aria-label="rank ${esc(e.horse_name || e.number || '')}">
+          <svg viewBox="0 0 56 12" fill="currentColor" aria-hidden="true">
+            <rect x="0" y="0.6" width="56" height="1.7" rx="0.85"/>
+            <rect x="0" y="5.15" width="56" height="1.7" rx="0.85"/>
+            <rect x="0" y="9.7" width="56" height="1.7" rx="0.85"/>
+          </svg>
+        </button>
+        ${pickable ? '<span class="sl-row__cutband" aria-hidden="true"></span><span class="sl-row__cutveil" aria-hidden="true"></span>' : ''}
+        ${scratched ? '' : '<span class="sl-system-share" data-system-share aria-hidden="true">0</span>'}
+        ${pickable ? `<button type="button" class="sl-system-lock" data-system-lock tabindex="-1"
+                aria-label="weight ${esc(e.horse_name || e.number || '')}"></button>` : ''}
+        ${pickable ? `<button type="button" class="sl-system-handle" data-system-handle tabindex="-1"
+                aria-label="weight ${esc(e.horse_name || e.number || '')}"></button>` : ''}
         <div class="sl-row__cells">
           ${lead}
           <span class="sl-c-horse">${horseCell(e)}</span>
@@ -929,7 +1394,7 @@
             <span class="sl-c-trn">${personCell(e.trainer_short || e.trainer_name, e.trainer_name, e.trainer_id ? `/trainer/${e.trainer_id}` : null)}</span>
           </span>
           <span class="sl-c-tform">${tformCell(e.tf_perf)}</span>
-          <span class="sl-c-eq">${shoeCells(e.shoe_code, e.shoe_front_changed, e.shoe_back_changed)}${sulkyCell(e)}</span>
+          <span class="sl-c-eq">${shoeCells(e)}${sulkyCell(e)}</span>
           <span class="sl-c-gps" data-prev-gps-cell${gpsCellAttrs(e._gps)}>${esc((e._gps && e._gps[gpsMetric().key]) || '')}</span>
           <span class="sl-c-gal" data-gal-cell>${galCell(e)}</span>
           <span class="sl-c-win">${winPct(e, which)}</span>
@@ -959,12 +1424,20 @@
         parts.push(rowHtml(e));
       });
       container.innerHTML = `<div class="sl" style="--sl-badge-ink:${BADGE_INK}">${parts.join('')}</div>`;
+      // Fresh DOM — the pre-rank child sequence has to be captured again.
+      rankBaseOrder = null;
+      rankPicked = null;
       wire();
       sync();
+      // A leg opened while the coupon is already reduced comes up weighted;
+      // the row expansion rides the unfold, so it skips the stagger wave.
+      syncReduced({ animate: false });
       syncPrevFocus();
     }
 
     function wire() {
+      rankWire();
+      systemWire();
       container.querySelectorAll('[data-sl-pick]').forEach(row => {
         const number = parseInt(row.dataset.slPick, 10);
         const badge = row.querySelector('.sl-row__badge');
@@ -984,7 +1457,7 @@
 
       container.querySelectorAll('.sl-row[data-horse-id]').forEach(row => {
         row.addEventListener('click', ev => {
-          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle]')) return;
+          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle], [data-rank-handle], [data-rank-seam], [data-rank-toggle], [data-system-toggle], [data-system-share], [data-system-handle], [data-system-lock]')) return;
           toggleHistory(row);
         });
       });
@@ -1038,6 +1511,884 @@
           setLegPicks(pickToggleLabel() === 'clear' ? [] : pickableNumbers());
         });
       }
+
+      const rankToggle = container.querySelector('[data-rank-toggle]');
+      if (rankToggle) {
+        rankToggle.addEventListener('click', ev => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          // Rank and weights/reduce stack. Either can be on, both, or neither.
+          if (rankIsActive()) rankDeactivate();
+          else rankActivate();
+        });
+      }
+
+      const systemToggle = container.querySelector('[data-system-toggle]');
+      if (systemToggle) {
+        systemToggle.addEventListener('click', ev => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          // Weighting is coupon-wide, so this flips every leg, not just this one.
+          if (window.Reduced) Reduced.setOn(!reducedOn());
+          else if (systemIsActive()) systemDeactivate();
+          else systemActivate();
+        });
+      }
+    }
+
+    /* ── rank mode ────────────────────────────────────────────────────────
+       The left gutter becomes a drag column: every row grows a handle,
+       scratched horses sink to the bottom, and rows can be reordered by
+       dragging, by selecting two handles, or via the arrows that appear
+       when hovering a seam. The order is remembered per race; leaving rank
+       mode restores the start list exactly as it was rendered. */
+
+    const RANK_EASE = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
+    const RANK_MS = 260;
+    const RANK_DRAG_SLOP = 4;         // px before a press becomes a drag
+    const RANK_SEAM_REACH = 6;        // px around a seam that shows the arrows
+
+    let rankBaseOrder = null;         // child sequence as first rendered
+    let rankPicked = null;            // handle-selected row awaiting a partner
+    let rankDrag = null;
+    let rankDropAt = 0;               // when the last drag finished
+    let rankWired = false;
+
+    function slRoot() { return container.querySelector('.sl'); }
+    function rankIsActive() {
+      const sl = slRoot();
+      return !!sl && sl.classList.contains('is-ranked');
+    }
+    function rankIsReady() {
+      const sl = slRoot();
+      return !!sl && sl.classList.contains('is-rank-ready');
+    }
+    function rankRows() {
+      const sl = slRoot();
+      return sl ? [...sl.querySelectorAll('.sl-row:not(.sl-row--head)')] : [];
+    }
+    function rankKeyOf(row) { return row.dataset.rankKey || ''; }
+    function rankPrevOf(row) {
+      const next = row.nextElementSibling;
+      return next && next.classList.contains('sl-prev') ? next : null;
+    }
+
+    function rankSyncToggle() {
+      const btn = container.querySelector('[data-rank-toggle]');
+      if (!btn) return;
+      btn.title = 'ranking mode';
+      btn.setAttribute('aria-label', 'ranking mode');
+    }
+
+    // Move rows (with any open history panel) into the given order.
+    function rankCommit(rows) {
+      const sl = slRoot();
+      if (!sl) return;
+      const units = rows.map(row => ({ row, prev: rankPrevOf(row) }));
+      const frag = document.createDocumentFragment();
+      units.forEach(u => {
+        frag.appendChild(u.row);
+        if (u.prev) frag.appendChild(u.prev);
+      });
+      sl.appendChild(frag);
+      rankOrders.set(raceId, rows.map(rankKeyOf));
+    }
+
+    // Reorder under a FLIP so rows glide from where they were to where they land.
+    function rankAnimate(mutate) {
+      const sl = slRoot();
+      if (!sl) { mutate(); return; }
+      const tracked = [...sl.children].filter(el =>
+        el.classList.contains('sl-row') || el.classList.contains('sl-prev'));
+      const before = new Map(tracked.map(el => [el, el.getBoundingClientRect().top]));
+      mutate();
+      const moved = [];
+      before.forEach((top, el) => {
+        if (!el.isConnected) return;
+        const dy = top - el.getBoundingClientRect().top;
+        if (Math.abs(dy) < 0.5) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${dy}px)`;
+        moved.push(el);
+      });
+      if (!moved.length) return;
+      requestAnimationFrame(() => {
+        moved.forEach(el => {
+          el.style.transition = `transform ${RANK_MS}ms ${RANK_EASE}`;
+          el.style.transform = 'translateY(0)';
+        });
+      });
+      setTimeout(() => moved.forEach(el => {
+        el.style.transition = '';
+        el.style.transform = '';
+      }), RANK_MS + 60);
+    }
+
+    /* ── reduced system ───────────────────────────────────────────────────
+       The right gutter opens into a weight column. Every unscratched row
+       shows the share of the coupon's lines that horse sits on, picked rows
+       fill only that far, and the share can be dragged from the fill edge
+       or pinned by clicking the number.
+
+       Reduced is a property of the coupon rather than of one leg — turning
+       it on in any race turns it on in all of them — so the switch lives in
+       window.Reduced and every leg simply follows it. */
+
+    let systemDrag = null;
+    let systemWired = false;
+
+    function reducedOn() { return !!(window.Reduced && Reduced.isOn()); }
+
+    // Reduce mode: a thumb dragged below its weight parks a cap there and the
+    // other picks stay put, instead of absorbing the slack.
+    function reducingOn() {
+      return !!(window.Reduced && Reduced.isOn() && Reduced.isReducing()
+                && Reduced.isReducible(gameType));
+    }
+
+    function systemIsActive() {
+      const sl = slRoot();
+      return !!sl && sl.classList.contains('is-system');
+    }
+
+    function systemWave() {
+      const sl = slRoot();
+      if (!sl) return [];
+      return [...sl.children].filter(el =>
+        el.classList.contains('sl-row') || el.classList.contains('sl-tillagg'));
+    }
+
+    function systemStaggerTargets(el) {
+      const cells = el.querySelector('.sl-row__cells');
+      const badge = el.querySelector('.sl-row__badge');
+      return [el, cells, badge].filter(Boolean);
+    }
+
+    function systemLocks() {
+      return window.Reduced ? Reduced.locksFor(raceId) : [];
+    }
+
+    // Shares for the picks as they stand. Derived, not stored: only weights
+    // the user actually set are persisted, and those are folded back in here.
+    function systemWeights(picks = currentPicks()) {
+      if (!window.Reduced) {
+        const even = picks.length ? 100 / picks.length : 0;
+        return Object.fromEntries(picks.map(n => [n, even]));
+      }
+      return Reduced.normalize(picks, Reduced.weightsFor(raceId), systemLocks());
+    }
+
+    function systemStoredCaps() {
+      return window.Reduced ? Reduced.capsFor(raceId) : {};
+    }
+
+    // Caps that currently paint and discount. Empty while reduce mode is
+    // off, so a parked cut comes back when the toggle is pressed again.
+    function systemCaps() {
+      return reducingOn() ? systemStoredCaps() : {};
+    }
+
+    /* Paint numbers and fill edges. Picking jumps the fill to the weight
+       so the wipe stops there; unpicking leaves the fill alone so the wipe
+       retreats from the thumb instead of snapping full-width first.
+
+       A cut pick has two edges: the cap it was pulled down to (--sl-fill,
+       where the yellow ink and the live thumb stop) and the weight it came
+       from (--sl-weight, the grey bar). --sl-cut is the ratio between them,
+       which is what the badge slices its pie on. */
+    function systemPaint(weights, picks, locks, caps) {
+      const picked = new Set(picks);
+      const locked = new Set(locks || []);
+      const reduced = reducedOn();
+      const cut = window.Reduced ? Reduced.cleanCaps(picks, weights, caps) : {};
+      container.querySelectorAll('[data-system-share]').forEach(el => {
+        const row = el.closest('.sl-row');
+        const num = parseInt(row?.dataset.slPick, 10);
+        const on = picked.has(num);
+        const w = on ? Math.max(0, Number(weights[num]) || 0) : 0;
+        const cap = on && cut[num] != null ? cut[num] : null;
+        const cov = cap != null ? cap : w;
+        el.textContent = String(Math.round(cov));
+        el.classList.toggle('is-on', on);
+        el.classList.toggle('is-locked', on && locked.has(num));
+        el.classList.toggle('is-cut', cap != null);
+        if (!row) return;
+        // Keep the yellow through an unpick so the ink retreats in the colour
+        // it was drawn in.
+        if (on || !row.classList.contains('is-unfilling')) {
+          row.classList.toggle('is-cut', cap != null);
+        }
+        const wasOn = row.dataset.fillOn === '1';
+        row.dataset.fillOn = on ? '1' : '0';
+        if (on && reduced) {
+          const fill = Math.max(0, Math.min(1, cov / 100));
+          const weightEdge = Math.max(0, Math.min(1, w / 100));
+          if (!wasOn) row.classList.add('is-fill-jump');
+          row.style.setProperty('--sl-fill', String(fill));
+          row.style.setProperty('--sl-weight', String(weightEdge));
+          row.style.setProperty('--sl-cut', String(w > 0 ? cov / w : 1));
+          if (!wasOn) {
+            requestAnimationFrame(() => row.classList.remove('is-fill-jump'));
+          }
+        } else if (on) {
+          row.style.setProperty('--sl-fill', '1');
+          row.style.setProperty('--sl-weight', '1');
+          row.style.setProperty('--sl-cut', '1');
+        } else if (wasOn && reduced) {
+          // Keep --sl-fill; setPicked schedules the reset after the wipe.
+        } else if (!row.classList.contains('is-unfilling')) {
+          row.style.setProperty('--sl-fill', '1');
+          row.style.setProperty('--sl-weight', '1');
+          row.style.setProperty('--sl-cut', '1');
+        }
+      });
+    }
+
+    function refreshSystemShares() {
+      const picks = currentPicks();
+      systemPaint(systemWeights(picks), picks, systemLocks(), systemCaps());
+      const sl = slRoot();
+      if (sl) sl.classList.toggle('is-reducing', reducingOn());
+    }
+
+    function systemActivate({ animate = true } = {}) {
+      const sl = slRoot();
+      if (!sl || sl.classList.contains('is-system')) return;
+      const wave = systemWave();
+      const rows = [...sl.querySelectorAll('.sl-row:not(.sl-row--head)')];
+      if (animate) {
+        wave.forEach((el, i) => {
+          systemStaggerTargets(el).forEach(t => { t.style.transitionDelay = `${i * 0.03}s`; });
+        });
+        rows.forEach((row, i) => {
+          const share = row.querySelector('[data-system-share]');
+          if (share) share.style.transitionDelay = `${0.08 + i * 0.03}s`;
+        });
+      }
+      sl.classList.add('is-system', 'is-reduced');
+      // Fills are set a frame later so the ink visibly recedes to its
+      // weight instead of appearing already trimmed.
+      if (animate) requestAnimationFrame(refreshSystemShares);
+      else refreshSystemShares();
+      requestAnimationFrame(() => {
+        if (!systemIsActive()) return;
+        sl.classList.add('is-system-ready');
+      });
+      if (!animate) return;
+      setTimeout(() => {
+        wave.forEach(el => {
+          systemStaggerTargets(el).forEach(t => { t.style.transitionDelay = ''; });
+        });
+        rows.forEach(row => {
+          const share = row.querySelector('[data-system-share]');
+          if (share) share.style.transitionDelay = '';
+        });
+      }, wave.length * 30 + 350);
+    }
+
+    function systemDeactivate() {
+      const sl = slRoot();
+      if (!sl) return;
+      systemDragEnd();
+      sl.classList.remove('is-system', 'is-system-ready', 'is-reduced',
+                          'is-weighting', 'is-reducing');
+      // Back to a classic system: every pick carries the full width again.
+      sl.querySelectorAll('.sl-row').forEach(row => {
+        row.style.setProperty('--sl-fill', '1');
+        row.style.setProperty('--sl-weight', '1');
+        row.style.setProperty('--sl-cut', '1');
+        row.classList.remove('is-cut');
+      });
+    }
+
+    // Follows window.Reduced — called on mount and whenever the mode or a
+    // weight changes anywhere on the page.
+    function syncReduced({ animate = true } = {}) {
+      const sl = slRoot();
+      if (!sl) return;
+      const want = reducedOn();
+      const have = sl.classList.contains('is-system');
+      if (want && !have) systemActivate({ animate });
+      else if (!want && have) systemDeactivate();
+      else if (want) refreshSystemShares();
+    }
+
+    /* ── dragging a weight ── */
+
+    // Within this many percentage points of another pick's thumb (or of the
+    // share that would make the two equal after redistribution), stick.
+    const SYSTEM_SNAP_PCT = 1.25;
+
+    /* Target share for `selfNum` that leaves it equal to `otherNum` after
+       applyDrag — locked horses keep their share, unlocked ones absorb. */
+    function systemEqualShareTarget(weights, locks, picks, selfNum, otherNum) {
+      const locked = new Set((locks || []).filter(n => picks.includes(n) && n !== selfNum));
+      let lockedSum = 0;
+      locked.forEach(n => { lockedSum += Number(weights[n]) || 0; });
+      if (locked.has(otherNum)) return Number(weights[otherNum]) || 0;
+
+      const others = picks.filter(n => n !== selfNum && !locked.has(n));
+      if (!others.includes(otherNum)) return null;
+      const sumRaw = others.reduce(
+        (s, n) => s + Math.max(0.0001, Number(weights[n]) || 0), 0);
+      const otherW = Math.max(0.0001, Number(weights[otherNum]) || 0);
+      const headroom = 100 - lockedSum;
+      // Solve self = otherW/sumRaw * (headroom - self).
+      return otherW * headroom / (sumRaw + otherW);
+    }
+
+    function systemSnapTarget(weights, locks, picks, selfNum, rawPct, live) {
+      let best = rawPct;
+      let bestDist = SYSTEM_SNAP_PCT;
+      const visualOf = live || weights;
+      picks.forEach(other => {
+        if (other === selfNum) return;
+        const equalAt = systemEqualShareTarget(weights, locks, picks, selfNum, other);
+        if (equalAt == null || !Number.isFinite(equalAt)) return;
+        const visual = Number(visualOf[other]) || 0;
+        // Stick when the pointer is near the other thumb, or near the
+        // equal-share landing — then land on the equal-share target.
+        const dist = Math.min(Math.abs(rawPct - visual), Math.abs(rawPct - equalAt));
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = equalAt;
+        }
+      });
+      return best;
+    }
+
+    /* Cutting has no redistribution to solve for. Snap to the landmarks
+       still on screen: this pick's own weight (release the cut), half of
+       it, and every other pick's current coverage — yellow caps and green
+       weights alike, since those thumbs don't move while we cut. */
+    function systemCutSnapTarget(weights, picks, selfNum, rawPct, weight, caps) {
+      const cov = window.Reduced
+        ? Reduced.coverage(picks, weights, caps)
+        : weights;
+      const stops = [weight, weight / 2];
+      picks.forEach(n => {
+        if (n === selfNum) return;
+        const v = Number(cov[n]);
+        if (Number.isFinite(v) && v > 0) stops.push(v);
+      });
+      let best = rawPct;
+      let bestDist = SYSTEM_SNAP_PCT;
+      stops.forEach(stop => {
+        if (!Number.isFinite(stop) || stop < Reduced.MIN || stop > weight + 0.05) return;
+        const dist = Math.abs(rawPct - stop);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = stop;
+        }
+      });
+      return Math.max(Reduced.MIN, Math.min(best, weight));
+    }
+
+    function systemDragStart(ev) {
+      if (ev.button != null && ev.button !== 0) return;
+      const lockEl = ev.target.closest('[data-system-lock]');
+      const handle = lockEl || ev.target.closest('[data-system-handle]');
+      if (!handle || !reducedOn() || systemDrag) return;
+      const row = handle.closest('.sl-row');
+      if (!row || !row.classList.contains('is-picked')) return;
+      const num = parseInt(row.dataset.slPick, 10);
+      if (!Number.isFinite(num)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const picks = currentPicks();
+      systemDrag = {
+        row,
+        num,
+        base: systemWeights(picks),
+        picks,
+        locks: systemLocks(),
+        caps: systemStoredCaps(),
+        // Reduce mode is fixed for the whole drag, so a mode flip mid-gesture
+        // can't turn a cut into a re-weight halfway through.
+        reducing: reducingOn(),
+        // Outer bar moves the weight; the yellow handle moves the cap.
+        via: lockEl ? 'weight' : 'cap',
+        next: null,
+        nextCaps: null,
+      };
+      slRoot()?.classList.add('is-weighting');
+      row.classList.add(lockEl ? 'is-weighting-lock' : 'is-weighting');
+      try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
+      systemDragMove(ev);
+    }
+
+    function systemFillTrack(row) {
+      const rect = row.getBoundingClientRect();
+      const cs = getComputedStyle(row);
+      const sideL = parseFloat(cs.getPropertyValue('--sl-track-l')) || 0;
+      const sideR = parseFloat(cs.getPropertyValue('--sl-side-r')) || 0;
+      return {
+        left: rect.left + sideL,
+        width: Math.max(1, rect.width - sideL - sideR),
+      };
+    }
+
+    function systemDragMove(ev) {
+      if (!systemDrag || !window.Reduced) return;
+      const { row, num, base, picks, locks, caps, reducing, next } = systemDrag;
+      // Map against the content track ending at the reduced-column border,
+      // not the full row (which includes the right gutter).
+      const track = systemFillTrack(row);
+      const raw = ((ev.clientX - track.left) / track.width) * 100;
+
+      if (reducing) {
+        const weight = Math.max(0, Number(base[num]) || 0);
+        const via = systemDrag.via || 'cap';
+        const growWeight = via === 'weight' || raw > weight + 0.4;
+        if (growWeight) {
+          // Move the outer bar. Other cut rows keep their weights so their
+          // locked thumbs stay put. This row's cap is kept — the yellow
+          // thumb does not follow the weight.
+          const held = picks.filter(n => n !== num && caps[n] != null);
+          const dragLocks = [...new Set([...(locks || []), ...held])];
+          const floor = via === 'weight'
+            ? Math.max(Reduced.MIN, Number(caps[num]) || Reduced.MIN)
+            : Reduced.MIN;
+          const pct = Math.max(floor,
+            systemSnapTarget(base, dragLocks, picks, num, raw, next));
+          const nextWeights = Reduced.applyDrag(picks, base, dragLocks, num, pct);
+          systemDrag.next = nextWeights;
+          systemDrag.nextCaps = Reduced.cleanCaps(picks, nextWeights, caps);
+          systemPaint(nextWeights, picks, dragLocks, systemDrag.nextCaps);
+          return;
+        }
+        // Left of the weight: cut. Other picks hold; only this cap moves.
+        const pct = systemCutSnapTarget(base, picks, num, raw, weight, caps);
+        const nextCaps = { ...caps };
+        if (pct >= weight - 0.05) delete nextCaps[num];
+        else nextCaps[num] = Math.max(Reduced.MIN, Math.min(pct, weight));
+        systemDrag.next = base;
+        systemDrag.nextCaps = Reduced.cleanCaps(picks, base, nextCaps);
+        systemPaint(base, picks, locks, systemDrag.nextCaps);
+        return;
+      }
+
+      const pct = systemSnapTarget(base, locks, picks, num, raw, next);
+      systemDrag.next = Reduced.applyDrag(picks, base, locks, num, pct);
+      // Weights moved, so any cap now sitting above its weight lapses.
+      systemDrag.nextCaps = Reduced.cleanCaps(picks, systemDrag.next, caps);
+      systemPaint(systemDrag.next, picks, locks, systemDrag.nextCaps);
+    }
+
+    function systemDragEnd() {
+      if (!systemDrag) return;
+      const drag = systemDrag;
+      systemDrag = null;
+      slRoot()?.classList.remove('is-weighting');
+      drag.row.classList.remove('is-weighting', 'is-weighting-lock');
+      if (drag.next && window.Reduced) {
+        Reduced.setRace(raceId, drag.next, drag.locks, drag.nextCaps || {});
+      }
+    }
+
+    /* ── pinning a weight ── */
+
+    // A pinned share sits out redistribution, so the others absorb every
+    // later drag. One pick always has to stay free to take up the slack.
+    function systemToggleLock(num) {
+      if (!window.Reduced || !Number.isFinite(num)) return;
+      const picks = currentPicks();
+      const locks = new Set(systemLocks());
+      if (locks.has(num)) locks.delete(num);
+      else locks.add(num);
+      if (picks.length > 1 && !picks.some(n => !locks.has(n))) locks.delete(num);
+      const weights = systemWeights(picks);
+      Reduced.setRace(raceId, weights, picks.filter(n => locks.has(n)));
+    }
+
+    function systemShareClick(ev) {
+      const share = ev.target.closest('[data-system-share]');
+      if (!share || !reducedOn()) return;
+      const row = share.closest('.sl-row');
+      if (!row || !row.classList.contains('is-picked')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      systemToggleLock(parseInt(row.dataset.slPick, 10));
+    }
+
+    function systemWire() {
+      if (systemWired) return;
+      systemWired = true;
+      container.addEventListener('pointerdown', systemDragStart, true);
+      container.addEventListener('click', systemShareClick, true);
+      window.addEventListener('pointermove', systemDragMove);
+      window.addEventListener('pointerup', systemDragEnd);
+      window.addEventListener('pointercancel', systemDragEnd);
+    }
+
+    // Opening order when rank mode turns on. Prefer weight/coverage order
+    // when this race has shares stored; a lone pick always floats to the
+    // top; otherwise restore the last ranked order (or sink scratched).
+    function rankOpeningOrder() {
+      const rows = rankRows();
+      const scratched = r => r.classList.contains('sl-row--scratched');
+      const active = rows.filter(r => !scratched(r));
+      const sunk = rows.filter(scratched);
+      const picked = active.filter(r => r.classList.contains('is-picked'));
+      const rest = active.filter(r => !r.classList.contains('is-picked'));
+
+      const stored = window.Reduced ? Reduced.weightsFor(raceId) : {};
+      if (stored && Object.keys(stored).length && picked.length) {
+        const picks = currentPicks();
+        const weights = systemWeights(picks);
+        const score = Reduced.coverage(picks, weights, systemCaps());
+        const weightOf = row => {
+          const n = parseInt(row.dataset.slPick, 10);
+          return Number.isFinite(n) ? (Number(score[n]) || 0) : 0;
+        };
+        picked.sort((a, b) => {
+          const dw = weightOf(b) - weightOf(a);
+          if (Math.abs(dw) > 0.05) return dw;
+          return rankKeyOf(a).localeCompare(rankKeyOf(b), undefined, { numeric: true });
+        });
+        return [...picked, ...rest, ...sunk];
+      }
+
+      // One horse selected → it is the ranking, even without stored weights.
+      if (picked.length === 1) {
+        return [...picked, ...rest, ...sunk];
+      }
+
+      const saved = rankOrders.get(raceId);
+      if (saved && saved.length) {
+        const byKey = new Map(rows.map(r => [rankKeyOf(r), r]));
+        const out = [];
+        saved.forEach(k => {
+          const row = byKey.get(k);
+          if (row && !out.includes(row)) out.push(row);
+        });
+        rows.forEach(r => { if (!out.includes(r)) out.push(r); });
+        return out;
+      }
+      return [...active, ...sunk];
+    }
+
+    function rankActivate() {
+      const sl = slRoot();
+      if (!sl || sl.classList.contains('is-ranked')) return;
+      if (!rankBaseOrder) rankBaseOrder = [...sl.children];
+      const head = sl.querySelector('.sl-row--head');
+      const rows = rankRows();
+      const wave = [head, ...rows].filter(Boolean);
+      const stagger = el => {
+        const cells = el.querySelector('.sl-row__cells');
+        const badge = el.querySelector('.sl-row__badge');
+        return [el, cells, badge].filter(Boolean);
+      };
+      wave.forEach((el, i) => {
+        stagger(el).forEach(t => { t.style.transitionDelay = `${i * 0.03}s`; });
+      });
+      // Handles follow the same top→bottom wave, a beat after the expand starts.
+      rows.forEach((row, i) => {
+        const handle = row.querySelector('.sl-rank-handle');
+        if (handle) handle.style.transitionDelay = `${0.08 + i * 0.03}s`;
+      });
+      sl.classList.add('is-ranked');
+      rankSyncToggle();
+      requestAnimationFrame(() => {
+        if (!rankIsActive()) return;
+        sl.classList.add('is-rank-ready');
+      });
+      setTimeout(() => {
+        wave.forEach(el => {
+          stagger(el).forEach(t => { t.style.transitionDelay = ''; });
+        });
+        rows.forEach(row => {
+          const handle = row.querySelector('.sl-rank-handle');
+          if (handle) handle.style.transitionDelay = '';
+        });
+        if (!rankIsActive()) return;
+        rankAnimate(() => rankCommit(rankOpeningOrder()));
+      }, wave.length * 30 + 350);
+    }
+
+    function rankDeactivate() {
+      const sl = slRoot();
+      if (!sl) return;
+      rankOrders.set(raceId, rankRows().map(rankKeyOf));
+      rankClearPick();
+      rankHideSeam();
+      sl.classList.remove('is-ranked', 'is-rank-ready');
+      rankSyncToggle();
+      if (!rankBaseOrder) return;
+      const base = rankBaseOrder.filter(el =>
+        el.isConnected && !el.classList.contains('sl-prev'));
+      const prevs = new Map(base.map(el => [el, rankPrevOf(el)]));
+      rankAnimate(() => {
+        const frag = document.createDocumentFragment();
+        base.forEach(el => {
+          frag.appendChild(el);
+          const p = prevs.get(el);
+          if (p) frag.appendChild(p);
+        });
+        sl.appendChild(frag);
+      });
+    }
+
+    /* ── drag to reorder ── */
+
+    function rankTranslate(unit, y) {
+      const t = y ? `translateY(${y}px)` : '';
+      unit.row.style.transform = t;
+      if (unit.prev) unit.prev.style.transform = t;
+    }
+
+    function rankDragStart(ev) {
+      if (ev.button !== 0 || !rankIsReady() || rankDrag) return;
+      if (ev.target.closest('[data-rank-seam], a, .sl-row__badge, [data-pct-cell],'
+        + ' [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle],'
+        + ' [data-sl-pick-toggle], [data-rank-toggle], [data-system-toggle],'
+        + ' [data-system-share], [data-system-handle], [data-system-lock]')) return;
+      const row = ev.target.closest('.sl-row:not(.sl-row--head)');
+      if (!row) return;
+      const from = rankRows().indexOf(row);
+      if (from < 0) return;
+      rankDrag = { row, from, to: from, startY: ev.clientY, live: false, units: null };
+      window.addEventListener('pointermove', rankDragMove);
+      window.addEventListener('pointerup', rankDragEnd);
+      window.addEventListener('pointercancel', rankDragEnd);
+    }
+
+    function rankDragEngage() {
+      const d = rankDrag;
+      const sl = slRoot();
+      d.units = rankRows().map(row => {
+        const prev = rankPrevOf(row);
+        const rect = row.getBoundingClientRect();
+        const height = rect.height + (prev ? prev.getBoundingClientRect().height : 0);
+        return { row, prev, top: rect.top, height };
+      });
+      d.height = d.units[d.from].height;
+      d.live = true;
+      sl.classList.add('is-rank-dragging');
+      d.units.forEach(u => {
+        u.row.style.transition = 'none';
+        if (u.prev) u.prev.style.transition = 'none';
+      });
+      const held = d.units[d.from];
+      held.row.classList.add('is-rank-held');
+      if (held.prev) held.prev.classList.add('is-rank-held');
+      rankClearPick();
+      rankHideSeam();
+      // Siblings glide; the held row must track the pointer exactly.
+      requestAnimationFrame(() => {
+        if (!rankDrag) return;
+        d.units.forEach((u, i) => {
+          if (i === d.from) return;
+          u.row.style.transition = `transform ${RANK_MS}ms ${RANK_EASE}`;
+          if (u.prev) u.prev.style.transition = `transform ${RANK_MS}ms ${RANK_EASE}`;
+        });
+      });
+    }
+
+    function rankDragMove(ev) {
+      const d = rankDrag;
+      if (!d) return;
+      const dy = ev.clientY - d.startY;
+      if (!d.live) {
+        if (Math.abs(dy) < RANK_DRAG_SLOP) return;
+        rankDragEngage();
+      }
+      ev.preventDefault();
+      const held = d.units[d.from];
+      rankTranslate(held, dy);
+      const center = held.top + held.height / 2 + dy;
+      let to = d.from;
+      d.units.forEach((u, i) => {
+        if (i === d.from) return;
+        const c = u.top + u.height / 2;
+        if (i < d.from && center < c) to = Math.min(to, i);
+        if (i > d.from && center > c) to = Math.max(to, i);
+      });
+      if (to === d.to) return;
+      d.to = to;
+      d.units.forEach((u, i) => {
+        if (i === d.from) return;
+        let shift = 0;
+        if (to < d.from && i >= to && i < d.from) shift = d.height;
+        else if (to > d.from && i > d.from && i <= to) shift = -d.height;
+        rankTranslate(u, shift);
+      });
+    }
+
+    function rankDragEnd() {
+      const d = rankDrag;
+      rankDrag = null;
+      window.removeEventListener('pointermove', rankDragMove);
+      window.removeEventListener('pointerup', rankDragEnd);
+      window.removeEventListener('pointercancel', rankDragEnd);
+      if (!d || !d.live) return;      // a plain press — let the click through
+      rankDropAt = performance.now();
+      const sl = slRoot();
+      const rows = rankRows();
+      const next = rows.slice();
+      next.splice(d.to, 0, next.splice(d.from, 1)[0]);
+
+      // Freeze where everything currently *looks*, commit, then glide to rest.
+      const seen = new Map();
+      d.units.forEach(u => {
+        seen.set(u.row, u.row.getBoundingClientRect().top);
+        if (u.prev) seen.set(u.prev, u.prev.getBoundingClientRect().top);
+      });
+      const held = d.units[d.from];
+      held.row.classList.remove('is-rank-held');
+      if (held.prev) held.prev.classList.remove('is-rank-held');
+      sl.classList.remove('is-rank-dragging');
+      d.units.forEach(u => {
+        u.row.style.transition = 'none';
+        u.row.style.transform = '';
+        if (u.prev) { u.prev.style.transition = 'none'; u.prev.style.transform = ''; }
+      });
+      rankCommit(next);
+      const moved = [];
+      seen.forEach((top, el) => {
+        if (!el.isConnected) return;
+        const dy = top - el.getBoundingClientRect().top;
+        if (Math.abs(dy) < 0.5) return;
+        el.style.transform = `translateY(${dy}px)`;
+        moved.push(el);
+      });
+      requestAnimationFrame(() => {
+        moved.forEach(el => {
+          el.style.transition = `transform ${RANK_MS}ms ${RANK_EASE}`;
+          el.style.transform = 'translateY(0)';
+        });
+      });
+      setTimeout(() => d.units.forEach(u => {
+        u.row.style.transition = '';
+        u.row.style.transform = '';
+        if (u.prev) { u.prev.style.transition = ''; u.prev.style.transform = ''; }
+      }), RANK_MS + 60);
+    }
+
+    /* ── pick two handles to swap ── */
+
+    function rankClearPick() {
+      const sl = slRoot();
+      if (sl) sl.querySelectorAll('.is-rank-picked')
+        .forEach(el => el.classList.remove('is-rank-picked'));
+      rankPicked = null;
+    }
+
+    function rankSwap(a, b) {
+      const rows = rankRows();
+      const ia = rows.indexOf(a);
+      const ib = rows.indexOf(b);
+      if (ia < 0 || ib < 0 || ia === ib) return;
+      const next = rows.slice();
+      next[ia] = rows[ib];
+      next[ib] = rows[ia];
+      rankAnimate(() => rankCommit(next));
+    }
+
+    function rankHandleClick(row) {
+      if (rankPicked === row) { rankClearPick(); return; }
+      if (!rankPicked) {
+        rankPicked = row;
+        row.classList.add('is-rank-picked');
+        return;
+      }
+      const first = rankPicked;
+      rankClearPick();
+      rankSwap(first, row);
+    }
+
+    /* ── seam arrows ── */
+
+    function rankSeamEl(create) {
+      const sl = slRoot();
+      if (!sl) return null;
+      let el = sl.querySelector('[data-rank-seam]');
+      if (!el && create) {
+        el = document.createElement('div');
+        el.className = 'sl-rank-seam';
+        el.setAttribute('data-rank-seam', '');
+        el.setAttribute('role', 'button');
+        el.innerHTML = `
+          <svg viewBox="0 0 12 7" fill="currentColor" aria-hidden="true"><path d="M6 0l6 7H0z"/></svg>
+          <svg viewBox="0 0 12 7" fill="currentColor" aria-hidden="true"><path d="M6 7L0 0h12z"/></svg>`;
+        sl.appendChild(el);
+      }
+      return el;
+    }
+
+    function rankHideSeam() {
+      const el = rankSeamEl(false);
+      if (el) el.classList.remove('is-on');
+    }
+
+    // Wide horizontal band (gutter through the # column); tight vertically on the seam.
+    function rankSeamTrack(ev) {
+      if (!rankIsReady() || rankDrag) { rankHideSeam(); return; }
+      const sl = slRoot();
+      const rows = rankRows();
+      if (rows.length < 2) return;
+      const sample = rows[0];
+      const rowLeft = sample.getBoundingClientRect().left;
+      const horse = sample.querySelector('.sl-c-horse');
+      // As far right as the # column goes — stop before the horse name.
+      const right = horse
+        ? horse.getBoundingClientRect().left
+        : (sample.querySelector('.sl-c-num')?.getBoundingClientRect().right
+            ?? sample.querySelector('[data-rank-handle]')?.getBoundingClientRect().right
+            ?? rowLeft) + 8;
+      if (ev.clientX < rowLeft - 4 || ev.clientX > right) { rankHideSeam(); return; }
+      let at = -1;
+      let best = Infinity;
+      let y = 0;
+      for (let i = 0; i < rows.length - 1; i++) {
+        const seam = rows[i + 1].getBoundingClientRect().top;
+        const dist = Math.abs(ev.clientY - seam);
+        if (dist < best) { best = dist; at = i; y = seam; }
+      }
+      if (at < 0 || best > RANK_SEAM_REACH) { rankHideSeam(); return; }
+      const el = rankSeamEl(true);
+      el.style.top = `${y - sl.getBoundingClientRect().top}px`;
+      el.dataset.rankSeamAt = String(at);
+      el.classList.add('is-on');
+    }
+
+    function rankWire() {
+      if (rankWired) return;
+      rankWired = true;
+
+      container.addEventListener('pointerdown', rankDragStart);
+      container.addEventListener('pointermove', rankSeamTrack);
+      container.addEventListener('pointerleave', rankHideSeam);
+
+      container.addEventListener('click', ev => {
+        // The click that closes a drag must not also toggle history. Bounded by
+        // time so a drag that never produced a click can't eat a later one.
+        if (performance.now() - rankDropAt < 300) {
+          rankDropAt = 0;
+          ev.preventDefault();
+          ev.stopPropagation();
+          return;
+        }
+        if (!rankIsReady()) return;
+        const seam = ev.target.closest('[data-rank-seam]');
+        if (seam) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const at = parseInt(seam.dataset.rankSeamAt ?? '', 10);
+          const rows = rankRows();
+          if (rows[at] && rows[at + 1]) rankSwap(rows[at], rows[at + 1]);
+          rankHideSeam();
+          return;
+        }
+        const handle = ev.target.closest('[data-rank-handle]');
+        if (handle) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const row = handle.closest('.sl-row');
+          if (row) rankHandleClick(row);
+        }
+      }, true);
     }
 
     function pickableEntries() {
@@ -1052,20 +2403,78 @@
     }
 
     function currentPicks() {
+      // Scratched horses can linger in a draft (picked before withdraw, or
+      // stale data). They have no row to show a share, so counting them
+      // silently steals weight from the visible picks — e.g. [1,2,3] with
+      // #2 scratched paints 33/33 instead of 50/50, or worse with leftovers.
+      const pickable = new Set(pickableNumbers());
       const ctx = couponCtx();
-      const draft = window.Coupon ? Coupon.load() : null;
-      if (ctx && draft && draft.gameId === ctx.gameId) {
-        return draft.selections[raceId] || [];
+      if (ctx && window.Coupon) {
+        // Draft is source of truth. No draft (or wrong game) means no picks —
+        // do not fall back to DOM .is-picked, or clear-leg becomes a no-op.
+        const draft = Coupon.load();
+        if (!draft || draft.gameId !== ctx.gameId) return [];
+        return (draft.selections[raceId] || []).filter(n => pickable.has(n));
       }
       return [...container.querySelectorAll('[data-sl-pick].is-picked')]
-        .map(row => parseInt(row.dataset.slPick, 10));
+        .map(row => parseInt(row.dataset.slPick, 10))
+        .filter(n => pickable.has(n));
+    }
+
+    /* Drop scratched numbers from the draft + reduced weights so they can't
+       keep eating share after a withdraw. Guard avoids coupon:changed → sync
+       re-entry while we're already syncing. */
+    let pruning = false;
+    function pruneUnpickable() {
+      if (pruning) return;
+      const pickable = new Set(pickableNumbers());
+      if (!pickable.size && !entries.length) return;
+      const ctx = couponCtx();
+      const draft = window.Coupon ? Coupon.load() : null;
+      let couponDirty = false;
+      if (ctx && draft && draft.gameId === ctx.gameId) {
+        const cur = draft.selections[raceId] || [];
+        const next = cur.filter(n => pickable.has(n));
+        if (next.length !== cur.length) {
+          if (next.length) draft.selections[raceId] = next;
+          else delete draft.selections[raceId];
+          if (draft.horseNames && draft.horseNames[raceId]) {
+            Object.keys(draft.horseNames[raceId]).forEach(k => {
+              if (!pickable.has(Number(k))) delete draft.horseNames[raceId][k];
+            });
+          }
+          couponDirty = true;
+        }
+      }
+      let reducedDirty = false;
+      let wNext = null;
+      let lNext = null;
+      if (window.Reduced) {
+        const prev = Reduced.weightsFor(raceId);
+        const locks = Reduced.locksFor(raceId);
+        wNext = {};
+        Object.keys(prev).forEach(k => {
+          const n = Number(k);
+          if (pickable.has(n)) wNext[n] = prev[k];
+        });
+        lNext = locks.filter(n => pickable.has(n));
+        reducedDirty = Object.keys(wNext).length !== Object.keys(prev).length
+          || lNext.length !== locks.length;
+      }
+      if (!couponDirty && !reducedDirty) return;
+      pruning = true;
+      try {
+        if (couponDirty) Coupon.store(Coupon.totalPicks(draft) > 0 ? draft : null);
+        if (reducedDirty) Reduced.setRace(raceId, wNext, lNext);
+      } finally {
+        pruning = false;
+      }
     }
 
     function pickToggleLabel() {
       const pickable = pickableNumbers();
       if (!pickable.length) return 'all';
-      const picks = new Set(currentPicks());
-      return pickable.every(n => picks.has(n)) ? 'clear' : 'all';
+      return currentPicks().length ? 'clear' : 'all';
     }
 
     function refreshPickToggle() {
@@ -1104,6 +2513,7 @@
         } else {
           delete d.selections[raceId];
           if (d.horseNames) delete d.horseNames[raceId];
+          if (window.Reduced) Reduced.setRace(raceId, {}, []);
         }
         Coupon.store(Coupon.totalPicks(d) > 0 ? d : null);
       } else {
@@ -1111,8 +2521,10 @@
           const n = parseInt(row.dataset.slPick, 10);
           setPicked(row, want.has(n));
         });
+        if (!want.size && window.Reduced) Reduced.setRace(raceId, {}, []);
       }
       refreshPickToggle();
+      refreshSystemShares();
     }
 
     async function pick(row, number) {
@@ -1127,13 +2539,33 @@
         if (res === null) return;          // user kept an existing draft
         setPicked(row, !!res);
         refreshPickToggle();
+        refreshSystemShares();
         return;
       }
       setPicked(row, wanted);              // no coupon context — local scratch pad
       refreshPickToggle();
+      refreshSystemShares();
     }
 
     function setPicked(row, on) {
+      if (!on && row.classList.contains('is-picked') && reducedOn()) {
+        // Hold the weight clip through the ink retreat, then clear it.
+        row.classList.add('is-unfilling');
+        clearTimeout(row._unfillTimer);
+        row._unfillTimer = setTimeout(() => {
+          row.classList.remove('is-unfilling');
+          if (!row.classList.contains('is-picked')) {
+            row.style.setProperty('--sl-fill', '1');
+            row.style.setProperty('--sl-weight', '1');
+            row.style.setProperty('--sl-cut', '1');
+            row.classList.remove('is-cut');
+            row.dataset.fillOn = '0';
+          }
+        }, 480);
+      } else if (on) {
+        clearTimeout(row._unfillTimer);
+        row.classList.remove('is-unfilling');
+      }
       row.classList.toggle('is-picked', on);
       const badge = row.querySelector('.sl-row__badge');
       if (badge) badge.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1153,12 +2585,17 @@
       root.classList.toggle('is-prev-open', !!root.querySelector('.sl-prev'));
     }
 
+    function notifyResize() {
+      container.dispatchEvent(new CustomEvent('startlist:resize', { bubbles: true }));
+    }
+
     async function toggleHistory(row) {
       const next = row.nextElementSibling;
       if (next && next.classList.contains('sl-prev')) {
         next.remove();
         row.classList.remove('is-prev-active');
         syncPrevFocus();
+        notifyResize();
         return;
       }
       const horseId = row.dataset.horseId;
@@ -1169,14 +2606,16 @@
       row.classList.add('is-prev-active');
       row.insertAdjacentElement('afterend', exp);
       syncPrevFocus();
+      notifyResize();
       try {
-        const rows = await horseRaces(horseId);
+        const rows = await horseRaces(horseId, raceId);
         const date = raceData?.race_date;
         const before = rows
           .filter(r => r.race_date && (!date || r.race_date < date))
           .slice(0, 5);
         if (!before.length) {
           exp.innerHTML = '<div class="sl-prev__empty">no previous races</div>';
+          notifyResize();
           return;
         }
         exp.innerHTML = prevRacesHtml(before);
@@ -1186,8 +2625,10 @@
             window.location.href = tr.dataset.href;
           });
         });
+        notifyResize();
       } catch (_) {
         exp.innerHTML = '<div class="sl-prev__empty">failed to load</div>';
+        notifyResize();
       }
     }
 
@@ -1196,7 +2637,7 @@
     async function loadGpsInBackground() {
       const ids = [...new Set(entries.map(e => e.horse_id).filter(Boolean))];
       await Promise.all(ids.map(async id => {
-        try { await horseRaces(id); } catch (_) {}
+        try { await horseRaces(id, raceId); } catch (_) {}
       }));
       if (destroyed) return;
       const date = raceData?.race_date;
@@ -1252,21 +2693,25 @@
     // Reflect the stored draft — restores picks on load and follows changes
     // made from another leg or the receipt overlay.
     function sync() {
-      const ctx = couponCtx();
-      const draft = window.Coupon ? Coupon.load() : null;
-      const picks = (ctx && draft && draft.gameId === ctx.gameId)
-        ? (draft.selections[raceId] || []) : [];
+      pruneUnpickable();
+      const picks = currentPicks();
+      const set = new Set(picks);
       container.querySelectorAll('[data-sl-pick]').forEach(row => {
         const n = parseInt(row.dataset.slPick, 10);
-        setPicked(row, picks.includes(n));
+        setPicked(row, set.has(n));
       });
       refreshPickToggle();
+      refreshSystemShares();
       return picks;
     }
 
     function destroy() {
       destroyed = true;
       instances.delete(inst);
+      systemDrag = null;
+      window.removeEventListener('pointermove', systemDragMove);
+      window.removeEventListener('pointerup', systemDragEnd);
+      window.removeEventListener('pointercancel', systemDragEnd);
       container.innerHTML = '';
     }
 
@@ -1284,6 +2729,7 @@
   }
 
   window.addEventListener('coupon:changed', () => instances.forEach(x => x.sync()));
+  window.addEventListener('reduced:changed', () => instances.forEach(x => x.syncReduced()));
 
   window.StartList = { mount, prevRacesCache };
 })();

@@ -38,7 +38,7 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 from psycopg2.pool import ThreadedConnectionPool
-from flask import (Flask, jsonify, redirect, render_template,
+from flask import (Flask, Response, jsonify, redirect, render_template,
                    render_template_string, request, session, url_for)
 
 from core.config import WEB_PORT
@@ -46,6 +46,7 @@ import core.config as _config
 import unicodedata as _unicodedata
 
 from core.db import get_connection
+import core.reduce_system as reduce_system
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -133,9 +134,96 @@ _LOGIN_HTML = """<!DOCTYPE html>
 </html>"""
 
 
+# ---------------------------------------------------------------------------
+# Builder-only mode (the cloud deployment)
+# ---------------------------------------------------------------------------
+# Everything the coupon builder needs, and nothing else. Listed by endpoint
+# name rather than by URL so that renaming a route cannot silently widen the
+# surface, and so that any route added later is invisible in the cloud until
+# someone puts it here on purpose.
+_BUILDER_ENDPOINTS = frozenset({
+    # Auth and static assets.
+    'login', 'logout', 'static',
+    # The three pages.
+    'play_page', 'game_page', 'game_summary_page',
+    # What those pages fetch.
+    'home_upcoming',        # /play — which tracks race on a given day
+    'atg_game_panels',      # game page — the legs of a game
+    'race_detail_by_atg',   # start list rows
+    'race_live_by_atg',     # live odds and scratchings
+    'horse_races',          # expanded history + the GPS column
+    # The reduced-system solver behind the summary page.
+    'api_reduced_solve', 'api_reduced_atg_file',
+})
+
+# Database keys that only ever existed to build links to pages the cloud does
+# not have. Dropping them server-side means the ids are not sitting in the JSON
+# for someone to read out of the network tab and try against another endpoint.
+# horse_id deliberately stays: the history and GPS columns are keyed on it, so
+# that endpoint checks the horse against a named field instead (_race_field).
+_BUILDER_STRIPPED_IDS = ('entry_id', 'driver_id', 'trainer_id',
+                         'race_id', 'atg_id', 'track_id')
+
+
+def _strip_builder_ids(rows):
+    """Drop link-only database ids from a payload, in builder-only mode."""
+    if not _config.BUILDER_ONLY:
+        return rows
+    for row in rows:
+        for key in _BUILDER_STRIPPED_IDS:
+            row.pop(key, None)
+    return rows
+
+
+def _parse_iso_date(value):
+    from datetime import date as _d
+    if value is None:
+        return None
+    if isinstance(value, _d):
+        return value
+    try:
+        return _d.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return None
+
+
+def _atg_embedded_date(atg_id: str, *, game: bool = False):
+    """Date baked into an ATG race id (`2026-08-19_5_4`) or game id
+    (`V85_2026-08-19_5_4`)."""
+    parts = (atg_id or '').split('_')
+    idx = 1 if game else 0
+    if len(parts) <= idx:
+        return None
+    return _parse_iso_date(parts[idx])
+
+
+def _builder_past(date) -> bool:
+    """True when the cloud build should refuse this date.
+
+    Today is allowed even if some legs have already run — a mid-card V85
+    still has to load. Dates we cannot parse are refused.
+    """
+    from datetime import date as _d
+    if not _config.BUILDER_ONLY:
+        return False
+    parsed = _parse_iso_date(date)
+    return parsed is None or parsed < _d.today()
+
+
+app.jinja_env.globals['BUILDER_ONLY'] = _config.BUILDER_ONLY
+
+
 @app.before_request
 def _gate():
-    """Block all routes unless authenticated, when SITE_PASSWORD is set."""
+    """Hide everything outside the builder, then require the access code."""
+    if _config.BUILDER_ONLY:
+        if request.path == '/':
+            return redirect(url_for('play_page'))
+        # request.endpoint is None for URLs that match no route at all, which
+        # falls through to the same 404 as a route we deliberately hide.
+        if request.endpoint not in _BUILDER_ENDPOINTS:
+            return 'not found', 404
+
     if not _SITE_PASSWORD:
         return  # no password configured — open access (local dev)
     exempt = request.path in ('/login', '/logout') or \
@@ -648,10 +736,14 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             sulky_code = stype.get('code')
             sulky_changed = bool(stype.get('changed'))
 
+        atg_ped = _atg_horse_pedigree(h)
         rows.append({
             'entry_id': None,
             'horse_id': _resolve_atg_horse_id(cur, h.get('id')),
             'horse_name': h.get('name') or '',
+            'father': atg_ped['father'],
+            'mother': atg_ped['mother'],
+            'mother_father': atg_ped['mother_father'],
             'number': s.get('number'),
             'distance': s.get('distance') or race_distance,
             'placement': None,
@@ -704,6 +796,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     horse_ids = [r['horse_id'] for r in rows if r['horse_id']]
     driver_ids = list({r['driver_id'] for r in rows if r['driver_id']})
     trainer_ids = list({r['trainer_id'] for r in rows if r['trainer_id']})
+    ped_map = _batch_horse_pedigree(cur, horse_ids)
 
     stats_pre: dict[int, dict] = {}
     if horse_ids and race_date:
@@ -747,8 +840,13 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     t_wr_map = _person_win_rates(cur.connection, trainer_ids, 'trainer')
     df_map = _batch_person_form_at_date(cur.connection, driver_ids, 'driver', race_date)
     tf_map = _batch_person_form_at_date(cur.connection, trainer_ids, 'trainer', race_date)
+    gear_hist = _batch_horse_gear_prior(cur, horse_ids, race_date)
 
     for r in rows:
+        db_ped = ped_map.get(r['horse_id'], {})
+        for key in ('father', 'mother', 'mother_father'):
+            if db_ped.get(key):
+                r[key] = db_ped[key]
         pre = stats_pre.get(r['horse_id'], {
             'starts': 0,
             'wins': 0,
@@ -763,6 +861,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         r['pre_galadj_wins'] = pre['clean_wins']
         r['post_galadj_starts'] = pre['clean_starts']
         r['post_galadj_wins'] = pre['clean_wins']
+        _apply_gear_debut(r, gear_hist.get(r['horse_id']) or [])
         if r['driver_id']:
             r['d_wr'] = d_wr_map.get(r['driver_id'])
             r['df'] = df_map.get(r['driver_id'], {}).get('form')
@@ -776,6 +875,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
 
     _today = _date_cls.today()
     is_upcoming = bool(race_date and race_date >= _today)
+    if _builder_past(race_date):
+        return jsonify({'error': 'not found'}), 404
     source_pills = [{
         'key': 'atg',
         'source_id': atg_race_id,
@@ -798,7 +899,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         'primary_source': 'atg',
         'contributors': ['atg'],
         'source_pills': source_pills,
-        'results': rows,
+        'results': _strip_builder_ids(rows),
     })
 
 
@@ -1163,6 +1264,8 @@ def atg_game_panels(game_id):
 
     For per-race bet types (vinnare/plats) ATG exposes one game per race, so we
     aggregate every leg of the track/date into a single ordered race list."""
+    if _builder_past(_atg_embedded_date(game_id, game=True)):
+        return jsonify({'error': 'not found'}), 404
     parts = game_id.split('_')
     game_type_raw = parts[0] if parts else ''
     game_type = _atg_game_id_to_internal(game_type_raw)
@@ -1188,12 +1291,11 @@ def atg_game_panels(game_id):
     })
 
 
-@app.route('/game/<game_id>')
-def game_page(game_id):
-    """
-    Game page for a specific ATG game.
+def _game_context(game_id):
+    """Header facts for a game page, keyed off the ATG game id.
 
-    game_id is the ATG game identifier like 'V64_2026-06-08_15_4'.
+    game_id is the ATG game identifier like 'V64_2026-06-08_15_4' —
+    type, date, track id, and the number of its first race.
     """
     from datetime import date as _date, datetime as _datetime
 
@@ -1259,16 +1361,33 @@ def game_page(game_id):
 
     is_jackpot = _atg_game_has_jackpot(game_info)
 
-    return render_template('game.html',
-                           active_tab='home',
-                           game_id=game_id,
-                           game_type_id=game_type_id,
-                           game_type_label=game_type_label,
-                           track_name=track_name or '',
-                           race_count=race_count,
-                           time_display=time_display,
-                           date_str=date_str,
-                           is_jackpot=is_jackpot)
+    # ATG's numeric track code doubles as the `trackcode` in a file-betting
+    # coupon, so keep it around for the reduced-system handoff.
+    try:
+        track_code = int(parts[2]) if len(parts) > 2 else None
+    except ValueError:
+        track_code = None
+
+    return {
+        'game_id': game_id,
+        'game_type_id': game_type_id,
+        'game_type_label': game_type_label,
+        'track_name': track_name or '',
+        'track_code': track_code,
+        'race_count': race_count,
+        'time_display': time_display,
+        'date_str': date_str,
+        'is_jackpot': is_jackpot,
+    }
+
+
+@app.route('/game/<game_id>')
+def game_page(game_id):
+    """Game page for a specific ATG game."""
+    if _builder_past(_atg_embedded_date(game_id, game=True)):
+        return 'not found', 404
+    return render_template('game.html', active_tab='home',
+                           **_game_context(game_id))
 
 
 _leaderboard_cache: dict[str, tuple[float, object]] = {}
@@ -2062,6 +2181,104 @@ _COUPON_GAME_RULES = {
 }
 
 
+def _clean_reduction(raw, legs) -> dict | None:
+    """Validate a saved coupon's weighted / reduced system.
+
+    `raw` is what the game page's `Reduced.plan()` produced. Weights and caps
+    are the user's intent; coverage and retention are recomputed here rather
+    than trusted, so a saved coupon can never claim a discount its own
+    numbers do not support.
+
+    Returns None when the coupon is a plain unweighted system.
+    """
+    if not isinstance(raw, dict):
+        return None
+    raw_legs = raw.get('legs')
+    if not isinstance(raw_legs, list):
+        return None
+
+    by_race = {leg['raceId']: leg for leg in legs}
+    out_legs = []
+    weighted = False
+    reduced = False
+
+    for raw_leg in raw_legs:
+        if not isinstance(raw_leg, dict):
+            continue
+        race_id = str(raw_leg.get('raceId') or '')
+        leg = by_race.get(race_id)
+        if not leg:
+            continue
+        picks = leg['numbers']
+        even = 100.0 / len(picks)
+
+        def numbers(source):
+            out = {}
+            for key, value in (source or {}).items():
+                try:
+                    num, val = int(key), float(value)
+                except (TypeError, ValueError):
+                    continue
+                if num in picks and val > 0:
+                    out[num] = val
+            return out
+
+        weights = numbers(raw_leg.get('weights'))
+        for num in picks:
+            weights.setdefault(num, even)
+        total = sum(weights.values())
+        if total > 0 and abs(total - 100) > 0.001:
+            weights = {n: v * 100 / total for n, v in weights.items()}
+        if any(abs(v - even) > 0.05 for v in weights.values()):
+            weighted = True
+
+        # A cap only counts while it is genuinely below the weight; at or
+        # above it, it is not a reduction at all.
+        caps = {n: v for n, v in numbers(raw_leg.get('caps')).items()
+                if v < weights[n] - 0.05}
+        if caps:
+            reduced = True
+
+        coverage = {n: min(weights[n], caps.get(n, weights[n])) for n in picks}
+        rank_order = [str(k) for k in (raw_leg.get('rankOrder') or [])
+                      if isinstance(k, (str, int))]
+        reserves = []
+        for n in (raw_leg.get('reserves') or []):
+            try:
+                num = int(n)
+            except (TypeError, ValueError):
+                continue
+            if num not in picks and num not in reserves:
+                reserves.append(num)
+
+        out_legs.append({
+            'leg': leg['leg'],
+            'raceId': race_id,
+            'picks': picks,
+            'weights': {str(n): round(v, 4) for n, v in sorted(weights.items())},
+            'caps': {str(n): round(v, 4) for n, v in sorted(caps.items())},
+            'coverage': {str(n): round(v, 4) for n, v in sorted(coverage.items())},
+            'retention': round(
+                max(0.0, min(1.0, sum(coverage.values()) / 100.0)), 6),
+            'reserves': reserves[:2],
+            'rankOrder': rank_order,
+        })
+
+    if not out_legs or not (weighted or reduced):
+        return None
+
+    retention = 1.0
+    for leg in out_legs:
+        retention *= leg['retention'] if reduced else 1.0
+
+    return {
+        'weighted': weighted,
+        'reduced': reduced,
+        'retention': round(retention, 6),
+        'legs': out_legs,
+    }
+
+
 @app.route('/play')
 def play_page():
     return render_template('play.html', active_tab='stable_play')
@@ -2080,7 +2297,7 @@ def api_coupons_list():
             cur.execute("""
                 SELECT coupon_id, name, game_type, atg_game_id, track_name,
                        game_date, selections, line_price, num_lines, cost,
-                       payout, status, created_at
+                       payout, status, created_at, reduction
                 FROM coupon
                 ORDER BY created_at DESC, coupon_id DESC
             """)
@@ -2095,6 +2312,7 @@ def api_coupons_list():
         'trackName': r['track_name'] or '',
         'gameDate': r['game_date'].isoformat() if r['game_date'] else None,
         'selections': r['selections'],
+        'reduction': r['reduction'],
         'linePrice': float(r['line_price']),
         'numLines': r['num_lines'],
         'cost': float(r['cost']),
@@ -2146,6 +2364,12 @@ def api_coupons_save():
         })
         num_lines *= len(numbers)
 
+    # A reduced system pays for fewer rows than the full one, so price it on
+    # what it actually covers rather than on the picks alone.
+    full_lines = num_lines
+    reduction = _clean_reduction(body.get('reduction'), clean)
+    if reduction and reduction['reduced']:
+        num_lines = max(1, round(full_lines * reduction['retention']))
     cost = round(num_lines * rule['line_price'], 2)
 
     name = (body.get('name') or '').strip() or None
@@ -2165,18 +2389,20 @@ def api_coupons_save():
             cur.execute("""
                 INSERT INTO coupon (name, game_type, atg_game_id, track_name,
                                     game_date, selections, line_price,
-                                    num_lines, cost)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    num_lines, cost, reduction)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING coupon_id
             """, (name, game_type, game_id, track_name, game_date,
                   psycopg2.extras.Json(clean), rule['line_price'],
-                  num_lines, cost))
+                  num_lines, cost,
+                  psycopg2.extras.Json(reduction) if reduction else None))
             coupon_id = cur.fetchone()[0]
             conn.commit()
     finally:
         conn.close()
-    return jsonify({'status': 'saved', 'id': coupon_id,
-                    'numLines': num_lines, 'cost': cost})
+    return jsonify({'status': 'saved', 'id': coupon_id, 'numLines': num_lines,
+                    'fullLines': full_lines, 'cost': cost,
+                    'reduction': reduction})
 
 
 @app.route('/api/coupons/<int:coupon_id>', methods=['DELETE'])
@@ -2189,6 +2415,130 @@ def api_coupons_delete(coupon_id):
     finally:
         conn.close()
     return jsonify({'status': 'deleted', 'id': coupon_id})
+
+
+# =====================================================================
+# Reduced systems — turning a weighted coupon into an ATG submission
+# =====================================================================
+# The game page produces per-horse coverage percentages; core.reduce_system
+# turns those into mathematical sub-coupons and an ATG file-betting XML.
+# See that module for why a file beats ATG's own reduction conditions.
+
+def _reduced_plan(body: dict) -> reduce_system.Plan:
+    """Build a solver Plan out of what the game page posted."""
+    game_type = str(body.get('gameType') or '').upper()
+    rule = _COUPON_GAME_RULES.get(game_type)
+    if not rule:
+        raise reduce_system.ReduceError(f'unsupported game type: {game_type}')
+
+    raw_legs = body.get('legs')
+    if not isinstance(raw_legs, list) or len(raw_legs) != rule['legs']:
+        raise reduce_system.ReduceError(
+            f'{game_type} needs {rule["legs"]} legs')
+
+    legs = []
+    for i, leg in enumerate(raw_legs, start=1):
+        if not isinstance(leg, dict):
+            raise reduce_system.ReduceError(f'leg {i} is malformed')
+        picks = sorted({int(n) for n in (leg.get('picks') or [])})
+        if not picks:
+            raise reduce_system.ReduceError(f'leg {i} has no horses selected')
+
+        coverage = {}
+        raw_cov = leg.get('coverage') or {}
+        for key, value in raw_cov.items():
+            try:
+                num = int(key)
+            except (TypeError, ValueError):
+                continue
+            if num in picks:
+                coverage[num] = max(0.0, float(value))
+        # A leg the user never touched is an even split.
+        for num in picks:
+            coverage.setdefault(num, 100.0 / len(picks))
+
+        reserves = []
+        for n in (leg.get('reserves') or []):
+            try:
+                num = int(n)
+            except (TypeError, ValueError):
+                continue
+            if num not in picks and num not in reserves:
+                reserves.append(num)
+
+        legs.append(reduce_system.Leg(
+            leg=int(leg.get('leg') or i),
+            race_id=str(leg.get('raceId') or ''),
+            picks=picks,
+            coverage=coverage,
+            reserves=reserves[:2],
+            starters=int(leg.get('starters') or 0),
+        ))
+
+    game_id = str(body.get('gameId') or '')
+    track_code = body.get('trackCode')
+    if track_code in (None, ''):
+        parts = game_id.split('_')
+        try:
+            track_code = int(parts[2]) if len(parts) > 2 else None
+        except ValueError:
+            track_code = None
+
+    return reduce_system.Plan(
+        game_type=game_type,
+        legs=legs,
+        line_price=rule['line_price'],
+        game_date=str(body.get('gameDate') or ''),
+        track_code=int(track_code) if track_code not in (None, '') else None,
+        track_name=str(body.get('trackName') or ''),
+    )
+
+
+@app.route('/api/reduced/solve', methods=['POST'])
+def api_reduced_solve():
+    """Coverage percentages in, mathematical sub-coupons out."""
+    body = request.get_json(silent=True) or {}
+    try:
+        plan = _reduced_plan(body)
+        return jsonify(reduce_system.build(plan))
+    except reduce_system.ReduceError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+
+@app.route('/api/reduced/atg-file', methods=['POST'])
+def api_reduced_atg_file():
+    """The same system as an ATG Filinlämning document.
+
+    The four hex digits on the end of the file name are a CRC16 of the
+    contents; ATG checks them on upload to spot an edited file.
+    """
+    body = request.get_json(silent=True) or {}
+    try:
+        plan = _reduced_plan(body)
+        boxes = reduce_system.solve(plan)
+        xml = reduce_system.atg_xml(plan, boxes)
+    except reduce_system.ReduceError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    name = reduce_system.atg_filename(plan.game_type, plan.game_date, xml)
+    return Response(xml, mimetype='application/xml', headers={
+        'Content-Disposition': f'attachment; filename="{name}"',
+    })
+
+
+@app.route('/game/<game_id>/summary')
+def game_summary_page(game_id):
+    """Finished-coupon summary and the handoff to ATG.
+
+    The system itself lives in the browser (coupon draft + reduced state),
+    so this only supplies the header facts and lets the page ask
+    /api/reduced/solve for the coupons."""
+    if _builder_past(_atg_embedded_date(game_id, game=True)):
+        return 'not found', 404
+    ctx = _game_context(game_id)
+    return render_template('coupon_summary.html', active_tab='home',
+                           atg_upload_url=reduce_system.ATG_UPLOAD_URL,
+                           **ctx)
 
 
 @app.route('/api/search')
@@ -2487,11 +2837,64 @@ def horse_page(horse_id):
     return render_template('horse.html', horse=horse, active_tab='stable_search')
 
 
+# The field for one race, cached because the GPS column asks for a history per
+# runner. Cards more than a day or two out have not been ingested yet — their
+# start lists are served live from ATG — so this has to answer from both.
+_FIELD_CACHE_TTL = 900.0
+_field_cache: dict[str, tuple[float, frozenset]] = {}
+_field_cache_lock = _threading.Lock()
+
+
+def _race_field(conn, atg_race_id: str) -> frozenset:
+    """The horse_ids making up a race's start list."""
+    import time
+    now = time.time()
+    with _field_cache_lock:
+        hit = _field_cache.get(atg_race_id)
+    if hit and now - hit[0] < _FIELD_CACHE_TTL:
+        return hit[1]
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT e.horse_id
+            FROM entry e
+            JOIN race r ON r.race_id = e.race_id
+            WHERE r.atg_race_id = %s AND e.horse_id IS NOT NULL
+        """, (atg_race_id,))
+        ids = {row['horse_id'] for row in cur.fetchall()}
+        if not ids:
+            raw = _fetch_atg_race(atg_race_id) or {}
+            for start in raw.get('starts') or []:
+                hid = _resolve_atg_horse_id(cur, (start.get('horse') or {}).get('id'))
+                if hid:
+                    ids.add(hid)
+
+    field = frozenset(ids)
+    with _field_cache_lock:
+        _field_cache[atg_race_id] = (now, field)
+    return field
+
+
+def _horse_is_in_field(conn, horse_id: int, atg_race_id: str) -> bool:
+    """Is this horse in the start list the caller claims it is in?
+
+    Builder-only mode answers a history request only when the horse is
+    genuinely in the named upcoming race, so the endpoint cannot be walked
+    id by id — or pointed at a finished card — to pull the archive back out.
+    """
+    if not atg_race_id or _builder_past(_atg_embedded_date(atg_race_id)):
+        return False
+    return horse_id in _race_field(conn, atg_race_id)
+
+
 @app.route('/api/horse/<int:horse_id>/races')
 def horse_races(horse_id):
     """Race history for a horse, most recent first."""
     conn = get_db()
     try:
+        if _config.BUILDER_ONLY and not _horse_is_in_field(
+                conn, horse_id, request.args.get('race', '').strip()):
+            return jsonify({'error': 'not found'}), 404
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 """
@@ -2545,8 +2948,29 @@ def horse_races(horse_id):
                 """,
                 (horse_id,),
             )
+            raw_rows = list(cur.fetchall())
+            cur.execute(
+                """
+                SELECT e.race_id, e.shoe_code, e.sulky, e.withdrawn
+                FROM entry e
+                JOIN race r ON r.race_id = e.race_id
+                WHERE e.horse_id = %s
+                ORDER BY r.race_date ASC NULLS LAST, e.race_id ASC
+                """,
+                (horse_id,),
+            )
+            gear_seq = [dict(row) for row in cur.fetchall()]
+            _annotate_gear_debut_sequence(gear_seq)
+            gear_by_race = {
+                row['race_id']: {
+                    'shoe_front_debut': row['shoe_front_debut'],
+                    'shoe_back_debut': row['shoe_back_debut'],
+                    'sulky_debut': row['sulky_debut'],
+                }
+                for row in gear_seq
+            }
             rows = []
-            for r in cur.fetchall():
+            for r in raw_rows:
                 contribs = r.get('contributors') or []
                 # Fall back to primary_source when no column-merge has
                 # happened yet — keeps pills visible from day one.
@@ -2589,6 +3013,7 @@ def horse_races(horse_id):
                     'shoe_code': r['shoe_code'],
                     'shoe_front_changed': r['shoe_front_changed'],
                     'shoe_back_changed': r['shoe_back_changed'],
+                    **gear_by_race.get(r['race_id'], _empty_gear_debut()),
                     'disqualified': r['dq'],
                     'galopp': r['gal'],
                     'withdrawn': r['withdrawn'],
@@ -2607,7 +3032,7 @@ def horse_races(horse_id):
                 })
     finally:
         conn.close()
-    return jsonify(rows)
+    return jsonify(_strip_builder_ids(rows))
 
 
 # =====================================================================
@@ -3672,6 +4097,8 @@ def race_detail_by_id(race_id):
 
 @app.route('/api/race/atg/<path:atg_race_id>')
 def race_detail_by_atg(atg_race_id):
+    if _builder_past(_atg_embedded_date(atg_race_id)):
+        return jsonify({'error': 'not found'}), 404
     return _race_entries(atg_race_id=atg_race_id)
 
 
@@ -3679,6 +4106,8 @@ def race_detail_by_atg(atg_race_id):
 def race_live_by_atg(atg_race_id):
     """Live win/place odds + bet distribution (spelprocent) for an upcoming
     race, pulled from the ATG game pools."""
+    if _builder_past(_atg_embedded_date(atg_race_id)):
+        return jsonify({'error': 'not found'}), 404
     data = _atg_live_pools(atg_race_id)
     if not data:
         return jsonify({'error': 'no live pools'}), 404
@@ -3733,6 +4162,8 @@ def _race_entries(*, race_id=None, atg_race_id=None):
             )
             head = cur.fetchone()
             if not head:
+                return jsonify({'error': 'not found'}), 404
+            if _builder_past(head.get('race_date')):
                 return jsonify({'error': 'not found'}), 404
 
             cur.execute(
@@ -3840,7 +4271,11 @@ def _race_entries(*, race_id=None, atg_race_id=None):
             horse_ids = [r['horse_id'] for r in entry_rows if r['horse_id']]
             driver_ids = list({r['driver_id'] for r in entry_rows if r['driver_id']})
             trainer_ids = list({r['trainer_id'] for r in entry_rows if r['trainer_id']})
+            ped_map = _batch_horse_pedigree(cur, horse_ids)
             head_race_date = head.get('race_date')
+            gear_hist = _batch_horse_gear_prior(
+                cur, horse_ids, head_race_date, race_id,
+            )
             d_wr_map = _person_win_rates(conn, driver_ids, 'driver')
             t_wr_map = _person_win_rates(conn, trainer_ids, 'trainer')
             df_map = _batch_person_form_at_date(conn, driver_ids, 'driver', head_race_date)
@@ -3904,10 +4339,14 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                 clean_won_this_race = won_this_race and (not r['gal'])
                 post_clean_starts = pre['clean_starts'] + (1 if clean_this_race else 0)
                 post_clean_wins   = pre['clean_wins']   + (1 if clean_won_this_race else 0)
+                ped = ped_map.get(r['horse_id'], {})
                 rows.append({
                     'entry_id': r['entry_id'],
                     'horse_id': r['horse_id'],
                     'horse_name': r['horse_name'],
+                    'father': ped.get('father', ''),
+                    'mother': ped.get('mother', ''),
+                    'mother_father': ped.get('mother_father', ''),
                     'number': r['number'],
                     'xgal_track': gal_track_map.get(r['entry_id']),
                     'xgal_general': gal_general_map.get(r['entry_id']),
@@ -3938,6 +4377,10 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'shoe_code': r['shoe_code'],
                     'shoe_front_changed': r['shoe_front_changed'],
                     'shoe_back_changed': r['shoe_back_changed'],
+                    **_gear_debut_flags(
+                        r['shoe_code'], r['sulky'],
+                        gear_hist.get(r['horse_id']) or [],
+                    ),
                     'tf': tf_map.get(r['trainer_id'], {}).get('form'),
                     'tf_odds': tf_map.get(r['trainer_id'], {}).get('form_odds'),
                     'tf_perf': tf_map.get(r['trainer_id'], {}).get('form_perf'),
@@ -4011,8 +4454,10 @@ def _race_entries(*, race_id=None, atg_race_id=None):
         'primary_source': head.get('primary_source'),
         'contributors': contributors,
         'source_pills': source_pills,
-        'results': rows,
+        'results': _strip_builder_ids(rows),
     }
+    if _config.BUILDER_ONLY:
+        _result.pop('track_id', None)
     _race_cache[_cache_key] = (_now, _result)
     return jsonify(_result)
 
@@ -4029,6 +4474,215 @@ def driver_page(driver_id):
 @app.route('/trainer/<int:trainer_id>')
 def trainer_page(trainer_id):
     return render_template('trainer.html', active_tab='trainer', trainer_id=trainer_id)
+
+
+def _atg_horse_pedigree(horse_block: dict) -> dict:
+    """Sire, dam, and maternal grandsire from an ATG start-list horse blob."""
+    ped = (horse_block or {}).get('pedigree') or {}
+    grandfather = ped.get('grandfather') or {}
+    return {
+        'father': ((ped.get('father') or {}).get('name') or '').strip(),
+        'mother': ((ped.get('mother') or {}).get('name') or '').strip(),
+        'mother_father': (grandfather.get('name') or '').strip()
+        if isinstance(grandfather, dict) else '',
+    }
+
+
+# TravSport / ATG shoe_code: 1=none, 2=back only, 3=front only, 4=both.
+_SHOE_KNOWN = frozenset({'1', '2', '3', '4'})
+_SHOE_FRONT_SHOD = frozenset({'3', '4'})
+_SHOE_BACK_SHOD = frozenset({'2', '4'})
+
+
+def _is_am_sulky(code) -> bool:
+    return str(code or '').strip().upper() == 'AM'
+
+
+def _empty_gear_debut() -> dict:
+    return {
+        'shoe_front_debut': False,
+        'shoe_back_debut': False,
+        'sulky_debut': False,
+    }
+
+
+def _gear_debut_flags(shoe_code, sulky, prior) -> dict:
+    """Gold gear-up: first career start barefoot on that hoof, or first AM sulky.
+
+    Shoes: only the unshod (gear-up) side can debut, and only if the horse
+    has raced shod on that hoof before. Putting shoes on is never gold.
+    Sulky: American is the upgrade; Va. is never gold.
+    """
+    ever_front_shod = ever_front_bare = False
+    ever_back_shod = ever_back_bare = False
+    ever_am = False
+    for p_shoe, p_sulky in prior:
+        code = str(p_shoe).strip() if p_shoe is not None else ''
+        if code in _SHOE_KNOWN:
+            if code in _SHOE_FRONT_SHOD:
+                ever_front_shod = True
+            else:
+                ever_front_bare = True
+            if code in _SHOE_BACK_SHOD:
+                ever_back_shod = True
+            else:
+                ever_back_bare = True
+        if _is_am_sulky(p_sulky):
+            ever_am = True
+    code = str(shoe_code).strip() if shoe_code is not None else ''
+    front_bare = code in _SHOE_KNOWN and code not in _SHOE_FRONT_SHOD
+    back_bare = code in _SHOE_KNOWN and code not in _SHOE_BACK_SHOD
+    return {
+        'shoe_front_debut': bool(
+            front_bare and ever_front_shod and not ever_front_bare
+        ),
+        'shoe_back_debut': bool(
+            back_bare and ever_back_shod and not ever_back_bare
+        ),
+        'sulky_debut': bool(_is_am_sulky(sulky) and not ever_am),
+    }
+
+
+def _batch_horse_gear_prior(cur, horse_ids: list[int], before_date,
+                            before_race_id=None) -> dict[int, list]:
+    """Prior (shoe_code, sulky) pairs per horse, excluding withdrawn starts."""
+    if not horse_ids or not before_date:
+        return {}
+    if before_race_id is not None:
+        extra = ("AND (r.race_date < %s OR "
+                 "(r.race_date = %s AND e.race_id < %s))")
+        params = (horse_ids, before_date, before_date, before_race_id)
+    else:
+        extra = "AND r.race_date < %s"
+        params = (horse_ids, before_date)
+    cur.execute(
+        f"""
+        SELECT e.horse_id, e.shoe_code, e.sulky
+        FROM entry e
+        JOIN race r ON r.race_id = e.race_id
+        WHERE e.horse_id = ANY(%s)
+          {extra}
+          AND NOT COALESCE(e.withdrawn, false)
+        """,
+        params,
+    )
+    hist: dict[int, list] = {}
+    for row in cur.fetchall():
+        hist.setdefault(row['horse_id'], []).append(
+            (row['shoe_code'], row['sulky'])
+        )
+    return hist
+
+
+def _apply_gear_debut(row: dict, prior) -> None:
+    row.update(_gear_debut_flags(row.get('shoe_code'), row.get('sulky'), prior))
+
+
+def _annotate_gear_debut_sequence(rows_oldest_first: list[dict]) -> None:
+    """Stamp debut flags on a single horse's starts, oldest first."""
+    ever_front_shod = ever_front_bare = False
+    ever_back_shod = ever_back_bare = False
+    ever_am = False
+    for r in rows_oldest_first:
+        code = str(r.get('shoe_code') or '').strip()
+        front_bare = code in _SHOE_KNOWN and code not in _SHOE_FRONT_SHOD
+        back_bare = code in _SHOE_KNOWN and code not in _SHOE_BACK_SHOD
+        r['shoe_front_debut'] = bool(
+            front_bare and ever_front_shod and not ever_front_bare
+        )
+        r['shoe_back_debut'] = bool(
+            back_bare and ever_back_shod and not ever_back_bare
+        )
+        r['sulky_debut'] = bool(_is_am_sulky(r.get('sulky')) and not ever_am)
+        if r.get('withdrawn'):
+            continue
+        if code in _SHOE_KNOWN:
+            if code in _SHOE_FRONT_SHOD:
+                ever_front_shod = True
+            else:
+                ever_front_bare = True
+            if code in _SHOE_BACK_SHOD:
+                ever_back_shod = True
+            else:
+                ever_back_bare = True
+        if _is_am_sulky(r.get('sulky')):
+            ever_am = True
+
+
+def _batch_annotate_gear_debut(cur, rows: list[dict], *,
+                               date_key: str = 'race_date') -> None:
+    """Debut flags for mixed-horse rows (driver/trainer recent lists)."""
+    horse_ids = [r['horse_id'] for r in rows if r.get('horse_id')]
+    dates = [r.get(date_key) for r in rows if r.get(date_key)]
+    if not horse_ids or not dates:
+        for r in rows:
+            r.update(_empty_gear_debut())
+        return
+
+    def _as_date_str(v):
+        if hasattr(v, 'isoformat'):
+            return v.isoformat()[:10]
+        return str(v)[:10]
+
+    max_date = max(dates, key=_as_date_str)
+    cur.execute(
+        """
+        SELECT e.horse_id, r.race_date, e.race_id, e.shoe_code, e.sulky
+        FROM entry e
+        JOIN race r ON r.race_id = e.race_id
+        WHERE e.horse_id = ANY(%s)
+          AND r.race_date <= %s
+          AND NOT COALESCE(e.withdrawn, false)
+        """,
+        (horse_ids, max_date),
+    )
+    hist: dict[int, list] = {}
+    for row in cur.fetchall():
+        hist.setdefault(row['horse_id'], []).append(row)
+
+    for r in rows:
+        hid = r.get('horse_id')
+        as_of = r.get(date_key)
+        rid = r.get('race_id')
+        prior = []
+        if hid and as_of:
+            as_s = _as_date_str(as_of)
+            for p in hist.get(hid, []):
+                pd_s = _as_date_str(p['race_date'])
+                if pd_s < as_s or (
+                    pd_s == as_s and rid and p['race_id']
+                    and p['race_id'] < rid
+                ):
+                    prior.append((p['shoe_code'], p['sulky']))
+        _apply_gear_debut(r, prior)
+
+
+def _batch_horse_pedigree(cur, horse_ids: list[int]) -> dict[int, dict]:
+    """Return sire/dam/maternal grandsire names keyed by horse_id."""
+    if not horse_ids:
+        return {}
+    cur.execute(
+        """
+        SELECT h.horse_id,
+               COALESCE(sire_h.name, h.sire_name) AS father,
+               COALESCE(dam_h.name, h.dam_name) AS mother,
+               COALESCE(mgs_h.name, dam_h.sire_name) AS mother_father
+        FROM horse h
+        LEFT JOIN horse sire_h ON sire_h.horse_id = h.sire_id
+        LEFT JOIN horse dam_h ON dam_h.horse_id = h.dam_id
+        LEFT JOIN horse mgs_h ON mgs_h.horse_id = dam_h.sire_id
+        WHERE h.horse_id = ANY(%s)
+        """,
+        (horse_ids,),
+    )
+    out: dict[int, dict] = {}
+    for row in cur.fetchall():
+        out[row['horse_id']] = {
+            'father': row['father'] or '',
+            'mother': row['mother'] or '',
+            'mother_father': row['mother_father'] or '',
+        }
+    return out
 
 
 def _person_win_rates(conn, person_ids: list[int], role: str) -> dict[int, int]:
@@ -4180,6 +4834,8 @@ def _person_recent_entries(conn, person_id: int, role: str) -> list:
             f'{other_alias}_short': rr['other_short_name'] or shortName(rr['other_name'] or ''),
         }
         recent.append(item)
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        _batch_annotate_gear_debut(cur, recent)
     return recent
 
 

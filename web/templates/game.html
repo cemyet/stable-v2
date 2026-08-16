@@ -3,10 +3,10 @@
 {% block title %}{{ game_type_label }} {{ track_name }} — stable{% endblock %}
 
 {% block extra_style %}
-  body { padding: 80px 24px 60px; }
-  /* Design-tab iframe: match live page geometry (1000px centered). */
-  body.is-embed {
+  body {
     padding: 80px 24px 60px;
+    --bg: #ffffff;
+    background: #ffffff;
   }
 
   /* Wide enough for a full start list to sit under a panel without the
@@ -14,8 +14,41 @@
      when the stack fits; `safe` falls back to top once a leg expands past
      the viewport. */
   .game-page {
+    --sl-side-l: 84px;
+    --sl-side-r: 84px;
+    --sl-fade-right: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
+    --sl-fade-left: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 100%
+    );
+    --sl-fade-both: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
     width: 100%;
-    max-width: 1000px;
+    max-width: calc(1000px + var(--sl-side-l) + var(--sl-side-r));
     margin: 0 auto;
     min-height: calc(100dvh - 140px);
     display: flex;
@@ -24,17 +57,20 @@
     justify-content: safe center;
   }
 
-  /* ── Ambient background plasma — dual pool, game sphere style ──
-     Two pools of the same game-type colour (e.g. V64 = orange+orange).
-     Jackpot replaces pool B with warm gold.
-     Technique: large radial-gradient divs with heavy gaussian blur +
-     transform-only animation (GPU-composited). The massive blur radius
-     + oversized layers ensure perfectly soft organic edges — no arcs. */
+  /* ── Ambient background — static dual-pool wash, game sphere colours ──
+     Same colour logic as the old plasma (game type twice, or game + gold
+     for jackpot). Cheap: one viewport-sized layer of radial-gradients,
+     no blur, no animation. The white center glow is unchanged. */
   .game-bg-plasma {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -1;
+  }
+  .game-bg-plasma__wash {
+    position: absolute;
+    inset: 0;
+    opacity: 0.48;
   }
   /* Soft white bloom from center — lifts mud and frames the panels. */
   .game-bg-plasma__glow {
@@ -48,37 +84,6 @@
       rgba(255, 255, 255, 0.12) 72%,
       transparent 88%
     );
-  }
-  .game-bg-plasma__layer {
-    position: absolute;
-    inset: -50%;
-    border-radius: 50%;
-    filter: blur(80px);
-    will-change: transform;
-    transform: translateZ(0);
-  }
-  .game-bg-plasma__layer--a {
-    opacity: 0.38;
-    animation: gp-drift-a 20s ease-in-out infinite alternate;
-  }
-  .game-bg-plasma__layer--b {
-    opacity: 0.30;
-    animation: gp-drift-b 26s ease-in-out infinite alternate;
-    animation-delay: -7s;
-  }
-  @keyframes gp-drift-a {
-    0%   { transform: translate(2%, -3%) scale(1.0); }
-    33%  { transform: translate(-4%, 5%) scale(1.08); }
-    66%  { transform: translate(3%, 2%) scale(0.96); }
-    100% { transform: translate(-2%, -4%) scale(1.04); }
-  }
-  @keyframes gp-drift-b {
-    0%   { transform: translate(-3%, 4%) scale(1.04); }
-    50%  { transform: translate(4%, -3%) scale(0.94); }
-    100% { transform: translate(-1%, 2%) scale(1.06); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .game-bg-plasma__layer { animation: none !important; }
   }
 
   /* One block per leg: the panel is the handle, the start list lives under it. */
@@ -114,6 +119,470 @@
     flex-direction: column;
   }
 
+  /* Panel / header / tillägg / history / foot sit in the 1000px lane.
+     Left gutter is empty until rank mode; right gutter is always the fade. */
+  .game-leg__head,
+  .game-leg .sl-row--head,
+  .game-leg .sl-tillagg,
+  .game-leg .sl-prev,
+  .game-leg__foot {
+    margin-left: var(--sl-side-r);
+    width: calc(100% - var(--sl-side-r) - var(--sl-side-r));
+    box-sizing: border-box;
+  }
+  .game-leg .sl-row--head {
+    transition: margin-left 0.28s ease, width 0.28s ease;
+  }
+  .game-leg .sl-row--head .sl-row__cells {
+    color: var(--panel-ink);
+    transition: padding-left 0.28s ease, padding-right 0.28s ease;
+  }
+  .game-leg .sl-row--head .sl-pct-eye {
+    color: var(--panel-ink);
+    width: 16px;
+    height: 16px;
+    justify-content: flex-end;
+  }
+  .game-leg .sl-row--head .sl-c-pct {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .game-leg .sl-row--head .sl-c-gps .gps-toggle {
+    color: var(--panel-ink);
+  }
+
+  /* Rank toggle: out of flow so "all" stays put; bottom-aligned to title text. */
+  .game-leg .sl-row--head .sl-rank-toggle {
+    position: absolute;
+    left: -42px;
+    top: 10px;
+    width: 22px;
+    height: 24px;
+    padding: 0 0 5px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--panel-ink);
+    cursor: pointer;
+    opacity: 0.62;
+    transition: opacity 0.15s, transform 0.15s, left 0.28s ease;
+    z-index: 2;
+  }
+  .game-leg .sl-row--head .sl-rank-toggle:hover { opacity: 1; transform: scale(1.08); }
+  .game-leg .sl-row--head .sl-rank-toggle svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+
+  /* System toggle: mirror of rank, parked in the right gutter. */
+  .game-leg .sl-row--head .sl-system-toggle {
+    position: absolute;
+    right: -42px;
+    top: 10px;
+    width: 22px;
+    height: 24px;
+    padding: 0 0 5px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--panel-ink);
+    cursor: pointer;
+    opacity: 0.62;
+    transition: opacity 0.15s, transform 0.15s, right 0.28s ease;
+    z-index: 2;
+  }
+  .game-leg .sl-row--head .sl-system-toggle:hover { opacity: 1; transform: scale(1.08); }
+  .game-leg .sl-row--head .sl-system-toggle svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+  /* Italic serif ω — open curves, reads as weights without looking stiff. */
+  .game-leg .sl-row--head .sl-system-toggle__omega {
+    display: block;
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: 22px;
+    line-height: 0.8;
+    letter-spacing: 0;
+    transform: translateY(-1.5px);
+  }
+
+  /* Entry rows: flush with the panel until a side mode expands them. */
+  .game-leg .sl-row:not(.sl-row--head) {
+    margin-left: var(--sl-side-r);
+    width: calc(100% - var(--sl-side-r) - var(--sl-side-r));
+    box-sizing: border-box;
+    transition: margin-left 0.28s ease, width 0.28s ease;
+  }
+  .game-leg .sl-row:not(.sl-row--head) .sl-row__cells {
+    padding-left: 12px;
+    padding-right: 12px;
+    transition: padding-left 0.28s ease, padding-right 0.28s ease;
+  }
+  .game-leg .sl-row:not(.sl-row--head) .sl-row__badge {
+    left: 12px;
+    transition: left 0.28s ease;
+  }
+
+  /* Ranked: header grows left; cell padding keeps "all" where it was. */
+  .game-leg .sl.is-ranked .sl-row--head {
+    margin-left: 0;
+    width: calc(100% - var(--sl-side-r));
+  }
+  .game-leg .sl.is-ranked .sl-row--head .sl-row__cells {
+    padding-left: calc(12px + var(--sl-side-l));
+  }
+  .game-leg .sl.is-ranked .sl-rank-toggle {
+    left: calc(var(--sl-side-l) - 42px);
+    opacity: 1;
+  }
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head) {
+    margin-left: 0;
+    width: calc(100% - var(--sl-side-r));
+  }
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head) .sl-row__cells {
+    padding-left: calc(12px + var(--sl-side-l));
+  }
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head) .sl-row__badge {
+    left: calc(12px + var(--sl-side-l));
+  }
+
+  /* System: header, tillägg and entry rows grow right. */
+  .game-leg .sl.is-system .sl-row--head {
+    width: calc(100% - var(--sl-side-r));
+  }
+  .game-leg .sl.is-system .sl-row--head .sl-row__cells {
+    padding-right: calc(12px + var(--sl-side-r));
+  }
+  .game-leg .sl.is-system .sl-system-toggle {
+    right: calc(var(--sl-side-r) - 42px);
+    opacity: 1;
+  }
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head) {
+    width: calc(100% - var(--sl-side-r));
+  }
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head) .sl-row__cells {
+    padding-right: calc(12px + var(--sl-side-r));
+  }
+  .game-leg .sl.is-system:not(.is-ranked) .sl-tillagg {
+    width: calc(100% - var(--sl-side-r));
+  }
+
+  /* Both: full bleed. Ranked rules already zeroed the left; system grows the rest. */
+  .game-leg .sl.is-ranked.is-system .sl-row--head,
+  .game-leg .sl.is-ranked.is-system .sl-row:not(.sl-row--head) {
+    width: 100%;
+  }
+
+  /* Fades sit on the header cells (and tillägg), not the header row —
+     the rank / weights toggles live outside the cells and must stay
+     visible and clickable in every combination of the two modes. */
+  .game-leg .sl.is-ranked:not(.is-system) .sl-row--head .sl-row__cells {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 100%
+    );
+  }
+  .game-leg .sl.is-system:not(.is-ranked) .sl-row--head .sl-row__cells,
+  .game-leg .sl.is-system:not(.is-ranked) .sl-tillagg {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
+  }
+  .game-leg .sl.is-ranked.is-system .sl-row--head .sl-row__cells {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      rgba(0, 0, 0, 0.18) calc(var(--sl-side-l) * 0.14),
+      rgba(0, 0, 0, 0.52) calc(var(--sl-side-l) * 0.36),
+      rgba(0, 0, 0, 0.92) calc(var(--sl-side-l) * 0.58),
+      #000 calc(var(--sl-side-l) * 0.72),
+      #000 calc(100% - var(--sl-side-r) * 0.72),
+      rgba(0, 0, 0, 0.92) calc(100% - var(--sl-side-r) * 0.58),
+      rgba(0, 0, 0, 0.52) calc(100% - var(--sl-side-r) * 0.36),
+      rgba(0, 0, 0, 0.18) calc(100% - var(--sl-side-r) * 0.14),
+      transparent 100%
+    );
+  }
+  /* Gutter fades must NOT sit on the row — mask clips box-shadow, which
+     is the white border glow regular picks use. Paper / ink / cells fade;
+     the row itself stays unmasked so the bloom can paint above and below. */
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head),
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head) {
+    -webkit-mask-image: none;
+    mask-image: none;
+    background: transparent;
+  }
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head)::before,
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head)::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: var(--leg-bright);
+  }
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head):hover::before,
+  .game-leg .sl.is-ranked .sl-row:not(.sl-row--head).is-picked::before,
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head):hover::before,
+  .game-leg .sl.is-system .sl-row:not(.sl-row--head).is-picked::before {
+    background: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      color-mix(in srgb, var(--panel-muted-bright) 68%, white) 0%,
+      color-mix(in srgb, var(--panel-muted-bright-to) 68%, white) 100%
+    );
+  }
+  .game-leg .sl.is-ranked:not(.is-system) .sl-row:not(.sl-row--head)::before,
+  .game-leg .sl.is-ranked:not(.is-system) .sl-row:not(.sl-row--head) .sl-row__ink,
+  .game-leg .sl.is-ranked:not(.is-system) .sl-row:not(.sl-row--head) .sl-row__cells,
+  .game-leg .sl.is-ranked:not(.is-system) .sl-row:not(.sl-row--head) .sl-rank-handle {
+    -webkit-mask-image: var(--sl-fade-left);
+    mask-image: var(--sl-fade-left);
+  }
+  .game-leg .sl.is-system:not(.is-ranked) .sl-row:not(.sl-row--head)::before,
+  .game-leg .sl.is-system:not(.is-ranked) .sl-row:not(.sl-row--head) .sl-row__ink,
+  .game-leg .sl.is-system:not(.is-ranked) .sl-row:not(.sl-row--head) .sl-row__cells {
+    -webkit-mask-image: var(--sl-fade-right);
+    mask-image: var(--sl-fade-right);
+  }
+  .game-leg .sl.is-ranked.is-system .sl-row:not(.sl-row--head)::before,
+  .game-leg .sl.is-ranked.is-system .sl-row:not(.sl-row--head) .sl-row__ink,
+  .game-leg .sl.is-ranked.is-system .sl-row:not(.sl-row--head) .sl-row__cells,
+  .game-leg .sl.is-ranked.is-system .sl-row:not(.sl-row--head) .sl-rank-handle {
+    -webkit-mask-image: var(--sl-fade-both);
+    mask-image: var(--sl-fade-both);
+  }
+  /* Picked rows: drop the gutter mask on cells so equipment glows (red/gold)
+     aren't clipped — the green fill already reads as selected. */
+  .game-leg .sl.is-ranked .sl-row.is-picked:not(.sl-row--head) .sl-row__cells,
+  .game-leg .sl.is-system .sl-row.is-picked:not(.sl-row--head) .sl-row__cells,
+  .game-leg .sl.is-ranked.is-system .sl-row.is-picked:not(.sl-row--head) .sl-row__cells {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  /* Anchor for the seam arrows. */
+  .game-leg .sl { position: relative; }
+
+  /* ── Rank column: handles, held row, seam arrows ──
+     The handle lives inside the row, so the row's own left fade mask makes it
+     dissolve into the gutter. Its right edge lines up with the header symbol. */
+  .game-leg .sl-rank-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: calc(var(--sl-side-l) - 21px);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: none;
+    border: 0;
+    /* Header-row fill tone — lighter than the dark panel ink. */
+    color: var(--panel-muted);
+    opacity: 0;
+    pointer-events: none;
+    cursor: grab;
+    transition: opacity 0.28s ease, color 0.18s ease;
+    z-index: 3;
+  }
+  .game-leg .sl-rank-handle svg {
+    width: 52px;
+    height: 12px;
+    display: block;
+  }
+
+  /* Reduced-system share: centered on the header symbol, in the opaque
+     part of the right gutter. Hidden until the expand wave finishes. */
+  .game-leg .sl-system-share {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(var(--sl-side-r) - 53px);
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--panel-ink);
+    opacity: 0;
+      pointer-events: none;
+      user-select: none;
+      transition: opacity 0.28s ease, transform 0.16s ease;
+      z-index: 3;
+    }
+    .game-leg .sl.is-system-ready .sl-system-share {
+      opacity: 1;
+    }
+    /* Clicking a share pins it, so it sits out redistribution when another
+       weight is dragged. */
+    .game-leg .sl.is-system-ready .sl-system-share.is-on {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .game-leg .sl.is-system-ready .sl-system-share.is-on:hover {
+      transform: scale(1.12);
+    }
+    /* Pinned weight — small lock to the right of the share number. */
+    .game-leg .sl-system-share.is-locked {
+      gap: 3px;
+    }
+    .game-leg .sl-system-share.is-locked::after {
+      content: '';
+      flex: none;
+      width: 8px;
+      height: 9px;
+      background: currentColor;
+      opacity: 0.72;
+      pointer-events: none;
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14'%3E%3Cpath fill='%23000' d='M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5h1.2A1.3 1.3 0 0 1 11 6.8v5A1.3 1.3 0 0 1 9.7 13H2.3A1.3 1.3 0 0 1 1 11.8v-5a1.3 1.3 0 0 1 1.3-1.3H3.5zm1.3 0h2.4V4a1.2 1.2 0 0 0-2.4 0v1.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14'%3E%3Cpath fill='%23000' d='M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5h1.2A1.3 1.3 0 0 1 11 6.8v5A1.3 1.3 0 0 1 9.7 13H2.3A1.3 1.3 0 0 1 1 11.8v-5a1.3 1.3 0 0 1 1.3-1.3H3.5zm1.3 0h2.4V4a1.2 1.2 0 0 0-2.4 0v1.5z'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+  .game-leg .sl.is-rank-ready .sl-rank-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Selected = full ink, same as the active header symbol. */
+  .game-leg .sl.is-rank-ready .sl-row.is-rank-picked .sl-rank-handle {
+    color: var(--panel-ink);
+  }
+  /* Whole row is a drag surface once ranked; cells stay readable. */
+  .game-leg .sl.is-rank-ready .sl-row:not(.sl-row--head) {
+    cursor: grab;
+  }
+  .game-leg .sl.is-rank-dragging { cursor: grabbing; }
+  .game-leg .sl.is-rank-dragging .sl-row:not(.sl-row--head) { cursor: grabbing; }
+  .game-leg .sl-row.is-rank-held,
+  .game-leg .sl-prev.is-rank-held {
+    z-index: 6;
+    filter: brightness(1.04);
+  }
+  .game-leg .sl-row.is-rank-held .sl-rank-handle { cursor: grabbing; }
+  /* Suppress the hover lift while dragging — it fights the moving row. */
+  .game-leg .sl.is-rank-dragging .sl-row:not(.sl-row--head):hover {
+    background: var(--leg-bright);
+  }
+
+  /* Seam arrows sit in the gap between the rank gutter and the # column. */
+  .game-leg .sl-rank-seam {
+    position: absolute;
+    left: calc(var(--sl-side-l) - 14px);
+    width: 14px;
+    height: 11px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    margin: 0;
+    transform: translateY(-50%);
+    pointer-events: none;
+    z-index: 7;
+    background: none;
+    border: 0;
+    color: var(--panel-muted);
+    opacity: 1;
+    cursor: pointer;
+  }
+  .game-leg .sl.is-rank-ready .sl-rank-seam.is-on {
+    display: flex;
+    pointer-events: auto;
+  }
+  .game-leg .sl-rank-seam svg {
+    width: 7px;
+    height: 4px;
+    display: block;
+    flex: none;
+    pointer-events: none;
+  }
+
+  /* Tillägg: fade out, then the gap closes once the bar is gone. */
+  .game-leg .sl-tillagg {
+    color: var(--panel-ink);
+    background: var(--leg-bridge);
+    overflow: hidden;
+    max-height: 32px;
+    opacity: 1;
+    transition:
+      opacity 0.18s ease 0.12s,
+      max-height 0.22s ease,
+      padding 0.22s ease,
+      border-width 0.22s ease,
+      margin-left 0.28s ease,
+      width 0.28s ease;
+  }
+  .game-leg .sl.is-ranked .sl-tillagg {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-width: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.18s ease,
+      max-height 0.22s ease 0.14s,
+      padding 0.22s ease 0.14s,
+      border-width 0.22s ease 0.14s;
+  }
+
   .game-leg__head {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
@@ -129,6 +598,8 @@
      header of the list below it. */
   .game-leg__head:hover .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only,
   .game-leg.is-open .glass-panel--hybrid-xp.glass-panel--hybrid-gradient-only {
+    border: none;
+    box-shadow: none;
     background: linear-gradient(
       var(--panel-hybrid-angle),
       color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 80%, white) 0%,
@@ -167,13 +638,13 @@
     justify-content: space-between;
     gap: 16px;
     padding: 10px 14px 12px;
+    /* Reserve the pie's height even while the button is hidden, so the
+       first pick doesn't grow the foot and clip it inside a pixel height. */
+    min-height: 42px;
+    box-sizing: border-box;
     font-size: 11px;
     letter-spacing: 1px;
     text-transform: lowercase;
-    background: var(--leg-bridge);
-  }
-  /* Volt tillägg bars — first-step muted (same as bridge/foot). */
-  .game-leg .sl-tillagg {
     background: var(--leg-bridge);
   }
   /* Entry rows: lightest muted game-type tint. History: bone-white paper. */
@@ -192,28 +663,54 @@
   .game-leg .sl-prev {
     background: var(--sl-paper-rest);
   }
-  .game-leg__clear {
-    color: var(--fg-muted);
-    font-family: inherit;
-    font-size: 11px;
-    letter-spacing: 1px;
-    text-decoration: none;
+  /* Reduce toggle — full pie idle, 3/4 when on. Same ink/opacity as
+     rank + ω; wedge animates like the number-sphere cut. */
+  @property --reduce-pie {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 1;
+  }
+  .game-leg__reduce {
+    color: var(--panel-ink);
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: 0;
-    padding: 0;
     cursor: pointer;
-    opacity: 0.72;
-    transition: opacity 0.15s, color 0.15s;
+    opacity: 0.62;
+    transition: opacity 0.15s;
   }
-  .game-leg__clear:hover { opacity: 1; color: var(--accent-warn); }
-  .game-leg__clear[hidden] { display: none; }
+  .game-leg__reduce.is-on {
+    opacity: 1;
+  }
+  .game-leg__reduce[hidden] { display: none; }
+  /* Missing quarter upper-right (12 → 3), same orientation as badge pies. */
+  .game-leg__reduce-pie {
+    --reduce-pie: 1;
+    display: block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 0turn,
+      transparent 0turn calc((1 - var(--reduce-pie, 1)) * 1turn),
+      currentColor calc((1 - var(--reduce-pie, 1)) * 1turn) 1turn
+    );
+    transition: --reduce-pie 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .game-leg__reduce.is-on .game-leg__reduce-pie {
+    --reduce-pie: 0.75;
+  }
 {% endblock %}
 
 {% block content %}
-  <a href="/home" class="page-back" aria-label="Back"></a>
+  <a href="{{ '/play' if BUILDER_ONLY else '/home' }}" class="page-back" aria-label="Back"></a>
   <div class="game-bg-plasma" id="gameBgPlasma" aria-hidden="true">
-    <div class="game-bg-plasma__layer game-bg-plasma__layer--a"></div>
-    <div class="game-bg-plasma__layer game-bg-plasma__layer--b"></div>
+    <div class="game-bg-plasma__wash"></div>
     <div class="game-bg-plasma__glow"></div>
   </div>
   <div class="game-page">
@@ -229,7 +726,7 @@
 {% block scripts %}
 {% include "partials/start_list.html" %}
 <script>
-  /* ── Background plasma — dual pool, game sphere colour logic.
+  /* ── Background wash — dual pool, game sphere colour logic.
      Standard = both pools use the game-type colour.
      Jackpot = pool A = game colour, pool B = warm gold. */
   (function initBgPlasma() {
@@ -251,17 +748,13 @@
       }).join(', ');
     }
 
-    const layerA = el.querySelector('.game-bg-plasma__layer--a');
-    const layerB = el.querySelector('.game-bg-plasma__layer--b');
-
-    if (layerA) layerA.style.background = [
-      `radial-gradient(ellipse 60% 55% at 35% 40%, rgba(${vibrant(a.shine, 0.25)}, 0.9) 0%, rgba(${vibrant(a.glow, 0.3)}, 0.5) 35%, transparent 65%)`,
-      `radial-gradient(ellipse 45% 50% at 70% 65%, rgba(${vibrant(a.glow, 0.2)}, 0.6) 0%, transparent 55%)`,
-    ].join(', ');
-
-    if (layerB) layerB.style.background = [
-      `radial-gradient(ellipse 55% 60% at 65% 55%, rgba(${vibrant(b.shine, 0.2)}, 0.85) 0%, rgba(${vibrant(b.glow, 0.25)}, 0.45) 35%, transparent 60%)`,
-      `radial-gradient(ellipse 40% 45% at 30% 70%, rgba(${vibrant(b.glow, 0.15)}, 0.55) 0%, transparent 50%)`,
+    const wash = el.querySelector('.game-bg-plasma__wash');
+    if (!wash) return;
+    wash.style.background = [
+      `radial-gradient(ellipse 74% 66% at 30% 38%, rgba(${vibrant(a.shine, 0.12)}, 0.88) 0%, rgba(${vibrant(a.glow, 0.1)}, 0.42) 40%, transparent 72%)`,
+      `radial-gradient(ellipse 54% 60% at 73% 66%, rgba(${vibrant(a.glow, 0.08)}, 0.52) 0%, transparent 64%)`,
+      `radial-gradient(ellipse 68% 70% at 67% 53%, rgba(${vibrant(b.shine, 0.1)}, 0.78) 0%, rgba(${vibrant(b.glow, 0.08)}, 0.36) 42%, transparent 70%)`,
+      `radial-gradient(ellipse 50% 54% at 26% 73%, rgba(${vibrant(b.glow, 0.06)}, 0.46) 0%, transparent 60%)`,
     ].join(', ');
   })();
 
@@ -275,6 +768,9 @@
   const gameTypeId = legsRoot.dataset.gameTypeId;
   // Coupon rules are keyed off the ATG game id prefix (V64, GS75, …).
   const couponGameType = (gameId.split('_')[0] || '').toUpperCase();
+  // Reducing only works on the pools ATG lets you reduce — the multi-race
+  // ones. Single-race pools have no rows to cut across legs.
+  const reducible = !window.Reduced || Reduced.isReducible(couponGameType);
 
   let races = [];
 
@@ -309,7 +805,10 @@
       <div class="game-leg__body" hidden>
         <div class="game-leg__scroll"><div class="game-leg__list"></div></div>
         <div class="game-leg__foot">
-          <button type="button" class="game-leg__clear" data-clear hidden>clear leg</button>
+          <button type="button" class="game-leg__reduce" data-reduce hidden
+                  aria-pressed="false" aria-label="reduce" title="reduce">
+            <span class="game-leg__reduce-pie" aria-hidden="true"></span>
+          </button>
         </div>
       </div>
     </div>`;
@@ -325,6 +824,7 @@
     body.style.height = from + 'px';
     void body.offsetHeight;
     body.style.height = target + 'px';
+    return from;
   }
 
   function contentHeight(body) {
@@ -337,6 +837,14 @@
 
   function settleOpen(body) {
     body.style.height = 'auto';
+  }
+
+  function clearGrowWait(leg) {
+    const body = leg.querySelector('.game-leg__body');
+    if (leg._growDone && body) body.removeEventListener('transitionend', leg._growDone);
+    leg._growDone = null;
+    clearTimeout(leg._growTimer);
+    leg._growTimer = null;
   }
 
   // A leg opened low on the screen would unfold below the fold, so the panel
@@ -374,11 +882,12 @@
 
   function growOpen(leg) {
     const body = leg.querySelector('.game-leg__body');
-    slideTo(body, contentHeight(body));
-    body.addEventListener('transitionend', function done(ev) {
-      if (ev.propertyName !== 'height') return;
-      body.removeEventListener('transitionend', done);
-      // The leg may have been closed again mid-slide.
+    clearGrowWait(leg);
+    const target = contentHeight(body);
+    const from = slideTo(body, target);
+
+    function finish() {
+      clearGrowWait(leg);
       if (!leg.classList.contains('is-open')) return;
       settleOpen(body);
       // Scroll once the list is in place — until then the page is too short
@@ -387,12 +896,29 @@
         leg._scrollOnSettle = false;
         keepInView(leg.querySelector('.game-leg__head'));
       }
-    });
+    }
+
+    // No actual change → transitionend never fires, and a leftover pixel
+    // height clips the footer and any history row that opens later.
+    if (Math.abs(from - target) < 1) {
+      finish();
+      return;
+    }
+
+    function done(ev) {
+      if (ev.propertyName !== 'height') return;
+      finish();
+    }
+    leg._growDone = done;
+    body.addEventListener('transitionend', done);
+    // Fallback if the transition is interrupted or never starts.
+    leg._growTimer = setTimeout(finish, 480);
   }
 
   function closeLeg(leg) {
     const body = leg.querySelector('.game-leg__body');
     const head = leg.querySelector('.game-leg__head');
+    clearGrowWait(leg);
     leg.classList.remove('is-open');
     head.setAttribute('aria-expanded', 'false');
     slideTo(body, 0);
@@ -428,17 +954,29 @@
         slot.innerHTML = picks.length ? pickChips(picks) : '';
         slot.classList.toggle('is-dense', picks.length > 5);
       }
-      const clear = leg.querySelector('[data-clear]');
-      if (clear) clear.hidden = !picks.length;
+      const reduce = leg.querySelector('[data-reduce]');
+      if (reduce) reduce.hidden = !picks.length || !reducible;
+      if (leg.classList.contains('is-open')) growOpen(leg);
+    });
+    renderReduceState();
+  }
+
+  function renderReduceState() {
+    const on = !!(window.Reduced && Reduced.isReducing());
+    legsRoot.querySelectorAll('[data-reduce]').forEach(btn => {
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = 'reduce';
     });
   }
 
-  function clearLeg(leg) {
-    const d = draftForThisGame();
-    if (!d) return;
-    delete d.selections[leg.dataset.raceId];
-    if (d.horseNames) delete d.horseNames[leg.dataset.raceId];
-    Coupon.store(Coupon.totalPicks(d) > 0 ? d : null);
+  // Reducing needs weighting, so switching it on switches weighting on too.
+  function toggleReduce() {
+    if (!window.Reduced || !reducible) return;
+    const next = !Reduced.isReducing();
+    if (next && !Reduced.isOn()) Reduced.setOn(true);
+    Reduced.setReducing(next);
+    renderReduceState();
   }
 
   /* ── wiring ── */
@@ -452,10 +990,16 @@
         ev.preventDefault();
         toggleLeg(leg);
       });
-      const clear = leg.querySelector('[data-clear]');
-      if (clear) clear.addEventListener('click', () => clearLeg(leg));
+      const reduce = leg.querySelector('[data-reduce]');
+      if (reduce) reduce.addEventListener('click', toggleReduce);
+      // History rows and late list content grow the body; refit so the
+      // footer and the new block aren't clipped by a leftover pixel height.
+      leg.addEventListener('startlist:resize', () => {
+        if (leg.classList.contains('is-open')) growOpen(leg);
+      });
     });
     window.addEventListener('coupon:changed', renderPicks);
+    window.addEventListener('reduced:changed', renderReduceState);
   }
 
   // A leg can be linked to directly (?race=… or #race-…) — e.g. from a coupon
