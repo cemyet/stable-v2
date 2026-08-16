@@ -749,11 +749,7 @@ def _refresh_career_stats(conn) -> None:
             print(f"[track_stats] refresh skipped: {exc!r}", flush=True)
         # Browse-page stats views. horse_stats / person_stats build on
         # horse_career_stats (already refreshed above), so order matters.
-        # horse_builder_stats / person_form_recent feed the game-page start
-        # list and cut their history at CURRENT_DATE, so they must be
-        # refreshed daily to stay right.
-        for mv in ("horse_stats", "person_stats", "track_post_stats",
-                   "horse_builder_stats", "person_form_recent"):
+        for mv in ("horse_stats", "person_stats", "track_post_stats"):
             try:
                 cur.execute(f"REFRESH MATERIALIZED VIEW CONCURRENTLY {mv}")
                 conn.commit()

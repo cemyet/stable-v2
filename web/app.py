@@ -879,11 +879,6 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     trainer_ids = list({r['trainer_id'] for r in rows if r['trainer_id']})
     ped_map = _batch_horse_pedigree(cur, horse_ids)
 
-    # This path only ever serves a race ATG has published but that is not in
-    # our database yet, i.e. an upcoming one, so the per-horse rollup applies:
-    # one indexed lookup instead of two aggregates over 7.6M entry rows.
-    rollup = _builder_horse_rollup(cur, horse_ids)
-
     stats_pre: dict[int, dict] = {}
     d_wr_map: dict = {}
     t_wr_map: dict = {}
@@ -892,7 +887,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     gear_hist: dict = {}
 
     def _q_stats():
-        if not horse_ids or not race_date or rollup:
+        if not horse_ids or not race_date:
             return {}
         c = get_db()
         try:
@@ -918,8 +913,9 @@ def _race_entries_atg_live(cur, atg_race_id: str):
                                  AND NOT e.galopp
                            ) AS clean_wins
                     FROM entry e
+                    JOIN race  r2 ON r2.race_id = e.race_id
                     WHERE e.horse_id = ANY(%s)
-                      AND e.race_date < %s
+                      AND r2.race_date < %s
                     GROUP BY e.horse_id
                     """,
                     (horse_ids, race_date),
@@ -953,22 +949,18 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     def _q_df():
         c = get_db()
         try:
-            return _person_form_for_race(c, driver_ids, 'driver', race_date,
-                                         upcoming=True)
+            return _batch_person_form_at_date(c, driver_ids, 'driver', race_date)
         finally:
             c.close()
 
     def _q_tf():
         c = get_db()
         try:
-            return _person_form_for_race(c, trainer_ids, 'trainer', race_date,
-                                         upcoming=True)
+            return _batch_person_form_at_date(c, trainer_ids, 'trainer', race_date)
         finally:
             c.close()
 
     def _q_gear():
-        if rollup:
-            return {}
         c = get_db()
         try:
             with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as qc:
@@ -1010,22 +1002,21 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         for key in ('father', 'mother', 'mother_father'):
             if db_ped.get(key):
                 r[key] = db_ped[key]
-        if not _apply_rollup(r, rollup.get(r['horse_id'])):
-            pre = stats_pre.get(r['horse_id'], {
-                'starts': 0,
-                'wins': 0,
-                'clean_starts': 0,
-                'clean_wins': 0,
-            })
-            r['pre_starts'] = pre['starts']
-            r['pre_wins'] = pre['wins']
-            r['post_starts'] = pre['starts']
-            r['post_wins'] = pre['wins']
-            r['pre_galadj_starts'] = pre['clean_starts']
-            r['pre_galadj_wins'] = pre['clean_wins']
-            r['post_galadj_starts'] = pre['clean_starts']
-            r['post_galadj_wins'] = pre['clean_wins']
-            _apply_gear_debut(r, gear_hist.get(r['horse_id']) or [])
+        pre = stats_pre.get(r['horse_id'], {
+            'starts': 0,
+            'wins': 0,
+            'clean_starts': 0,
+            'clean_wins': 0,
+        })
+        r['pre_starts'] = pre['starts']
+        r['pre_wins'] = pre['wins']
+        r['post_starts'] = pre['starts']
+        r['post_wins'] = pre['wins']
+        r['pre_galadj_starts'] = pre['clean_starts']
+        r['pre_galadj_wins'] = pre['clean_wins']
+        r['post_galadj_starts'] = pre['clean_starts']
+        r['post_galadj_wins'] = pre['clean_wins']
+        _apply_gear_debut(r, gear_hist.get(r['horse_id']) or [])
         if r['driver_id']:
             r['d_wr'] = d_wr_map.get(r['driver_id'])
             r['df'] = df_map.get(r['driver_id'], {}).get('form')
@@ -1675,57 +1666,6 @@ def _batch_person_form_at_date(conn, person_ids: list[int], role: str,
                 'form_perf': _permille_perf(n_pf, sum_pf),
             }
         return out
-
-
-def _person_form_recent(conn, person_ids: list[int],
-                        role: str) -> dict[int, dict[str, int | None]] | None:
-    """Today's 30-day form for a list of people, from person_form_recent.
-
-    The live version reads the 4.3GB entry table, which does not fit in the
-    cloud replica's cache and cost over a minute on a cold start list. Every
-    upcoming race on a card wants the same "last 30 days" window, so the
-    nightly rollup answers them all from ~1MB that stays resident.
-
-    Returns None when the view is missing, which tells the caller to fall back
-    to computing it live rather than showing blank form columns.
-    """
-    if not person_ids:
-        return {}
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT person_id, starts, wins, n_of, sum_of, n_pf, sum_pf "
-                "FROM person_form_recent WHERE role = %s AND person_id = ANY(%s)",
-                (role, person_ids),
-            )
-            rows = cur.fetchall()
-    except psycopg2.Error:
-        conn.rollback()
-        app.logger.warning('person_form_recent unavailable; '
-                           'falling back to live form aggregation')
-        return None
-    return {
-        pid: {
-            'form': _permille_form(starts, wins),
-            'form_odds': _permille_s_form(n_of, sum_of),
-            'form_perf': _permille_perf(n_pf, sum_pf),
-        }
-        for pid, starts, wins, n_of, sum_of, n_pf, sum_pf in rows
-    }
-
-
-def _person_form_for_race(conn, person_ids: list[int], role: str, as_of,
-                          upcoming: bool) -> dict[int, dict[str, int | None]]:
-    """Form for a start list: the nightly rollup upcoming, live for past races.
-
-    A past race needs the window as it stood on the day, which only the live
-    query can answer without leaking later results into it.
-    """
-    if upcoming:
-        rolled = _person_form_recent(conn, person_ids, role)
-        if rolled is not None:
-            return rolled
-    return _batch_person_form_at_date(conn, person_ids, role, as_of)
 
 
 def _batch_person_form_multi(conn, person_ids: list[int], role: str,
@@ -4490,38 +4430,27 @@ def _race_entries(*, race_id=None, atg_race_id=None):
             trainer_ids = list({r['trainer_id'] for r in entry_rows if r['trainer_id']})
             ped_map = _batch_horse_pedigree(cur, horse_ids)
             head_race_date = head.get('race_date')
-            # A race that has not run yet asks for each horse's record "before
-            # this start", which is exactly its career to date — so the nightly
-            # per-horse rollup answers it with one indexed lookup instead of two
-            # aggregates over the 7.6M-row entry table. A race that has already
-            # run needs its own as-of-that-day numbers and still computes them.
-            from datetime import date as _today_cls
-            rollup = (_builder_horse_rollup(cur, horse_ids)
-                      if head_race_date and head_race_date >= _today_cls.today()
-                      else {})
-            gear_hist = {} if rollup else _batch_horse_gear_prior(
+            gear_hist = _batch_horse_gear_prior(
                 cur, horse_ids, head_race_date, race_id,
             )
             d_wr_map = _person_win_rates(conn, driver_ids, 'driver')
             t_wr_map = _person_win_rates(conn, trainer_ids, 'trainer')
-            df_map = _person_form_for_race(conn, driver_ids, 'driver',
-                                           head_race_date, upcoming=bool(rollup))
-            tf_map = _person_form_for_race(conn, trainer_ids, 'trainer',
-                                           head_race_date, upcoming=bool(rollup))
+            df_map = _batch_person_form_at_date(conn, driver_ids, 'driver', head_race_date)
+            tf_map = _batch_person_form_at_date(conn, trainer_ids, 'trainer', head_race_date)
 
             stats_pre: dict[int, dict] = {}
-            if horse_ids and head_race_date and not rollup:
+            if horse_ids and head_race_date:
                 cur.execute(
                     """
                     SELECT e.horse_id,
                            COUNT(*) FILTER (
                                WHERE NOT e.withdrawn
-                                 AND """ + _NOT_QUALIFIER + """
+                                 AND COALESCE(e.placement_text, '') !~ '{_QUALIFIER_RE}'
                            ) AS starts,
                            COUNT(*) FILTER (
                                WHERE e.placement_text = '1'
                                  AND NOT COALESCE(e.disqualified, false)
-                                 AND """ + _NOT_QUALIFIER + """
+                                 AND COALESCE(e.placement_text, '') !~ '{_QUALIFIER_RE}'
                            ) AS wins,
                            COUNT(*) FILTER (
                                WHERE NOT e.withdrawn
@@ -4536,8 +4465,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                                  AND """ + _NOT_QUALIFIER + """
                            ) AS clean_wins
                     FROM entry e
+                    JOIN race  r2 ON r2.race_id = e.race_id
                     WHERE e.horse_id = ANY(%s)
-                      AND e.race_date < %s
+                      AND r2.race_date < %s
                     GROUP BY e.horse_id
                     """,
                     (horse_ids, head_race_date),
@@ -4552,15 +4482,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
 
             rows = []
             for r in entry_rows:
-                roll = rollup.get(r['horse_id'])
-                pre = {
-                    'starts': roll['starts'] or 0,
-                    'wins': roll['wins'] or 0,
-                    'clean_starts': roll['clean_starts'] or 0,
-                    'clean_wins': roll['clean_wins'] or 0,
-                } if roll else stats_pre.get(
-                    r['horse_id'],
-                    {'starts': 0, 'wins': 0, 'clean_starts': 0, 'clean_wins': 0})
+                pre = stats_pre.get(r['horse_id'],
+                                    {'starts': 0, 'wins': 0,
+                                     'clean_starts': 0, 'clean_wins': 0})
                 pt = r['placement_text'] or ''
                 qual = bool(_re_mod.match(_QUALIFIER_RE, pt))
                 contributes_start = (not r['withdrawn']) and (not qual)
@@ -4610,12 +4534,10 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'shoe_code': r['shoe_code'],
                     'shoe_front_changed': r['shoe_front_changed'],
                     'shoe_back_changed': r['shoe_back_changed'],
-                    **(_gear_debut_flags_from_facts(
-                        r['shoe_code'], r['sulky'], roll,
-                    ) if roll else _gear_debut_flags(
+                    **_gear_debut_flags(
                         r['shoe_code'], r['sulky'],
                         gear_hist.get(r['horse_id']) or [],
-                    )),
+                    ),
                     'tf': tf_map.get(r['trainer_id'], {}).get('form'),
                     'tf_odds': tf_map.get(r['trainer_id'], {}).get('form_odds'),
                     'tf_perf': tf_map.get(r['trainer_id'], {}).get('form_perf'),
@@ -4741,52 +4663,6 @@ def _empty_gear_debut() -> dict:
     }
 
 
-def _gear_debut_flags_from_facts(shoe_code, sulky, facts) -> dict:
-    """Gold gear-up, given what the horse has already raced in.
-
-    `facts` carries the five booleans the rule needs. Keeping the rule here,
-    apart from how the history was gathered, lets a per-request walk over prior
-    starts and the precomputed horse_builder_stats rollup produce identical
-    markers instead of drifting apart.
-    """
-    code = str(shoe_code).strip() if shoe_code is not None else ''
-    front_bare = code in _SHOE_KNOWN and code not in _SHOE_FRONT_SHOD
-    back_bare = code in _SHOE_KNOWN and code not in _SHOE_BACK_SHOD
-    return {
-        'shoe_front_debut': bool(
-            front_bare and facts['ever_front_shod']
-            and not facts['ever_front_bare']
-        ),
-        'shoe_back_debut': bool(
-            back_bare and facts['ever_back_shod']
-            and not facts['ever_back_bare']
-        ),
-        'sulky_debut': bool(_is_am_sulky(sulky) and not facts['ever_am']),
-    }
-
-
-def _gear_facts_from_prior(prior) -> dict:
-    """Reduce prior (shoe_code, sulky) starts to the five gear-debut booleans."""
-    facts = {
-        'ever_front_shod': False, 'ever_front_bare': False,
-        'ever_back_shod': False, 'ever_back_bare': False, 'ever_am': False,
-    }
-    for p_shoe, p_sulky in prior:
-        code = str(p_shoe).strip() if p_shoe is not None else ''
-        if code in _SHOE_KNOWN:
-            if code in _SHOE_FRONT_SHOD:
-                facts['ever_front_shod'] = True
-            else:
-                facts['ever_front_bare'] = True
-            if code in _SHOE_BACK_SHOD:
-                facts['ever_back_shod'] = True
-            else:
-                facts['ever_back_bare'] = True
-        if _is_am_sulky(p_sulky):
-            facts['ever_am'] = True
-    return facts
-
-
 def _gear_debut_flags(shoe_code, sulky, prior) -> dict:
     """Gold gear-up: first career start barefoot on that hoof, or first AM sulky.
 
@@ -4794,8 +4670,34 @@ def _gear_debut_flags(shoe_code, sulky, prior) -> dict:
     has raced shod on that hoof before. Putting shoes on is never gold.
     Sulky: American is the upgrade; Va. is never gold.
     """
-    return _gear_debut_flags_from_facts(
-        shoe_code, sulky, _gear_facts_from_prior(prior))
+    ever_front_shod = ever_front_bare = False
+    ever_back_shod = ever_back_bare = False
+    ever_am = False
+    for p_shoe, p_sulky in prior:
+        code = str(p_shoe).strip() if p_shoe is not None else ''
+        if code in _SHOE_KNOWN:
+            if code in _SHOE_FRONT_SHOD:
+                ever_front_shod = True
+            else:
+                ever_front_bare = True
+            if code in _SHOE_BACK_SHOD:
+                ever_back_shod = True
+            else:
+                ever_back_bare = True
+        if _is_am_sulky(p_sulky):
+            ever_am = True
+    code = str(shoe_code).strip() if shoe_code is not None else ''
+    front_bare = code in _SHOE_KNOWN and code not in _SHOE_FRONT_SHOD
+    back_bare = code in _SHOE_KNOWN and code not in _SHOE_BACK_SHOD
+    return {
+        'shoe_front_debut': bool(
+            front_bare and ever_front_shod and not ever_front_bare
+        ),
+        'shoe_back_debut': bool(
+            back_bare and ever_back_shod and not ever_back_bare
+        ),
+        'sulky_debut': bool(_is_am_sulky(sulky) and not ever_am),
+    }
 
 
 def _batch_horse_gear_prior(cur, horse_ids: list[int], before_date,
@@ -4803,20 +4705,18 @@ def _batch_horse_gear_prior(cur, horse_ids: list[int], before_date,
     """Prior (shoe_code, sulky) pairs per horse, excluding withdrawn starts."""
     if not horse_ids or not before_date:
         return {}
-    # Filtered on entry.race_date rather than through a join to race: the
-    # denormalised column is covered by entry_horse_date_idx, so this is an
-    # index scan instead of a random probe into race for every entry row.
     if before_race_id is not None:
-        extra = ("AND (e.race_date < %s OR "
-                 "(e.race_date = %s AND e.race_id < %s))")
+        extra = ("AND (r.race_date < %s OR "
+                 "(r.race_date = %s AND e.race_id < %s))")
         params = (horse_ids, before_date, before_date, before_race_id)
     else:
-        extra = "AND e.race_date < %s"
+        extra = "AND r.race_date < %s"
         params = (horse_ids, before_date)
     cur.execute(
         f"""
         SELECT e.horse_id, e.shoe_code, e.sulky
         FROM entry e
+        JOIN race r ON r.race_id = e.race_id
         WHERE e.horse_id = ANY(%s)
           {extra}
           AND NOT COALESCE(e.withdrawn, false)
@@ -4831,57 +4731,8 @@ def _batch_horse_gear_prior(cur, horse_ids: list[int], before_date,
     return hist
 
 
-_BUILDER_ROLLUP_COLS = (
-    'starts', 'wins', 'clean_starts', 'clean_wins',
-    'ever_front_shod', 'ever_front_bare', 'ever_back_shod', 'ever_back_bare',
-    'ever_am',
-)
-
-
-def _builder_horse_rollup(cur, horse_ids: list[int]) -> dict[int, dict]:
-    """Career counts and gear facts per horse, from horse_builder_stats.
-
-    One indexed lookup on a 283k-row rollup replaces two aggregates over the
-    7.6M-row entry table. Only valid for races that have not run yet, where
-    "before this start" and "career to date" are the same thing.
-
-    Returns {} if the view is missing, so a database that has not been
-    migrated yet falls back to computing the numbers live rather than
-    rendering a start list full of zeroes.
-    """
-    if not horse_ids:
-        return {}
-    try:
-        cur.execute(
-            f"SELECT horse_id, {', '.join(_BUILDER_ROLLUP_COLS)} "
-            "FROM horse_builder_stats WHERE horse_id = ANY(%s)",
-            (horse_ids,),
-        )
-    except psycopg2.Error:
-        cur.connection.rollback()
-        app.logger.warning('horse_builder_stats unavailable; '
-                           'falling back to live aggregation')
-        return {}
-    return {row['horse_id']: dict(row) for row in cur.fetchall()}
-
-
 def _apply_gear_debut(row: dict, prior) -> None:
     row.update(_gear_debut_flags(row.get('shoe_code'), row.get('sulky'), prior))
-
-
-def _apply_rollup(row: dict, roll: dict | None) -> bool:
-    """Fill a start-list row's career stats and gear markers from the rollup."""
-    if not roll:
-        return False
-    starts, wins = roll['starts'] or 0, roll['wins'] or 0
-    clean_starts, clean_wins = roll['clean_starts'] or 0, roll['clean_wins'] or 0
-    row['pre_starts'] = row['post_starts'] = starts
-    row['pre_wins'] = row['post_wins'] = wins
-    row['pre_galadj_starts'] = row['post_galadj_starts'] = clean_starts
-    row['pre_galadj_wins'] = row['post_galadj_wins'] = clean_wins
-    row.update(_gear_debut_flags_from_facts(
-        row.get('shoe_code'), row.get('sulky'), roll))
-    return True
 
 
 def _annotate_gear_debut_sequence(rows_oldest_first: list[dict]) -> None:

@@ -86,20 +86,6 @@ MATVIEWS = [
     "track_stats", "horse_stats", "person_stats", "track_post_stats",
 ]
 
-# Rollups the game-page start list reads. Deliberately NOT in MATVIEWS: they
-# aggregate the whole 4.3GB entry table, which the cloud instance (1GB RAM)
-# cannot hold in cache — refreshing them there took 10 minutes and 40+ minutes
-# respectively, and would have made the site crawl every night. Locally the
-# same views build in 12s and 1.3s against a warm cache, so we compute them
-# here and ship the finished rows instead. They are small (27MB and ~1MB) and,
-# unlike the tables they summarise, stay resident in the cloud's cache.
-#
-# (name, primary key columns)
-SNAPSHOT_VIEWS: list[tuple[str, tuple[str, ...]]] = [
-    ("horse_builder_stats", ("horse_id",)),
-    ("person_form_recent",  ("role", "person_id")),
-]
-
 # Overlap re-pulled each run so boundary rows (equal timestamps / late same-day
 # derived rows) are never missed. Upserts make the re-pull idempotent.
 _TS_OVERLAP = "INTERVAL '1 hour'"
@@ -828,82 +814,6 @@ def reconcile_apply(local_read, cloud, spec: dict, plan: list[tuple[int, int]],
         f"{len(plan):,} merged-away rows")
 
 
-def _snapshot_columns(local_read, name: str) -> list[tuple[str, str]]:
-    """(column, sql_type) for a local relation, in ordinal order."""
-    with local_read.cursor() as cur:
-        cur.execute("""
-            SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS typ
-            FROM pg_attribute a
-            JOIN pg_class c ON c.oid = a.attrelid
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = 'public' AND c.relname = %s
-              AND a.attnum > 0 AND NOT a.attisdropped
-            ORDER BY a.attnum
-        """, (name,))
-        return [(r[0], r[1]) for r in cur.fetchall()]
-
-
-def publish_snapshot(local_read, cloud, name: str, key: tuple[str, ...],
-                     *, log=print) -> int:
-    """Replace the cloud's copy of a locally-computed rollup.
-
-    Loads into a side table and swaps it in with a rename, so readers keep
-    serving the previous copy for all but the instant of the swap. A
-    TRUNCATE-and-refill would instead hold an exclusive lock for the whole
-    load, blocking every start list for as long as the transfer takes.
-    """
-    cols = _snapshot_columns(local_read, name)
-    if not cols:
-        log(f"  snapshot[{name}]: missing locally, skipped")
-        return 0
-    names = [c for c, _ in cols]
-    col_list = ", ".join(names)
-    staging = f"{name}__new"
-
-    with cloud.cursor() as cc:
-        cc.execute(f"DROP TABLE IF EXISTS {staging} CASCADE")
-        cc.execute("CREATE TABLE {} ({})".format(
-            staging, ", ".join(f"{c} {t}" for c, t in cols)))
-    cloud.commit()
-
-    pushed = 0
-    insert = f"INSERT INTO {staging} ({col_list}) VALUES %s"
-    with local_read.cursor(name=f"snap_{name}") as src:
-        src.itersize = _BATCH
-        src.execute(f"SELECT {col_list} FROM {name}")
-        with cloud.cursor() as dst:
-            batch: list = []
-            for row in src:
-                batch.append(row)
-                if len(batch) >= _BATCH:
-                    execute_values(dst, insert, batch, page_size=1000)
-                    cloud.commit()
-                    pushed += len(batch)
-                    batch = []
-            if batch:
-                execute_values(dst, insert, batch, page_size=1000)
-                cloud.commit()
-                pushed += len(batch)
-
-    with cloud.cursor() as cc:
-        cc.execute(f"ALTER TABLE {staging} ADD PRIMARY KEY ({', '.join(key)})")
-        # The first run replaces whatever shape the cloud already had — these
-        # started life as materialized views there, which DROP TABLE won't touch.
-        cc.execute(f"DROP MATERIALIZED VIEW IF EXISTS {name} CASCADE")
-        cc.execute(f"DROP TABLE IF EXISTS {name} CASCADE")
-        cc.execute(f"ALTER TABLE {staging} RENAME TO {name}")
-    cloud.commit()
-    log(f"  snapshot[{name}]: replaced with {pushed:,} rows")
-    return pushed
-
-
-def publish_snapshots(local_read, cloud, *, log=print) -> int:
-    total = 0
-    for name, key in SNAPSHOT_VIEWS:
-        total += publish_snapshot(local_read, cloud, name, key, log=log)
-    return total
-
-
 def refresh_matviews(cloud, *, log=print) -> None:
     for mv in MATVIEWS:
         t0 = time.time()
@@ -1037,16 +947,6 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
         if do_matviews:
             log("refreshing materialized views on cloud...")
             refresh_matviews(cloud, log=log)
-
-        # After the base tables land, so the rollups summarise what the cloud
-        # now actually holds. Computed locally and shipped, not refreshed there.
-        try:
-            totals["snapshots"] = publish_snapshots(local_read, cloud, log=log)
-        except Exception as exc:
-            _safe_rollback(cloud)
-            if _conn_dead(cloud):
-                raise _ConnectionLost(f"snapshots: {exc!r}") from exc
-            log(f"  snapshots: ERROR {exc!r}")
     finally:
         local_read.close()
         state.close()
@@ -1102,21 +1002,7 @@ def main() -> int:
     ap.add_argument("--retry-delay", type=float, default=15.0,
                     help="base backoff seconds between retries; grows per attempt "
                          "(default 15 → 15s, 30s, 45s)")
-    ap.add_argument("--snapshots-only", action="store_true",
-                    help="only replace the locally-computed rollups on the "
-                         "cloud (horse_builder_stats, person_form_recent)")
     args = ap.parse_args()
-
-    if args.snapshots_only:
-        local_read = _connect(config.DATABASE_URL, readonly=True)
-        cloud = _connect(config.SUPABASE_DATABASE_URL,
-                         statement_timeout=_CLOUD_STATEMENT_TIMEOUT)
-        try:
-            publish_snapshots(local_read, cloud)
-        finally:
-            local_read.close()
-            cloud.close()
-        return 0
 
     if args.init:
         conn = _connect(config.DATABASE_URL)
