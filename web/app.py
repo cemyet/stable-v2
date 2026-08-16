@@ -4445,12 +4445,10 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     SELECT e.horse_id,
                            COUNT(*) FILTER (
                                WHERE NOT e.withdrawn
-                                 AND COALESCE(e.placement_text, '') !~ '{_QUALIFIER_RE}'
+                                 AND """ + _NOT_QUALIFIER + """
                            ) AS starts,
                            COUNT(*) FILTER (
-                               WHERE e.placement_text = '1'
-                                 AND NOT COALESCE(e.disqualified, false)
-                                 AND COALESCE(e.placement_text, '') !~ '{_QUALIFIER_RE}'
+                               WHERE """ + _IS_WIN + """
                            ) AS wins,
                            COUNT(*) FILTER (
                                WHERE NOT e.withdrawn
