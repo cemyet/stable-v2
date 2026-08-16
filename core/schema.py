@@ -1338,6 +1338,116 @@ GROUP BY r.track_id, e.auto, e.program_number;
 -- track_id column still serves the track-browse filter (no separate index
 -- needed).
 CREATE UNIQUE INDEX ON track_post_stats (track_id, auto, post);
+
+-- ===== horse_builder_stats — one row per horse for the game-page start list ==
+-- Every row of a start list shows career starts/wins (raw and gal-adjusted)
+-- plus the five "has this horse ever raced like this" gear facts behind the
+-- gold debut markers. Deriving those per request means aggregating the 7.6M-row
+-- entry table for a dozen horses at a time, which the cloud replica cannot do
+-- at interactive speed: cold, that single query measured 76s against Supabase.
+--
+-- A per-horse rollup is exact rather than an approximation here, because the
+-- builder only ever serves races that have not been run yet — and for an
+-- upcoming race, "the horse's record before this start" is simply its record
+-- to date. Past races still compute their own as-of-that-day numbers.
+DROP MATERIALIZED VIEW IF EXISTS horse_builder_stats CASCADE;
+CREATE MATERIALIZED VIEW horse_builder_stats AS
+SELECT e.horse_id,
+       COUNT(*) FILTER (WHERE q.started)                       AS starts,
+       COUNT(*) FILTER (WHERE q.is_win)                        AS wins,
+       COUNT(*) FILTER (WHERE q.started
+                          AND NOT COALESCE(e.galopp, false)
+                          AND NOT COALESCE(e.disqualified, false)) AS clean_starts,
+       COUNT(*) FILTER (WHERE q.is_win
+                          AND NOT COALESCE(e.galopp, false))    AS clean_wins,
+       -- Withdrawn starts are excluded: the horse never actually raced in that
+       -- gear, so it cannot have established (or spent) a debut. Mirrors the
+       -- withdrawn skip in the app's gear-debut walk.
+       COALESCE(bool_or(q.ran AND e.shoe_code IN ('3','4')), false) AS ever_front_shod,
+       COALESCE(bool_or(q.ran AND e.shoe_code IN ('1','2')), false) AS ever_front_bare,
+       COALESCE(bool_or(q.ran AND e.shoe_code IN ('2','4')), false) AS ever_back_shod,
+       COALESCE(bool_or(q.ran AND e.shoe_code IN ('1','3')), false) AS ever_back_bare,
+       COALESCE(bool_or(q.ran AND upper(btrim(e.sulky)) = 'AM'), false) AS ever_am
+FROM entry e
+CROSS JOIN LATERAL (
+    SELECT NOT e.withdrawn
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS started,
+           e.placement_text = '1'
+             AND NOT COALESCE(e.disqualified, false)
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS is_win,
+           NOT COALESCE(e.withdrawn, false) AS ran
+) q
+-- Only races that have actually been run. A horse declared for an upcoming
+-- card already has an entry row, and ATG publishes its shoes and sulky in
+-- advance — counting those would inflate its start count and, worse, mark the
+-- very gear change we are trying to flag as something it had already raced in,
+-- silently disabling every gold debut marker.
+WHERE e.horse_id IS NOT NULL
+  AND e.race_date IS NOT NULL
+  AND e.race_date < CURRENT_DATE
+GROUP BY e.horse_id;
+
+CREATE UNIQUE INDEX ON horse_builder_stats (horse_id);
+
+-- ===== person_form_recent — 30-day rolling driver/trainer form =============
+-- The same problem as horse_builder_stats, for the form columns. Computing a
+-- 30-day window live reads the 4.3GB entry table, which does not fit in the
+-- cloud replica's cache, so a cold start list waited over a minute on it.
+-- The window is "the last 30 days" for every upcoming race on the card, so one
+-- nightly rollup answers them all from a table small enough to stay resident.
+--
+-- Raw counts rather than finished percentages: the app applies its own
+-- minimum-starts and cap rules to these, and storing the inputs keeps those
+-- rules in one place instead of duplicating them into SQL.
+DROP MATERIALIZED VIEW IF EXISTS person_form_recent CASCADE;
+CREATE MATERIALIZED VIEW person_form_recent AS
+SELECT 'driver'::text AS role,
+       e.driver_id    AS person_id,
+       COUNT(*) FILTER (WHERE q.started)          AS starts,
+       COUNT(*) FILTER (WHERE q.is_win)           AS wins,
+       COUNT(eo.market_outperf)                   AS n_of,
+       COALESCE(SUM(eo.market_outperf), 0)        AS sum_of,
+       COUNT(ep.perf)                             AS n_pf,
+       COALESCE(SUM(ep.perf), 0)                  AS sum_pf
+FROM entry e
+LEFT JOIN entry_outperf eo ON eo.entry_id = e.entry_id
+LEFT JOIN entry_perf    ep ON ep.entry_id = e.entry_id
+CROSS JOIN LATERAL (
+    SELECT NOT COALESCE(e.withdrawn, false)
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS started,
+           e.placement_text = '1'
+             AND NOT COALESCE(e.disqualified, false)
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS is_win
+) q
+WHERE e.driver_id IS NOT NULL
+  AND e.race_date >= CURRENT_DATE - INTERVAL '30 days'
+  AND e.race_date <  CURRENT_DATE
+GROUP BY e.driver_id
+UNION ALL
+SELECT 'trainer'::text,
+       e.trainer_id,
+       COUNT(*) FILTER (WHERE q.started),
+       COUNT(*) FILTER (WHERE q.is_win),
+       COUNT(eo.market_outperf),
+       COALESCE(SUM(eo.market_outperf), 0),
+       COUNT(ep.perf),
+       COALESCE(SUM(ep.perf), 0)
+FROM entry e
+LEFT JOIN entry_outperf eo ON eo.entry_id = e.entry_id
+LEFT JOIN entry_perf    ep ON ep.entry_id = e.entry_id
+CROSS JOIN LATERAL (
+    SELECT NOT COALESCE(e.withdrawn, false)
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS started,
+           e.placement_text = '1'
+             AND NOT COALESCE(e.disqualified, false)
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$' AS is_win
+) q
+WHERE e.trainer_id IS NOT NULL
+  AND e.race_date >= CURRENT_DATE - INTERVAL '30 days'
+  AND e.race_date <  CURRENT_DATE
+GROUP BY e.trainer_id;
+
+CREATE UNIQUE INDEX ON person_form_recent (role, person_id);
 """
 
 
