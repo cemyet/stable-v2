@@ -165,9 +165,17 @@ _BUILDER_STRIPPED_IDS = ('entry_id', 'driver_id', 'trainer_id',
                          'race_id', 'atg_id', 'track_id')
 
 
+def builder_only() -> bool:
+    """Read the lock at request time so a Railway env change cannot go stale.
+
+    On Railway the default is on (see core.config); locally it stays off.
+    """
+    return _config._env_bool("BUILDER_ONLY", _config._ON_RAILWAY)
+
+
 def _strip_builder_ids(rows):
     """Drop link-only database ids from a payload, in builder-only mode."""
-    if not _config.BUILDER_ONLY:
+    if not builder_only():
         return rows
     for row in rows:
         for key in _BUILDER_STRIPPED_IDS:
@@ -204,19 +212,21 @@ def _builder_past(date) -> bool:
     still has to load. Dates we cannot parse are refused.
     """
     from datetime import date as _d
-    if not _config.BUILDER_ONLY:
+    if not builder_only():
         return False
     parsed = _parse_iso_date(date)
     return parsed is None or parsed < _d.today()
 
 
-app.jinja_env.globals['BUILDER_ONLY'] = _config.BUILDER_ONLY
+@app.context_processor
+def _builder_template_flag():
+    return {'BUILDER_ONLY': builder_only()}
 
 
 @app.before_request
 def _gate():
     """Hide everything outside the builder, then require the access code."""
-    if _config.BUILDER_ONLY:
+    if builder_only():
         if request.path == '/':
             return redirect(url_for('play_page'))
         # request.endpoint is None for URLs that match no route at all, which
@@ -247,6 +257,8 @@ def login():
             # Basic open-redirect guard: only allow relative paths.
             if not dest.startswith('/') or dest.startswith('//'):
                 dest = '/'
+            if builder_only() and dest == '/':
+                dest = url_for('play_page')
             return redirect(dest)
         return render_template_string(_LOGIN_HTML, error='Wrong access code.')
     return render_template_string(_LOGIN_HTML, error='')
@@ -792,6 +804,13 @@ def _race_entries_atg_live(cur, atg_race_id: str):
 
     if not rows:
         return jsonify({'error': 'not found'}), 404
+
+    # Cloud Supabase is much slower than local Postgres. Cap the enrichment
+    # queries so a start list fails visibly instead of spinning forever.
+    try:
+        cur.execute("SET LOCAL statement_timeout = '20000'")
+    except Exception:
+        pass
 
     horse_ids = [r['horse_id'] for r in rows if r['horse_id']]
     driver_ids = list({r['driver_id'] for r in rows if r['driver_id']})
@@ -2892,7 +2911,7 @@ def horse_races(horse_id):
     """Race history for a horse, most recent first."""
     conn = get_db()
     try:
-        if _config.BUILDER_ONLY and not _horse_is_in_field(
+        if builder_only() and not _horse_is_in_field(
                 conn, horse_id, request.args.get('race', '').strip()):
             return jsonify({'error': 'not found'}), 404
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -4456,7 +4475,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
         'source_pills': source_pills,
         'results': _strip_builder_ids(rows),
     }
-    if _config.BUILDER_ONLY:
+    if builder_only():
         _result.pop('track_id', None)
     _race_cache[_cache_key] = (_now, _result)
     return jsonify(_result)

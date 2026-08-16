@@ -46,7 +46,7 @@ def _env_bool(name: str, default: bool) -> bool:
     val = os.environ.get(name)
     if val is None:
         return default
-    return val.strip().lower() in ("1", "true", "yes", "on")
+    return val.strip().strip('"').strip("'").lower() in ("1", "true", "yes", "on")
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +88,14 @@ WEB_PORT = int(os.environ.get("WEB_PORT", "5002"))
 # has no business being reachable there. The web app enforces this as an
 # endpoint allowlist rather than by deleting routes, so a route added later is
 # hidden in the cloud until it is deliberately allowed.
-BUILDER_ONLY = _env_bool("BUILDER_ONLY", False)
+#
+# Default is on whenever we are running on Railway, so a missing or
+# mis-typed BUILDER_ONLY variable cannot accidentally publish the full
+# personal app. Set BUILDER_ONLY=0 to force the full app in the cloud.
+_ON_RAILWAY = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID")
+)
+BUILDER_ONLY = _env_bool("BUILDER_ONLY", _ON_RAILWAY)
 
 # ---------------------------------------------------------------------------
 # Generic HTTP knobs
