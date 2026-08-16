@@ -276,7 +276,7 @@ def logout():
 # ---------------------------------------------------------------------------
 _pool: "ThreadedConnectionPool | None" = None
 _pool_lock = _threading.Lock()
-_POOL_MIN, _POOL_MAX = 2, 8
+_POOL_MIN, _POOL_MAX = 2, 12
 
 
 class _PooledConn:
@@ -695,6 +695,50 @@ def _resolve_atg_horse_id(cur, atg_horse_id) -> int | None:
     return row['horse_id'] if row else None
 
 
+def _batch_resolve_atg_horse_ids(cur, atg_ids: list) -> dict:
+    """Resolve many ATG horse ids to internal ids in one query."""
+    clean = [str(x) for x in atg_ids if x is not None]
+    if not clean:
+        return {}
+    cur.execute(
+        "SELECT atg_id, horse_id FROM horse WHERE atg_id = ANY(%s)",
+        (clean,),
+    )
+    out = {row['atg_id']: row['horse_id'] for row in cur.fetchall()}
+    missing = [x for x in clean if x not in out]
+    if missing:
+        cur.execute(
+            "SELECT st_id::text AS key, horse_id FROM horse "
+            "WHERE st_id = ANY(%s::int[]) AND atg_id IS NULL",
+            ([int(x) for x in missing if x.isdigit()],),
+        )
+        for row in cur.fetchall():
+            out.setdefault(row['key'], row['horse_id'])
+    return out
+
+
+def _batch_resolve_atg_person_ids(cur, atg_ids: list) -> dict:
+    """Resolve many ATG person ids to internal ids in one query."""
+    clean = [str(x) for x in atg_ids if x is not None]
+    if not clean:
+        return {}
+    cur.execute(
+        "SELECT atg_id, person_id FROM person WHERE atg_id = ANY(%s)",
+        (clean,),
+    )
+    out = {row['atg_id']: row['person_id'] for row in cur.fetchall()}
+    missing = [x for x in clean if x not in out]
+    if missing:
+        cur.execute(
+            "SELECT st_id::text AS key, person_id FROM person "
+            "WHERE st_id = ANY(%s::int[]) AND atg_id IS NULL",
+            ([int(x) for x in missing if x.isdigit()],),
+        )
+        for row in cur.fetchall():
+            out.setdefault(row['key'], row['person_id'])
+    return out
+
+
 def _resolve_atg_person_id(cur, atg_person_id) -> int | None:
     if atg_person_id is None:
         return None
@@ -729,12 +773,18 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     race_distance = raw.get('distance')
 
     rows: list[dict] = []
+    atg_horse_ids = []
+    atg_driver_ids = []
+    atg_trainer_ids = []
     for s in raw.get('starts') or []:
         h = s.get('horse') or {}
         if not h.get('name'):
             continue
         driver = s.get('driver') or {}
         trainer = h.get('trainer') or {}
+        atg_horse_ids.append(h.get('id'))
+        atg_driver_ids.append(driver.get('id'))
+        atg_trainer_ids.append(trainer.get('id'))
         driver_name, driver_short = _atg_person_display(driver)
         trainer_name, trainer_short = _atg_person_display(trainer)
         shoe_code, shoe_front_changed, shoe_back_changed = _atg_parse_shoes(
@@ -751,7 +801,10 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         atg_ped = _atg_horse_pedigree(h)
         rows.append({
             'entry_id': None,
-            'horse_id': _resolve_atg_horse_id(cur, h.get('id')),
+            'horse_id': None,  # resolved in batch below
+            '_atg_horse_id': h.get('id'),
+            '_atg_driver_id': driver.get('id'),
+            '_atg_trainer_id': trainer.get('id'),
             'horse_name': h.get('name') or '',
             'father': atg_ped['father'],
             'mother': atg_ped['mother'],
@@ -773,10 +826,10 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             'shoe_back_changed': shoe_back_changed,
             'driver_name': driver_name,
             'driver_short': driver_short,
-            'driver_id': _resolve_atg_person_id(cur, driver.get('id')),
+            'driver_id': None,
             'trainer_name': trainer_name,
             'trainer_short': trainer_short,
-            'trainer_id': _resolve_atg_person_id(cur, trainer.get('id')),
+            'trainer_id': None,
             'dq': False,
             'gal': False,
             'withdrawn': s.get('number') in scratched_nums,
@@ -805,8 +858,17 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     if not rows:
         return jsonify({'error': 'not found'}), 404
 
-    # Cloud Supabase is much slower than local Postgres. Cap the enrichment
-    # queries so a start list fails visibly instead of spinning forever.
+    # Batch-resolve ATG ids to internal ids (2-3 queries instead of ~36).
+    horse_id_map = _batch_resolve_atg_horse_ids(cur, atg_horse_ids)
+    person_id_map = _batch_resolve_atg_person_ids(
+        cur, list(set(atg_driver_ids + atg_trainer_ids)))
+    for r in rows:
+        r['horse_id'] = horse_id_map.get(str(r.pop('_atg_horse_id') or ''))
+        r['driver_id'] = person_id_map.get(str(r.pop('_atg_driver_id') or ''))
+        r['trainer_id'] = person_id_map.get(str(r.pop('_atg_trainer_id') or ''))
+
+    # Cloud Supabase is much slower than local Postgres. Run enrichment
+    # queries in parallel so wall-clock time = max(individual) not sum().
     try:
         cur.execute("SET LOCAL statement_timeout = '20000'")
     except Exception:
@@ -818,48 +880,122 @@ def _race_entries_atg_live(cur, atg_race_id: str):
     ped_map = _batch_horse_pedigree(cur, horse_ids)
 
     stats_pre: dict[int, dict] = {}
-    if horse_ids and race_date:
-        cur.execute(
-            """
-            SELECT e.horse_id,
-                   COUNT(*) FILTER (
-                       WHERE NOT e.withdrawn
-                         AND """ + _NOT_QUALIFIER + """
-                   ) AS starts,
-                   COUNT(*) FILTER (
-                       WHERE """ + _IS_WIN + """
-                   ) AS wins,
-                   COUNT(*) FILTER (
-                       WHERE NOT e.withdrawn
-                         AND NOT e.galopp
-                         AND NOT COALESCE(e.disqualified, false)
-                         AND """ + _NOT_QUALIFIER + """
-                   ) AS clean_starts,
-                   COUNT(*) FILTER (
-                       WHERE """ + _IS_WIN + """
-                         AND NOT e.galopp
-                   ) AS clean_wins
-            FROM entry e
-            JOIN race  r2 ON r2.race_id = e.race_id
-            WHERE e.horse_id = ANY(%s)
-              AND r2.race_date < %s
-            GROUP BY e.horse_id
-            """,
-            (horse_ids, race_date),
-        )
-        for srow in cur.fetchall():
-            stats_pre[srow['horse_id']] = {
-                'starts': srow['starts'] or 0,
-                'wins': srow['wins'] or 0,
-                'clean_starts': srow['clean_starts'] or 0,
-                'clean_wins': srow['clean_wins'] or 0,
-            }
+    d_wr_map: dict = {}
+    t_wr_map: dict = {}
+    df_map: dict = {}
+    tf_map: dict = {}
+    gear_hist: dict = {}
 
-    d_wr_map = _person_win_rates(cur.connection, driver_ids, 'driver')
-    t_wr_map = _person_win_rates(cur.connection, trainer_ids, 'trainer')
-    df_map = _batch_person_form_at_date(cur.connection, driver_ids, 'driver', race_date)
-    tf_map = _batch_person_form_at_date(cur.connection, trainer_ids, 'trainer', race_date)
-    gear_hist = _batch_horse_gear_prior(cur, horse_ids, race_date)
+    def _q_stats():
+        if not horse_ids or not race_date:
+            return {}
+        c = get_db()
+        try:
+            with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as qc:
+                qc.execute(
+                    """
+                    SELECT e.horse_id,
+                           COUNT(*) FILTER (
+                               WHERE NOT e.withdrawn
+                                 AND """ + _NOT_QUALIFIER + """
+                           ) AS starts,
+                           COUNT(*) FILTER (
+                               WHERE """ + _IS_WIN + """
+                           ) AS wins,
+                           COUNT(*) FILTER (
+                               WHERE NOT e.withdrawn
+                                 AND NOT e.galopp
+                                 AND NOT COALESCE(e.disqualified, false)
+                                 AND """ + _NOT_QUALIFIER + """
+                           ) AS clean_starts,
+                           COUNT(*) FILTER (
+                               WHERE """ + _IS_WIN + """
+                                 AND NOT e.galopp
+                           ) AS clean_wins
+                    FROM entry e
+                    JOIN race  r2 ON r2.race_id = e.race_id
+                    WHERE e.horse_id = ANY(%s)
+                      AND r2.race_date < %s
+                    GROUP BY e.horse_id
+                    """,
+                    (horse_ids, race_date),
+                )
+                return {
+                    srow['horse_id']: {
+                        'starts': srow['starts'] or 0,
+                        'wins': srow['wins'] or 0,
+                        'clean_starts': srow['clean_starts'] or 0,
+                        'clean_wins': srow['clean_wins'] or 0,
+                    }
+                    for srow in qc.fetchall()
+                }
+        finally:
+            c.close()
+
+    def _q_d_wr():
+        c = get_db()
+        try:
+            return _person_win_rates(c, driver_ids, 'driver')
+        finally:
+            c.close()
+
+    def _q_t_wr():
+        c = get_db()
+        try:
+            return _person_win_rates(c, trainer_ids, 'trainer')
+        finally:
+            c.close()
+
+    def _q_df():
+        c = get_db()
+        try:
+            return _batch_person_form_at_date(c, driver_ids, 'driver', race_date)
+        finally:
+            c.close()
+
+    def _q_tf():
+        c = get_db()
+        try:
+            return _batch_person_form_at_date(c, trainer_ids, 'trainer', race_date)
+        finally:
+            c.close()
+
+    def _q_gear():
+        c = get_db()
+        try:
+            with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as qc:
+                return _batch_horse_gear_prior(qc, horse_ids, race_date)
+        finally:
+            c.close()
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {
+            pool.submit(_q_stats): 'stats',
+            pool.submit(_q_d_wr): 'd_wr',
+            pool.submit(_q_t_wr): 't_wr',
+            pool.submit(_q_df): 'df',
+            pool.submit(_q_tf): 'tf',
+            pool.submit(_q_gear): 'gear',
+        }
+        for fut in as_completed(futures):
+            key = futures[fut]
+            try:
+                result = fut.result()
+            except Exception:
+                result = {}
+            if key == 'stats':
+                stats_pre = result
+            elif key == 'd_wr':
+                d_wr_map = result
+            elif key == 't_wr':
+                t_wr_map = result
+            elif key == 'df':
+                df_map = result
+            elif key == 'tf':
+                tf_map = result
+            elif key == 'gear':
+                gear_hist = result
 
     for r in rows:
         db_ped = ped_map.get(r['horse_id'], {})
@@ -2883,10 +3019,12 @@ def _race_field(conn, atg_race_id: str) -> frozenset:
         ids = {row['horse_id'] for row in cur.fetchall()}
         if not ids:
             raw = _fetch_atg_race(atg_race_id) or {}
-            for start in raw.get('starts') or []:
-                hid = _resolve_atg_horse_id(cur, (start.get('horse') or {}).get('id'))
-                if hid:
-                    ids.add(hid)
+            atg_ids = [
+                (start.get('horse') or {}).get('id')
+                for start in raw.get('starts') or []
+            ]
+            resolved = _batch_resolve_atg_horse_ids(cur, atg_ids)
+            ids = set(resolved.values())
 
     field = frozenset(ids)
     with _field_cache_lock:
@@ -2963,9 +3101,9 @@ def horse_races(horse_id):
                 LEFT JOIN entry_comment ec ON ec.entry_id = e.entry_id
                 WHERE e.horse_id = %s
                 ORDER BY r.race_date DESC NULLS LAST, e.race_id DESC NULLS LAST
-                LIMIT 500
+                LIMIT %s
                 """,
-                (horse_id,),
+                (horse_id, 10 if builder_only() else 500),
             )
             raw_rows = list(cur.fetchall())
             cur.execute(
