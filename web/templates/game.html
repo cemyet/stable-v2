@@ -661,7 +661,15 @@
     );
   }
   .game-leg .sl-prev {
-    background: var(--sl-paper-rest);
+    background: transparent;
+    /* Same as header/footer bridge — second-brightest game-type tint. */
+    --sl-prev-line: var(--panel-muted);
+    /* Bleed both gutters like ranked+system rows; date left, comments right.
+       Eq / driver stay pinned in the 1000px lane. */
+    margin-left: 0;
+    width: 100%;
+    -webkit-mask-image: var(--sl-fade-both);
+    mask-image: var(--sl-fade-both);
   }
   /* Reduce toggle — full pie idle, 3/4 when on. Same ink/opacity as
      rank + ω; wedge animates like the number-sphere cut. */

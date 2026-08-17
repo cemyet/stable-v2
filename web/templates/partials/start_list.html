@@ -44,7 +44,7 @@
     background-color: var(--sl-paper);
     --sl-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
     --sl-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
-    --sl-ink-num: color-mix(in srgb, #17171a 68%, white);
+    --sl-ink-num: color-mix(in srgb, var(--panel-ink, #17171a) 68%, white);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.9),
       0 0 12px rgba(255, 255, 255, 0.55),
@@ -454,7 +454,7 @@
   .sl-row:not(.sl-row--head) {
     --sl-ink: var(--fg-heading);
     --sl-ink-muted: var(--fg-muted);
-    --sl-ink-num: #17171a;
+    --sl-ink-num: var(--panel-ink, #17171a);
   }
 
   .sl-row__cells {
@@ -515,6 +515,14 @@
     overflow: hidden;
     background: #ffffff;
     transition: background-color 0.28s ease;
+  }
+  /* Unpicked: thin ring in the header/footer game-type wash. */
+  .sl-row:not(.sl-row--head):not(.is-picked) .sl-badge {
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(#fff, #fff) padding-box,
+      var(--leg-bridge, var(--panel-muted, #c5d4e0)) border-box;
   }
   .sl-badge__digit {
     position: absolute;
@@ -605,13 +613,20 @@
   .sl-c-eq {
     flex: 0 0 60px;
     min-width: 0;
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: 31px 19px;
+    column-gap: 10px;
+    justify-content: end;
     align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
     color: var(--sl-ink-muted);
     transition: color 0.15s ease;
   }
+  .sl-c-eq .shoes { min-width: 31px; }
+  .sl-c-eq .sl-sulky {
+    min-width: 19px;
+    text-align: left;
+  }
+  .sl-c-eq .sl-sulky--empty { visibility: hidden; }
   .sl-c-gps {
     flex: 0 0 46px;
     text-align: right;
@@ -852,18 +867,37 @@
     border-collapse: collapse;
     font-size: 12.5px;
   }
-  /* Game-page history hover — lift toward lighter paper + softened ink. */
+  /* Game-page history hover — same lift as a regular start-list row. */
   .game-leg table.sl-prev-races tbody tr {
     --sl-prev-ink: var(--fg-heading);
     --sl-prev-ink-muted: var(--fg-muted);
-    background-color: transparent !important;
+    --sl-prev-ink-num: var(--panel-ink, #17171a);
+    background: transparent;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    position: relative;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
   }
   .game-leg table.sl-prev-races tbody tr:hover {
-    background-color: var(--sl-paper) !important;
+    z-index: 1;
+    background: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      color-mix(in srgb, var(--panel-muted-bright) 68%, white) 0%,
+      color-mix(in srgb, var(--panel-muted-bright-to) 68%, white) 100%
+    );
     --sl-prev-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
     --sl-prev-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
+    --sl-prev-ink-num: color-mix(in srgb, var(--panel-ink, #17171a) 68%, white);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.9),
+      0 0 12px rgba(255, 255, 255, 0.55),
+      0 0 24px rgba(255, 255, 255, 0.28);
+  }
+  .game-leg table.sl-prev-races tbody tr:hover .sform-hot {
+    color: color-mix(in srgb, var(--accent-hot) 72%, white);
+  }
+  .game-leg table.sl-prev-races tbody tr:hover .sform-cold {
+    color: color-mix(in srgb, var(--accent-cold) 72%, white);
   }
   table.sl-prev-races tbody tr,
   table.sl-prev-races tbody tr:hover {
@@ -881,6 +915,12 @@
   .game-leg table.sl-prev-races td { color: var(--sl-prev-ink-muted); }
   .game-leg table.sl-prev-races td:not(.muted) { color: var(--sl-prev-ink); }
   table.sl-prev-races tbody tr:last-child td { border-bottom: 0; }
+  .game-leg table.sl-prev-races tbody tr:first-child td {
+    border-top: 1px solid var(--sl-prev-line, var(--panel-muted));
+  }
+  .game-leg table.sl-prev-races tbody tr:last-child td {
+    border-bottom: 1px solid var(--sl-prev-line, var(--panel-muted));
+  }
   table.sl-prev-races td.num { text-align: right; font-variant-numeric: tabular-nums; }
   table.sl-prev-races td.center { text-align: center; }
   table.sl-prev-races td.muted { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
@@ -890,14 +930,201 @@
     gap: 3px;
     line-height: 1;
     align-items: center;
+    vertical-align: middle;
     color: var(--sl-prev-ink-muted, var(--fg-muted));
   }
-  table.sl-prev-races .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
+  table.sl-prev-races .shoe-icon {
+    width: 14px;
+    height: 14px;
+    color: currentColor;
+    display: block;
+    flex: none;
+  }
   table.sl-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
   table.sl-prev-races .shoe-icon.shoe-debut { color: var(--accent-first); }
-  table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
+  table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink-muted, var(--fg-muted)); font-size: 11px; letter-spacing: 0.2px; }
   table.sl-prev-races .sl-sulky.sulky-changed { color: var(--accent-warn); }
   table.sl-prev-races .sl-sulky.sulky-debut { color: var(--accent-first); }
+  /* Locked right stack (do not change eq/prize/comment — keeps them pinned):
+     eq | inset (eq→win%) | comment (win%→gutter).
+     Driver is pinned the same way: 78px under main .sl-c-drv, then the
+     trainer+form lane (dist/odds/method) before eq. */
+  .game-leg table.sl-prev-races {
+    table-layout: fixed;
+    width: 100%;
+    --sl-prev-gap: 12px;
+    --sl-prev-eq: 60px;
+    --sl-prev-drv: 78px;
+    --sl-prev-trn: 78px;
+    --sl-prev-form: 48px;
+    --sl-prev-gal: 44px;
+    /* people gap + trainer — sits between drv and form */
+    --sl-prev-trn-col: calc(10px + var(--sl-prev-trn));
+    /* empty form lane so eq stays pinned */
+    --sl-prev-form-col: calc(var(--sl-prev-gap) + var(--sl-prev-form) + var(--sl-prev-gap));
+    --sl-prev-gps: 46px;
+    /* gap after eq + gps — matches .sl-c-gps */
+    --sl-prev-gps-col: calc(var(--sl-prev-gap) + var(--sl-prev-gps));
+    /* gap + gal — odds sits under gal% */
+    --sl-prev-odds-col: calc(var(--sl-prev-gap) + var(--sl-prev-gal));
+    /* Old prize minus the gal lane we just gave to odds */
+    --sl-prev-prize: calc(46px + 44px + (3 * var(--sl-prev-gap)) - var(--sl-prev-odds-col));
+    --sl-prev-comment-inset: calc(var(--sl-prev-gps-col) + var(--sl-prev-odds-col) + var(--sl-prev-prize));
+    --sl-prev-trail: calc(
+      46px + 44px + 44px + 44px + 24px + 52px + 44px
+      + (7 * var(--sl-prev-gap))
+      + 12px
+    );
+    --sl-prev-comment: calc(
+      var(--sl-prev-trail) - var(--sl-prev-comment-inset) + var(--sl-side-r, 0px)
+    );
+    --sl-prev-date: var(--sl-side-l, 84px);
+    /* pad + .sl-c-num + gap — track starts under the horse name */
+    --sl-prev-num: calc(12px + 24px + var(--sl-prev-gap));
+  }
+  .game-leg table.sl-prev-races col.sl-prev-col-date { width: var(--sl-prev-date); }
+  .game-leg table.sl-prev-races col.sl-prev-col-num { width: var(--sl-prev-num); }
+  .game-leg table.sl-prev-races col.sl-prev-col-eq { width: var(--sl-prev-eq); }
+  .game-leg table.sl-prev-races col.sl-prev-col-gps { width: var(--sl-prev-gps-col); }
+  .game-leg table.sl-prev-races col.sl-prev-col-form { width: var(--sl-prev-form-col); }
+  .game-leg table.sl-prev-races col.sl-prev-col-odds { width: var(--sl-prev-odds-col); }
+  .game-leg table.sl-prev-races col.sl-prev-col-prize { width: var(--sl-prev-prize); }
+  .game-leg table.sl-prev-races col.sl-prev-col-comment { width: var(--sl-prev-comment); }
+  .game-leg table.sl-prev-races col.sl-prev-col-track { width: 112px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-place { width: 28px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-time { width: 40px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-dist { width: 40px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-drv { width: var(--sl-prev-drv); }
+  .game-leg table.sl-prev-races col.sl-prev-col-trn { width: var(--sl-prev-trn-col); }
+  .game-leg table.sl-prev-races col.sl-prev-col-flex { width: auto; }
+  .game-leg table.sl-prev-races td.sl-prev-eq {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-eq .sl-prev-eq__inner {
+    display: grid;
+    grid-template-columns: 31px 19px;
+    column-gap: 10px;
+    justify-content: end;
+    align-items: center;
+    width: 100%;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-eq .sl-sulky--empty {
+    visibility: hidden;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-gps {
+    padding-left: var(--sl-prev-gap);
+    padding-right: 0;
+    box-sizing: border-box;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-prize {
+    padding-left: 6px;
+    padding-right: var(--sl-prev-gap);
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-comment {
+    width: var(--sl-prev-comment);
+    max-width: var(--sl-prev-comment);
+    padding-left: 0;
+    padding-right: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-date {
+    width: var(--sl-prev-date);
+    max-width: var(--sl-prev-date);
+    padding-left: 12px;
+    padding-right: 6px;
+    box-sizing: border-box;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-num {
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+    text-align: center;
+    overflow: hidden;
+    color: var(--sl-prev-ink-num, var(--panel-ink));
+  }
+  .game-leg table.sl-prev-races td.sl-prev-track {
+    padding-left: 0;
+    padding-right: 8px;
+    box-sizing: border-box;
+    font-size: 11.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-gap {
+    padding: 0;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-drv,
+  .game-leg table.sl-prev-races td.sl-prev-trn {
+    padding-left: 0;
+    padding-right: 0;
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+    font-size: 13px;
+    line-height: 1.2;
+    letter-spacing: 0;
+    font-weight: inherit;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-trn {
+    padding-left: 10px;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-place,
+  .game-leg table.sl-prev-races td.sl-prev-time,
+  .game-leg table.sl-prev-races td.sl-prev-dist {
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-time {
+    color: var(--sl-prev-ink);
+  }
+  .game-leg table.sl-prev-races td.sl-prev-form {
+    padding-left: var(--sl-prev-gap);
+    padding-right: var(--sl-prev-gap);
+    box-sizing: border-box;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    color: var(--sl-prev-ink-muted, var(--fg-muted));
+  }
+  .game-leg table.sl-prev-races td.sl-prev-form .sform-hot {
+    color: color-mix(in srgb, var(--accent-hot) 48%, var(--fg-muted));
+  }
+  .game-leg table.sl-prev-races td.sl-prev-form .sform-cold {
+    color: color-mix(in srgb, var(--accent-cold) 48%, var(--fg-muted));
+  }
+  .game-leg table.sl-prev-races td.sl-prev-odds {
+    padding-left: var(--sl-prev-gap);
+    padding-right: 0;
+    text-align: right;
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-dist .sl-prev-dist__method {
+    display: none;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-dist:hover .sl-prev-dist__km {
+    display: none;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-dist:hover .sl-prev-dist__method {
+    display: inline;
+  }
   table.sl-prev-races .dq,
   table.sl-prev-races .withdrew { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
   table.sl-prev-races .gal-mark {
@@ -906,8 +1133,6 @@
     vertical-align: super;
   }
   table.sl-prev-races td.sl-prev-comment {
-    width: 100%;
-    max-width: 0;
     overflow: hidden;
     color: var(--sl-prev-ink-muted, var(--fg-muted));
     font-size: 11.5px;
@@ -1020,15 +1245,18 @@
   }
 
   // shoe_code: '1' none, '2' back only, '3' front only, '4' both.
+  // Always emit a shoes slot so a missing sulky can't slide shoes right.
   function shoeCells(e) {
     const code = e && e.shoe_code;
-    if (!code) return '';
+    if (!code) return '<span class="shoes shoes--empty" aria-hidden="true"></span>';
     return `<span class="shoes">${shoeIcon(code === '3' || code === '4', e.shoe_front_changed, e.shoe_front_debut)}`
       + `${shoeIcon(code === '2' || code === '4', e.shoe_back_changed, e.shoe_back_debut)}</span>`;
   }
 
   function sulkyCell(e) {
-    if (!e.sulky) return '';
+    if (!e || !e.sulky) {
+      return '<span class="sl-sulky sl-sulky--empty" aria-hidden="true"></span>';
+    }
     const txt = e.sulky.charAt(0).toUpperCase() + e.sulky.slice(1, 2).toLowerCase() + '.';
     const cls = 'sl-sulky'
       + (e.sulky_changed ? ' sulky-changed' : '')
@@ -1073,6 +1301,27 @@
       : `<span class="sl-c-horse__name"${titleAttr}>${name}</span>`;
     const sa = sexAge(e);
     return link + (sa ? ` <span class="sl-c-sa">${esc(sa)}</span>` : '');
+  }
+
+  // Same recipe as web.shortName: raw "Lastname First" → "Las Fi".
+  function shortName(name) {
+    if (!name) return '';
+    const parts = String(name).trim().split(/\s+/);
+    if (!parts.length) return '';
+    const last = parts[0].slice(0, 3);
+    const lastC = last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
+    if (parts.length === 1) return lastC;
+    const firsts = parts.slice(1);
+    const firstShort = firsts.length === 1
+      ? firsts[0].slice(0, 2).charAt(0).toUpperCase() + firsts[0].slice(1, 2).toLowerCase()
+      : firsts.filter(Boolean).map(p => p.charAt(0).toUpperCase()).join('');
+    return lastC + ' ' + firstShort;
+  }
+
+  function displayPersonShort(short, full) {
+    const s = (short || '').trim();
+    if (s && s.split(/\s+/).every(p => p.length <= 3)) return s;
+    return shortName(full || s);
   }
 
   function personCell(short, full, href) {
@@ -1196,6 +1445,21 @@
     return attrs;
   }
 
+  function prizeShort(kr) {
+    const raw = String(kr || '').replace(/\s*kr$/i, '').replace(/\s/g, '');
+    if (!raw) return '';
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const thousands = Math.ceil(n / 1000);
+    return String(thousands) + "'";
+  }
+
+  function raceGpsVals(r) {
+    const out = {};
+    PREV_GPS_METRICS.forEach(m => { out[m.key] = kmTime(raceMetricMs(r, m.key)); });
+    return out;
+  }
+
   /* ── horse history rows ──────────────────────────────────────────────── */
 
   function prevPlacement(r) {
@@ -1221,23 +1485,50 @@
     const body = rows.map(r => {
       const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
       const href = r.atg_id ? `/race/atg/${r.atg_id}` : r.race_id ? `/race/${r.race_id}` : '';
+      const date = (r.race_date || '').length >= 10 ? r.race_date.slice(2) : (r.race_date || '');
+      const gps = raceGpsVals(r);
       return `<tr${r.withdrawn ? ' class="scratched"' : ''}${href ? ` data-href="${esc(href)}"` : ''}>
-        <td class="muted">${esc(r.race_date || '')}</td>
-        <td class="muted">${esc(r.track_label || '')}</td>
-        <td>${prevPlacement(r)}</td>
-        <td>${esc(r.km_time_text || timeVal(r.time_val))}</td>
-        <td class="muted num">${esc(r.program_number || '')}</td>
-        <td class="muted">${esc(startType)}</td>
-        <td class="muted num">${esc(r.distance || '')}</td>
-        <td class="muted">${esc(r.odds_text || '')}</td>
-        <td class="muted">${esc(r.driver_short || r.driver_name || '')}</td>
-        <td class="center">${shoeCells(r)}</td>
-        <td class="center">${sulkyCell(r)}</td>
-        <td class="num">${esc(r.prize_kr || '')}</td>
+        <td class="muted sl-prev-date">${esc(date)}</td>
+        <td class="num sl-prev-num">${esc(r.program_number || '')}</td>
+        <td class="muted sl-prev-track">${esc(r.track_label || '')}</td>
+        <td class="sl-prev-place">${prevPlacement(r)}</td>
+        <td class="num sl-prev-time">${esc(r.km_time_text || timeVal(r.time_val))}</td>
+        <td class="sl-prev-gap" aria-hidden="true"></td>
+        <td class="muted num sl-prev-dist">${startType
+          ? `<span class="sl-prev-dist__km">${esc(r.distance || '')}</span><span class="sl-prev-dist__method">${esc(startType)}</span>`
+          : esc(r.distance || '')}</td>
+        <td class="sl-prev-gap" aria-hidden="true"></td>
+        <td class="muted sl-prev-drv">${esc(r.driver_short || r.driver_name || '')}</td>
+        <td class="muted sl-prev-trn">${esc(displayPersonShort(r.trainer_short, r.trainer_name))}</td>
+        <td class="sl-prev-form" title="trainer form">${tformCell(r.tf_perf)}</td>
+        <td class="sl-prev-eq"><span class="sl-prev-eq__inner">${shoeCells(r)}${sulkyCell(r)}</span></td>
+        <td class="muted num sl-prev-gps" data-prev-gps-cell${gpsCellAttrs(gps)}>${esc(gps[gpsMetric().key] || '')}</td>
+        <td class="muted sl-prev-odds" title="odds">${esc(r.odds_text || '')}</td>
+        <td class="num muted sl-prev-prize">${esc(prizeShort(r.prize_kr))}</td>
         <td class="sl-prev-comment"><div class="sl-prev-comment__clip"><span class="sl-prev-comment__text">${esc(r.comment || '')}</span></div></td>
       </tr>`;
     }).join('');
-    return `<table class="sl-prev-races"><tbody>${body}</tbody></table>`;
+    return `<table class="sl-prev-races">
+      <colgroup>
+        <col class="sl-prev-col-date">
+        <col class="sl-prev-col-num">
+        <col class="sl-prev-col-track">
+        <col class="sl-prev-col-place">
+        <col class="sl-prev-col-time">
+        <col class="sl-prev-col-flex">
+        <col class="sl-prev-col-dist">
+        <col class="sl-prev-col-flex">
+        <col class="sl-prev-col-drv">
+        <col class="sl-prev-col-trn">
+        <col class="sl-prev-col-form">
+        <col class="sl-prev-col-eq">
+        <col class="sl-prev-col-gps">
+        <col class="sl-prev-col-odds">
+        <col class="sl-prev-col-prize">
+        <col class="sl-prev-col-comment">
+      </colgroup>
+      <tbody>${body}</tbody>
+    </table>`;
   }
 
   // The race is named so the server can check the horse is actually in that
@@ -2644,7 +2935,7 @@
       entries.forEach(e => {
         e._gps = e.horse_id ? bestPrevGps(prevRacesCache[e.horse_id], date) : {};
       });
-      const cells = container.querySelectorAll('[data-prev-gps-cell]');
+      const cells = container.querySelectorAll('.sl-row [data-prev-gps-cell]');
       entries.forEach((e, i) => {
         const cell = cells[i];
         if (!cell) return;

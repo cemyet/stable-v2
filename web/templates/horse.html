@@ -8,6 +8,7 @@
   .horse-page {
     width: 100%;
     max-width: 880px;
+    overflow: visible;
   }
 
   .horse-title {
@@ -180,6 +181,104 @@
     border-collapse: collapse;
     font-size: 12.5px;
   }
+  /* Comment icon sits in the page gutter, out of table flow — same idea as
+     the start-list rank toggle. Do not pad the table or the whole list shifts. */
+  #historyMount,
+  #historyMount .list-fold,
+  #historyMount .list-fold__table {
+    overflow: visible;
+  }
+  .history-scroll {
+    --history-bleed: 24px;
+    overflow-x: auto;
+    overflow-y: visible;
+    padding-left: 20px;
+    margin-left: -20px;
+    width: calc(100% + 20px + var(--history-bleed));
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .history-scroll::-webkit-scrollbar { display: none; }
+  table.history {
+    width: max-content;
+    min-width: 100%;
+  }
+  /* Fade lives in the bleed past the 880px column, so extra columns
+     stick out and dissolve instead of clipping at the column edge. */
+  .history-scroll.is-overflow-right {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--history-bleed)),
+      rgba(0, 0, 0, 0.78) calc(100% - var(--history-bleed) * 0.62),
+      rgba(0, 0, 0, 0.48) calc(100% - var(--history-bleed) * 0.28),
+      rgba(0, 0, 0, 0.18) 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 0%,
+      #000 calc(100% - var(--history-bleed)),
+      rgba(0, 0, 0, 0.78) calc(100% - var(--history-bleed) * 0.62),
+      rgba(0, 0, 0, 0.48) calc(100% - var(--history-bleed) * 0.28),
+      rgba(0, 0, 0, 0.18) 100%
+    );
+  }
+  table.history tbody td:first-child {
+    position: relative;
+  }
+  table.history .comment-toggle {
+    position: absolute;
+    right: calc(100% + 5px);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+  }
+  table.history .comment-toggle:hover,
+  table.history .comment-toggle[aria-expanded="true"] {
+    transform: translateY(-50%) scale(1.08);
+  }
+  table.history tbody tr.comment-row,
+  table.history tbody tr.comment-row > td,
+  table.history tbody tr.comment-row:hover,
+  table.history tbody tr.comment-row:hover > td {
+    text-align: left;
+    background: transparent !important;
+    background-color: transparent !important;
+    /* General td border would otherwise leave a hairline against the page bg. */
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  table.history .comment-row__inner {
+    position: relative;
+    /* Must stay visible — hidden was clipping the heartbeat on the left
+       into a hard edge against the page background. */
+    overflow: visible;
+  }
+  table.history tr.comment-row .comment-body {
+    display: block;
+    /* Kill layout’s side padding so margin-left is the only horizontal shift. */
+    padding: 0.5rem 0.7rem 0.5rem 0;
+    max-width: none;
+  }
+  table.history .comment-wave {
+    position: absolute;
+    left: var(--comment-wave-x, 24px);
+    top: 2px;
+    /* Heartbeat mark — keep 32×100 proportions. */
+    height: calc(100% - 4px);
+    width: auto;
+    aspect-ratio: 32 / 100;
+    transform: translateX(-50%);
+    pointer-events: none;
+    overflow: visible;
+  }
+  table.history .comment-wave path {
+    fill: none;
+    stroke: var(--fg-muted);
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
   table.history th, table.offspring th, table.siblings th {
     text-align: left;
     color: var(--fg-muted);
@@ -192,6 +291,7 @@
     padding: 6px 8px;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
+    vertical-align: middle;
   }
   table.offspring tr:hover,
   table.siblings tr:hover {
@@ -204,12 +304,19 @@
   table.history th.center,
   table.history td.center { text-align: center; }
 
-  .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
+  .shoes {
+    display: inline-flex;
+    gap: 3px;
+    line-height: 1;
+    align-items: center;
+    vertical-align: middle;
+  }
   .shoe-icon {
     width: 14px;
     height: 14px;
     color: var(--fg);
     display: block;
+    flex: none;
   }
   .shoe-icon.shoe-changed { color: var(--accent-warn); }
   .sulky-changed { color: var(--accent-warn); }
@@ -275,7 +382,9 @@
   }
 
   /* Long tables — initial peek, +10 per show more. */
-  .list-fold tbody tr.is-row-hidden {
+  .list-fold tbody tr.is-row-hidden,
+  .list-fold tbody tr.is-row-hidden + tr.comment-row,
+  .list-fold tbody tr.is-row-fade-low + tr.comment-row {
     display: none;
   }
   .list-fold tbody tr.is-row-fade-mid {
@@ -474,6 +583,26 @@
       });
     }
 
+    function initHistoryScroll(root) {
+      const scroller = root.querySelector('.history-scroll');
+      if (!scroller) return;
+      const page = root.closest('.horse-page') || root;
+      const table = scroller.querySelector('table');
+      const sync = () => {
+        const col = page.clientWidth;
+        const bleed = Math.max(24, Math.floor(window.innerWidth - page.getBoundingClientRect().right - 20));
+        scroller.style.setProperty('--history-bleed', bleed + 'px');
+        scroller.classList.toggle('is-overflow-right', (table?.scrollWidth || 0) > col + 1);
+      };
+      scroller.addEventListener('scroll', sync, { passive: true });
+      window.addEventListener('resize', sync);
+      if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(sync).observe(page);
+        if (table) new ResizeObserver(sync).observe(table);
+      }
+      sync();
+    }
+
     function mountFoldedTable(mount, tableHtml, rowCount) {
       if (rowCount <= LIST_FOLD_INITIAL) {
         mount.innerHTML = tableHtml;
@@ -484,7 +613,7 @@
           `<div class="list-fold__table">${tableHtml}</div>` +
         `</div>`;
       const fold = mount.querySelector('.list-fold');
-      const trs = [...fold.querySelectorAll('tbody tr')];
+      const trs = [...fold.querySelectorAll('tbody tr:not(.comment-row)')];
       let disclosed = LIST_FOLD_INITIAL;
       let toggleBtn = null;
 
@@ -565,9 +694,8 @@
       const d = has ? SHOE_ON_PATH : SHOE_OFF_PATH;
       const title = debut ? ' title="first time without shoes"'
         : changed ? ' title="changed since last race"' : '';
-      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"${title}>
-        <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/>
-      </svg>`;
+      return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"${title}>`
+        + `<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="${d}"/></svg>`;
     }
     function shoeCells(e) {
       const code = e && e.shoe_code;
@@ -622,10 +750,9 @@
             <th class="num">sulky</th>
             <th class="num">prize</th>
             <th title="source(s) that contributed this entry">src</th>
-            <th class="comment-col" title="trotting-press comment for this start">comment</th>
           </tr>
         </thead>`;
-      const COL_COUNT = 16;
+      const COL_COUNT = 15;
       const body = rows.map(r => {
         const date = r.race_date || '';
         const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
@@ -647,7 +774,7 @@
         const trData  = raceHref ? ` data-href="${esc(raceHref)}"` : '';
         return `
           <tr${trAttrs}${trData}>
-            <td class="muted">${esc(date)}</td>
+            <td class="muted">${commentCell(r.comment, COL_COUNT, 1)}${esc(date)}</td>
             <td>${r.track_id
               ? `<a href="/track/${r.track_id}" onclick="event.stopPropagation()">${esc(r.track_label || '')}</a>`
               : esc(r.track_label || '')}</td>
@@ -668,14 +795,14 @@
             <td class="num muted">${sulkyCell(r)}</td>
             <td class="num">${esc(r.prize_kr || '')}</td>
             <td>${srcPillsList((r.sources || []).map(s => ({key: s})), {size: 'sm'})}</td>
-            <td>${commentCell(r.comment, COL_COUNT)}</td>
           </tr>`;
       }).join('');
       const fold = mountFoldedTable(
         mount,
-        `<table class="history">${head}<tbody>${body}</tbody></table>`,
+        `<div class="history-scroll"><table class="history">${head}<tbody>${body}</tbody></table></div>`,
         rows.length,
       );
+      initHistoryScroll(mount);
       initListSection(document.getElementById('resultsSection'), fold);
       mount.querySelectorAll('tr.clickable').forEach(tr => {
         tr.addEventListener('click', () => { window.location.href = tr.dataset.href; });

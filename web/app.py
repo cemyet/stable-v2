@@ -3076,6 +3076,7 @@ def horse_races(horse_id):
                        p.short_name                          AS driver_short_name,
                        e.driver_id,
                        pt.name                               AS trainer_name,
+                       pt.short_name                         AS trainer_short_name,
                        e.trainer_id,
                        e.sulky, e.sulky_changed,
                        e.shoe_code, e.shoe_front_changed, e.shoe_back_changed,
@@ -3126,6 +3127,14 @@ def horse_races(horse_id):
                 }
                 for row in gear_seq
             }
+            # One scan of the trainers' 30-day windows (same helper as
+            # trainer/driver history). Cheap for a handful of starts.
+            tf_map = _batch_person_form_multi(
+                conn,
+                [r['trainer_id'] for r in raw_rows],
+                'trainer',
+                [r['race_date'] for r in raw_rows],
+            )
             rows = []
             for r in raw_rows:
                 contribs = r.get('contributors') or []
@@ -3164,7 +3173,9 @@ def horse_races(horse_id):
                     'driver_short': r['driver_short_name'],
                     'driver_id': r['driver_id'],
                     'trainer_name': r['trainer_name'],
+                    'trainer_short': r['trainer_short_name'] or shortName(r['trainer_name'] or ''),
                     'trainer_id': r['trainer_id'],
+                    'tf_perf': (tf_map.get((r['trainer_id'], r['race_date'])) or {}).get('form_perf'),
                     'sulky': r['sulky'],
                     'sulky_changed': r['sulky_changed'],
                     'shoe_code': r['shoe_code'],

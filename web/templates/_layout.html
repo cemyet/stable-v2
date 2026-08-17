@@ -3649,30 +3649,29 @@
 
     /* ---- Race comments ----
        The trotting-press comment for a start ("Sg, ifatt i 6-inv 1400 kv…").
-       Long enough to wreck a table row, so the cell only carries a toggle and
-       the text unfolds into a full-width row beneath. */
+       Long enough to wreck a table row, so a gutter icon unfolds the text
+       into a full-width row beneath. */
 
-    th.comment-col,
-    td:has(> .comment-toggle) {
-      text-align: center;
-    }
     .comment-toggle {
       background: none;
       border: 0;
       padding: 0;
-      font: inherit;
-      font-size: 0.92em;
       color: var(--fg-muted);
       cursor: pointer;
-      white-space: nowrap;
-      border-bottom: 1px dotted currentColor;
-      line-height: 1.2;
+      line-height: 0;
+      transition: transform 0.15s, color 0.15s;
     }
-    .comment-toggle:hover {
-      color: var(--fg);
+    .comment-toggle svg {
+      display: block;
+      width: 15px;
+      height: 15px;
     }
+    .comment-toggle path {
+      fill: currentColor;
+    }
+    .comment-toggle:hover,
     .comment-toggle[aria-expanded="true"] {
-      color: var(--fg);
+      color: rgb(var(--ink-muted-rgb));
     }
 
     tr.comment-row > td {
@@ -4201,9 +4200,10 @@
       backdrop-filter: none;
     }
 
-    /* List row dividers — white lines (not on home page lists). */
-    table th,
-    table td {
+    /* List row dividers — white lines (not on home page lists or
+       game-leg history, which uses the game-type palette). */
+    table:not(.sl-prev-races) th,
+    table:not(.sl-prev-races) td {
       border-bottom-color: var(--list-line) !important;
     }
     .home-page table.top-list th,
@@ -7959,7 +7959,7 @@ window.trackNameHtml = trackNameHtml;
   </script>
 
   <script>
-    /* Race comments: renders the "show" cell and unfolds the text into
+    /* Race comments: renders a gutter icon and unfolds the text into
        a full-width row under the start it belongs to.
 
        Delegated from document so it works for tables that are built after load
@@ -7972,12 +7972,22 @@ window.trackNameHtml = trackNameHtml;
         }[c]));
       }
 
-      // Cell contents for a start's comment column. `colspan` must cover the
+      const COMMENT_ICON =
+        '<svg viewBox="0 0 24 24" aria-hidden="true">'
+        + '<path d="M5 6.2A2.2 2.2 0 0 1 7.2 4h9.6A2.2 2.2 0 0 1 19 6.2v7.1A2.2 2.2 0 0 1 16.8 15.5H9.4L5 19V6.2Z"/>'
+        + '</svg>';
+
+      // Icon for a start that has a press comment. `colspan` must cover the
       // whole table so the unfolded text is not squeezed into one column.
-      window.commentCell = function (comment, colspan) {
+      window.commentCell = function (comment, colspan, alignCol) {
         if (!comment) return '';
+        const align = alignCol == null || alignCol === '' ? '' : String(alignCol);
         return `<button type="button" class="comment-toggle" aria-expanded="false"`
-             + ` data-comment="${esc(comment)}" data-colspan="${colspan}">show</button>`;
+             + ` aria-label="show comment" title="comment"`
+             + ` data-comment="${esc(comment)}" data-colspan="${colspan}"`
+             + (align !== '' ? ` data-align-col="${align}"` : '')
+             + `>`
+             + COMMENT_ICON + `</button>`;
       };
 
       // Capture phase: result rows carry their own click listener that
@@ -7998,17 +8008,46 @@ window.trackNameHtml = trackNameHtml;
           const next = row.nextElementSibling;
           if (next && next.classList.contains('comment-row')) next.remove();
           btn.setAttribute('aria-expanded', 'false');
-          btn.textContent = 'show';
+          btn.setAttribute('aria-label', 'show comment');
           return;
         }
 
         const tr = document.createElement('tr');
         tr.className = 'comment-row';
+        const wave = btn.dataset.alignCol !== undefined && btn.dataset.alignCol !== '';
         tr.innerHTML = `<td colspan="${btn.dataset.colspan || 99}">`
-                     + `<div class="comment-body">${esc(btn.dataset.comment)}</div></td>`;
+                     + `<div class="comment-row__inner">`
+                     + (wave
+                        ? '<svg class="comment-wave" viewBox="0 0 32 100" aria-hidden="true">'
+                          + '<path d="M16 2 L16 36 L29.4 40 L0.6 52 L16 56 L16 98"/>'
+                          + '</svg>'
+                        : '')
+                     + `<div class="comment-body">${esc(btn.dataset.comment)}</div>`
+                     + `</div></td>`;
         row.insertAdjacentElement('afterend', tr);
+        const align = btn.dataset.alignCol;
+        if (align !== undefined && align !== '') {
+          const cell = row.cells[parseInt(align, 10)];
+          const body = tr.querySelector('.comment-body');
+          const inner = tr.querySelector('.comment-row__inner');
+          const table = row.closest('table');
+          const dateTitle = table && table.querySelector('thead th');
+          // Line up with the track column’s text (cell edge + its padding).
+          if (cell && body && inner) {
+            const cellPad = parseFloat(getComputedStyle(cell).paddingLeft) || 0;
+            const indent = cell.getBoundingClientRect().left
+              + cellPad
+              - inner.getBoundingClientRect().left;
+            body.style.marginLeft = Math.max(0, indent) + 'px';
+          }
+          if (dateTitle && inner) {
+            const dateBox = dateTitle.getBoundingClientRect();
+            const x = dateBox.left + dateBox.width * 0.25 - inner.getBoundingClientRect().left;
+            tr.style.setProperty('--comment-wave-x', x + 'px');
+          }
+        }
         btn.setAttribute('aria-expanded', 'true');
-        btn.textContent = 'hide';
+        btn.setAttribute('aria-label', 'hide comment');
       }, true);
     })();
 
