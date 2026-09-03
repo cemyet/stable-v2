@@ -40,6 +40,15 @@ PRIORITY = {
 }
 
 
+# Sources whose reported name IS the registry name, and may therefore replace
+# a name outright. The aggregator feeds are excluded: ATG reports a rename
+# within hours, but it also has the weakest identity links in the system (see
+# scripts/split_polluted_atg_ids.py — 21 Italian rows currently carry an
+# unrelated horse's name under source_data.atg). They may still re-dress a
+# name (case, country suffix, ST's rename star); they just can't replace it.
+RENAME_SOURCES = frozenset({"st", "usta", "letrot", "hvt"})
+
+
 def _rank(concept: str, source: str) -> int:
     order = PRIORITY[concept]
     try:
@@ -75,6 +84,18 @@ def _merge_source_data(
     return out
 
 
+def _record_name_history(
+    source_data: dict | None, old_name: str | None, new_name: str, source: str
+) -> dict:
+    """Append a rename to source_data._name_history (same shape as the
+    backfill scripts use, so the existing inspection tooling still reads it)."""
+    out = dict(source_data or {})
+    hist = list(out.get("_name_history") or [])
+    hist.append({"old": old_name, "new": new_name, "by": source})
+    out["_name_history"] = hist
+    return out
+
+
 def _build_canonical_update(
     concept: str,
     incoming_source: str,
@@ -92,7 +113,10 @@ def _build_canonical_update(
         if val is None:
             continue
         if concept == "horse" and col == "name" and current_row.get("name"):
-            val = _pick_better_horse_name(current_row.get("name"), val)
+            val = _pick_better_horse_name(
+                current_row.get("name"), val,
+                allow_rename=incoming_source in RENAME_SOURCES,
+            )
             if val == current_row.get("name"):
                 continue
         if overwrite_all or current_row.get(col) is None:
@@ -104,12 +128,50 @@ _NAME_COUNTRY_SUFFIX_RX = re.compile(r"\((?!SE\b|SWE\b)[A-Z]{2,3}\)\s*$")
 _NAME_NOISE_SUFFIX_RX = re.compile(r"\s*\((?:SE|SWE)\)\s*$", re.IGNORECASE)
 
 
-def _pick_better_horse_name(current_name: str | None, incoming_name: str | None) -> str | None:
+def _name_identity_key(name: str | None) -> str:
+    """Decoration-free key used to tell a rename from a re-dressed name."""
+    # Local import: core.identity imports this module at module level, so a
+    # top-level import here would be circular.
+    from core.identity import normalize_name
+
+    key = normalize_name(name)
+    # Sources disagree on how to fold Nordic vowels ("Gjärla" vs "Gjaerla").
+    # Folding both ways round keeps that out of the rename decision.
+    for digraph, plain in (("AE", "A"), ("OE", "O"), ("UE", "U")):
+        key = key.replace(digraph, plain)
+    return key
+
+
+def _is_name_variant(current: str, incoming: str) -> bool:
+    """True when one name is just the other plus extra trailing tokens.
+
+    ST appends owner initials that other feeds drop ("Keep Going F.R." ->
+    "Keep Going", "Crazy Muscles S." -> "Crazy Muscles"). Those initials
+    distinguish actually-different horses, so shedding them is a downgrade
+    rather than a rename.
+    """
+    current_tokens = _name_identity_key(current).split()
+    incoming_tokens = _name_identity_key(incoming).split()
+    if not current_tokens or not incoming_tokens:
+        return False
+    shorter, longer = sorted((current_tokens, incoming_tokens), key=len)
+    return longer[:len(shorter)] == shorter
+
+
+def _pick_better_horse_name(current_name: str | None, incoming_name: str | None,
+                            *, allow_rename: bool = True) -> str | None:
     """Keep the richer display name during source refreshes.
 
-    LeTrot/ATG often refresh with all-caps names without a country suffix.
-    If a row already has a suffix such as "(FR)" or a mixed-case version,
-    don't let a same-source refresh degrade it.
+    Two different questions hide behind this one field:
+
+      * Same name, different dress — LeTrot/ATG often refresh with all-caps
+        names without a country suffix. If a row already has a suffix such as
+        "(FR)" or a mixed-case version, don't let a refresh degrade it.
+      * A genuine rename — horses are routinely renamed before their first
+        start, and the old logic could not tell that from a re-dressed name,
+        so it kept the stale name even when the registry itself reported the
+        new one. A rename now wins, subject to `allow_rename` (registry
+        sources only, see RENAME_SOURCES) and the caller's priority gate.
     """
     if not current_name:
         return incoming_name or None
@@ -126,6 +188,20 @@ def _pick_better_horse_name(current_name: str | None, incoming_name: str | None)
     current_is_caps = current_name.upper() == current_name and any(ch.isalpha() for ch in current_name)
     incoming_is_caps = incoming_name.upper() == incoming_name and any(ch.isalpha() for ch in incoming_name)
 
+    if _name_identity_key(current_name) != _name_identity_key(incoming_name):
+        if not allow_rename:
+            return current_name
+        if _is_name_variant(current_name, incoming_name):
+            return current_name
+        if incoming_is_caps and not current_is_caps:
+            return current_name
+        if current_has_suffix and not incoming_has_suffix:
+            # A rename doesn't change where the horse was born, and the
+            # frontend reads the suffix to pick a flag.
+            code = _NAME_COUNTRY_SUFFIX_RX.search(current_name).group(0).strip()
+            return f"{incoming_name} {code}"
+        return incoming_name
+
     if incoming_has_suffix and not current_has_suffix and not current_is_caps and incoming_is_caps:
         code = _NAME_COUNTRY_SUFFIX_RX.search(incoming_name).group(0).strip()
         return f"{current_name} {code}"
@@ -135,6 +211,10 @@ def _pick_better_horse_name(current_name: str | None, incoming_name: str | None)
         return incoming_name
 
     if current_is_caps and not incoming_is_caps:
+        return incoming_name
+    # Same name and same case quality: let ST's rename star back in if an
+    # earlier source recorded the new name without it.
+    if "*" in incoming_name and "*" not in current_name:
         return incoming_name
     return current_name
 
@@ -332,6 +412,10 @@ def upsert_horse(
             fields,
             existing,
         )
+        if "name" in upd:
+            new_source_data = _record_name_history(
+                new_source_data, existing.get("name"), upd["name"], source,
+            )
         # Always set the source_id column we just learned, even if the row
         # was matched via registration_number / ueln (i.e. we now have a
         # cross-link we didn't have before).

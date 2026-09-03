@@ -69,6 +69,15 @@
     color: var(--accent-reduce, #d29b00);
     border-color: var(--accent-reduce, #d29b00);
   }
+  .coupon-system--levered {
+    color: var(--accent-lever, #2f96d8);
+    border-color: var(--accent-lever, #2f96d8);
+  }
+  /* Reduced and levered in equal measure — neither colour would be true. */
+  .coupon-system--even {
+    color: var(--fg-heading);
+    border-color: var(--fg-heading);
+  }
   .coupons-empty {
     color: var(--fg-muted);
     margin-top: 24px;
@@ -109,13 +118,19 @@
   }
 
   // Weighted and reduced coupons are a different thing to reopen than a flat
-  // one, so say which before the row is clicked.
+  // one, so say which before the row is clicked. A coupon that both reduces
+  // and levers takes its colour from where it ended up, not from whichever
+  // of the two is checked first — the sign and the pill have to agree.
   function systemHtml(c) {
     const r = c.reduction;
     if (!r) return '';
-    if (r.reduced) {
-      return ` <span class="coupon-system coupon-system--reduced">−${
-        Math.round((1 - r.retention) * 100)}%</span>`;
+    if (r.reduced || r.levered) {
+      const swing = Math.round((r.retention - 1) * 100);
+      const cls = swing > 0 ? ' coupon-system--levered'
+                : swing < 0 ? ' coupon-system--reduced'
+                : ' coupon-system--even';
+      return ` <span class="coupon-system${cls}">${
+        swing < 0 ? '−' : '+'}${Math.abs(swing)}%</span>`;
     }
     return ' <span class="coupon-system">ω</span>';
   }

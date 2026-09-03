@@ -9,8 +9,8 @@ no database and no network — the vendored XSD is read off disk.
 
 What it checks:
 
-  1. CRC16 against the CCITT-FALSE reference vector, since the file name ATG
-     validates is nothing but that checksum.
+  1. CRC16 against the Princeton CRC16.java reference vector (`123456789` →
+     `0xBB3D`), since the file name ATG validates is nothing but that checksum.
   2. A plain unweighted system collapses to a single coupon (the merge is not
      silently giving up).
   3. A weighted + reduced V85 — the shape the game page produces — comes back
@@ -21,6 +21,13 @@ What it checks:
      `v86Coupon` for the check only. See core/vendor/README.md.
   5. Heavy weighting still balances — the units land on repeated rows via
      `betmultiplier` rather than being quietly dropped.
+  6. No row carries less stake than a row it beats. This is the property the
+     old proportional allocator did not have: it left roughly a third of its
+     rows behind a weaker sibling, so a coupon could pay out on the longshot
+     and not on the favourite standing next to it.
+  7. Stake lands on new rows before it doubles up on old ones, so a weighted
+     coupon covers about as many different combinations as its weights allow
+     rather than piling up early.
 """
 
 from __future__ import annotations
@@ -60,9 +67,31 @@ def make_plan(spec, game_type='V85', line_price=0.5):
                    game_date='2026-08-19', track_code=5, track_name='Solvalla')
 
 
+def weighted_only(spec):
+    """The same opinions with nothing capped — a coupon at its full price."""
+    out = []
+    for picks, coverage in spec:
+        total = sum(coverage.values())
+        out.append((picks, {n: v * 100 / total for n, v in coverage.items()}))
+    return out
+
+
+def reachable_rows(plan):
+    """The most different rows any allocation of this plan could cover.
+
+    A pick in a k-horse leg is on one row in k, so it can carry stake on at
+    most full_rows/k different rows however the weights fall. Summing that
+    across a leg bounds the whole system, and the tightest leg wins.
+    """
+    return min(
+        sum(min(target, plan.full_rows // len(leg.picks))
+            for target in rs.integer_targets(leg, plan.rows).values())
+        for leg in plan.legs)
+
+
 def check_crc():
     got = rs.crc16(b'123456789')
-    assert got == 0x29B1, f'CRC-16/CCITT-FALSE mismatch: {got:#06x}'
+    assert got == 0xBB3D, f'CRC-16/ARC mismatch: {got:#06x}'
     print(f'  crc16("123456789") = {got:#06X}')
 
 
@@ -139,6 +168,49 @@ def check_heavy_weighting():
           f'{len(boxes)} coupons, flagged as too many to submit')
 
 
+def check_monotone():
+    for label, spec in (('weighted', weighted_only(V85_SPEC)),
+                        ('weighted + reduced', V85_SPEC)):
+        plan = make_plan(spec)
+        check = rs.verify(plan, rs.solve(plan))
+        assert check.gaps == 0, (label, check.warnings)
+        print(f'  {label}: no row behind one it beats, across all '
+              f'{check.distinct_rows} rows carrying stake')
+
+    # The reported case in miniature: back the favourite in a leg and the
+    # rows you get must be a superset of what backing the longshot gets.
+    plan = make_plan(weighted_only(V85_SPEC))
+    units = rs.row_units(rs.solve(plan))
+    leg, strong, weak = 1, 2, 7            # leg 2 is 70/30 on horses 2 and 7
+    on_weak = {row[:leg] + row[leg + 1:]
+               for row in units if row[leg] == weak}
+    on_strong = {row[:leg] + row[leg + 1:]
+                 for row in units if row[leg] == strong}
+    missing = on_weak - on_strong
+    assert not missing, (
+        f'{len(missing)} rows play horse {weak} but not horse {strong}, '
+        f'e.g. {sorted(missing)[0]}')
+    print(f'  backing horse {strong} ({70}%) covers every rest that horse '
+          f'{weak} ({30}%) does, and {len(on_strong) - len(on_weak)} more')
+
+
+def check_breadth():
+    plan = make_plan(weighted_only(V85_SPEC))
+    check = rs.verify(plan, rs.solve(plan))
+    ceiling = reachable_rows(plan)
+    assert check.distinct_rows <= ceiling, (check.distinct_rows, ceiling)
+    # The ceiling reads one leg at a time and so is loose — every leg has to
+    # be satisfied at once, and no allocation gets all the way there. What the
+    # margin below is really separating is the two allocators: the old one ran
+    # at 74-79% of this number on real coupons, this one at 88-98%.
+    assert check.distinct_rows >= ceiling * 0.85, (
+        f'stake covers {check.distinct_rows} rows where {ceiling} were '
+        f'reachable — it is doubling up before it has to')
+    print(f'  {check.units} units over {check.distinct_rows} different rows '
+          f'of {ceiling} reachable ({plan.full_rows} in the full system)')
+    print(f'  deepest row carries {check.deepest_row} units')
+
+
 def check_track_code():
     plan = make_plan(V85_SPEC[:7], game_type='V75')
     xml = rs.atg_xml(plan, rs.solve(plan))
@@ -165,6 +237,10 @@ def main() -> int:
     check_xml(plan, boxes)
     print('heavy weighting')
     check_heavy_weighting()
+    print('monotone')
+    check_monotone()
+    print('breadth')
+    check_breadth()
     print('track code')
     check_track_code()
     print('\nall good')

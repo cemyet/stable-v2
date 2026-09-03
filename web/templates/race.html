@@ -209,12 +209,18 @@
     text-align: center;
   }
 
-  /* Win-rate column: low-emphasis, right-aligned to match # column. */
-  table.entries th.winrate, table.entries td.winrate {
-    text-align: right;
+  /* Win-rate column: win unmuted, clean stays muted. Title is centred. */
+  table.entries th.winrate {
+    text-align: center;
     color: var(--fg-muted);
     font-variant-numeric: tabular-nums;
   }
+  table.entries td.winrate {
+    text-align: right;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+  table.entries td.winrate .sl-win-clean { color: var(--fg-muted); }
 
   /* xLabs GPS columns — same muted treatment as the horse-page history. */
   table.entries th.gps, table.entries td.gps {
@@ -371,7 +377,7 @@
   .ink-row--head2 .rr-gps,
   .ink-row--head2 .rr-gal,
   .ink-row--head2 .rr-winpct,
-  .ink-row--head2 .rr-cleanpct,
+  .ink-row--head2 .rr-sek,
   .ink-row--head2 .rr-pct,
   .ink-row--head2 .rr-odds {
     font-size: 11px; font-weight: 400; color: inherit;
@@ -432,23 +438,31 @@
   .ink-row--race2 .rr-eq {
     flex: 0 0 62px; min-width: 0;
     display: inline-flex; align-items: center; justify-content: flex-end;
-    gap: 10px; color: var(--fg-muted);
+    gap: 10px; color: var(--fg);
   }
   .ink-row--race2 .rr-gps {
     flex: 0 0 48px; text-align: right;
     font-variant-numeric: tabular-nums; color: var(--fg-muted);
   }
-  .ink-row--race2 .rr-gal,
-  .ink-row--race2 .rr-winpct,
-  .ink-row--race2 .rr-cleanpct {
+  .ink-row--race2 .rr-gal {
+    flex: 0 0 44px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg-muted);
+  }
+  .ink-row--race2 .rr-winpct {
+    flex: 0 0 72px; margin-left: 16px; text-align: right;
+    font-variant-numeric: tabular-nums; color: var(--fg);
+  }
+  .ink-row--race2 .rr-winpct .sl-win-clean { color: var(--fg-muted); }
+  .ink-row--head2 .rr-winpct { text-align: center; }
+  .ink-row--race2 .rr-sek {
     flex: 0 0 44px; text-align: right;
     font-variant-numeric: tabular-nums; color: var(--fg-muted);
   }
   /* Modest gap before game cols — not a full flex blow-out. */
   .ink-row--race2 .rr-pct-gap {
-    flex: 1 1 20px;
-    max-width: 32px;
-    min-width: 16px;
+    flex: 1 1 8px;
+    max-width: 16px;
+    min-width: 8px;
   }
   .ink-row--race2 .rr-pct {
     flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums;
@@ -518,7 +532,7 @@
   .ink-row--race2 .ink-row__content--ink .rr-gps,
   .ink-row--race2 .ink-row__content--ink .rr-gal,
   .ink-row--race2 .ink-row__content--ink .rr-winpct,
-  .ink-row--race2 .ink-row__content--ink .rr-cleanpct,
+  .ink-row--race2 .ink-row__content--ink .rr-sek,
   .ink-row--race2 .ink-row__content--ink .rr-eq,
   .ink-row--race2 .ink-row__content--ink .rr-odds { color: inherit; opacity: 0.78; }
   .ink-row--race2 .ink-row__content--ink .gal-lo,
@@ -603,14 +617,14 @@
   table.ink-prev-races td.muted { color: var(--fg-muted); }
   table.ink-prev-races .shoes {
     display: inline-flex; gap: 3px; line-height: 1; align-items: center;
-    color: var(--fg-muted);
+    color: var(--fg);
   }
   table.ink-prev-races .shoe-icon {
     width: 14px; height: 14px; color: currentColor; display: block;
   }
   table.ink-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
   table.ink-prev-races .shoe-icon.shoe-debut { color: var(--accent-first); }
-  table.ink-prev-races .rr-sulky { font-size: 11px; letter-spacing: 0.2px; color: var(--fg-muted); }
+  table.ink-prev-races .rr-sulky { font-size: 11px; letter-spacing: 0.2px; color: var(--fg); }
   table.ink-prev-races .rr-sulky.sulky-changed { color: var(--accent-warn); }
   table.ink-prev-races .rr-sulky.sulky-debut { color: var(--accent-first); }
   table.ink-prev-races td.ink-prev-comment {
@@ -916,11 +930,6 @@
     }
 
     // Horse cell: name + flag + small sex/age.
-    function stripPedigreeName(name) {
-      if (!name) return '';
-      return String(name).replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').trim().toLowerCase();
-    }
-
     function pedigreeTitle(e) {
       const father = stripPedigreeName(e.father);
       const mother = stripPedigreeName(e.mother);
@@ -1345,8 +1354,8 @@
             <span class="rr-eq"></span>
             ${prevGpsHeadHtml()}
             <span class="rr-gal" title="${esc(galModelNote() + galHint)}"${galExtra}>${galLbl}</span>
-            <span class="rr-winpct">win%</span>
-            <span class="rr-cleanpct">clean%</span>
+            <span class="rr-winpct" title="win%/clean%">win%</span>
+            <span class="rr-sek" title="lifetime earnings, thousands of kronor">kkr</span>
             <span class="rr-pct-gap" aria-hidden="true"></span>
             <span class="rr-pct"><button type="button" class="rr-pct-eye" data-pct-toggle title="toggle row% visibility">${EYE_CLOSED}</button></span>
             <span class="rr-odds">odds</span>
@@ -1393,8 +1402,8 @@
             <span class="rr-eq">${inkEq(e)}</span>
             ${prevGpsCellHtml(e._prevGps)}
             <span class="rr-gal">${inkGal(e)}</span>
-            <span class="rr-winpct">${winRate(e, 'pre')}</span>
-            <span class="rr-cleanpct">${galAdjWinRate(e, 'pre')}</span>
+            <span class="rr-winpct">${winCleanPct(e, 'pre')}</span>
+            <span class="rr-sek">${sekCell(e, 'pre')}</span>
             <span class="rr-pct-gap" aria-hidden="true"></span>
             <span class="rr-pct" data-pct-cell><span class="rr-pct__val is-hidden">${inkPctCell(s)}</span><span class="rr-pct__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
             <span class="rr-odds">${inkOdds(s)}</span>
@@ -1523,6 +1532,21 @@
       return Math.round((w / s) * 100) + '%';
     }
 
+    function winCleanPct(e, which) {
+      const w = winRate(e, which);
+      if (!w) return '';
+      const c = galAdjWinRate(e, which);
+      return c
+        ? `${w}<span class="sl-win-clean">/${c}</span>`
+        : w;
+    }
+
+    function sekCell(e, which) {
+      const n = Number(which === 'post' ? e.post_prize_kr : e.pre_prize_kr);
+      if (!Number.isFinite(n) || n <= 0) return '';
+      return String(Math.round(n / 1000));
+    }
+
     // List view: starting list, ordered by program number, scratched stay in place.
     function renderList(mount, entries) {
       const sorted = entries.slice().sort((a, b) => {
@@ -1538,8 +1562,8 @@
           <th>trainer</th>
           <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
           <th class="num">odds</th>
-          <th class="winrate">w%</th>
-          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
+          <th class="winrate" title="win%/clean%">win%</th>
+          <th class="num" title="lifetime earnings, thousands of kronor">kkr</th>
           <th class="center">shoes</th>
           <th class="num">sulky</th>
         </tr></thead>`;
@@ -1559,10 +1583,10 @@
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
             <td class="sform">${tfPerfCell(e.tf_perf)}</td>
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
-            <td class="winrate">${winRate(e, 'pre')}</td>
-            <td class="winrate">${galAdjWinRate(e, 'pre')}</td>
+            <td class="winrate">${winCleanPct(e, 'pre')}</td>
+            <td class="num">${sekCell(e, 'pre')}</td>
             <td class="center">${shoeCells(e)}</td>
-            <td class="num muted">${sulkyCell(e)}</td>
+            <td class="num">${sulkyCell(e)}</td>
           </tr>`;
       }).join('');
       mount.innerHTML = `<table class="entries">${head}<tbody>${rows}</tbody></table>`;
@@ -1715,8 +1739,8 @@
           <th>trainer</th>
           <th class="sform" title="trainer form — avg finishing percentile of the trainer's last-30d runners (100 = wins, 0 = last). Actual recent form: rewards winning favourites, predicts winning.">t form</th>
           <th class="num">odds</th>
-          <th class="winrate">w%</th>
-          <th class="winrate" title="clean win rate (galopp & DQ excluded)">clean%</th>
+          <th class="winrate" title="win%/clean%">win%</th>
+          <th class="num" title="lifetime earnings, thousands of kronor">kkr</th>
           <th class="center">shoes</th>
           <th class="num">sulky</th>
           <th>time</th>
@@ -1743,10 +1767,10 @@
             <td class="muted">${shortCell(e.trainer_short, e.trainer_name, trainerHref)}</td>
             <td class="sform">${tfPerfCell(e.tf_perf)}</td>
             <td class="num muted">${e.odds != null ? e.odds : ''}</td>
-            <td class="winrate">${winRate(e, 'post')}</td>
-            <td class="winrate">${galAdjWinRate(e, 'post')}</td>
+            <td class="winrate">${winCleanPct(e, 'post')}</td>
+            <td class="num">${sekCell(e, 'post')}</td>
             <td class="center">${shoeCells(e)}</td>
-            <td class="num muted">${sulkyCell(e)}</td>
+            <td class="num">${sulkyCell(e)}</td>
             <td>${esc(time)}</td>
             ${gpsCells}
           </tr>`;

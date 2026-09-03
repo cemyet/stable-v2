@@ -10,9 +10,8 @@
   }
 
   /* Wide enough for a full start list to sit under a panel without the
-     columns floating away from the pill's right edge. Vertically centered
-     when the stack fits; `safe` falls back to top once a leg expands past
-     the viewport. */
+     columns floating away from the pill's right edge. Anchored at the top
+     so the game header is the first thing on a fresh visit. */
   .game-page {
     --sl-side-l: 84px;
     --sl-side-r: 84px;
@@ -50,11 +49,285 @@
     width: 100%;
     max-width: calc(1000px + var(--sl-side-l) + var(--sl-side-r));
     margin: 0 auto;
+    --leg-panel-h: 52px;   /* .glass-panel--hybrid-xp min-height */
+    --game-legs-gap: 14px;
     min-height: calc(100dvh - 140px);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: safe center;
+    justify-content: flex-start;
+  }
+
+  /* Game type + track sit in the same 1000px lane as the race pills. */
+  .game-hero {
+    width: calc(100% - var(--sl-side-l) - var(--sl-side-r));
+    margin: 0 0 36px;
+    box-sizing: border-box;
+    align-self: center;
+  }
+  /* Hybrid class supplies title ink + bridge fill for the hero panel. */
+  .game-hero.glass-panel--hybrid {
+    --leg-bridge: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      var(--panel-muted) 0%,
+      var(--panel-muted-to) 100%
+    );
+    background: none;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: visible;
+    isolation: auto;
+  }
+  .game-hero.glass-panel--hybrid::after {
+    display: none;
+  }
+  .game-hero__titles {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 36px;
+  }
+  .game-hero__title {
+    margin: 0;
+    letter-spacing: 0.25px;
+    line-height: 1.15;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.08em 0.18em;
+    font-size: var(--title-size);
+    font-weight: var(--title-weight);
+    color: color-mix(in srgb, var(--panel-ink) calc(100% - var(--title-mute)), var(--fg-muted));
+  }
+  .game-hero__title[data-title="game"] {
+    --title-weight: 800;
+    --title-size: 30px;
+    color: transparent;
+    letter-spacing: -0.03em;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .game-hero__game-pill,
+  .game-hero__jackpot-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.55em;
+    padding: 0.1em 0.44em 0.12em;
+    border-radius: 0;
+    background-clip: border-box;
+    -webkit-background-clip: border-box;
+    line-height: 1.1;
+    font-size: var(--title-size);
+    font-weight: var(--title-weight);
+    letter-spacing: inherit;
+  }
+  .game-hero__game-pill {
+    background-color: var(--game-type-brand, #4fb1ee);
+    color: #fff !important;
+    -webkit-text-fill-color: #fff !important;
+  }
+  /* ATG jackpot banderole: #ffdd00 fill, #2a3e50 ink. */
+  .game-hero__jackpot-pill {
+    background-color: #ffdd00;
+    color: #2a3e50 !important;
+    -webkit-text-fill-color: #2a3e50 !important;
+    font-size: 20px;
+    letter-spacing: 0;
+  }
+  .game-hero__title[data-title="track"] {
+    --title-weight: 900;
+    --title-size: 42px;
+    --title-mute: 50%;
+    color: color-mix(in srgb, var(--fg-heading) calc(100% - var(--title-mute)), var(--fg-muted));
+  }
+  .game-hero__stage {
+    position: relative;
+    margin-top: 36px;
+  }
+  .game-hero__section {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    margin: 0;
+    text-align: center;
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    color: var(--panel-ink);
+    pointer-events: none;
+  }
+  .game-hero__arrow {
+    position: absolute;
+    top: 50%;
+    left: auto;
+    right: calc(100% + 24px);
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--panel-ink);
+    opacity: 1;
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 2;
+  }
+  .game-hero__arrow svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+  }
+  .game-hero__arrow svg path {
+    fill: currentColor;
+  }
+  .game-hero__arrow--next {
+    right: auto;
+    left: calc(100% + 23px);
+  }
+  .game-hero__arrow:hover {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.08);
+  }
+  .game-hero.glass-panel--hybrid .game-hero__glass {
+    width: 100%;
+    height: calc(4 * var(--leg-panel-h) + 3 * var(--game-legs-gap));
+    box-sizing: border-box;
+    background: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      color-mix(in srgb, white 87%, rgb(var(--panel-hybrid-from-rgb)) 13%) 0%,
+      color-mix(in srgb, white 87%, rgb(var(--panel-hybrid-to-rgb)) 13%) 100%
+    );
+    border: none;
+    outline: none;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+  }
+  .game-hero__slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateX(100%);
+    transition: none;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .game-hero__slide.is-active,
+  .game-hero__slide.is-prep-right,
+  .game-hero__slide.is-prep-left,
+  .game-hero__slide.is-exit-left,
+  .game-hero__slide.is-exit-right {
+    visibility: visible;
+  }
+  .game-hero__slide.is-active {
+    transform: translateX(0);
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: auto;
+  }
+  .game-hero__slide.is-prep-right { transform: translateX(100%); transition: none; }
+  .game-hero__slide.is-prep-left { transform: translateX(-100%); transition: none; }
+  .game-hero__slide.is-exit-left,
+  .game-hero__slide.is-exit-right {
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .game-hero__slide.is-exit-left { transform: translateX(-100%); }
+  .game-hero__slide.is-exit-right { transform: translateX(100%); }
+  .game-hero__slide-label {
+    color: var(--panel-ink);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .game-hero__slide[data-slide="track"].is-active {
+    justify-content: flex-start;
+    padding: 20px 32px;
+    box-sizing: border-box;
+  }
+  .game-hero__track-passport {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+  .game-hero__track-facts {
+    position: absolute;
+    left: 25%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+  }
+  .game-hero__track-facts .facts-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .game-hero__track-facts .fact-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .game-hero__track-facts .fact-row .k {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: right;
+    color: color-mix(in srgb, var(--panel-ink) 52%, white);
+    flex-shrink: 0;
+    min-width: 100px;
+  }
+  .game-hero__track-facts .fact-row .v {
+    font-size: 14px;
+    color: var(--panel-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .game-hero__track-facts .fact-row .v small {
+    font-size: 11px;
+    color: color-mix(in srgb, var(--panel-ink) 52%, white);
+    margin-left: 3px;
+  }
+  .game-hero__track-facts .fact-row .v .rank {
+    font-size: 11px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--panel-ink) 52%, white);
+    margin-left: 4px;
+  }
+  /* Fixed frame so long ovals and mile tracks occupy the same slot. */
+  .game-hero__track-drawing {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .game-hero__track-drawing-box {
+    width: min(420px, 100%);
+    height: min(188px, 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .game-hero__track-drawing-box svg {
+    display: block;
+    width: 100%;
+    height: 100%;
   }
 
   /* ── Ambient background — static dual-pool wash, game sphere colours ──
@@ -90,7 +363,7 @@
   .game-legs {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--game-legs-gap);
     width: 100%;
     margin-top: 0;
   }
@@ -103,6 +376,19 @@
     --panel-muted-bright: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-from-rgb)) 4%);
     --panel-muted-bright-to: color-mix(in srgb, white 96%, rgb(var(--panel-hybrid-to-rgb)) 4%);
     --panel-ink: color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 62%, black);
+    /* Tips band fill — ink at 0.40 over the header/bridge muted. */
+    --tips-band-fill: color-mix(in srgb, var(--panel-ink) 40%, var(--panel-muted));
+    /* Reduce / reserves idle fill — same apparent ink as opacity 0.62 over the bridge. */
+    --tool-fill: color-mix(in srgb, var(--panel-ink) 62%, var(--panel-muted));
+    --tool-inset-bloom:
+      inset 0 2px 5px color-mix(in srgb, var(--panel-ink) 58%, transparent),
+      inset 0 0 8px color-mix(in srgb, var(--panel-ink) 38%, transparent);
+    /* Same lit fill as the open race pill. */
+    --leg-panel-fill: linear-gradient(
+      var(--panel-hybrid-angle, 45deg),
+      color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 80%, white) 0%,
+      color-mix(in srgb, rgb(var(--panel-hybrid-to-rgb)) 80%, white) 100%
+    );
     /* Bridge under the panel / column header / foot. */
     --leg-bridge: linear-gradient(
       var(--panel-hybrid-angle, 45deg),
@@ -117,6 +403,7 @@
     );
     display: flex;
     flex-direction: column;
+    --leg-colhead-h: 34px; /* .sl-row--head */
   }
 
   /* Panel / header / tillägg / history / foot sit in the 1000px lane.
@@ -146,6 +433,11 @@
   .game-leg .sl-row--head .sl-c-pct {
     display: flex;
     justify-content: flex-end;
+    align-items: center;
+  }
+  .game-leg .sl-row--head .sl-c-odds {
+    display: flex;
+    justify-content: center;
     align-items: center;
   }
   .game-leg .sl-row--head .sl-c-gps .gps-toggle {
@@ -623,7 +915,7 @@
   }
   /* Gap under the panel + column title row — one continuous soft bridge. */
   .game-leg .sl-row--head {
-    height: 34px;
+    height: var(--leg-colhead-h);
     padding-top: 10px;
     box-sizing: border-box;
     background: var(--leg-bridge);
@@ -632,20 +924,231 @@
     background: var(--leg-bridge);
   }
 
+  /* Footer = tools row (same height as a start-list row) + tips band.
+     Combined height matches the race pill + column header above. */
   .game-leg__foot {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 10px 14px 12px;
-    /* Reserve the pie's height even while the button is hidden, so the
-       first pick doesn't grow the foot and clip it inside a pixel height. */
-    min-height: 42px;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    height: calc(var(--leg-panel-h) + var(--leg-colhead-h));
+    min-height: calc(var(--leg-panel-h) + var(--leg-colhead-h));
     box-sizing: border-box;
     font-size: 11px;
     letter-spacing: 1px;
     text-transform: lowercase;
     background: var(--leg-bridge);
+  }
+
+  /* Upper band — exact start-list row height; reduce sits in the sphere slot.
+     Grows into the right gutter with the weight column; tips stay in-lane. */
+  .game-leg__foot-row {
+    position: relative;
+    flex: none;
+    height: 34px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 14px 0 12px;
+    box-sizing: border-box;
+    background: var(--leg-bridge);
+    transition: width 0.28s ease;
+  }
+  .game-leg:has(.sl.is-system) .game-leg__foot-row {
+    width: calc(100% + var(--sl-side-r));
+  }
+  .game-leg__foot-tools {
+    flex: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  /* Sum of this leg's displayed weights — same slot and type as row shares. */
+  .game-leg__foot-sum {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(var(--sl-side-r) - 53px);
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--panel-ink);
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    transition: opacity 0.28s ease;
+    z-index: 3;
+  }
+  .game-leg:has(.sl.is-system-ready) .game-leg__foot-sum {
+    opacity: 1;
+  }
+  .game-leg__foot-sum.is-cut {
+    color: var(--accent-reduce, var(--accent-first));
+  }
+  .game-leg__foot-sum.is-lev {
+    color: var(--accent-lever, #2f96d8);
+  }
+
+  /* Row% eye — same slot as the start-list eyes (52px, right-aligned, vertically centered). */
+  .game-leg__pct-eye {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(12px + 44px + 12px);
+    width: 52px;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background: none;
+    border: 0;
+    color: var(--panel-ink);
+    opacity: 0.62;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .game-leg:has(.sl.is-system) .game-leg__pct-eye {
+    right: calc(12px + 44px + 12px + var(--sl-side-r));
+  }
+  .game-leg__pct-eye:hover { opacity: 1; }
+  .game-leg__pct-eye svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: translateY(1px);
+  }
+
+  /* Odds eye — same slot as the start-list odds column (44px, right-aligned). */
+  .game-leg__odds-eye {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 12px;
+    width: 44px;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    color: var(--panel-ink);
+    opacity: 0.62;
+    cursor: pointer;
+    z-index: 3;
+  }
+  .game-leg:has(.sl.is-system) .game-leg__odds-eye {
+    right: calc(12px + var(--sl-side-r));
+  }
+  .game-leg__odds-eye:hover { opacity: 1; }
+  .game-leg__odds-eye svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: translateY(1px);
+  }
+
+  /* Lower band — tipster comment on the lit race-panel fill. */
+  .game-leg__tips {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.45;
+    color: #fff;
+    background: var(--tips-band-fill);
+    /* Soft recess along the top edge only. */
+    box-shadow: inset 0 8px 14px color-mix(in srgb, var(--panel-muted) 42%, transparent);
+    overflow: hidden;
+  }
+  /* Sized by an invisible full-text measure so the line can sit centered
+     while the visible typewriter grows left→right from its final left edge. */
+  .game-leg__tips-line {
+    display: grid;
+    max-width: 100%;
+    text-align: left;
+    align-items: start;
+    justify-items: start;
+  }
+  .game-leg__tips-measure,
+  .game-leg__tips-live {
+    grid-area: 1 / 1;
+    max-width: 100%;
+  }
+  .game-leg__tips-measure {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  /* Reserve the same metrics as the real caret so the live layer isn't clipped. */
+  .game-leg__tips-measure::after {
+    content: '';
+    display: inline-block;
+    width: 1.5px;
+    height: 1em;
+    vertical-align: -0.15em;
+    margin-left: 2px;
+  }
+  .game-leg__tips-live {
+    text-align: left;
+    /* Fainter than the caret halo — just a hint of the lightest tint. */
+    text-shadow:
+      0 0 2px color-mix(in srgb, var(--panel-muted-bright) 18%, transparent),
+      0 0 5px color-mix(in srgb, var(--panel-muted-bright) 8%, transparent);
+  }
+  /* Classic vertical caret — only while a tip is live (hover typing). */
+  .game-leg__caret {
+    display: none;
+    width: 1.5px;
+    height: 1em;
+    vertical-align: -0.15em;
+    margin-left: 2px;
+    background: #fff;
+    /* Soft halo in the lightest game-type tint. */
+    box-shadow:
+      0 0 4px var(--panel-muted-bright),
+      0 0 8px color-mix(in srgb, var(--panel-muted-bright) 70%, transparent);
+    animation: caret-blink 1.06s step-end infinite;
+  }
+  .game-leg__tips.is-live .game-leg__caret {
+    display: inline-block;
+  }
+  /* Solid while characters are landing; only blinks in the pauses. */
+  .game-leg__caret--typing {
+    animation: none;
+    opacity: 1;
+  }
+  @keyframes caret-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
   }
   /* Entry rows: lightest muted game-type tint. History: bone-white paper. */
   .game-leg .sl-row:not(.sl-row--head) {
@@ -671,17 +1174,17 @@
     -webkit-mask-image: var(--sl-fade-both);
     mask-image: var(--sl-fade-both);
   }
-  /* Reduce toggle — full pie idle, 3/4 when on. Same ink/opacity as
-     rank + ω; wedge animates like the number-sphere cut. */
+  /* Reduce toggle — sits in the number-sphere slot (24px). Full pie idle,
+     3/4 when on; wedge animates like the badge cut. Active keeps the idle
+     fill and recesses the painted sector with inset bloom. */
   @property --reduce-pie {
     syntax: '<number>';
     inherits: false;
     initial-value: 1;
   }
   .game-leg__reduce {
-    color: var(--panel-ink);
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     display: flex;
     align-items: center;
@@ -689,29 +1192,71 @@
     background: none;
     border: 0;
     cursor: pointer;
-    opacity: 0.62;
-    transition: opacity 0.15s;
-  }
-  .game-leg__reduce.is-on {
-    opacity: 1;
   }
   .game-leg__reduce[hidden] { display: none; }
-  /* Missing quarter upper-right (12 → 3), same orientation as badge pies. */
+  /* Mask lives on the wrapper so the fill's inset shadow is clipped to the
+     pie — a box-shadow on the same node as the mask would still be a disc. */
   .game-leg__reduce-pie {
     --reduce-pie: 1;
     display: block;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: conic-gradient(
+    width: 24px;
+    height: 24px;
+    -webkit-mask-image: conic-gradient(
       from 0turn,
       transparent 0turn calc((1 - var(--reduce-pie, 1)) * 1turn),
-      currentColor calc((1 - var(--reduce-pie, 1)) * 1turn) 1turn
+      #000 calc((1 - var(--reduce-pie, 1)) * 1turn) 1turn
+    );
+    mask-image: conic-gradient(
+      from 0turn,
+      transparent 0turn calc((1 - var(--reduce-pie, 1)) * 1turn),
+      #000 calc((1 - var(--reduce-pie, 1)) * 1turn) 1turn
     );
     transition: --reduce-pie 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
   }
+  .game-leg__reduce-pie::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--tool-fill);
+    transition: box-shadow 0.18s ease;
+  }
   .game-leg__reduce.is-on .game-leg__reduce-pie {
     --reduce-pie: 0.75;
+  }
+  .game-leg__reduce.is-on .game-leg__reduce-pie::before {
+    box-shadow: var(--tool-inset-bloom);
+  }
+
+  /* Reserves — same 24px fill as the idle pie. Active adds the same inset bloom. */
+  .game-leg__reserves {
+    box-sizing: border-box;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 0;
+    background: var(--tool-fill);
+    color: var(--panel-muted);
+    cursor: pointer;
+    transition: box-shadow 0.18s ease, background 0.18s ease;
+  }
+  .game-leg__reserves-r {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1;
+    transform: translateY(0.5px);
+  }
+  .game-leg__reserves.is-on {
+    background: var(--leg-bridge);
+    box-shadow: var(--tool-inset-bloom);
+    color: var(--tool-fill);
   }
 {% endblock %}
 
@@ -722,6 +1267,37 @@
     <div class="game-bg-plasma__glow"></div>
   </div>
   <div class="game-page">
+    {% set _hybrid = {'v64': 'orange', 'v85': 'blue', 'v86': 'purple', 'gs75': 'green', 'v65': 'red'} %}
+    {% set _brand = {'v64': '#f98314', 'v85': '#007aff', 'v86': '#802c7e', 'v65': '#d43140', 'gs75': '#00815c'} %}
+    {% set _brand_color = game_type_brand|default(_brand.get(game_type_id, '#4fb1ee'), true) %}
+    <header class="game-hero glass-panel--hybrid glass-panel--hybrid-{{ _hybrid.get(game_type_id, 'cyan') }}"
+            style="--game-type-brand: {{ _brand_color }}">
+      <div class="game-hero__titles">
+        <h1 class="game-hero__title" data-title="game">
+          <span class="game-hero__game-pill" style="background-color: {{ _brand_color }}">{{ game_type_label }}</span>
+          {% if is_jackpot %}
+          <span class="game-hero__jackpot-pill">JACKPOT</span>
+          {% endif %}
+        </h1>
+        {% if track_name %}
+        <h2 class="game-hero__title" data-title="track">{{ track_name }}</h2>
+        {% endif %}
+      </div>
+      <div class="game-hero__stage" id="heroStage">
+        <p class="game-hero__section" id="heroSectionTitle">OVERVIEW</p>
+        <div class="game-hero__glass">
+          <div class="game-hero__slide is-active" data-slide="overview"><span class="game-hero__slide-label">test</span></div>
+          <div class="game-hero__slide" data-slide="track"></div>
+          <div class="game-hero__slide" data-slide="play"><span class="game-hero__slide-label">test</span></div>
+        </div>
+        <button type="button" class="game-hero__arrow" data-hero-dir="-1" aria-label="Previous panel">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M20 3 L20 17 L6 10 Z" fill="currentColor"/></svg>
+        </button>
+        <button type="button" class="game-hero__arrow game-hero__arrow--next" data-hero-dir="1" aria-label="Next panel">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M0 3 L0 17 L14 10 Z" fill="currentColor"/></svg>
+        </button>
+      </div>
+    </header>
     <div class="game-legs" id="gameLegs"
          data-game-type-id="{{ game_type_id }}"
          data-game-id="{{ game_id }}"
@@ -733,7 +1309,97 @@
 
 {% block scripts %}
 {% include "partials/start_list.html" %}
+{% include "partials/track_drawing.html" %}
 <script>
+  const TRACK_PASSPORT = {{ track_passport | tojson }};
+</script>
+<script>
+  (function initHeroPanels() {
+    const stage = document.getElementById('heroStage');
+    if (!stage) return;
+    const title = document.getElementById('heroSectionTitle');
+    const slides = Array.from(stage.querySelectorAll('.game-hero__slide'));
+    const labels = slides.map(el => (el.dataset.slide || '').toUpperCase());
+    let index = Math.max(0, slides.findIndex(el => el.classList.contains('is-active')));
+    let busy = false;
+
+    function show(next, dir) {
+      const incoming = slides[(next + slides.length) % slides.length];
+      const outgoing = slides[index];
+      if (!incoming || incoming === outgoing || busy) return;
+      busy = true;
+      incoming.classList.add(dir > 0 ? 'is-prep-right' : 'is-prep-left');
+      incoming.offsetHeight;
+      outgoing.classList.remove('is-active');
+      outgoing.classList.add(dir > 0 ? 'is-exit-left' : 'is-exit-right');
+      incoming.classList.remove('is-prep-right', 'is-prep-left');
+      incoming.classList.add('is-active');
+      index = slides.indexOf(incoming);
+      if (title) title.textContent = labels[index] || '';
+      let finished = false;
+      const done = (ev) => {
+        if (finished || (ev && ev.target !== outgoing)) return;
+        finished = true;
+        outgoing.classList.remove('is-exit-left', 'is-exit-right');
+        outgoing.removeEventListener('transitionend', done);
+        busy = false;
+      };
+      outgoing.addEventListener('transitionend', done);
+      window.setTimeout(done, 500);
+    }
+
+    stage.querySelectorAll('[data-hero-dir]').forEach(btn => {
+      btn.addEventListener('click', () => show(index + Number(btn.dataset.heroDir), Number(btn.dataset.heroDir)));
+    });
+  })();
+
+  (function fillHeroTrack() {
+    const slide = document.querySelector('.game-hero__slide[data-slide="track"]');
+    const t = typeof TRACK_PASSPORT === 'object' ? TRACK_PASSPORT : null;
+    if (!slide || !t) return;
+    const esc = (s) => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fact = (k, v, unit, rank) => {
+      if (v == null || v === '') return '';
+      const u = unit ? `<small>${esc(unit)}</small>` : '';
+      const r = rank != null ? `<span class="rank">(${esc(String(rank))})</span>` : '';
+      return `<div class="fact-row"><div class="k">${esc(k)}</div><div class="v">${esc(String(v))}${u}${r}</div></div>`;
+    };
+    const wing = t.auto_car_wings === 'angled' ? 'angled'
+      : t.auto_car_wings === 'straight' ? 'straight' : null;
+    const open = t.num_open_stretches == null ? null
+      : t.num_open_stretches === 0 ? 'none'
+      : t.num_open_stretches === 1 ? '1 (single)'
+      : t.num_open_stretches + ' (double)';
+    const ranks = t.ranks || {};
+    const headline = fact('races', t.races ? Number(t.races).toLocaleString() : null)
+      + fact('gal rate', t.gal_rate, '%', ranks.gal_rate)
+      + fact('avg odds', t.avg_winner_odds != null ? Number(t.avg_winner_odds).toFixed(1) : null, null, ranks.avg_winner_odds)
+      + fact('median odds', t.median_winner_odds != null ? Number(t.median_winner_odds).toFixed(2) : null, null, ranks.median_winner_odds)
+      + fact('fav wins', t.fav_win_rate, '%', ranks.fav_win_rate)
+      + fact('upset rate', t.upset_rate, '%', ranks.upset_rate);
+    const course = fact('lap length', t.track_length_m, 'm')
+      + fact('home stretch', t.home_stretch_m, 'm')
+      + fact('open stretch', open)
+      + fact('width', t.track_width_m, 'm')
+      + fact('car wing', wing)
+      + fact('surface', t.surface);
+    let drawing = '';
+    if (t.country === 'SE' && t.track_length_m && t.home_stretch_m
+        && typeof drawTrackSVG === 'function') {
+      drawing = drawTrackSVG(t.name, t.track_length_m, t.home_stretch_m,
+        t.num_open_stretches, t.track_width_m);
+    }
+    slide.innerHTML =
+      `<div class="game-hero__track-passport">`
+      + `<div class="game-hero__track-facts">`
+      + `<div class="facts-col">${headline}</div>`
+      + `<div class="facts-col">${course}</div>`
+      + `</div>`
+      + `<div class="game-hero__track-drawing"><div class="game-hero__track-drawing-box">${drawing}</div></div>`
+      + `</div>`;
+  })();
+
   /* ── Background wash — dual pool, game sphere colour logic.
      Standard = both pools use the game-type colour.
      Jackpot = pool A = game colour, pool B = warm gold. */
@@ -813,10 +1479,35 @@
       <div class="game-leg__body" hidden>
         <div class="game-leg__scroll"><div class="game-leg__list"></div></div>
         <div class="game-leg__foot">
-          <button type="button" class="game-leg__reduce" data-reduce hidden
-                  aria-pressed="false" aria-label="reduce" title="reduce">
-            <span class="game-leg__reduce-pie" aria-hidden="true"></span>
-          </button>
+          <div class="game-leg__foot-row">
+            <div class="game-leg__foot-tools">
+              <button type="button" class="game-leg__reduce" data-reduce hidden
+                      aria-pressed="false" aria-label="reduce" title="reduce">
+                <span class="game-leg__reduce-pie" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="game-leg__reserves" data-reserves
+                      aria-pressed="false" aria-label="reserves" title="reserves">
+                <span class="game-leg__reserves-r" aria-hidden="true">R</span>
+              </button>
+            </div>
+            <button type="button" class="game-leg__pct-eye" data-pct-toggle
+                    title="toggle row% visibility" aria-label="toggle row%">
+              <svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+            <button type="button" class="game-leg__odds-eye" data-odds-toggle
+                    title="toggle odds visibility" aria-label="toggle odds">
+              <svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+            <span class="game-leg__foot-sum" data-foot-sum aria-hidden="true"></span>
+          </div>
+          <div class="game-leg__tips" aria-live="polite">
+            <span class="game-leg__tips-line">
+              <span class="game-leg__tips-measure" aria-hidden="true"></span>
+              <span class="game-leg__tips-live">
+                <span class="game-leg__tips-text"></span><span class="game-leg__caret"></span>
+              </span>
+            </span>
+          </div>
         </div>
       </div>
     </div>`;
@@ -963,7 +1654,9 @@
         slot.classList.toggle('is-dense', picks.length > 5);
       }
       const reduce = leg.querySelector('[data-reduce]');
-      if (reduce) reduce.hidden = !picks.length || !reducible;
+      // Shown on any reducible pool, picks or not, so the footer keeps a
+      // stable left edge instead of the toggle popping in with the first pick.
+      if (reduce) reduce.hidden = !reducible;
       if (leg.classList.contains('is-open')) growOpen(leg);
     });
     renderReduceState();
@@ -1000,6 +1693,13 @@
       });
       const reduce = leg.querySelector('[data-reduce]');
       if (reduce) reduce.addEventListener('click', toggleReduce);
+      const reserves = leg.querySelector('[data-reserves]');
+      if (reserves) reserves.addEventListener('click', () => {
+        const on = !reserves.classList.contains('is-on');
+        reserves.classList.toggle('is-on', on);
+        reserves.setAttribute('aria-pressed', on ? 'true' : 'false');
+        leg.dispatchEvent(new CustomEvent('reserves:toggled', { detail: { on }, bubbles: true }));
+      });
       // History rows and late list content grow the body; refit so the
       // footer and the new block aren't clipped by a leftover pixel height.
       leg.addEventListener('startlist:resize', () => {
@@ -1010,23 +1710,14 @@
     window.addEventListener('reduced:changed', renderReduceState);
   }
 
-  // A leg can be linked to directly (?race=… or #race-…) — e.g. from a coupon
-  // receipt. Failing that, a draft in progress opens at its first empty leg and
-  // a fresh visit opens at leg one, so there is always something on screen.
+  // Deep links (?race=… or #race-…) still open that leg — e.g. from a coupon
+  // receipt. A plain visit stays at the top with every panel closed.
   function initialLeg() {
     const wanted = new URLSearchParams(location.search).get('race')
       || (location.hash.startsWith('#race-') ? decodeURIComponent(location.hash.slice(6)) : '');
-    const legs = [...legsRoot.querySelectorAll('[data-leg]')];
-    if (wanted) {
-      const hit = legs.find(l => l.dataset.raceId === wanted);
-      if (hit) return hit;
-    }
-    const d = draftForThisGame();
-    if (d) {
-      const empty = legs.find(l => !(d.selections[l.dataset.raceId] || []).length);
-      if (empty) return empty;
-    }
-    return legs[0] || null;
+    if (!wanted) return null;
+    return [...legsRoot.querySelectorAll('[data-leg]')]
+      .find(l => l.dataset.raceId === wanted) || null;
   }
 
   (async () => {

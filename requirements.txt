@@ -1,5 +1,9 @@
 httpx>=0.27
 psycopg2-binary>=2.9
+# Solves the TravSport bot challenge once per run so httpx can do the bulk
+# fetching (scrapers/st_clearance.py). Drives the installed Chrome, so no
+# `playwright install` browser download is needed.
+playwright>=1.40
 flask>=3.0
 beautifulsoup4>=4.12
 lxml>=5.0

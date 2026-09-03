@@ -18,6 +18,12 @@
   .sl {
     width: 100%;
     min-width: 840px;
+    /* Driver/trainer lane — shared with history column widths. */
+    --sl-drv-w: 58px;
+    --sl-people-gap: 6px;
+    /* Keeps trainer+form pinned while driver slides right. */
+    --sl-people-inset: 40px;
+    --sl-eq-nudge: 8px;
     /* Bone-white paper — shared by entry rows and (on game) history. */
     --sl-paper: color-mix(in srgb, var(--bg, #f4f3ec) 32%, white);
     --sl-paper-rest: color-mix(in srgb, var(--sl-paper) 99%, black 1%);
@@ -43,12 +49,17 @@
     z-index: 1;
     background-color: var(--sl-paper);
     --sl-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
-    --sl-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
+    --sl-ink-muted: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     --sl-ink-num: color-mix(in srgb, var(--panel-ink, #17171a) 68%, white);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.9),
       0 0 12px rgba(255, 255, 255, 0.55),
       0 0 24px rgba(255, 255, 255, 0.28);
+  }
+  /* History is a sibling under this row — clip the glow at the bottom so
+     it cannot sit on top of the first history line. */
+  .sl-row:not(.sl-row--head).is-prev-active {
+    clip-path: inset(-48px -48px 0 -48px);
   }
 
   /* Ink wipe — a soft green front that runs from the sphere to the right edge.
@@ -154,6 +165,23 @@
     inherits: true;
     initial-value: 1;
   }
+  /* Where an even split would land this leg's thumbs — 0.25 on four picks.
+     The same number on every row, so the ticks stack into one line down the
+     leg and reading over/underweight is a glance. */
+  @property --sl-even {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
+  /* How far a levered pick is past 100 — 0 at the crossing, 1 at the ceiling.
+     Drives the bloom on the band, the thumb and the number sphere, so buying
+     a second pass over a horse is something the row shows rather than only
+     the number says. */
+  @property --sl-lev-glow {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
 
   /* --sl-track-l: left edge of the weight scale. 0 when unranked; the
      all/clear (#) column edge once rank mode expands the left gutter. */
@@ -161,6 +189,7 @@
     --sl-fill: 1;
     --sl-weight: 1;
     --sl-cut: 1;
+    --sl-even: 0;
     --sl-thumb-half: 2px;
     --sl-track-l: 0px;
   }
@@ -178,7 +207,11 @@
   .sl.is-reduced .sl-row__cutveil,
   .sl.is-reduced .sl-system-lock {
     transition: --sl-fill 0.42s cubic-bezier(0.2, 0.72, 0.3, 1),
-                --sl-weight 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+                --sl-weight 0.42s cubic-bezier(0.2, 0.72, 0.3, 1),
+                --sl-lev-glow 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-reduced .sl-row__evenmark {
+    transition: --sl-even 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
   }
   .sl.is-reduced .sl-badge {
     transition: background-color 0.28s ease,
@@ -188,16 +221,14 @@
   .sl.is-weighting .sl-system-handle,
   .sl.is-weighting .sl-row__cutband,
   .sl.is-weighting .sl-row__cutveil,
+  .sl.is-weighting .sl-row__evenmark,
   .sl.is-weighting .sl-system-lock,
   .sl.is-weighting .sl-badge,
-  .sl-row.is-weighting-lock .sl-row__ink,
-  .sl-row.is-weighting-lock .sl-row__cutband,
-  .sl-row.is-weighting-lock .sl-row__cutveil,
-  .sl-row.is-weighting-lock .sl-system-lock,
-  .sl-row.is-weighting-lock .sl-badge,
+  .sl.is-weighting .sl-row.is-weighting .sl-row__badge,
   .sl-row.is-fill-jump .sl-row__ink,
   .sl-row.is-fill-jump .sl-row__cutband,
   .sl-row.is-fill-jump .sl-row__cutveil,
+  .sl-row.is-fill-jump .sl-row__evenmark,
   .sl-row.is-fill-jump .sl-system-lock,
   .sl-row.is-fill-jump .sl-badge,
   .sl-row.is-fill-jump .sl-system-handle {
@@ -219,6 +250,23 @@
       0
       calc(
         (1 - var(--sl-fill))
+          * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+        + var(--sl-side-r, 0px)
+        + var(--sl-thumb-half)
+      )
+      0
+      var(--sl-track-l, 0px)
+    );
+  }
+  /* Levered ink stops at the nearer of the two edges — the weight on a
+     normal lever, the overflow thumb just past 100 — so the hatch sits on
+     the same pale ground as a cut instead of on the cyan fill. */
+  .sl.is-reduced .sl-row.is-picked.is-lev .sl-row__ink,
+  .sl.is-reduced .sl-row.is-unfilling.is-lev .sl-row__ink {
+    clip-path: inset(
+      0
+      calc(
+        (1 - min(var(--sl-fill), var(--sl-weight)))
           * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
         + var(--sl-side-r, 0px)
         + var(--sl-thumb-half)
@@ -254,6 +302,9 @@
     touch-action: none;
     overflow: visible;
     z-index: 5;
+    /* The readout lives on the button; without this it takes the UA button
+       face instead of the share number's type. */
+    font: inherit;
   }
   .sl.is-reduced.is-system-ready .sl-row.is-picked .sl-system-handle {
     display: block;
@@ -279,16 +330,28 @@
       inset 0 0 14px rgba(255, 255, 255, 0.28);
   }
 
-  /* ── reducing ──────────────────────────────────────────────────────────
+  /* ── reducing and levering ─────────────────────────────────────────────
      Weighting moves lines between the picks in a leg and always adds up to
      the whole. Reducing gives lines up: the pick is capped below its weight
      and nothing else grows to fill the hole, so the leg buys fewer rows.
+     Levering is the same gesture the other way — the pick is pushed above
+     its weight, again with nothing else moving, and the leg buys a second
+     pass over that horse's rows.
 
      A cut row reads in three parts, left to right:
        · yellow ink out to the cap        — rows still paid for
        · muted hatched band               — rows released, the saving
-       · locked bar at the old weight     — same yellow as the row fill
-     Same shapes as the green weighted row, swung to yellow. */
+       · bar at the old weight            — same yellow as the row fill
+
+     A levered row is that picture mirrored, in cyan: the bar sits at the
+     weight, the hatch runs from there out to the coverage, and the ink
+     fills the whole of it, because all of it is bought.
+
+     Past 100 the track has no more room, so the thumb wraps: just over 100
+     it starts again at the left and walks the same 0–100 as the overflow
+     (100 → 0, 200 → 100). The weight bar stays put. Crossing 100 therefore
+     looks like a reduced row in cyan, and the two views still agree at
+     exactly 100. */
   .sl-row.is-cut {
     --sl-ink-fill: var(--accent-reduce-bright, #ffe89a);
     --sl-thumb-fill: var(--accent-reduce-deep, var(--accent-first));
@@ -296,8 +359,23 @@
     /* Unfilled pie — the brightest game-type row tint, not grey. */
     --sl-badge-cut-gone: var(--panel-muted-bright, #eef4fa);
     --sl-lock-fill: var(--accent-reduce-bright, #ffe89a);
+    --sl-band-tint: var(--accent-reduce-bright, #ffe89a);
+  }
+  .sl-row.is-lev {
+    --sl-ink-fill: var(--accent-lever-bright, #bfe6ff);
+    --sl-thumb-fill: var(--accent-lever-deep, #2478b0);
+    --sl-badge-cut: var(--accent-lever, #2f96d8);
+    --sl-lock-fill: var(--accent-lever, #2f96d8);
+    --sl-band-tint: var(--accent-lever-bright, #bfe6ff);
   }
 
+  /* The band always spans weight ↔ coverage; which of the two is on the left
+     is the whole difference between a cut and a levered row.
+
+     The hatch carries the same white bloom as the ink beside it — top
+     highlight plus a glow off the row's own edges. The band is the other
+     half of one bar, and without it the lit part stops dead where the ink
+     does. Cut and levered differ only in --sl-band-tint. */
   .sl-row__cutband {
     position: absolute;
     top: 0;
@@ -305,25 +383,49 @@
     /* Same track as the thumb. */
     left: calc(
       var(--sl-track-l, 0px)
-      + var(--sl-fill) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      + min(var(--sl-fill), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
     );
     right: calc(
       100% - var(--sl-track-l, 0px)
-      - var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      - max(var(--sl-fill), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
     );
     display: none;
     pointer-events: none;
     z-index: 0;
     background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.3) 0%,
+        rgba(255, 255, 255, 0.08) 40%,
+        rgba(255, 255, 255, 0) 72%
+      ),
       repeating-linear-gradient(
         -45deg,
-        var(--panel-muted-bright, #eef4fa) 0 2px,
+        color-mix(in srgb, var(--panel-muted-bright, #eef4fa) 72%, transparent) 0 2px,
         transparent 2px 6px
       ),
-      color-mix(in srgb, var(--accent-reduce-bright, #ffe89a) 58%, white);
-    opacity: 0.5;
+      color-mix(in srgb, var(--sl-band-tint, #ffe89a) 34%, transparent);
+    /* Edge-only, unlike the ink's all-round inset — the ink's left and right
+       are clipped away, so top and bottom is all that ever shows there. The
+       hatch is translucent, so this leans on the two lines rather than on a
+       wash down the face, which would only fog the stripes. */
+    box-shadow:
+      inset 0 8px 9px -8px rgba(255, 255, 255, 0.98),
+      inset 0 -8px 9px -8px rgba(255, 255, 255, 0.88);
   }
-  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutband {
+  /* Leverage lights up with how far past its own weight the pick has been
+     pushed — nothing at 100, full at the ceiling. */
+  .sl-row.is-lev .sl-row__cutband {
+    box-shadow:
+      inset 0 8px 9px -8px rgba(255, 255, 255, 0.98),
+      inset 0 -8px 9px -8px rgba(255, 255, 255, 0.88),
+      inset 0 0 calc(4px + 20px * var(--sl-lev-glow))
+        rgb(255 255 255 / calc(0.1 + 0.42 * var(--sl-lev-glow)));
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutband,
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-lev .sl-row__cutband {
     display: block;
   }
 
@@ -335,24 +437,54 @@
     bottom: 0;
     left: calc(
       var(--sl-track-l, 0px)
-      + var(--sl-fill) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      + min(var(--sl-fill), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
     );
     right: calc(
       100% - var(--sl-track-l, 0px)
-      - var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      - max(var(--sl-fill), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
     );
     display: none;
     pointer-events: none;
     z-index: 2;
-    background: color-mix(in srgb, var(--accent-reduce-bright, #ffe89a) 42%, white);
+    background: color-mix(in srgb, var(--sl-band-tint, #ffe89a) 42%, white);
     opacity: 0.38;
   }
-  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutveil {
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-row__cutveil,
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-lev .sl-row__cutveil {
     display: block;
   }
 
-  /* Locked bar — same yellow as the row fill. Draggable: moving it
-     changes the weight; the yellow cap thumb stays put. */
+  /* Even-split tick — where every thumb in this leg would sit if the weights
+     were flat. Dashed on purpose: solid bars are things you can drag, this
+     is only a reading. */
+  .sl-row__evenmark {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(
+      var(--sl-track-l, 0px)
+      + var(--sl-even) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    width: 1px;
+    margin-left: -0.5px;
+    display: none;
+    pointer-events: none;
+    z-index: 3;
+    background: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--panel-ink, #17171a) 34%, transparent) 0 3px,
+      transparent 3px 6px
+    );
+  }
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.has-even .sl-row__evenmark {
+    display: block;
+  }
+
+  /* Weight bar — where this pick's own share sits, in the row's own colour.
+     A reading rather than a handle: while reduce mode is on the thumb owns
+     both directions, and re-weighting is what having the mode off is for. */
   .sl-system-lock {
     position: absolute;
     top: 0;
@@ -385,17 +517,25 @@
     margin-left: -1px;
     background-color: var(--sl-lock-fill, var(--accent-reduce-bright, #ffe89a));
   }
-  .sl-row.is-weighting-lock .sl-system-lock::before {
-    width: 8px;
-    margin-left: -4px;
-  }
-  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-system-lock {
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-cut .sl-system-lock,
+  .sl.is-reduced.is-system-ready .sl-row.is-picked.is-lev .sl-system-lock {
     display: block;
+  }
+  /* Reduce mode owns the thumb in both directions, so while it is on the
+     weight bar is a reading and not a handle — re-weighting is what having
+     the mode off is for. */
+  .sl.is-reducing .sl-system-lock {
+    pointer-events: none;
+    cursor: default;
   }
 
   /* Number sphere — deep yellow, cut like a pie chart. The whole circle is
      the pick's weight; the filled sector is what survived the cap, so the
-     wedge grows and shrinks as the thumb is dragged. */
+     wedge grows and shrinks as the thumb is dragged. A levered pick has
+     given nothing up, so its sphere stays whole and only turns cyan. */
+  .sl-row.is-picked.is-lev .sl-badge {
+    background: var(--sl-badge-cut, var(--accent-lever, #2f96d8));
+  }
   .sl-row.is-picked.is-cut .sl-badge {
     /* Missing piece starts at 12 o'clock and runs clockwise — upper right,
        same orientation as the footer reduce pie. */
@@ -406,12 +546,22 @@
       var(--sl-badge-cut, var(--accent-reduce)) calc((1 - var(--sl-cut)) * 1turn) 1turn
     );
   }
-  /* No gold (or green) bloom on the pie — the wedge is the treatment. */
+  /* No gold bloom on the pie — the wedge is the treatment. A levered sphere
+     has no wedge to read, so it keeps a bloom instead, in its own cyan, and
+     that bloom is what grows once the pick is past 100. */
   .sl-row.is-picked.is-cut .sl-row__badge {
     filter: none;
   }
+  .sl-row.is-picked.is-lev .sl-row__badge {
+    filter:
+      drop-shadow(0 0 calc(1px + 2px * var(--sl-lev-glow))
+        rgb(191 230 255 / calc(0.55 + 0.45 * var(--sl-lev-glow))))
+      drop-shadow(0 0 calc(3px + 9px * var(--sl-lev-glow))
+        rgb(47 150 216 / calc(0.28 + 0.42 * var(--sl-lev-glow))));
+  }
   /* Digit hairline matches the gold pie wedge, not a separate ink. */
-  .sl-row.is-picked.is-cut .sl-badge__digit {
+  .sl-row.is-picked.is-cut .sl-badge__digit,
+  .sl-row.is-picked.is-lev .sl-badge__digit {
     text-shadow:
       -0.85px 0 0 var(--sl-badge-cut, var(--accent-reduce)),
       0.85px 0 0 var(--sl-badge-cut, var(--accent-reduce)),
@@ -430,14 +580,68 @@
       drop-shadow(0 0 3px rgba(255, 255, 255, 0.7));
     box-shadow: none;
   }
-  /* The share number turns gold too — it now reads the cap, not the weight. */
+  /* Levered thumb — the same white outline, over a cyan bloom that comes up
+     with the pick past 100. */
+  .sl-row.is-lev .sl-system-handle::before,
+  .sl-row.is-lev.is-weighting .sl-system-handle::before {
+    filter:
+      drop-shadow(-0.35px 0 0 rgba(255, 255, 255, 1))
+      drop-shadow(0.35px 0 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 -0.35px 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 0.35px 0 rgba(255, 255, 255, 1))
+      drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.9))
+      drop-shadow(0 0 calc(3px + 5px * var(--sl-lev-glow))
+        rgb(255 255 255 / calc(0.7 + 0.3 * var(--sl-lev-glow))))
+      drop-shadow(0 0 calc(2px + 10px * var(--sl-lev-glow))
+        rgb(140 214 255 / calc(0.2 + 0.6 * var(--sl-lev-glow))));
+    box-shadow: none;
+  }
+  /* The share number takes the row's colour too — it now reads the coverage,
+     not the weight. */
   .sl .sl-system-share.is-cut {
     color: var(--accent-reduce, var(--accent-first));
   }
+  .sl .sl-system-share.is-lev {
+    color: var(--accent-lever, #2f96d8);
+  }
 
-  /* Reduce mode on: the thumbs advertise that they now cut rather than
-     re-weight. */
-  .sl.is-reducing .sl-row.is-picked .sl-system-handle { cursor: w-resize; }
+  /* Live read-out at the thumb — the same number the gutter carries, but
+     under the pointer where you are actually looking, and only for as long
+     as the drag lasts. Flips to the left of the thumb near the end of the
+     track so it never runs off the row. */
+  .sl-system-readout {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(11px, -50%);
+    display: none;
+    font: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    color: var(--sl-thumb-fill, rgb(64, 230, 40));
+    text-shadow:
+      0 0 3px rgba(255, 255, 255, 0.95),
+      0 0 7px rgba(255, 255, 255, 0.75);
+    z-index: 6;
+  }
+  .sl-row.is-weighting .sl-system-readout { display: block; }
+  .sl-row.is-weighting.is-readout-left .sl-system-readout {
+    transform: translate(calc(-100% - 11px), -50%);
+  }
+  /* Cut and levered rows read in their own colour; the deep yellow is too
+     dark against the fill, so the number takes the accent instead. */
+  .sl-row.is-cut .sl-system-readout { color: var(--accent-reduce, var(--accent-first)); }
+  .sl-row.is-lev .sl-system-readout { color: var(--accent-lever, #2f96d8); }
+
+  /* Reduce mode on: the thumbs advertise that they now move coverage rather
+     than re-weight, in either direction. */
+  .sl.is-reducing .sl-row.is-picked .sl-system-handle { cursor: ew-resize; }
 
   /* While dragging, the row text steps back so the fill edges and the
      share numbers are what you read. */
@@ -453,7 +657,8 @@
 
   .sl-row:not(.sl-row--head) {
     --sl-ink: var(--fg-heading);
-    --sl-ink-muted: var(--fg-muted);
+    /* Same mute as hero track ranks / row% eyes: panel-ink washed 52% toward white. */
+    --sl-ink-muted: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     --sl-ink-num: var(--panel-ink, #17171a);
   }
 
@@ -546,6 +751,37 @@
   }
   .sl-row.is-picked .sl-badge__digit { color: #fff; }
 
+  /* Reserve badge — small "1" or "2" at the top-right edge of the sphere. */
+  .sl-row__reserve-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.5px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    z-index: 4;
+    background: var(--tool-fill, color-mix(in srgb, var(--panel-ink, #334) 62%, var(--panel-muted, #c5d4e0)));
+    color: var(--panel-muted-bright, #f4f8fc);
+    box-shadow:
+      0 0 0 1px var(--panel-muted-bright, #f4f8fc),
+      0 0 3px color-mix(in srgb, var(--panel-muted-bright, #f4f8fc) 60%, transparent);
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  .sl.is-reserves .sl-row__reserve-badge.is-visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
   /* Columns — fixed widths so every open leg lines up vertically. */
   .sl-c-num { flex: none; width: 24px; text-align: center; }
   .sl-row--head .sl-c-num {
@@ -576,8 +812,15 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Keyed off the name element rather than `> a`, so the name still lifts on
-     hover and pick where it is a span instead of a link. */
+  /* Regular weight in every state — scoped through .sl-row__cells so it
+     outranks `.sl-row__cells a` / `a:hover` (which bump weight to 600). */
+  .sl-row__cells .sl-c-horse__name,
+  .sl-row__cells a.sl-c-horse__name:hover,
+  .sl-row:not(.sl-row--head):hover .sl-c-horse__name,
+  .sl-row:not(.sl-row--head).is-picked .sl-c-horse__name {
+    font-weight: 400;
+    text-shadow: none;
+  }
   .sl-row:not(.sl-row--head):hover .sl-c-horse__name,
   .sl-row:not(.sl-row--head).is-picked .sl-c-horse__name {
     color: var(--fg-heading);
@@ -592,12 +835,14 @@
   .sl-c-people {
     flex: 0 0 auto;
     display: inline-flex;
-    gap: 10px;
-    margin-left: 16px;
+    gap: var(--sl-people-gap);
+    margin-left: var(--sl-people-inset);
+    /* Eat the people→form gap so driver/trainer slide right (history
+       distance sits just left of driver and needs that air). */
+    margin-right: -12px;
   }
   .sl-c-drv,
   .sl-c-trn {
-    flex: 0 0 78px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -605,10 +850,28 @@
     color: var(--sl-ink-muted);
     transition: color 0.15s ease;
   }
+  .sl-c-drv {
+    flex: 0 0 var(--sl-drv-w);
+    text-align: center;
+  }
+  .sl-c-trn {
+    flex: 0 0 78px;
+    text-align: center;
+  }
+  /* Only the hovered name lifts — not the whole row.
+     !important beats the global a:hover black glow. */
+  .sl-row:not(.sl-row--head) .sl-c-drv:hover,
+  .sl-row:not(.sl-row--head) .sl-c-trn:hover,
+  .sl-row:not(.sl-row--head) .sl-c-drv:hover a,
+  .sl-row:not(.sl-row--head) .sl-c-trn:hover a {
+    color: var(--panel-ink, var(--sl-ink-muted)) !important;
+    text-shadow: none;
+  }
   .sl-c-tform {
     flex: 0 0 48px;
-    text-align: left;
+    text-align: center;
     font-variant-numeric: tabular-nums;
+    color: var(--sl-ink-muted);
   }
   .sl-c-eq {
     flex: 0 0 60px;
@@ -618,8 +881,11 @@
     column-gap: 10px;
     justify-content: end;
     align-items: center;
-    color: var(--sl-ink-muted);
+    color: var(--sl-ink);
     transition: color 0.15s ease;
+    /* Slide the pair toward right-aligned GPS so it sits midway
+       between centered form and the GPS figures. */
+    margin-left: var(--sl-eq-nudge);
   }
   .sl-c-eq .shoes { min-width: 31px; }
   .sl-c-eq .sl-sulky {
@@ -629,14 +895,46 @@
   .sl-c-eq .sl-sulky--empty { visibility: hidden; }
   .sl-c-gps {
     flex: 0 0 46px;
+    margin-left: calc(var(--sl-eq-nudge) * -1);
     text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--sl-ink-muted);
     transition: color 0.15s ease;
   }
-  .sl-c-gal,
-  .sl-c-win,
-  .sl-c-clean {
+  .sl-c-gal {
+    flex: 0 0 44px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--sl-ink-muted);
+    transition: color 0.15s ease;
+  }
+  /* win%/clean% — wide enough for 100%/100%. Extra left margin lifts
+     the pair off gal%; the gap before row% shrinks by the same amount
+     so the trail width (and the prev-races alignment) stays put. */
+  .sl-c-win {
+    flex: 0 0 72px;
+    margin-left: 16px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s ease;
+  }
+  .sl-c-win .sl-win-pct {
+    color: var(--panel-ink, var(--sl-ink-muted));
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
+  .sl-c-win .sl-pct-w1 { font-weight: 400; }
+  .sl-c-win .sl-pct-w2 { font-weight: 500; }
+  .sl-c-win .sl-pct-w3 { font-weight: 600; }
+  .sl-c-win .sl-pct-w4 { font-weight: 700; }
+  .sl-c-win .sl-pct-w5 { font-weight: 800; }
+  .sl-c-win .sl-win-clean {
+    color: var(--sl-ink-muted);
+    font-weight: 400;
+  }
+  .sl-c-win .sl-win-clean > span {
+    transition: font-weight 0.15s ease;
+  }
+  .sl-c-sek {
     flex: 0 0 44px;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -644,7 +942,7 @@
     transition: color 0.15s ease;
   }
   .sl-c-gap {
-    flex: 0 1 24px;
+    flex: 0 1 8px;
     min-width: 0;
   }
   .sl-c-pct {
@@ -655,12 +953,65 @@
     user-select: none;
     position: relative;
   }
+  .sl-row--head .sl-c-pct {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    letter-spacing: 0;
+  }
+  /* 16px slot matches the row eye; the glyph is larger and centered on it. */
+  .sl-row--head .sl-pct-mark {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+  }
+  /* Row eyes: flex-center so the glyph sits midway in the 34px row
+     (inline-flex otherwise baselines and reads high). */
+  .sl-row:not(.sl-row--head) .sl-c-pct {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+  }
+  /* Row% weight steps — 10 tiers at 10% intervals. */
+  .sl-c-pct .sl-rowpct-w1 { font-weight: 400; }
+  .sl-c-pct .sl-rowpct-w2 { font-weight: 500; }
+  .sl-c-pct .sl-rowpct-w3 { font-weight: 550; }
+  .sl-c-pct .sl-rowpct-w4 { font-weight: 600; }
+  .sl-c-pct .sl-rowpct-w5 { font-weight: 650; }
+  .sl-c-pct .sl-rowpct-w6 { font-weight: 700; }
+  .sl-c-pct .sl-rowpct-w7 { font-weight: 750; }
+  .sl-c-pct .sl-rowpct-w8 { font-weight: 800; }
+  .sl-c-pct .sl-rowpct-w9 { font-weight: 850; }
+  .sl-c-pct .sl-rowpct-w10 { font-weight: 900; }
+  .sl-c-pct .sl-pct__val > span {
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
   .sl-c-odds {
     flex: 0 0 44px;
     text-align: right;
     color: var(--sl-ink-muted);
     font-variant-numeric: tabular-nums;
     transition: color 0.15s ease;
+  }
+  .sl-row:not(.sl-row--head) .sl-c-odds {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+  .sl-row--head .sl-c-odds {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
   }
 
   .sl-row:not(.sl-row--head):hover .sl-gal-mid {
@@ -670,16 +1021,34 @@
     color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
   }
   .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 72%, white);
+    color: color-mix(in srgb, var(--accent-hot) 48%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot-hi {
+    color: color-mix(in srgb, var(--accent-hot) 58%, white);
   }
   .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold) 72%, white);
+    color: color-mix(in srgb, var(--accent-cold) 48%, white);
   }
-  .sl-row:not(.sl-row--head):hover .sl-tr.up {
-    color: color-mix(in srgb, var(--accent-hot, #ff5a5a) 72%, white);
+  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-cold-hi {
+    color: color-mix(in srgb, var(--accent-cold) 58%, white);
   }
-  .sl-row:not(.sl-row--head):hover .sl-tr.dn {
-    color: color-mix(in srgb, var(--accent-cold, #5aa6ff) 72%, white);
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.up.t1 {
+    color: color-mix(in srgb, var(--accent-hot, #249740) 58%, var(--panel-ink, #17171a));
+  }
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.dn.t1 {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, var(--panel-ink, #17171a));
+  }
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.up.t2 {
+    color: color-mix(in srgb, var(--accent-hot, #249740) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.dn.t2 {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 72%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.up.t3 {
+    color: color-mix(in srgb, var(--accent-hot, #249740) 82%, white);
+  }
+  .sl-row:not(.sl-row--head):hover .sl-pct-trend.dn.t3 {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 82%, white);
   }
   .sl-row:not(.sl-row--head):hover .shoe-icon.shoe-changed,
   .sl-row:not(.sl-row--head):hover .sl-sulky.sulky-changed {
@@ -690,9 +1059,25 @@
     color: color-mix(in srgb, var(--accent-first) 72%, white);
   }
 
-  .sl-tr { font-size: 9px; margin-right: 2px; }
-  .sl-tr.up { color: var(--accent-hot, #ff5a5a); }
-  .sl-tr.dn { color: var(--accent-cold, #5aa6ff); }
+  /* Trend shade follows |ATG trend| in percentage points, not relative %.
+     t1 <1pp (soft), t2 1–2pp (the previous single green/red), t3 ≥2pp. */
+  .sl-pct-trend {
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
+  .sl-pct-trend.up.t1 {
+    color: color-mix(in srgb, var(--accent-hot, #249740) 48%, var(--panel-ink, #17171a));
+  }
+  .sl-pct-trend.dn.t1 {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 48%, var(--panel-ink, #17171a));
+  }
+  .sl-pct-trend.up.t2 { color: var(--accent-hot, #249740); }
+  .sl-pct-trend.dn.t2 { color: var(--accent-cold, #b00010); }
+  .sl-pct-trend.up.t3 {
+    color: color-mix(in srgb, var(--accent-hot, #249740) 72%, white);
+  }
+  .sl-pct-trend.dn.t3 {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 72%, white);
+  }
   .sl-row .shoes { display: inline-flex; gap: 3px; line-height: 1; align-items: center; }
   .sl-row .shoe-icon { width: 14px; height: 14px; color: currentColor; display: block; }
   .sl-row .shoe-icon.shoe-changed { color: var(--accent-warn); }
@@ -750,24 +1135,49 @@
     color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
     font-weight: 700;
   }
-  .sl-c-tform .sform-hot { color: var(--accent-hot); }
-  .sl-c-tform .sform-cold { color: var(--accent-cold); }
+  /* Form follows gal%: muted rest, then two steps of mix + weight. */
+  .sl-c-tform .sform-lo {
+    color: var(--sl-ink-muted);
+    font-weight: 400;
+    transition: color 0.15s ease, font-weight 0.15s ease;
+  }
+  .sl-c-tform .sform-hot {
+    color: color-mix(in srgb, var(--accent-hot) 42%, white);
+    font-weight: 600;
+  }
+  .sl-c-tform .sform-hot-hi {
+    color: color-mix(in srgb, var(--accent-hot) 58%, white);
+    font-weight: 700;
+  }
+  .sl-c-tform .sform-cold {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
+    font-weight: 600;
+  }
+  .sl-c-tform .sform-cold-hi {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
+    font-weight: 700;
+  }
 
-  /* Market share is hidden until asked for — an eye reveals one row, the
-     header eye reveals the whole card. Odds follow the same veil. */
-  .sl-pct__val.is-hidden { display: none; }
-  .sl-pct__eye {
+  /* Market share and odds are hidden until asked for — an eye reveals one row,
+     the footer eye reveals the whole card. */
+  .sl-pct__val.is-hidden,
+  .sl-odds__val.is-hidden { display: none; }
+  .sl-pct__eye,
+  .sl-odds__eye {
     display: none;
     align-items: center;
-    justify-content: flex-end;
     width: 100%;
-    color: var(--fg-muted);
+    height: 100%;
+    color: var(--panel-ink, var(--fg-muted));
     opacity: 0.45;
     pointer-events: none;
   }
-  .sl-c-pct:has(.sl-pct__val.is-hidden) .sl-pct__eye { display: inline-flex; }
-  .sl-c-pct:hover .sl-pct__eye { opacity: 0.8; }
-  .sl-row__cells:has(.sl-pct__val.is-hidden) .sl-c-odds { visibility: hidden; }
+  .sl-pct__eye { justify-content: flex-end; }
+  .sl-odds__eye { justify-content: center; }
+  .sl-c-pct:has(.sl-pct__val.is-hidden) .sl-pct__eye,
+  .sl-c-odds:has(.sl-odds__val.is-hidden) .sl-odds__eye { display: inline-flex; }
+  .sl-c-pct:hover .sl-pct__eye,
+  .sl-c-odds:hover .sl-odds__eye { opacity: 0.8; }
   .sl-pct-eye {
     background: none;
     border: 0;
@@ -775,18 +1185,19 @@
     margin: 0;
     font: inherit;
     cursor: pointer;
-    color: var(--fg-muted);
+    color: var(--panel-ink, var(--fg-muted));
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 20px;
     height: 16px;
-    opacity: 0.55;
+    opacity: 0.62;
     transition: opacity 0.18s;
   }
   .sl-pct-eye:hover { opacity: 1; }
   .sl-pct-eye svg,
-  .sl-pct__eye svg {
+  .sl-pct__eye svg,
+  .sl-odds__eye svg {
     width: 16px;
     height: 16px;
     fill: none;
@@ -795,13 +1206,18 @@
     stroke-linecap: round;
     stroke-linejoin: round;
   }
+  /* Closed-eye glyph sits optically high in the viewBox — drop it 1px. */
+  .sl-row:not(.sl-row--head) .sl-pct__eye svg,
+  .sl-row:not(.sl-row--head) .sl-odds__eye svg {
+    transform: translateY(1px);
+  }
 
   /* Header row */
   .sl-row--head {
     height: 24px;
     background: transparent;
     border: 0;
-    color: var(--fg-muted);
+    color: var(--panel-ink, var(--fg-muted));
     letter-spacing: 0.5px;
     overflow: visible;
   }
@@ -811,9 +1227,10 @@
   .sl-row--head .sl-c-gps .gps-toggle,
   .sl-row--head .sl-c-gal[data-gal-toggle],
   .sl-row--head .sl-pick-toggle { cursor: pointer; }
-  .sl-row--head .sl-c-pct { cursor: default; }
+  .sl-row--head .sl-c-pct,
+  .sl-row--head .sl-c-odds { cursor: default; }
 
-  .sl-row--scratched .sl-row__cells { color: var(--fg-muted); opacity: 0.55; }
+  .sl-row--scratched .sl-row__cells { color: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white); opacity: 0.55; }
   .sl-row--scratched::after {
     content: '';
     position: absolute;
@@ -838,13 +1255,13 @@
     font-size: 10px;
     letter-spacing: 1.5px;
     text-transform: lowercase;
-    color: var(--fg-muted);
+    color: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     background: var(--hover);
     border-bottom: 1px solid var(--list-line, var(--border));
   }
 
   .sl-empty {
-    color: var(--fg-muted);
+    color: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     font-size: 12px;
     padding: 14px 12px;
     text-align: center;
@@ -856,9 +1273,12 @@
     --sl-prev-paper: color-mix(in srgb, var(--bg, #f4f3ec) 95%, black);
     --sl-prev-line: var(--fluid-toggle-fg, rgba(0, 0, 0, 0.34));
     background: var(--sl-prev-paper);
+    /* Above the parent row so its hover glow cannot cover the first history line. */
+    position: relative;
+    z-index: 2;
   }
   .sl-prev__empty {
-    color: var(--fg-muted);
+    color: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     font-size: 12px;
     padding: 8px 12px;
   }
@@ -870,7 +1290,7 @@
   /* Game-page history hover — same lift as a regular start-list row. */
   .game-leg table.sl-prev-races tbody tr {
     --sl-prev-ink: var(--fg-heading);
-    --sl-prev-ink-muted: var(--fg-muted);
+    --sl-prev-ink-muted: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     --sl-prev-ink-num: var(--panel-ink, #17171a);
     background: transparent;
     cursor: pointer;
@@ -886,7 +1306,7 @@
       color-mix(in srgb, var(--panel-muted-bright-to) 68%, white) 100%
     );
     --sl-prev-ink: color-mix(in srgb, var(--fg-heading) 68%, white);
-    --sl-prev-ink-muted: color-mix(in srgb, var(--fg-muted) 76%, white);
+    --sl-prev-ink-muted: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     --sl-prev-ink-num: color-mix(in srgb, var(--panel-ink, #17171a) 68%, white);
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.9),
@@ -894,10 +1314,16 @@
       0 0 24px rgba(255, 255, 255, 0.28);
   }
   .game-leg table.sl-prev-races tbody tr:hover .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 72%, white);
+    color: color-mix(in srgb, var(--accent-hot) 48%, white);
+  }
+  .game-leg table.sl-prev-races tbody tr:hover .sform-hot-hi {
+    color: color-mix(in srgb, var(--accent-hot) 58%, white);
   }
   .game-leg table.sl-prev-races tbody tr:hover .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold) 72%, white);
+    color: color-mix(in srgb, var(--accent-cold) 48%, white);
+  }
+  .game-leg table.sl-prev-races tbody tr:hover .sform-cold-hi {
+    color: color-mix(in srgb, var(--accent-cold) 58%, white);
   }
   table.sl-prev-races tbody tr,
   table.sl-prev-races tbody tr:hover {
@@ -931,7 +1357,7 @@
     line-height: 1;
     align-items: center;
     vertical-align: middle;
-    color: var(--sl-prev-ink-muted, var(--fg-muted));
+    color: var(--sl-prev-ink, var(--fg));
   }
   table.sl-prev-races .shoe-icon {
     width: 14px;
@@ -942,36 +1368,40 @@
   }
   table.sl-prev-races .shoe-icon.shoe-changed { color: var(--accent-warn); }
   table.sl-prev-races .shoe-icon.shoe-debut { color: var(--accent-first); }
-  table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink-muted, var(--fg-muted)); font-size: 11px; letter-spacing: 0.2px; }
+  table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink, var(--fg)); font-size: 11px; letter-spacing: 0.2px; }
   table.sl-prev-races .sl-sulky.sulky-changed { color: var(--accent-warn); }
   table.sl-prev-races .sl-sulky.sulky-debut { color: var(--accent-first); }
   /* Locked right stack (do not change eq/prize/comment — keeps them pinned):
      eq | inset (eq→win%) | comment (win%→gutter).
-     Driver is pinned the same way: 78px under main .sl-c-drv, then the
-     trainer+form lane (dist/odds/method) before eq. */
+     Driver is pinned under main .sl-c-drv, then trainer+form before eq.
+     The right trail is gps + gal + win%/clean% + kkr + gap + pct + odds. */
   .game-leg table.sl-prev-races {
     table-layout: fixed;
     width: 100%;
     --sl-prev-gap: 12px;
-    --sl-prev-eq: 60px;
-    --sl-prev-drv: 78px;
+    --sl-prev-drv: var(--sl-drv-w, 58px);
     --sl-prev-trn: 78px;
     --sl-prev-form: 48px;
     --sl-prev-gal: 44px;
-    /* people gap + trainer — sits between drv and form */
-    --sl-prev-trn-col: calc(10px + var(--sl-prev-trn));
-    /* empty form lane so eq stays pinned */
-    --sl-prev-form-col: calc(var(--sl-prev-gap) + var(--sl-prev-form) + var(--sl-prev-gap));
+    /* gap + trainer — matches main .sl-people-gap */
+    --sl-prev-trn-col: calc(var(--sl-people-gap, 2px) + var(--sl-prev-trn));
+    /* inset before driver col — keeps drv aligned with main table */
+    --sl-prev-pre-drv: calc(var(--sl-people-inset, 44px) - 16px);
+    /* form lane — left pad dropped so driver can sit 12px further right */
+    --sl-prev-form-col: calc(var(--sl-prev-form) + var(--sl-prev-gap));
+    --sl-prev-eq: calc(60px + var(--sl-eq-nudge, 8px));
     --sl-prev-gps: 46px;
-    /* gap after eq + gps — matches .sl-c-gps */
-    --sl-prev-gps-col: calc(var(--sl-prev-gap) + var(--sl-prev-gps));
+    /* gap after eq + gps — nudge stolen from this gap, same as main .sl-c-gps */
+    --sl-prev-gps-col: calc(var(--sl-prev-gap) - var(--sl-eq-nudge, 8px) + var(--sl-prev-gps));
     /* gap + gal — odds sits under gal% */
     --sl-prev-odds-col: calc(var(--sl-prev-gap) + var(--sl-prev-gal));
     /* Old prize minus the gal lane we just gave to odds */
     --sl-prev-prize: calc(46px + 44px + (3 * var(--sl-prev-gap)) - var(--sl-prev-odds-col));
-    --sl-prev-comment-inset: calc(var(--sl-prev-gps-col) + var(--sl-prev-odds-col) + var(--sl-prev-prize));
+    --sl-prev-comment-inset: calc(
+      var(--sl-prev-gap) + var(--sl-prev-gps) + var(--sl-prev-odds-col) + var(--sl-prev-prize)
+    );
     --sl-prev-trail: calc(
-      46px + 44px + 44px + 44px + 24px + 52px + 44px
+      46px + 44px + 16px + 72px + 44px + 8px + 52px + 44px
       + (7 * var(--sl-prev-gap))
       + 12px
     );
@@ -993,12 +1423,15 @@
   .game-leg table.sl-prev-races col.sl-prev-col-track { width: 112px; }
   .game-leg table.sl-prev-races col.sl-prev-col-place { width: 28px; }
   .game-leg table.sl-prev-races col.sl-prev-col-time { width: 40px; }
-  .game-leg table.sl-prev-races col.sl-prev-col-dist { width: 40px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-dist { width: 48px; }
+  .game-leg table.sl-prev-races col.sl-prev-col-dist + col.sl-prev-col-flex {
+    width: var(--sl-prev-pre-drv);
+  }
   .game-leg table.sl-prev-races col.sl-prev-col-drv { width: var(--sl-prev-drv); }
   .game-leg table.sl-prev-races col.sl-prev-col-trn { width: var(--sl-prev-trn-col); }
   .game-leg table.sl-prev-races col.sl-prev-col-flex { width: auto; }
   .game-leg table.sl-prev-races td.sl-prev-eq {
-    padding-left: 0;
+    padding-left: var(--sl-eq-nudge, 8px);
     padding-right: 0;
   }
   .game-leg table.sl-prev-races td.sl-prev-eq .sl-prev-eq__inner {
@@ -1013,7 +1446,7 @@
     visibility: hidden;
   }
   .game-leg table.sl-prev-races td.sl-prev-gps {
-    padding-left: var(--sl-prev-gap);
+    padding-left: calc(var(--sl-prev-gap) - var(--sl-eq-nudge, 8px));
     padding-right: 0;
     box-sizing: border-box;
     text-align: right;
@@ -1069,7 +1502,6 @@
   .game-leg table.sl-prev-races td.sl-prev-trn {
     padding-left: 0;
     padding-right: 0;
-    text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1079,8 +1511,12 @@
     letter-spacing: 0;
     font-weight: inherit;
   }
+  .game-leg table.sl-prev-races td.sl-prev-drv {
+    text-align: center;
+  }
   .game-leg table.sl-prev-races td.sl-prev-trn {
-    padding-left: 10px;
+    padding-left: var(--sl-people-gap, 2px);
+    text-align: center;
   }
   .game-leg table.sl-prev-races td.sl-prev-place,
   .game-leg table.sl-prev-races td.sl-prev-time,
@@ -1091,23 +1527,45 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .game-leg table.sl-prev-races td.sl-prev-dist {
+    white-space: nowrap;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-dist .sl-prev-start {
+    color: var(--sl-prev-ink-num, var(--panel-ink));
+  }
   .game-leg table.sl-prev-races td.sl-prev-time {
     color: var(--sl-prev-ink);
   }
   .game-leg table.sl-prev-races td.sl-prev-form {
-    padding-left: var(--sl-prev-gap);
+    padding-left: 0;
     padding-right: var(--sl-prev-gap);
     box-sizing: border-box;
-    text-align: left;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
     overflow: hidden;
     color: var(--sl-prev-ink-muted, var(--fg-muted));
   }
+  .game-leg table.sl-prev-races td.sl-prev-form .sform-lo {
+    color: var(--sl-prev-ink-muted, var(--fg-muted));
+    font-weight: 400;
+  }
   .game-leg table.sl-prev-races td.sl-prev-form .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 48%, var(--fg-muted));
+    color: color-mix(in srgb, var(--accent-hot) 42%, white);
+    font-weight: 600;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-form .sform-hot-hi {
+    color: color-mix(in srgb, var(--accent-hot) 58%, white);
+    font-weight: 700;
   }
   .game-leg table.sl-prev-races td.sl-prev-form .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold) 48%, var(--fg-muted));
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
+    font-weight: 600;
+  }
+  .game-leg table.sl-prev-races td.sl-prev-form .sform-cold-hi {
+    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
+    font-weight: 700;
   }
   .game-leg table.sl-prev-races td.sl-prev-odds {
     padding-left: var(--sl-prev-gap);
@@ -1115,15 +1573,6 @@
     text-align: right;
     font-size: 11.5px;
     font-variant-numeric: tabular-nums;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-dist .sl-prev-dist__method {
-    display: none;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-dist:hover .sl-prev-dist__km {
-    display: none;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-dist:hover .sl-prev-dist__method {
-    display: inline;
   }
   table.sl-prev-races .dq,
   table.sl-prev-races .withdrew { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
@@ -1178,6 +1627,8 @@
 
   const EYE_OPEN = `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
   const EYE_CLOSED = `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+  /* Geometric % — sits over the row eyes; ATG Rubrik's percent reads goofy at 11px. */
+  const PCT_MARK = `<svg class="sl-pct-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/><path d="M18 6L6 18"/></svg>`;
 
   // Ink colours match the race page: white ink in the row, green in the sphere.
   const BADGE_INK = '#00a500';
@@ -1187,6 +1638,7 @@
   const instances = new Set();
   const prevRacesCache = {};          // horseId -> last starts (shared by all legs)
   let pctRevealed = false;            // market share veil, page-wide
+  let oddsRevealed = false;           // odds veil, page-wide
   let galMode = localStorage.getItem('galModelMode') || 'track';
 
   /* raceId -> ranked row keys, strongest first. The store lives in
@@ -1272,11 +1724,6 @@
     return `${s || ''}${a}`;
   }
 
-  function stripPedigreeName(name) {
-    if (!name) return '';
-    return String(name).replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').trim().toLowerCase();
-  }
-
   function pedigreeTitle(e) {
     const father = stripPedigreeName(e.father);
     const mother = stripPedigreeName(e.mother);
@@ -1331,25 +1778,80 @@
   }
 
   // Trainer form: avg finishing percentile of recent runners (100 = wins).
+  // Same two-step mix + weight as gal% — 65/75 hot, 40/30 cold.
   function tformCell(v) {
     if (v == null) return '';
     const n = v / 10;
-    const cls = n >= 65 ? 'sform-hot' : n <= 40 ? 'sform-cold' : '';
+    let cls = 'sform-lo';
+    if (n >= 75) cls = 'sform-hot-hi';
+    else if (n >= 65) cls = 'sform-hot';
+    else if (n <= 30) cls = 'sform-cold-hi';
+    else if (n <= 40) cls = 'sform-cold';
     return `<span class="${cls}">${n.toFixed(1)}</span>`;
   }
 
-  function winPct(e, which) {
+  function winPctNum(e, which) {
     const s = which === 'post' ? e.post_starts : e.pre_starts;
     const w = which === 'post' ? e.post_wins : e.pre_wins;
-    if (!s) return '';
-    return Math.round((w / s) * 100) + '%';
+    if (!s) return null;
+    return Math.round((w / s) * 100);
+  }
+
+  function rowPctWeightClass(n) {
+    if (n >= 90) return 'sl-rowpct-w10';
+    if (n >= 80) return 'sl-rowpct-w9';
+    if (n >= 70) return 'sl-rowpct-w8';
+    if (n >= 60) return 'sl-rowpct-w7';
+    if (n >= 50) return 'sl-rowpct-w6';
+    if (n >= 40) return 'sl-rowpct-w5';
+    if (n >= 30) return 'sl-rowpct-w4';
+    if (n >= 20) return 'sl-rowpct-w3';
+    if (n >= 10) return 'sl-rowpct-w2';
+    return 'sl-rowpct-w1';
+  }
+
+  function pctWeightClass(n) {
+    if (n >= 50) return 'sl-pct-w5';
+    if (n >= 30) return 'sl-pct-w4';
+    if (n >= 20) return 'sl-pct-w3';
+    if (n >= 10) return 'sl-pct-w2';
+    return 'sl-pct-w1';
+  }
+
+  function winPct(e, which) {
+    const n = winPctNum(e, which);
+    return n == null ? '' : n + '%';
+  }
+
+  function cleanPctNum(e, which) {
+    const s = which === 'post' ? e.post_galadj_starts : e.pre_galadj_starts;
+    const w = which === 'post' ? e.post_galadj_wins : e.pre_galadj_wins;
+    if (!s) return null;
+    return Math.round((w / s) * 100);
   }
 
   function cleanPct(e, which) {
-    const s = which === 'post' ? e.post_galadj_starts : e.pre_galadj_starts;
-    const w = which === 'post' ? e.post_galadj_wins : e.pre_galadj_wins;
-    if (!s) return '';
-    return Math.round((w / s) * 100) + '%';
+    const n = cleanPctNum(e, which);
+    return n == null ? '' : n + '%';
+  }
+
+  // One cell: win%/clean%. Win uses panel-ink + weight steps; clean keeps
+  // muted ink with the same weight tiers. The slash stays regular weight.
+  function winCleanPct(e, which) {
+    const n = winPctNum(e, which);
+    if (n == null) return '';
+    const win = `<span class="sl-win-pct ${pctWeightClass(n)}">${n}%</span>`;
+    const cn = cleanPctNum(e, which);
+    if (cn == null) return win;
+    const clean = `<span class="${pctWeightClass(cn)}">${cn}%</span>`;
+    return `${win}<span class="sl-win-clean">/${clean}</span>`;
+  }
+
+  // Lifetime earnings in thousands of kronor — 4000 → 4, 790900 → 791.
+  function sekCell(e, which) {
+    const n = Number(which === 'post' ? e.post_prize_kr : e.pre_prize_kr);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    return String(Math.round(n / 1000));
   }
 
   function activeXgal(e) {
@@ -1365,13 +1867,23 @@
     return `<span class="${cls}">${p.toFixed(0)}%</span>`;
   }
 
+  function pctTrendStep(trend) {
+    const a = Math.abs(trend);
+    if (a >= 0.02) return 't3';
+    if (a >= 0.01) return 't2';
+    return 't1';
+  }
+
   function pctCell(s) {
     if (!s || s.betDist == null) return '';
-    let tr = '';
+    const val = `${s.betDist.toFixed(1)}%`;
+    const wt = rowPctWeightClass(s.betDist);
     if (s.trend != null && Math.abs(s.trend) > 0.003) {
-      tr = s.trend > 0 ? '<span class="sl-tr up">▲</span>' : '<span class="sl-tr dn">▼</span>';
+      const dir = s.trend > 0 ? 'up' : 'dn';
+      const cls = `sl-pct-trend ${dir} ${pctTrendStep(s.trend)}`;
+      return `<span class="${cls} ${wt}">${val}</span>`;
     }
-    return `${tr}${s.betDist.toFixed(1)}%`;
+    return `<span class="${wt}">${val}</span>`;
   }
 
   function oddsCell(s) {
@@ -1481,9 +1993,15 @@
     return placementHtml(t, galMark, num);
   }
 
+  function prevDistHtml(r) {
+    const dist = r.distance || '';
+    const method = r.start_method === 'A' ? 'a' : r.start_method === 'V' ? 'v' : '';
+    if (!method) return esc(dist);
+    return `${esc(dist)}<span class="sl-prev-start">${esc(method)}</span>`;
+  }
+
   function prevRacesHtml(rows) {
     const body = rows.map(r => {
-      const startType = r.start_method === 'A' ? 'auto' : r.start_method === 'V' ? 'volt' : '';
       const href = r.atg_id ? `/race/atg/${r.atg_id}` : r.race_id ? `/race/${r.race_id}` : '';
       const date = (r.race_date || '').length >= 10 ? r.race_date.slice(2) : (r.race_date || '');
       const gps = raceGpsVals(r);
@@ -1494,9 +2012,7 @@
         <td class="sl-prev-place">${prevPlacement(r)}</td>
         <td class="num sl-prev-time">${esc(r.km_time_text || timeVal(r.time_val))}</td>
         <td class="sl-prev-gap" aria-hidden="true"></td>
-        <td class="muted num sl-prev-dist">${startType
-          ? `<span class="sl-prev-dist__km">${esc(r.distance || '')}</span><span class="sl-prev-dist__method">${esc(startType)}</span>`
-          : esc(r.distance || '')}</td>
+        <td class="muted num sl-prev-dist">${prevDistHtml(r)}</td>
         <td class="sl-prev-gap" aria-hidden="true"></td>
         <td class="muted sl-prev-drv">${esc(r.driver_short || r.driver_name || '')}</td>
         <td class="muted sl-prev-trn">${esc(displayPersonShort(r.trainer_short, r.trainer_name))}</td>
@@ -1556,7 +2072,7 @@
     let upcoming = false;
     let destroyed = false;
 
-    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct, syncReduced };
+    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct, refreshOdds, syncReduced };
     instances.add(inst);
 
     function couponCtx() {
@@ -1591,6 +2107,7 @@
       if (destroyed) return null;
       render();
       loadGpsInBackground();
+      if (upcoming) loadTipsInBackground();
       if (opts.onLoaded) opts.onLoaded(raceData);
       return raceData;
     }
@@ -1632,10 +2149,10 @@
             <button type="button" class="gps-toggle" data-prev-gps-th>${esc(m.label)}</button>
           </span>
           <span class="sl-c-gal"${galClickable ? ' data-gal-toggle role="button" tabindex="0" title="click to switch galopp model"' : ''}>${galLabel}</span>
-          <span class="sl-c-win">win%</span>
-          <span class="sl-c-clean">clean%</span>
+          <span class="sl-c-win" title="win%/clean%">win%</span>
+          <span class="sl-c-sek" title="lifetime earnings, thousands of kronor">kkr</span>
           <span class="sl-c-gap" aria-hidden="true"></span>
-          <span class="sl-c-pct"><button type="button" class="sl-pct-eye" data-pct-toggle title="toggle row% visibility">${pctRevealed ? EYE_OPEN : EYE_CLOSED}</button></span>
+          <span class="sl-c-pct" title="row%">${PCT_MARK}</span>
           <span class="sl-c-odds">odds</span>
         </div>
       </div>`;
@@ -1654,11 +2171,14 @@
         ? `<div class="sl-row__badge" role="button" tabindex="0" aria-pressed="false"
                 aria-label="select horse ${esc(e.number)}">
              <span class="sl-badge"><span class="sl-badge__digit">${e.number}</span></span>
+             <span class="sl-row__reserve-badge" data-reserve-badge aria-hidden="true"></span>
            </div>`
         : '';
-      const hidden = pctRevealed ? '' : ' is-hidden';
+      const pctHidden = pctRevealed ? '' : ' is-hidden';
+      const oddsHidden = oddsRevealed ? '' : ' is-hidden';
       return `<div class="sl-row${scratched ? ' sl-row--scratched' : ''}"
                    data-rank-key="${esc(rankKeyFor(e))}"
+                   ${e.number != null ? `data-num="${esc(e.number)}"` : ''}
                    ${pickable ? `data-sl-pick="${e.number}"` : ''}
                    ${e.horse_id ? `data-horse-id="${e.horse_id}"` : ''}>
         ${pickable ? '<span class="sl-row__ink" aria-hidden="true"></span>' : ''}
@@ -1671,12 +2191,13 @@
             <rect x="0" y="9.7" width="56" height="1.7" rx="0.85"/>
           </svg>
         </button>
-        ${pickable ? '<span class="sl-row__cutband" aria-hidden="true"></span><span class="sl-row__cutveil" aria-hidden="true"></span>' : ''}
+        ${pickable ? '<span class="sl-row__cutband" aria-hidden="true"></span><span class="sl-row__cutveil" aria-hidden="true"></span><span class="sl-row__evenmark" aria-hidden="true"></span>' : ''}
         ${scratched ? '' : '<span class="sl-system-share" data-system-share aria-hidden="true">0</span>'}
         ${pickable ? `<button type="button" class="sl-system-lock" data-system-lock tabindex="-1"
                 aria-label="weight ${esc(e.horse_name || e.number || '')}"></button>` : ''}
         ${pickable ? `<button type="button" class="sl-system-handle" data-system-handle tabindex="-1"
-                aria-label="weight ${esc(e.horse_name || e.number || '')}"></button>` : ''}
+                aria-label="weight ${esc(e.horse_name || e.number || '')}"><span
+                class="sl-system-readout" data-system-readout aria-hidden="true"></span></button>` : ''}
         <div class="sl-row__cells">
           ${lead}
           <span class="sl-c-horse">${horseCell(e)}</span>
@@ -1688,11 +2209,11 @@
           <span class="sl-c-eq">${shoeCells(e)}${sulkyCell(e)}</span>
           <span class="sl-c-gps" data-prev-gps-cell${gpsCellAttrs(e._gps)}>${esc((e._gps && e._gps[gpsMetric().key]) || '')}</span>
           <span class="sl-c-gal" data-gal-cell>${galCell(e)}</span>
-          <span class="sl-c-win">${winPct(e, which)}</span>
-          <span class="sl-c-clean">${cleanPct(e, which)}</span>
+          <span class="sl-c-win">${winCleanPct(e, which)}</span>
+          <span class="sl-c-sek">${sekCell(e, which)}</span>
           <span class="sl-c-gap" aria-hidden="true"></span>
-          <span class="sl-c-pct" data-pct-cell><span class="sl-pct__val${hidden}">${pctCell(s)}</span><span class="sl-pct__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
-          <span class="sl-c-odds">${oddsCell(s)}</span>
+          <span class="sl-c-pct" data-pct-cell><span class="sl-pct__val${pctHidden}">${pctCell(s)}</span><span class="sl-pct__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
+          <span class="sl-c-odds" data-odds-cell><span class="sl-odds__val${oddsHidden}">${oddsCell(s)}</span><span class="sl-odds__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
         </div>
       </div>`;
     }
@@ -1719,6 +2240,8 @@
       rankBaseOrder = null;
       rankPicked = null;
       wire();
+      refreshPct();
+      refreshOdds();
       sync();
       // A leg opened while the coupon is already reduced comes up weighted;
       // the row expansion rides the unfold, so it skips the stagger wave.
@@ -1736,6 +2259,11 @@
           const toggle = async ev => {
             ev.stopPropagation();
             ev.preventDefault();
+            if (reservesActive) {
+              handleReserveClick(row, number);
+              return;
+            }
+            removeFromReserves(number);
             await pick(row, number);
           };
           badge.addEventListener('click', toggle);
@@ -1748,25 +2276,26 @@
 
       container.querySelectorAll('.sl-row[data-horse-id]').forEach(row => {
         row.addEventListener('click', ev => {
-          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle], [data-rank-handle], [data-rank-seam], [data-rank-toggle], [data-system-toggle], [data-system-share], [data-system-handle], [data-system-lock]')) return;
+          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle], [data-rank-handle], [data-rank-seam], [data-rank-toggle], [data-system-toggle], [data-system-share], [data-system-handle], [data-system-lock]')) return;
           toggleHistory(row);
         });
       });
 
-      // Market share: the header eye reveals every leg, a cell reveals its row.
+      // Market share: a cell reveals its row; the footer eye reveals every leg.
       container.addEventListener('click', ev => {
-        const btn = ev.target.closest('[data-pct-toggle]');
-        if (btn) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          setPctRevealed(!pctRevealed);
-          return;
-        }
         const cell = ev.target.closest('[data-pct-cell]');
         if (cell) {
           ev.preventDefault();
           ev.stopPropagation();
           const val = cell.querySelector('.sl-pct__val');
+          if (val) val.classList.toggle('is-hidden');
+          return;
+        }
+        const oddsCellEl = ev.target.closest('[data-odds-cell]');
+        if (oddsCellEl) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const val = oddsCellEl.querySelector('.sl-odds__val');
           if (val) val.classList.toggle('is-hidden');
         }
       }, true);
@@ -1793,6 +2322,33 @@
           if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); cycle(); }
         });
       }
+
+      // Footer: reserves + page-wide row% eye
+      const leg = container.closest('.game-leg');
+      if (leg) {
+        leg.addEventListener('reserves:toggled', ev => {
+          toggleReservesMode(ev.detail.on);
+        });
+        const footEye = leg.querySelector('[data-pct-toggle]');
+        if (footEye && !footEye.dataset.slPctBound) {
+          footEye.dataset.slPctBound = '1';
+          footEye.addEventListener('click', ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setPctRevealed(!pctRevealed);
+          });
+        }
+        const footOddsEye = leg.querySelector('[data-odds-toggle]');
+        if (footOddsEye && !footOddsEye.dataset.slOddsBound) {
+          footOddsEye.dataset.slOddsBound = '1';
+          footOddsEye.addEventListener('click', ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setOddsRevealed(!oddsRevealed);
+          });
+        }
+      }
+      paintReserveBadges();
 
       const pickToggle = container.querySelector('[data-sl-pick-toggle]');
       if (pickToggle) {
@@ -1983,15 +2539,25 @@
        so the wipe stops there; unpicking leaves the fill alone so the wipe
        retreats from the thumb instead of snapping full-width first.
 
-       A cut pick has two edges: the cap it was pulled down to (--sl-fill,
-       where the yellow ink and the live thumb stop) and the weight it came
-       from (--sl-weight, the grey bar). --sl-cut is the ratio between them,
-       which is what the badge slices its pie on. */
+       A pick whose coverage has been moved off its weight has two edges: the
+       coverage (--sl-fill, where the ink and the live thumb stop) and the
+       weight it came from (--sl-weight, the bar). --sl-cut is the ratio
+       between them, which is what the badge slices its pie on.
+
+       Above 100 the coverage no longer fits the track, so the thumb wraps:
+       --sl-fill is the overflow (0 at 100, 1 at 200) and the weight bar
+       stays on the pick's own share. Crossing 100 therefore looks like a
+       reduced row in cyan, and the two views still agree at exactly 100. */
     function systemPaint(weights, picks, locks, caps) {
       const picked = new Set(picks);
       const locked = new Set(locks || []);
       const reduced = reducedOn();
-      const cut = window.Reduced ? Reduced.cleanCaps(picks, weights, caps) : {};
+      const cut = window.Reduced ? Reduced.overrides(picks, weights, caps) : {};
+      // Where a flat split would put every thumb in the leg. A lone pick has
+      // nothing to be even against, so it gets no tick.
+      const even = picks.length > 1 ? 100 / picks.length : 0;
+      // Headroom above 100, which is what the lever bloom is measured against.
+      const levTop = Math.max(1, (window.Reduced ? Reduced.MAX : 200) - 100);
       container.querySelectorAll('[data-system-share]').forEach(el => {
         const row = el.closest('.sl-row');
         const num = parseInt(row?.dataset.slPick, 10);
@@ -1999,25 +2565,34 @@
         const w = on ? Math.max(0, Number(weights[num]) || 0) : 0;
         const cap = on && cut[num] != null ? cut[num] : null;
         const cov = cap != null ? cap : w;
+        const isCut = cap != null && cap < w;
+        const isLev = cap != null && cap > w;
         el.textContent = String(Math.round(cov));
         el.classList.toggle('is-on', on);
         el.classList.toggle('is-locked', on && locked.has(num));
-        el.classList.toggle('is-cut', cap != null);
+        el.classList.toggle('is-cut', isCut);
+        el.classList.toggle('is-lev', isLev);
         if (!row) return;
-        // Keep the yellow through an unpick so the ink retreats in the colour
+        // Keep the colour through an unpick so the ink retreats in the shade
         // it was drawn in.
         if (on || !row.classList.contains('is-unfilling')) {
-          row.classList.toggle('is-cut', cap != null);
+          row.classList.toggle('is-cut', isCut);
+          row.classList.toggle('is-lev', isLev);
         }
         const wasOn = row.dataset.fillOn === '1';
         row.dataset.fillOn = on ? '1' : '0';
+        row.classList.toggle('has-even', on && reduced && even > 0);
         if (on && reduced) {
-          const fill = Math.max(0, Math.min(1, cov / 100));
+          const overflow = cov > 100;
+          const fill = Math.max(0, Math.min(1, (overflow ? cov - 100 : cov) / 100));
           const weightEdge = Math.max(0, Math.min(1, w / 100));
           if (!wasOn) row.classList.add('is-fill-jump');
           row.style.setProperty('--sl-fill', String(fill));
           row.style.setProperty('--sl-weight', String(weightEdge));
-          row.style.setProperty('--sl-cut', String(w > 0 ? cov / w : 1));
+          row.style.setProperty('--sl-cut', String(w > 0 ? Math.min(1, cov / w) : 1));
+          row.style.setProperty('--sl-even', String(even / 100));
+          row.style.setProperty('--sl-lev-glow',
+                                String(Math.max(0, Math.min(1, (cov - 100) / levTop))));
           if (!wasOn) {
             requestAnimationFrame(() => row.classList.remove('is-fill-jump'));
           }
@@ -2025,14 +2600,58 @@
           row.style.setProperty('--sl-fill', '1');
           row.style.setProperty('--sl-weight', '1');
           row.style.setProperty('--sl-cut', '1');
+          row.style.setProperty('--sl-even', '0');
+          row.style.setProperty('--sl-lev-glow', '0');
         } else if (wasOn && reduced) {
           // Keep --sl-fill; setPicked schedules the reset after the wipe.
         } else if (!row.classList.contains('is-unfilling')) {
           row.style.setProperty('--sl-fill', '1');
           row.style.setProperty('--sl-weight', '1');
           row.style.setProperty('--sl-cut', '1');
+          row.style.setProperty('--sl-even', '0');
+          row.style.setProperty('--sl-lev-glow', '0');
         }
       });
+      if (systemDrag) systemPaintReadout(cut, weights);
+      refreshFootSum(weights, cut);
+    }
+
+    /* The number that rides the thumb. Only the row being dragged carries
+       one, and it flips to the left of the thumb once the thumb is far
+       enough over that the number would run off the row. */
+    function systemPaintReadout(cut, weights) {
+      const { row, num } = systemDrag;
+      const el = row.querySelector('[data-system-readout]');
+      if (!el) return;
+      const w = Math.max(0, Number(weights[num]) || 0);
+      const cov = cut[num] != null ? cut[num] : w;
+      el.textContent = String(Math.round(cov));
+      const visual = cov > 100 ? (cov - 100) / 100 : cov / 100;
+      row.classList.toggle('is-readout-left',
+                           Math.max(0, Math.min(1, visual)) > 0.86);
+    }
+
+    /* The leg's coverage summed up — 100 until something is reduced or
+       levered, and after that the multiplier this leg puts on the coupon's
+       row count. `weights` and `cut` are handed in mid-drag so the number
+       tracks the thumb; otherwise it reads the committed system. */
+    function refreshFootSum(weights, cut) {
+      const leg = container.closest('.game-leg');
+      const el = leg && leg.querySelector('[data-foot-sum]');
+      if (!el) return;
+      const picks = currentPicks();
+      const live = weights || systemWeights(picks);
+      const caps = cut
+        || (window.Reduced ? Reduced.overrides(picks, live, systemCaps()) : {});
+      let total = 0;
+      picks.forEach(n => {
+        const w = Math.max(0, Number(live[n]) || 0);
+        const cap = caps[n] != null ? caps[n] : null;
+        total += Math.round(cap != null ? cap : w);
+      });
+      el.textContent = String(total);
+      el.classList.toggle('is-cut', reducingOn() && total < 100);
+      el.classList.toggle('is-lev', reducingOn() && total > 100);
     }
 
     function refreshSystemShares() {
@@ -2088,8 +2707,11 @@
         row.style.setProperty('--sl-fill', '1');
         row.style.setProperty('--sl-weight', '1');
         row.style.setProperty('--sl-cut', '1');
-        row.classList.remove('is-cut');
+        row.style.setProperty('--sl-even', '0');
+        row.style.setProperty('--sl-lev-glow', '0');
+        row.classList.remove('is-cut', 'is-lev', 'has-even');
       });
+      refreshFootSum();
     }
 
     // Follows window.Reduced — called on mount and whenever the mode or a
@@ -2148,37 +2770,37 @@
       return best;
     }
 
-    /* Cutting has no redistribution to solve for. Snap to the landmarks
-       still on screen: this pick's own weight (release the cut), half of
-       it, and every other pick's current coverage — yellow caps and green
-       weights alike, since those thumbs don't move while we cut. */
-    function systemCutSnapTarget(weights, picks, selfNum, rawPct, weight, caps) {
+    /* Moving coverage has no redistribution to solve for — the other picks
+       hold either way. Snap to the landmarks still on screen: this pick's
+       own weight (which releases the override), half and double it, the
+       whole leg at 100, and every other pick's current coverage, since
+       those thumbs do not move while this one does. */
+    function systemCoverSnapTarget(weights, picks, selfNum, rawPct, weight, caps) {
       const cov = window.Reduced
         ? Reduced.coverage(picks, weights, caps)
         : weights;
-      const stops = [weight, weight / 2];
+      const stops = [weight, weight / 2, weight * 2, 100];
       picks.forEach(n => {
         if (n === selfNum) return;
         const v = Number(cov[n]);
         if (Number.isFinite(v) && v > 0) stops.push(v);
       });
-      let best = rawPct;
       let bestDist = SYSTEM_SNAP_PCT;
+      let best = rawPct;
       stops.forEach(stop => {
-        if (!Number.isFinite(stop) || stop < Reduced.MIN || stop > weight + 0.05) return;
+        if (!Number.isFinite(stop) || stop < Reduced.MIN || stop > Reduced.MAX) return;
         const dist = Math.abs(rawPct - stop);
         if (dist < bestDist) {
           bestDist = dist;
           best = stop;
         }
       });
-      return Math.max(Reduced.MIN, Math.min(best, weight));
+      return Math.max(Reduced.MIN, Math.min(best, Reduced.MAX));
     }
 
     function systemDragStart(ev) {
       if (ev.button != null && ev.button !== 0) return;
-      const lockEl = ev.target.closest('[data-system-lock]');
-      const handle = lockEl || ev.target.closest('[data-system-handle]');
+      const handle = ev.target.closest('[data-system-handle]');
       if (!handle || !reducedOn() || systemDrag) return;
       const row = handle.closest('.sl-row');
       if (!row || !row.classList.contains('is-picked')) return;
@@ -2187,23 +2809,30 @@
       ev.preventDefault();
       ev.stopPropagation();
       const picks = currentPicks();
+      const base = systemWeights(picks);
+      const caps = systemStoredCaps();
       systemDrag = {
         row,
         num,
-        base: systemWeights(picks),
+        base,
         picks,
         locks: systemLocks(),
-        caps: systemStoredCaps(),
+        caps,
         // Reduce mode is fixed for the whole drag, so a mode flip mid-gesture
-        // can't turn a cut into a re-weight halfway through.
+        // can't turn a coverage move into a re-weight halfway through.
         reducing: reducingOn(),
-        // Outer bar moves the weight; the yellow handle moves the cap.
-        via: lockEl ? 'weight' : 'cap',
+        // Coverage moves relative to where it already stood, so a thumb that
+        // has wrapped past 100 carries on from its value instead of being
+        // re-read off its position — which down there means a reduction.
+        startX: ev.clientX,
+        startCov: window.Reduced
+          ? (Reduced.coverage(picks, base, caps)[num] ?? 0)
+          : (base[num] || 0),
         next: null,
         nextCaps: null,
       };
       slRoot()?.classList.add('is-weighting');
-      row.classList.add(lockEl ? 'is-weighting-lock' : 'is-weighting');
+      row.classList.add('is-weighting');
       try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
       systemDragMove(ev);
     }
@@ -2228,41 +2857,35 @@
       const raw = ((ev.clientX - track.left) / track.width) * 100;
 
       if (reducing) {
+        // Reduce mode moves this pick's coverage and nothing else: below the
+        // weight it gives rows up, above it buys more. The other picks hold
+        // either way, so there is no redistribution to run.
+        //
+        // The whole width of the track is worth 100 points wherever the thumb
+        // happens to be, so the drag has one speed and the thumb stays under
+        // the finger — including after it has wrapped past 100, where its
+        // position no longer says what its value is. Getting from 100 to the
+        // ceiling takes a second grab, which is the price of the wrap.
         const weight = Math.max(0, Number(base[num]) || 0);
-        const via = systemDrag.via || 'cap';
-        const growWeight = via === 'weight' || raw > weight + 0.4;
-        if (growWeight) {
-          // Move the outer bar. Other cut rows keep their weights so their
-          // locked thumbs stay put. This row's cap is kept — the yellow
-          // thumb does not follow the weight.
-          const held = picks.filter(n => n !== num && caps[n] != null);
-          const dragLocks = [...new Set([...(locks || []), ...held])];
-          const floor = via === 'weight'
-            ? Math.max(Reduced.MIN, Number(caps[num]) || Reduced.MIN)
-            : Reduced.MIN;
-          const pct = Math.max(floor,
-            systemSnapTarget(base, dragLocks, picks, num, raw, next));
-          const nextWeights = Reduced.applyDrag(picks, base, dragLocks, num, pct);
-          systemDrag.next = nextWeights;
-          systemDrag.nextCaps = Reduced.cleanCaps(picks, nextWeights, caps);
-          systemPaint(nextWeights, picks, dragLocks, systemDrag.nextCaps);
-          return;
-        }
-        // Left of the weight: cut. Other picks hold; only this cap moves.
-        const pct = systemCutSnapTarget(base, picks, num, raw, weight, caps);
+        const moved = systemDrag.startCov
+          + ((ev.clientX - systemDrag.startX) / track.width) * 100;
+        const pct = systemCoverSnapTarget(
+          base, picks, num,
+          Math.max(Reduced.MIN, Math.min(moved, Reduced.MAX)), weight, caps);
         const nextCaps = { ...caps };
-        if (pct >= weight - 0.05) delete nextCaps[num];
-        else nextCaps[num] = Math.max(Reduced.MIN, Math.min(pct, weight));
+        if (weight <= 0 || Math.abs(pct - weight) < 0.05) delete nextCaps[num];
+        else nextCaps[num] = pct / weight;
         systemDrag.next = base;
-        systemDrag.nextCaps = Reduced.cleanCaps(picks, base, nextCaps);
+        systemDrag.nextCaps = Reduced.pruneCaps(picks, nextCaps);
         systemPaint(base, picks, locks, systemDrag.nextCaps);
         return;
       }
 
       const pct = systemSnapTarget(base, locks, picks, num, raw, next);
       systemDrag.next = Reduced.applyDrag(picks, base, locks, num, pct);
-      // Weights moved, so any cap now sitting above its weight lapses.
-      systemDrag.nextCaps = Reduced.cleanCaps(picks, systemDrag.next, caps);
+      // Overrides are held as a multiple of the weight, so they ride the
+      // re-weighting instead of lapsing at it.
+      systemDrag.nextCaps = Reduced.pruneCaps(picks, caps);
       systemPaint(systemDrag.next, picks, locks, systemDrag.nextCaps);
     }
 
@@ -2271,7 +2894,7 @@
       const drag = systemDrag;
       systemDrag = null;
       slRoot()?.classList.remove('is-weighting');
-      drag.row.classList.remove('is-weighting', 'is-weighting-lock');
+      drag.row.classList.remove('is-weighting', 'is-readout-left');
       if (drag.next && window.Reduced) {
         Reduced.setRace(raceId, drag.next, drag.locks, drag.nextCaps || {});
       }
@@ -2312,16 +2935,31 @@
       window.addEventListener('pointercancel', systemDragEnd);
     }
 
+    // Saved rank position, strongest first. Unknown keys sort after known ones.
+    function rankSavedIndex() {
+      const saved = rankOrders.get(raceId) || [];
+      const idx = new Map(saved.map((k, i) => [k, i]));
+      return row => idx.has(rankKeyOf(row)) ? idx.get(rankKeyOf(row)) : Infinity;
+    }
+
+    function rankBySaved(list) {
+      const pos = rankSavedIndex();
+      return [...list].sort((a, b) => pos(a) - pos(b));
+    }
+
     // Opening order when rank mode turns on. Prefer weight/coverage order
     // when this race has shares stored; a lone pick always floats to the
     // top; otherwise restore the last ranked order (or sink scratched).
+    // Unpicked horses keep their last ranked order in every path — they are
+    // the reserve candidates, so forgetting them forces a full re-rank.
     function rankOpeningOrder() {
       const rows = rankRows();
       const scratched = r => r.classList.contains('sl-row--scratched');
       const active = rows.filter(r => !scratched(r));
-      const sunk = rows.filter(scratched);
+      const sunk = rankBySaved(rows.filter(scratched));
       const picked = active.filter(r => r.classList.contains('is-picked'));
-      const rest = active.filter(r => !r.classList.contains('is-picked'));
+      const rest = rankBySaved(active.filter(r => !r.classList.contains('is-picked')));
+      const savedPos = rankSavedIndex();
 
       const stored = window.Reduced ? Reduced.weightsFor(raceId) : {};
       if (stored && Object.keys(stored).length && picked.length) {
@@ -2335,6 +2973,8 @@
         picked.sort((a, b) => {
           const dw = weightOf(b) - weightOf(a);
           if (Math.abs(dw) > 0.05) return dw;
+          const ds = savedPos(a) - savedPos(b);
+          if (ds) return ds;
           return rankKeyOf(a).localeCompare(rankKeyOf(b), undefined, { numeric: true });
         });
         return [...picked, ...rest, ...sunk];
@@ -2432,7 +3072,7 @@
     function rankDragStart(ev) {
       if (ev.button !== 0 || !rankIsReady() || rankDrag) return;
       if (ev.target.closest('[data-rank-seam], a, .sl-row__badge, [data-pct-cell],'
-        + ' [data-pct-toggle], [data-prev-gps-th], [data-gal-toggle],'
+        + ' [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-prev-gps-th], [data-gal-toggle],'
         + ' [data-sl-pick-toggle], [data-rank-toggle], [data-system-toggle],'
         + ' [data-system-share], [data-system-handle], [data-system-lock]')) return;
       const row = ev.target.closest('.sl-row:not(.sl-row--head)');
@@ -2849,7 +3489,8 @@
             row.style.setProperty('--sl-fill', '1');
             row.style.setProperty('--sl-weight', '1');
             row.style.setProperty('--sl-cut', '1');
-            row.classList.remove('is-cut');
+            row.style.setProperty('--sl-even', '0');
+            row.classList.remove('is-cut', 'is-lev', 'has-even');
             row.dataset.fillOn = '0';
           }
         }, 480);
@@ -2860,6 +3501,85 @@
       row.classList.toggle('is-picked', on);
       const badge = row.querySelector('.sl-row__badge');
       if (badge) badge.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+
+    /* ── reserves ────────────────────────────────────────────────────────
+       Up to two unpicked horses per leg can be marked as reserves (r1, r2).
+       Stored in the coupon draft so they survive reload. When the reserves
+       toggle is active, clicking an unpicked sphere assigns the next free
+       slot; clicking a reserve sphere removes it. Picking a reserve for the
+       main coupon removes it from the reserve list (promoting r2 → r1 when
+       r1 is picked). */
+
+    let reservesActive = false;
+
+    function reservesForRace() {
+      const d = window.Coupon ? Coupon.load() : null;
+      if (!d || d.gameId !== couponCtx()?.gameId) return [];
+      return (d.reserves && d.reserves[raceId]) || [];
+    }
+
+    function storeReserves(list) {
+      const ctx = couponCtx();
+      if (!ctx || !window.Coupon) return;
+      let d = Coupon.load();
+      if (!d || d.gameId !== ctx.gameId) return;
+      d.reserves = d.reserves || {};
+      if (list.length) d.reserves[raceId] = list.slice(0, 2);
+      else delete d.reserves[raceId];
+      const hasContent = Coupon.totalPicks(d) > 0
+        || Object.keys(d.reserves || {}).some(k => (d.reserves[k] || []).length > 0);
+      Coupon.store(hasContent ? d : null);
+    }
+
+    function toggleReservesMode(on) {
+      reservesActive = on;
+      const sl = slRoot();
+      if (sl) sl.classList.toggle('is-reserves', on);
+      paintReserveBadges();
+    }
+
+    function paintReserveBadges() {
+      const reserves = reservesForRace();
+      container.querySelectorAll('[data-reserve-badge]').forEach(el => {
+        const row = el.closest('.sl-row');
+        if (!row) return;
+        const num = parseInt(row.dataset.slPick, 10);
+        const idx = reserves.indexOf(num);
+        if (idx >= 0) {
+          el.textContent = String(idx + 1);
+          el.classList.add('is-visible');
+        } else {
+          el.textContent = '';
+          el.classList.remove('is-visible');
+        }
+      });
+    }
+
+    function handleReserveClick(row, number) {
+      const picks = currentPicks();
+      if (picks.includes(number)) return false;
+      const reserves = reservesForRace();
+      const idx = reserves.indexOf(number);
+      if (idx >= 0) {
+        reserves.splice(idx, 1);
+      } else if (reserves.length < 2) {
+        reserves.push(number);
+      } else {
+        return true;
+      }
+      storeReserves(reserves);
+      paintReserveBadges();
+      return true;
+    }
+
+    function removeFromReserves(number) {
+      const reserves = reservesForRace();
+      const idx = reserves.indexOf(number);
+      if (idx < 0) return;
+      reserves.splice(idx, 1);
+      storeReserves(reserves);
+      paintReserveBadges();
     }
 
     function syncPrevFocus() {
@@ -2947,6 +3667,94 @@
       refreshGps();
     }
 
+    /* ── tipster comments (typed out in the leg footer on row hover) ────── */
+
+    let tips = {};  // { programNumber: commentText }
+    let typingAnim = null;
+
+    async function loadTipsInBackground() {
+      try {
+        const r = await fetch(`/api/race/atg/${encodeURIComponent(raceId)}/tips`);
+        if (!r.ok) return;
+        tips = await r.json();
+      } catch (_) {}
+      if (destroyed || !Object.keys(tips).length) return;
+      wireTipsHover();
+    }
+
+    function wireTipsHover() {
+      container.querySelectorAll('.sl-row[data-num]').forEach(row => {
+        const text = tips[row.dataset.num];
+        if (!text) return;
+        row.addEventListener('mouseenter', () => startTyping(text));
+        row.addEventListener('mouseleave', stopTyping);
+      });
+    }
+
+    function tipsBox() {
+      const leg = container.closest('.game-leg');
+      return leg ? leg.querySelector('.game-leg__tips') : null;
+    }
+
+    // Typed L→R inside a measure-sized line so the caret starts at the left
+    // of the final centered block and the finished text still sits centered.
+    function startTyping(text) {
+      stopTyping();
+      const box = tipsBox();
+      if (!box) return;
+      box.classList.add('is-live');
+      const measure = box.querySelector('.game-leg__tips-measure');
+      const span = box.querySelector('.game-leg__tips-text');
+      const caret = box.querySelector('.game-leg__caret');
+      measure.textContent = text;
+      span.textContent = '';
+
+      const TIP_DELAY_MS = 1000;
+      const CHAR_MS = 22;
+      const SENTENCE_PAUSE_MS = 650;
+      let i = 0;
+
+      function tick() {
+        if (!typingAnim) return;
+        if (i >= text.length) {
+          typingAnim = null;
+          caret.classList.remove('game-leg__caret--typing');
+          return;
+        }
+        const ch = text[i++];
+        span.textContent += ch;
+        if (ch === '.' && text[i] === ' ') {
+          caret.classList.remove('game-leg__caret--typing');
+          typingAnim = setTimeout(() => {
+            if (!typingAnim) return;
+            caret.classList.add('game-leg__caret--typing');
+            typingAnim = setTimeout(tick, CHAR_MS);
+          }, SENTENCE_PAUSE_MS);
+        } else {
+          typingAnim = setTimeout(tick, CHAR_MS);
+        }
+      }
+
+      // Caret blinks at the start position during the hover delay.
+      typingAnim = setTimeout(() => {
+        if (!typingAnim) return;
+        caret.classList.add('game-leg__caret--typing');
+        typingAnim = setTimeout(tick, CHAR_MS);
+      }, TIP_DELAY_MS);
+    }
+
+    function stopTyping() {
+      clearTimeout(typingAnim);
+      typingAnim = null;
+      const box = tipsBox();
+      if (!box) return;
+      box.classList.remove('is-live');
+      const measure = box.querySelector('.game-leg__tips-measure');
+      if (measure) measure.textContent = '';
+      box.querySelector('.game-leg__tips-text').textContent = '';
+      box.querySelector('.game-leg__caret').classList.remove('game-leg__caret--typing');
+    }
+
     function refreshGps() {
       const m = gpsMetric();
       const head = container.querySelector('[data-prev-gps-th]');
@@ -2971,13 +3779,24 @@
     }
 
     function refreshPct() {
-      const head = container.querySelector('[data-pct-toggle]');
-      if (head) {
-        head.innerHTML = pctRevealed ? EYE_OPEN : EYE_CLOSED;
-        head.title = pctRevealed ? 'hide all row%' : 'reveal all row%';
+      const foot = container.closest('.game-leg')?.querySelector('[data-pct-toggle]');
+      if (foot) {
+        foot.innerHTML = pctRevealed ? EYE_OPEN : EYE_CLOSED;
+        foot.title = pctRevealed ? 'hide all row%' : 'reveal all row%';
       }
       container.querySelectorAll('[data-pct-cell] .sl-pct__val').forEach(v => {
         v.classList.toggle('is-hidden', !pctRevealed);
+      });
+    }
+
+    function refreshOdds() {
+      const foot = container.closest('.game-leg')?.querySelector('[data-odds-toggle]');
+      if (foot) {
+        foot.innerHTML = oddsRevealed ? EYE_OPEN : EYE_CLOSED;
+        foot.title = oddsRevealed ? 'hide all odds' : 'reveal all odds';
+      }
+      container.querySelectorAll('[data-odds-cell] .sl-odds__val').forEach(v => {
+        v.classList.toggle('is-hidden', !oddsRevealed);
       });
     }
 
@@ -2993,12 +3812,14 @@
       });
       refreshPickToggle();
       refreshSystemShares();
+      paintReserveBadges();
       return picks;
     }
 
     function destroy() {
       destroyed = true;
       instances.delete(inst);
+      stopTyping();
       systemDrag = null;
       window.removeEventListener('pointermove', systemDragMove);
       window.removeEventListener('pointerup', systemDragEnd);
@@ -3017,6 +3838,11 @@
   function setPctRevealed(on) {
     pctRevealed = !!on;
     instances.forEach(x => x.refreshPct());
+  }
+
+  function setOddsRevealed(on) {
+    oddsRevealed = !!on;
+    instances.forEach(x => x.refreshOdds());
   }
 
   window.addEventListener('coupon:changed', () => instances.forEach(x => x.sync()));

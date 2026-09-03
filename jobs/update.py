@@ -158,6 +158,68 @@ def _merge_summary(conn, run_id: int, patch: dict) -> None:
         pass
 
 
+def _source_fetch_health(conn, since) -> dict:
+    """Per-source HTTP outcome since `since`, read from the rolling buffers.
+
+    Every scraper funnels its fetches through `core.db.buffer_insert`, so this
+    sees each source that made a request without having to trust the source's
+    own reporting. `last_success` looks at the whole buffer, not just this run,
+    so an outage's age is visible even on a night nothing was attempted.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' AND table_name = ANY(%s)",
+            ([f"{s}_buffer" for s in config.KNOWN_SOURCES],),
+        )
+        tables = {r[0] for r in cur.fetchall()}
+
+    out: dict = {}
+    for source in config.KNOWN_SOURCES:
+        table = f"{source}_buffer"
+        if table not in tables:
+            continue
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT count(*) FILTER (WHERE fetched_at >= %s), "
+                f"       count(*) FILTER (WHERE fetched_at >= %s AND http_status = 200), "
+                f"       max(fetched_at) FILTER (WHERE http_status = 200) "
+                f"  FROM {table}",
+                (since, since),
+            )
+            attempts, ok, last_ok = cur.fetchone()
+        if not attempts and last_ok is None:
+            continue  # source never used on this install
+        out[source] = {
+            "attempts": attempts,
+            "ok": ok,
+            "last_success": last_ok.isoformat(timespec="seconds") if last_ok else None,
+            "last_success_age_h": (
+                round((datetime.now() - last_ok).total_seconds() / 3600, 1)
+                if last_ok else None
+            ),
+        }
+    return out
+
+
+def _check_fetch_health(conn, run_id: int, since) -> tuple[dict, list[str]]:
+    """Log per-source fetch health and return the sources that fetched nothing.
+
+    A source that tried and got zero successes is an outage, not a quiet night:
+    ST answered 404 for 13 straight days in Aug 2026 while every run still
+    reported success, because failures only ever became smaller counts.
+    """
+    health = _source_fetch_health(conn, since)
+    for source, h in sorted(health.items()):
+        age = h["last_success_age_h"]
+        _log(conn, run_id,
+             f"[health] {source}: {h['ok']}/{h['attempts']} fetches ok this run, "
+             f"last success {h['last_success'] or 'never'}"
+             + (f" ({age}h ago)" if age is not None else ""))
+    dead = sorted(s for s, h in health.items() if h["attempts"] and not h["ok"])
+    return health, dead
+
+
 def _finish(conn, run_id: int, status: str, summary_patch: dict | None = None) -> None:
     if summary_patch:
         _merge_summary(conn, run_id, summary_patch)
@@ -1242,6 +1304,11 @@ def main() -> int:
         run_id = _start_run(conn, job_name=job_name)
     _log(conn, run_id, f"[update] start  mode={mode} (cli={args.mode})  run_id={run_id}  pid={os.getpid()}  at={datetime.now().isoformat(timespec='seconds')}")
 
+    # Database clock, so the window lines up with the buffers' own NOW() stamps.
+    with conn.cursor() as _cur:
+        _cur.execute("SELECT NOW()")
+        run_started_at = _cur.fetchone()[0]
+
     try:
         if mode == "bridge":
             summary = run_bridge(conn, run_id)
@@ -1261,6 +1328,17 @@ def main() -> int:
         _log(conn, run_id, f"[update] FAILED: {exc!r}\n{traceback.format_exc()}")
         _set_phase(conn, run_id, "Failed")
         _finish(conn, run_id, "failed", {"error": repr(exc)})
+        return 1
+
+    health, dead_sources = _check_fetch_health(conn, run_id, run_started_at)
+    summary = {**summary, "fetch_health": health}
+    if dead_sources:
+        msg = (f"no successful fetch from: {', '.join(dead_sources)} — "
+               f"the source is unreachable, not merely quiet")
+        _log(conn, run_id, f"[update] FAILED: {msg}")
+        _set_phase(conn, run_id, "Failed — source unreachable")
+        _finish(conn, run_id, "failed", {**summary, "dead_sources": dead_sources,
+                                        "error": msg})
         return 1
 
     _set_phase(conn, run_id, "Done")

@@ -250,9 +250,6 @@
   }
   table.history .comment-row__inner {
     position: relative;
-    /* Must stay visible — hidden was clipping the heartbeat on the left
-       into a hard edge against the page background. */
-    overflow: visible;
   }
   table.history tr.comment-row .comment-body {
     display: block;
@@ -261,23 +258,7 @@
     max-width: none;
   }
   table.history .comment-wave {
-    position: absolute;
-    left: var(--comment-wave-x, 24px);
-    top: 2px;
-    /* Heartbeat mark — keep 32×100 proportions. */
-    height: calc(100% - 4px);
-    width: auto;
-    aspect-ratio: 32 / 100;
-    transform: translateX(-50%);
-    pointer-events: none;
-    overflow: visible;
-  }
-  table.history .comment-wave path {
-    fill: none;
-    stroke: var(--fg-muted);
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
+    display: none;
   }
   table.history th, table.offspring th, table.siblings th {
     text-align: left;
@@ -468,11 +449,6 @@
   <script>
     const horse = {{ horse | tojson }};
 
-    function stripCountry(name) {
-      if (!name) return '';
-      return name.replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '').toLowerCase();
-    }
-
     // Source badges (chips per source that contributed data).
     if (horse.sources && horse.sources.length) {
       document.getElementById('sources').innerHTML = horse.sources.map(s =>
@@ -509,16 +485,16 @@
 
     const ped = [];
     if (horse.father) {
-      const f = esc(stripCountry(horse.father));
+      const f = esc(stripPedigreeName(horse.father));
       ped.push(horse.father_id ? `<a href="/horse/${horse.father_id}">${f}</a>` : f);
     } else { ped.push(''); }
     if (horse.mother) {
-      const m = esc(stripCountry(horse.mother));
+      const m = esc(stripPedigreeName(horse.mother));
       ped.push(horse.mother_id ? `<a href="/horse/${horse.mother_id}">${m}</a>` : m);
     } else { ped.push(''); }
     let pedStr = ped[0] + ' \u2013 ' + ped[1];
     if (horse.mother_father) {
-      pedStr += ' (' + esc(stripCountry(horse.mother_father)) + ')';
+      pedStr += ' (' + esc(stripPedigreeName(horse.mother_father)) + ')';
     }
     document.getElementById('pedigree').innerHTML = pedStr;
 

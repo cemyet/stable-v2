@@ -18,68 +18,113 @@
     gap: 0.08em 0.18em;
   }
   .track-title .flag-lg { margin-left: 0.16em; flex-shrink: 0; }
-  .track-desc { font-size: 12px; color: var(--fg-muted); opacity: 0.48; margin-bottom: 6px; }
-
-  .method-toggle {
-    display: inline-flex; gap: 0; margin-left: 12px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
-  }
-  .mtog {
-    background: none; border: none; padding: 2px 10px; font-family: inherit;
-    font-size: 11px; color: var(--fg-muted); cursor: pointer; letter-spacing: 0;
-    transition: background 0.15s, color 0.15s;
-  }
-  .mtog.active { background: var(--fg-muted); color: var(--bg); }
-  .mtog:not(.active):hover { background: var(--hover); }
-
-  /* post-position bar viz */
-  .bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
-  .bar-row { display: grid; grid-template-columns: 30px 1fr 46px; align-items: center; gap: 10px; }
-  .bar-post {
-    font-family: ATGRubrik, sans-serif; font-size: 18px; line-height: 1; text-align: center;
-    color: var(--fg-heading);
-  }
-  .bar-lane { position: relative; height: 16px; border-radius: 4px; background: rgba(127,127,127,0.08); overflow: visible; }
-  .bar-fill {
-    position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px;
-    transition: width 0.4s cubic-bezier(0.4,1,0.5,1), background 0.3s;
-  }
-  .bar-avg-mark {
-    position: absolute; top: -1px; bottom: -1px; width: 1.5px;
-    background: var(--fg-muted); opacity: 0.5; border-radius: 1px;
-    transition: left 0.4s cubic-bezier(0.4,1,0.5,1);
-  }
-  .bar-val { font-size: 11.5px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
-  .bar-val.dim { color: var(--fg-muted); }
-  .bar-row.empty .bar-lane { opacity: 0.35; }
 
   .track-passport {
     display: flex; flex-direction: column;
     margin-bottom: 36px; padding-bottom: 14px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid #ddd8cc;
   }
-  .meta-row {
-    display: flex; flex-wrap: nowrap; gap: 28px; align-items: baseline;
-    color: var(--fg-muted); font-size: 13px;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
-  }
-  .meta-row::-webkit-scrollbar { display: none; }
-  .meta-row > span { flex: 0 0 auto; white-space: nowrap; }
-  .meta-row span b { color: var(--fg); font-weight: 400; margin-left: 6px; }
 
-  /* physical facts grid */
-  .facts {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 14px 20px; margin: 4px 0 0;
+  /* Headline stats | course facts | overhead track */
+  .passport-body {
+    display: flex; gap: 28px; align-items: center;
+    margin-top: 18px; min-height: 160px;
   }
-  .fact { display: flex; flex-direction: column; gap: 3px; }
-  .fact .k {
-    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fg-muted);
+  .facts-group {
+    display: flex; gap: 28px; align-items: flex-start;
+    flex: 0 1 auto;
   }
-  .fact .v { font-size: 17px; color: var(--fg); font-variant-numeric: tabular-nums; }
-  .fact .v small { font-size: 11px; color: var(--fg-muted); margin-left: 3px; }
-  .fact .v.muted { color: var(--fg-muted); font-size: 14px; }
+  .facts-col { flex: 0 0 auto; }
+  .track-drawing {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; justify-content: flex-end; align-items: center;
+  }
+  .track-drawing svg { display: block; width: 100%; max-width: 440px; height: auto; }
+  @media (max-width: 640px) {
+    .passport-body { flex-direction: column; align-items: stretch; gap: 20px; }
+    .facts-group { flex-wrap: wrap; }
+    .track-drawing { justify-content: flex-start; }
+    .track-drawing svg { max-width: 100%; }
+  }
+
+  /* Facts stacked vertically */
+  .facts-col {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .fact-row {
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .fact-row .k {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--fg-muted); flex-shrink: 0; min-width: 100px;
+  }
+  .fact-row .v {
+    font-size: 14px; color: var(--fg); font-variant-numeric: tabular-nums;
+  }
+  .fact-row .v small { font-size: 11px; color: var(--fg-muted); margin-left: 3px; }
+  .fact-row .v.muted { color: var(--fg-muted); }
+
+  /* post-position bar viz */
+  .bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; position: relative; }
+  .bar-row { display: grid; grid-template-columns: 30px 1fr 46px; align-items: center; gap: 10px; }
+  .bar-post {
+    font-family: inherit; font-size: 18px; font-weight: 600; line-height: 1; text-align: center;
+    color: var(--fg-heading);
+  }
+  .bar-lane { position: relative; height: 16px; }
+  .bar-track {
+    position: absolute; inset: 0; border-radius: 4px; overflow: hidden;
+    background: color-mix(in srgb, var(--bg) 94%, black 6%);
+    box-shadow:
+      inset 0 1.5px 2.5px rgba(0, 0, 0, 0.1),
+      inset 0 -0.5px 0 rgba(255, 255, 255, 0.22);
+  }
+  .bar-lane .bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    width: var(--bar-w, 0%);
+    max-width: 100%;
+    box-sizing: border-box;
+    border-radius: 4px;
+    display: block;
+    background: var(--glass-fill-gradient);
+    border: 1px solid var(--glass-fill-border);
+    -webkit-backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+    backdrop-filter: blur(var(--glass-fill-blur)) saturate(var(--glass-fill-saturate));
+    box-shadow: var(--glass-fill-shadow);
+    transition: width 0.22s cubic-bezier(0.4,1,0.5,1);
+  }
+  .bar-avg-mark {
+    position: absolute; top: -1px; bottom: -1px; width: 2px; z-index: 2;
+    border-radius: 1px;
+    transition: left 0.22s cubic-bezier(0.4,1,0.5,1), background-color 0.22s ease;
+    pointer-events: none;
+  }
+  .bar-val { font-size: 11.5px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .bar-val.dim { color: var(--fg-muted); }
+  .bar-row.empty .bar-lane { opacity: 0.35; }
+  .bars-avg-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 3;
+  }
+  .bars-legend {
+    display: flex; gap: 16px; margin-top: 10px;
+    font-size: 11px; color: var(--fg-muted);
+  }
+  .bars-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .bars-legend i {
+    display: inline-block; width: 8px; height: 2px; border-radius: 1px;
+  }
+  .bars-legend i.avg-hot { background: var(--accent-hot); }
+  .bars-legend i.avg-cold { background: var(--accent-cold); }
+  .bars-legend i.global { background: #1a3d7c; }
 
   .track-list-section { margin-top: 32px; }
+
+  .stats-head-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin: 0 0 14px;
+  }
+  .stats-head-row .section-heading { margin: 0; }
 
   .section-heading {
     display: inline-flex; align-items: baseline; margin: 0 0 14px;
@@ -94,13 +139,16 @@
   .section-heading__toggle:hover { opacity: 0.78; }
   .track-list-section.is-section-collapsed .track-list-section__body { display: none; }
 
+  .stats-toggles {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+
   table.history { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.history th {
     text-align: left; color: var(--fg-muted); font-weight: 400;
     padding: 6px 8px; border-bottom: 1px solid var(--border); letter-spacing: 0.5px;
   }
   table.history td { padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  /* hover handled by global C treatment in _layout.html */
   table.history tr.clickable { cursor: pointer; }
   table.history td.num, table.history th.num { text-align: right; }
   table.history td.muted { color: var(--fg-muted); }
@@ -121,30 +169,29 @@
   <div class="track-page">
     <section class="track-passport">
       <h1 class="track-title" id="trackName"></h1>
-      <div class="track-desc" id="trackDesc"></div>
-      <div class="meta-row" id="metaRow"></div>
-    </section>
-
-    <section class="track-list-section" id="physicalSection">
-      <h2 class="section-heading">
-        <span class="section-heading__label">course</span>
-        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
-      </h2>
-      <div class="track-list-section__body" id="physicalMount"></div>
+      <div class="passport-body">
+        <div class="facts-group">
+          <div class="facts-col" id="headlineMount"></div>
+          <div class="facts-col" id="factsMount"></div>
+        </div>
+        <div class="track-drawing" id="trackDrawing"></div>
+      </div>
     </section>
 
     <section class="track-list-section" id="galSection">
-      <h2 class="section-heading">
-        <span class="section-heading__label">stats</span>
-        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
-      </h2>
+      <div class="stats-head-row">
+        <h2 class="section-heading">
+          <span class="section-heading__label">start positions</span>
+        </h2>
+        <div class="stats-toggles" id="statsToggles"></div>
+      </div>
       <div class="track-list-section__body" id="galMount"></div>
     </section>
 
-    <section class="track-list-section" id="racesSection">
+    <section class="track-list-section is-section-collapsed" id="racesSection">
       <h2 class="section-heading">
         <span class="section-heading__label">recent races</span>
-        <button type="button" class="section-heading__toggle" aria-expanded="true" aria-label="Collapse">▴</button>
+        <button type="button" class="section-heading__toggle" aria-expanded="false" aria-label="Expand">▾</button>
       </h2>
       <div class="track-list-section__body" id="racesMount"><div class="empty-section"></div></div>
     </section>
@@ -152,10 +199,11 @@
 {% endblock %}
 
 {% block scripts %}
+  {% include "partials/track_drawing.html" %}
   <script>
     const track = {{ track | tojson }};
 
-    // Title: name + country flag (by code, never guessed).
+    /* ── Title: name + country flag ── */
     const nameEl = document.getElementById('trackName');
     nameEl.style.setProperty('color', 'var(--fg-heading)', 'important');
     nameEl.style.setProperty('-webkit-text-fill-color', 'var(--fg-heading)', 'important');
@@ -163,123 +211,255 @@
       `<span style="color:var(--fg-heading)!important;-webkit-text-fill-color:var(--fg-heading)!important">${esc(track.name)}</span>`
       + countryFlag(track.country, true);
 
-    // Descriptor: sport · shape · surface · year range
-    const desc = [];
-    if (track.sport) desc.push(track.sport);
-    if (track.shape) desc.push(track.shape);
-    if (track.surface) desc.push(track.surface);
-    if (track.first_year && track.last_year) desc.push(track.first_year + '–' + track.last_year);
-    document.getElementById('trackDesc').textContent = desc.join(' · ');
-
-    // Headline meta-row (our data).
-    const meta = [];
-    if (track.races)  meta.push(['races', track.races.toLocaleString()]);
-    if (track.starts) meta.push(['starts', track.starts.toLocaleString()]);
-    if (track.gal_rate != null) meta.push(['gal rate', track.gal_rate + '%']);
-    if (track.avg_winner_odds != null) meta.push(['avg winner odds', track.avg_winner_odds.toFixed(1)]);
-    document.getElementById('metaRow').innerHTML =
-      meta.map(([k, v]) => `<span>${esc(k)}<b>${esc(v)}</b></span>`).join('');
-
-    // Static physical facts.
-    function fact(k, v, unit) {
-      if (v == null || v === '') return `<div class="fact"><div class="k">${esc(k)}</div><div class="v muted">—</div></div>`;
+    /* ── Fact rows (headline stats left, course facts right) ── */
+    function factRow(k, v, unit) {
+      if (v == null || v === '') return '';
       const u = unit ? `<small>${esc(unit)}</small>` : '';
-      return `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}${u}</div></div>`;
+      return `<div class="fact-row"><div class="k">${esc(k)}</div><div class="v">${esc(String(v))}${u}</div></div>`;
     }
+    document.getElementById('headlineMount').innerHTML =
+        factRow('races', track.races ? track.races.toLocaleString() : null) +
+        factRow('gal rate', track.gal_rate, '%') +
+        factRow('avg odds', track.avg_winner_odds != null ? track.avg_winner_odds.toFixed(1) : null) +
+        factRow('median odds', track.median_winner_odds != null ? track.median_winner_odds.toFixed(2) : null) +
+        factRow('fav wins', track.fav_win_rate, '%') +
+        factRow('upset rate', track.upset_rate, '%');
+
     const wingLabel = track.auto_car_wings === 'angled' ? 'angled' :
                       track.auto_car_wings === 'straight' ? 'straight' : null;
     const openLabel = track.num_open_stretches == null ? null :
                       track.num_open_stretches === 0 ? 'none' :
                       track.num_open_stretches === 1 ? '1 (single)' :
                       track.num_open_stretches + ' (double)';
-    document.getElementById('physicalMount').innerHTML =
-      `<div class="facts">` +
-        fact('lap length', track.track_length_m, 'm') +
-        fact('home stretch', track.home_stretch_m, 'm') +
-        fact('open stretch', openLabel) +
-        fact('width', track.track_width_m, 'm') +
-        fact('auto car wing', wingLabel) +
-        fact('surface', track.surface) +
-      `</div>`;
+    document.getElementById('factsMount').innerHTML =
+        factRow('lap length', track.track_length_m, 'm') +
+        factRow('home stretch', track.home_stretch_m, 'm') +
+        factRow('open stretch', openLabel) +
+        factRow('width', track.track_width_m, 'm') +
+        factRow('car wing', wingLabel) +
+        factRow('surface', track.surface);
 
-    // Post-position bar visualization (fetched from precomputed MV).
-    let postMethod = 'auto', postMetric = 'win';
-
-    function barColor(value, avg, metric) {
-      if (value == null || avg == null || avg === 0) return 'var(--fg-muted)';
-      let rel = (value - avg) / avg;
-      if (metric === 'gal') rel = -rel;
-      const c = Math.max(-1, Math.min(1, rel / 0.4));
-      const hue = 8 + (c + 1) / 2 * (142 - 8);
-      return `hsl(${hue.toFixed(0)}, 52%, 46%)`;
+    /* Overhead SVG comes from partials/track_drawing.html (window.drawTrackSVG). */
+    const drawingEl = document.getElementById('trackDrawing');
+    if (track.country === 'SE' && track.track_length_m && track.home_stretch_m) {
+      drawingEl.innerHTML = drawTrackSVG(track.name, track.track_length_m,
+        track.home_stretch_m, track.num_open_stretches, track.track_width_m);
+    } else {
+      drawingEl.style.display = 'none';
     }
 
-    async function loadPostViz() {
+    /* ── Post-position bar visualization ── */
+    let postMetric = 'win';
+    let postBreed = null;
+    let postDist = null;
+    let barsBuilt = false;
+    let loadGen = 0;
+    let lastPostData = null;
+    const postCache = new Map();
+
+    const togglesMount = document.getElementById('statsToggles');
+    togglesMount.innerHTML = `
+      <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="metricToggle">
+        <button class="period-btn fluid-toggle__btn active" data-m="win">win%</button>
+        <button class="period-btn fluid-toggle__btn" data-m="gal">gal%</button>
+      </div>
+      <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="breedToggle">
+        <button class="period-btn fluid-toggle__btn active" data-breed="">all</button>
+        <button class="period-btn fluid-toggle__btn" data-breed="V">standardbred</button>
+        <button class="period-btn fluid-toggle__btn" data-breed="K">coldblood</button>
+      </div>
+      <div class="period-toggle fluid-toggle fluid-toggle--segmented" id="distToggle">
+        <button class="period-btn fluid-toggle__btn active" data-dist="">all</button>
+        <button class="period-btn fluid-toggle__btn" data-dist="short">short</button>
+        <button class="period-btn fluid-toggle__btn" data-dist="medium">medium</button>
+        <button class="period-btn fluid-toggle__btn" data-dist="long">long</button>
+      </div>
+    `;
+
+    function wireToggle(id, setter) {
+      document.getElementById(id).querySelectorAll('.fluid-toggle__btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById(id).querySelectorAll('.fluid-toggle__btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          setter(btn);
+          loadPostViz();
+        });
+      });
+    }
+    wireToggle('metricToggle', btn => { postMetric = btn.dataset.m; });
+    wireToggle('breedToggle', btn => { postBreed = btn.dataset.breed || null; });
+    wireToggle('distToggle',  btn => { postDist  = btn.dataset.dist  || null; });
+
+    function cacheKey(breed, dist) { return `${breed || 'all'}|${dist || 'all'}`; }
+
+    function fetchPosts(breed, dist) {
+      const k = cacheKey(breed, dist);
+      if (postCache.has(k)) return postCache.get(k);
+      const p = (async () => {
+        let url = `/api/stats/track-posts?track_id=${track.track_id}&method=auto`;
+        if (breed) url += `&breed=${encodeURIComponent(breed)}`;
+        if (dist)  url += `&dist=${encodeURIComponent(dist)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.statusText);
+        return data;
+      })();
+      p.then(data => { p._data = data; }).catch(() => { postCache.delete(k); });
+      postCache.set(k, p);
+      return p;
+    }
+
+    function paintGlobalLine(mount, globalAvg, scale) {
+      const barsEl = mount.querySelector('.bars');
+      const svgEl = mount.querySelector('#globalAvgSvg');
+      if (!barsEl || !svgEl) return;
+      if (globalAvg == null) {
+        svgEl.innerHTML = '';
+        svgEl.style.display = 'none';
+        return;
+      }
+      svgEl.style.display = '';
+      const rows = barsEl.querySelectorAll('.bar-lane');
+      if (!rows.length) return;
+      const wrapRect = barsEl.getBoundingClientRect();
+      const frac = Math.min(globalAvg / scale, 1);
+      const points = [];
+      rows.forEach((lane, i) => {
+        const r = lane.getBoundingClientRect();
+        const x = r.left - wrapRect.left + r.width * frac;
+        if (i === 0) points.push([x, r.top - wrapRect.top]);
+        points.push([x, r.top - wrapRect.top + r.height / 2]);
+        if (i === rows.length - 1) points.push([x, r.bottom - wrapRect.top]);
+      });
+      svgEl.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
+      const d = points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`).join(' ');
+      svgEl.innerHTML = `<path d="${d}" stroke="#1a3d7c" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
+    }
+
+    function applyPostData(data) {
       const mount = document.getElementById('galMount');
-      mount.innerHTML = '<div class="empty-section" style="opacity:0.5">loading…</div>';
-      const res = await fetch(`/api/stats/track-posts?track_id=${track.track_id}&method=${postMethod}&metric=${postMetric}`);
-      const data = await res.json();
       const posts = data.posts;
       if (!posts || !posts.length) {
+        barsBuilt = false;
         mount.innerHTML = '<div class="empty-section">no post stats available</div>';
         return;
       }
-      mount.innerHTML = '<div class="bars">' + posts.map(p => {
-        const has = p.value != null;
-        const scale = p.max || 1;
-        const w = has ? Math.min((p.value / scale) * 100, 100) : 0;
-        const avgPos = p.avg != null ? Math.min((p.avg / scale) * 100, 100) : null;
-        const col = barColor(p.value, p.avg, postMetric);
-        const avgMark = avgPos != null
-          ? `<div class="bar-avg-mark" style="left:${avgPos.toFixed(1)}%"></div>` : '';
-        return `<div class="bar-row${has ? '' : ' empty'}">
-          <div class="bar-post">${p.post}</div>
-          <div class="bar-lane">
-            <div class="bar-fill" style="width:${w.toFixed(1)}%;background:${col}"></div>
-            ${avgMark}
-          </div>
-          <div class="bar-val${has ? '' : ' dim'}">${has ? p.value.toFixed(1) : '–'}</div>
-        </div>`;
-      }).join('') + '</div>';
+      const isGal = postMetric === 'gal';
+      const scale = Number(isGal ? data.global_max_gal : data.global_max_win) > 0
+        ? Number(isGal ? data.global_max_gal : data.global_max_win)
+        : (Number(data.global_max) > 0 ? Number(data.global_max) : 1);
+      const globalAvg = isGal ? (data.global_avg_gal ?? data.global_avg) : null;
+
+      if (!barsBuilt) {
+        mount.innerHTML =
+          '<div class="bars">' +
+          posts.map(p => `
+            <div class="bar-row" data-post="${p.post}">
+              <div class="bar-post">${p.post}</div>
+              <div class="bar-lane">
+                <div class="bar-track">
+                  <div class="bar-fill"></div>
+                </div>
+                <div class="bar-avg-mark" hidden></div>
+              </div>
+              <div class="bar-val"></div>
+            </div>`).join('') +
+          '<svg class="bars-avg-svg" id="globalAvgSvg" preserveAspectRatio="none"></svg>' +
+          '</div>' +
+          `<div class="bars-legend">
+            <span><i class="avg-hot"></i><i class="avg-cold"></i> post avg</span>
+            <span class="legend-global"><i class="global"></i> all tracks</span>
+          </div>`;
+        barsBuilt = true;
+      }
+
+      posts.forEach(p => {
+        const row = mount.querySelector(`.bar-row[data-post="${p.post}"]`);
+        if (!row) return;
+        const value = isGal ? p.gal : p.win;
+        const avg = isGal ? p.gal_avg : p.win_avg;
+        const has = value != null;
+        const w = has ? Math.min((value / scale) * 100, 100) : 0;
+        row.classList.toggle('empty', !has);
+        const fill = row.querySelector('.bar-fill');
+        fill.style.width = w.toFixed(1) + '%';
+        fill.style.setProperty('--bar-w', w.toFixed(1) + '%');
+        const mark = row.querySelector('.bar-avg-mark');
+        if (avg != null) {
+          const avgPos = Math.min((avg / scale) * 100, 100);
+          let color = 'var(--fg-muted)';
+          if (has) {
+            color = isGal
+              ? (value > avg ? 'var(--accent-cold)' : 'var(--accent-hot)')
+              : (value >= avg ? 'var(--accent-hot)' : 'var(--accent-cold)');
+          }
+          mark.hidden = false;
+          mark.style.left = avgPos.toFixed(1) + '%';
+          mark.style.background = color;
+        } else {
+          mark.hidden = true;
+        }
+        const valEl = row.querySelector('.bar-val');
+        valEl.classList.toggle('dim', !has);
+        valEl.textContent = has ? value.toFixed(1) : '–';
+      });
+
+      const legendGlobal = mount.querySelector('.legend-global');
+      if (legendGlobal) legendGlobal.style.display = isGal ? '' : 'none';
+
+      requestAnimationFrame(() => paintGlobalLine(mount, globalAvg, scale));
     }
 
-    // Toggle buttons for method + metric.
-    const galHeading = document.querySelector('#galSection .section-heading');
-    const methodToggle = document.createElement('span');
-    methodToggle.className = 'method-toggle';
-    methodToggle.innerHTML =
-      `<button type="button" class="mtog active" data-m="auto">auto</button>` +
-      `<button type="button" class="mtog" data-m="volt">volt</button>`;
-    galHeading.insertBefore(methodToggle, galHeading.querySelector('.section-heading__toggle'));
+    async function loadPostViz() {
+      const gen = ++loadGen;
+      const mount = document.getElementById('galMount');
+      if (lastPostData
+          && (lastPostData.breed || null) === (postBreed || null)
+          && (lastPostData.dist || null) === (postDist || null)) {
+        applyPostData(lastPostData);
+        return;
+      }
+      const req = fetchPosts(postBreed, postDist);
+      if (req._data) {
+        lastPostData = req._data;
+        applyPostData(req._data);
+        return;
+      }
+      if (!barsBuilt) {
+        mount.innerHTML = '<div class="empty-section" style="opacity:0.5">loading…</div>';
+      }
+      try {
+        const data = await req;
+        if (gen !== loadGen) return;
+        req._data = data;
+        lastPostData = data;
+        applyPostData(data);
+        prefetchNearby(data.source);
+      } catch (err) {
+        if (gen !== loadGen) return;
+        if (!barsBuilt) mount.innerHTML = '<div class="empty-section">could not load post stats</div>';
+      }
+    }
 
-    const metricToggle = document.createElement('span');
-    metricToggle.className = 'method-toggle';
-    metricToggle.innerHTML =
-      `<button type="button" class="mtog active" data-m="win">win%</button>` +
-      `<button type="button" class="mtog" data-m="gal">gal%</button>`;
-    galHeading.insertBefore(metricToggle, methodToggle.nextSibling);
+    function prefetchNearby(source) {
+      const breeds = [null, 'V', 'K'];
+      breeds.forEach(b => {
+        if (b !== postBreed) fetchPosts(b, postDist).catch(() => {});
+      });
+      if (source !== 'live') {
+        const dists = [null, 'short', 'medium', 'long'];
+        dists.forEach(d => {
+          if (d !== postDist) fetchPosts(postBreed, d).catch(() => {});
+        });
+      }
+    }
 
-    methodToggle.querySelectorAll('.mtog').forEach(btn => {
-      btn.addEventListener('click', () => {
-        postMethod = btn.dataset.m;
-        methodToggle.querySelectorAll('.mtog').forEach(b => b.classList.toggle('active', b === btn));
-        loadPostViz();
-      });
-    });
-    metricToggle.querySelectorAll('.mtog').forEach(btn => {
-      btn.addEventListener('click', () => {
-        postMetric = btn.dataset.m;
-        metricToggle.querySelectorAll('.mtog').forEach(b => b.classList.toggle('active', b === btn));
-        loadPostViz();
-      });
-    });
     loadPostViz();
 
+    if (typeof initFluidToggles === 'function') initFluidToggles(document.querySelector('.track-page'));
+    if (typeof initFluidHighlights === 'function') initFluidHighlights(document.querySelector('.track-page'));
 
-    if (typeof initFluidHighlights === 'function') {
-      initFluidHighlights(document.querySelector('.track-page'));
-    }
-
+    /* ── Recent races (collapsed by default) ── */
     function fmtTimeVal(v) {
       if (v == null || v === 0) return '';
       const mins = Math.floor(v / 60);
@@ -319,8 +499,10 @@
       syncToggle();
       return { expandAll() { disclosed = rowCount; syncToggle(); } };
     }
+
     function initListSection(sectionEl, fold) {
       const btn = sectionEl.querySelector('.section-heading__toggle');
+      if (!btn) return;
       btn.addEventListener('click', () => {
         const collapsed = sectionEl.classList.toggle('is-section-collapsed');
         btn.textContent = collapsed ? '▾' : '▴';
@@ -328,7 +510,6 @@
         if (!collapsed && fold) fold.expandAll();
       });
     }
-    document.querySelectorAll('#physicalSection, #galSection').forEach(s => initListSection(s, null));
 
     async function loadRaces() {
       const res = await fetch(`/api/track/${track.track_id}/races`);

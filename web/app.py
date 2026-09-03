@@ -573,6 +573,34 @@ _CYAN_SATELLITE_ORDER = ['vinnare', 'dd', 'ld', 'V5', 'V4', 'plats']
 _PER_RACE_GAME_TYPES = {'vinnare', 'plats'}
 _ATG_CALENDAR_TTL = 120  # seconds
 
+# Official ATG game-type brand fills (app / marketing). V85 is the vivid
+# system blue; headline pools use saturated brand hues; cyan satellites share
+# the light pool blue.
+GAME_TYPE_BRAND = {
+    'v64': '#f98314',
+    'v85': '#007aff',
+    'v86': '#802c7e',
+    'v65': '#d43140',
+    'gs75': '#00815c',
+    'v4': '#4fb1ee',
+    'v5': '#4fb1ee',
+    'v3': '#4fb1ee',
+    'ld': '#4fb1ee',
+    'dd': '#4fb1ee',
+    'vinnare': '#4fb1ee',
+    'plats': '#4fb1ee',
+    'komb': '#4fb1ee',
+    'tvilling': '#4fb1ee',
+    'vp': '#4fb1ee',
+    'trio': '#4fb1ee',
+    'h2h': '#4fb1ee',
+    'top7': '#4fb1ee',
+}
+
+
+def _game_type_brand(game_type_id: str) -> str:
+    return GAME_TYPE_BRAND.get((game_type_id or '').lower(), '#4fb1ee')
+
 
 def _atg_game_id_to_internal(game_type_str: str) -> str:
     """ATG uses 'V64', 'V65', 'dd' etc. Map to our internal lowercase ids."""
@@ -841,6 +869,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             'pre_wins': 0,
             'post_starts': 0,
             'post_wins': 0,
+            'pre_prize_kr': 0,
+            'post_prize_kr': 0,
             'pre_galadj_starts': 0,
             'pre_galadj_wins': 0,
             'post_galadj_starts': 0,
@@ -911,7 +941,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
                            COUNT(*) FILTER (
                                WHERE """ + _IS_WIN + """
                                  AND NOT e.galopp
-                           ) AS clean_wins
+                           ) AS clean_wins,
+                           COALESCE(SUM(e.prize_kr), 0) AS prize
                     FROM entry e
                     JOIN race  r2 ON r2.race_id = e.race_id
                     WHERE e.horse_id = ANY(%s)
@@ -926,6 +957,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
                         'wins': srow['wins'] or 0,
                         'clean_starts': srow['clean_starts'] or 0,
                         'clean_wins': srow['clean_wins'] or 0,
+                        'prize': int(srow['prize'] or 0),
                     }
                     for srow in qc.fetchall()
                 }
@@ -1007,6 +1039,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             'wins': 0,
             'clean_starts': 0,
             'clean_wins': 0,
+            'prize': 0,
         })
         r['pre_starts'] = pre['starts']
         r['pre_wins'] = pre['wins']
@@ -1016,6 +1049,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         r['pre_galadj_wins'] = pre['clean_wins']
         r['post_galadj_starts'] = pre['clean_starts']
         r['post_galadj_wins'] = pre['clean_wins']
+        r['pre_prize_kr'] = pre['prize']
+        r['post_prize_kr'] = pre['prize']
         _apply_gear_debut(r, gear_hist.get(r['horse_id']) or [])
         if r['driver_id']:
             r['d_wr'] = d_wr_map.get(r['driver_id'])
@@ -1446,6 +1481,255 @@ def atg_game_panels(game_id):
     })
 
 
+def _ore_to_sek(value) -> float:
+    if isinstance(value, (int, float)):
+        return round(value / 100.0, 2)
+    return 0.0
+
+
+@app.route('/api/atg/game/<game_id>/pool')
+def atg_game_pool(game_id):
+    """Live pool pots + row% for guessing a coupon's payout.
+
+    `tierPools` is the money sitting in each N-rätt pot (SEK). After the race
+    `resultPayouts` is the official dividend per winning unit. ATG stores both
+    in öre."""
+    data = _fetch_atg_game(game_id)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+
+    game_type = str(data.get('type') or game_id.split('_')[0] or '').upper()
+    rule = _COUPON_GAME_RULES.get(game_type) or {}
+    pool = (data.get('pools') or {}).get(game_type) or {}
+    turnover = _ore_to_sek(pool.get('turnover'))
+
+    raw_pots = pool.get('payouts') or {}
+    tier_pools = {}
+    if isinstance(raw_pots, dict):
+        for key, value in raw_pots.items():
+            try:
+                tier_pools[int(key)] = _ore_to_sek(value)
+            except (TypeError, ValueError):
+                continue
+    if not tier_pools:
+        shares = _COUPON_TIER_SHARE.get(game_type) or {}
+        for tier, share in shares.items():
+            tier_pools[tier] = round(turnover * _COUPON_RTP * share, 2)
+
+    result_payouts = None
+    raw_result = (pool.get('result') or {}).get('payouts') or {}
+    if isinstance(raw_result, dict) and raw_result:
+        result_payouts = {}
+        for key, value in raw_result.items():
+            if not isinstance(value, dict):
+                continue
+            try:
+                result_payouts[int(key)] = _ore_to_sek(value.get('payout'))
+            except (TypeError, ValueError):
+                continue
+        if not result_payouts:
+            result_payouts = None
+
+    pay_tiers = [int(t) for t in (rule.get('pay_tiers') or sorted(tier_pools))]
+    legs = []
+    for i, race in enumerate(data.get('races') or [], start=1):
+        if not isinstance(race, dict):
+            continue
+        winner = None
+        starts = []
+        for start in race.get('starts') or []:
+            if not isinstance(start, dict):
+                continue
+            number = start.get('number')
+            horse = start.get('horse') or {}
+            scratched = bool(start.get('scratched') or horse.get('scratched'))
+            bet = (start.get('pools') or {}).get(game_type) or {}
+            bd = bet.get('betDistribution')
+            pct = round(bd / 100.0, 2) if isinstance(bd, (int, float)) else None
+            place = (start.get('result') or {}).get('place')
+            if place == 1 and number is not None and not scratched:
+                winner = number
+            starts.append({
+                'number': number,
+                'name': horse.get('name') or '',
+                'pct': pct,
+                'scratched': scratched,
+            })
+        legs.append({
+            'leg': i,
+            'raceId': race.get('id'),
+            'winner': winner,
+            'starts': starts,
+        })
+
+    return jsonify({
+        'gameId': data.get('id') or game_id,
+        'gameType': game_type,
+        'turnover': turnover,
+        'linePrice': rule.get('line_price'),
+        'payTiers': pay_tiers,
+        'tierPools': {str(k): v for k, v in sorted(tier_pools.items())},
+        'resultPayouts': (
+            {str(k): v for k, v in sorted(result_payouts.items())}
+            if result_payouts else None),
+        'legs': legs,
+    })
+
+
+def _pct(num, den):
+    return round(100 * num / den, 1) if den else None
+
+
+def _rank_desc(rows: list[dict], key: str, track_id: int) -> int | None:
+    """Competition rank, highest value = 1. Ties share a rank."""
+    ranked = [(r['track_id'], r[key]) for r in rows if r.get(key) is not None]
+    ranked.sort(key=lambda x: x[1], reverse=True)
+    pos = 0
+    prev = None
+    for i, (tid, val) in enumerate(ranked, 1):
+        if prev is None or val < prev:
+            pos = i
+            prev = val
+        if tid == track_id:
+            return pos
+    return None
+
+
+def _track_passport(track_name: str | None, atg_track_id: int | None) -> dict | None:
+    """Physical + headline facts for the game-hero track panel."""
+    if not track_name and atg_track_id is None:
+        return None
+    try:
+        conn = get_db()
+    except Exception:
+        return None
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            row = None
+            if atg_track_id is not None:
+                cur.execute(
+                    "SELECT * FROM track WHERE atg_track_id = %s",
+                    (atg_track_id,),
+                )
+                row = cur.fetchone()
+            if row is None and track_name:
+                cur.execute(
+                    "SELECT * FROM track WHERE lower(name) = lower(%s)",
+                    (track_name.strip(),),
+                )
+                row = cur.fetchone()
+            if row is None:
+                return None
+            tid = row['track_id']
+            ea = None
+            try:
+                cur.execute("SELECT * FROM track_stats WHERE track_id = %s", (tid,))
+                ea = cur.fetchone()
+            except Exception:
+                conn.rollback()
+            odds_sum = odds_cnt = None
+            try:
+                cur.execute(
+                    """
+                    SELECT SUM(winner_odds_sum) AS odds_sum,
+                           SUM(winner_cnt) AS odds_cnt
+                    FROM track_post_stats
+                    WHERE track_id = %s
+                    """,
+                    (tid,),
+                )
+                odds = cur.fetchone()
+                if odds:
+                    odds_sum, odds_cnt = odds['odds_sum'], odds['odds_cnt']
+            except Exception:
+                conn.rollback()
+            peers = []
+            try:
+                cur.execute(
+                    """
+                    SELECT t.track_id,
+                           ts.races, ts.starts, ts.gals,
+                           ts.fav_races, ts.fav_wins,
+                           ts.median_winner_odds, ts.upset_races, ts.odds_races,
+                           o.odds_sum, o.odds_cnt
+                    FROM track t
+                    JOIN track_stats ts ON ts.track_id = t.track_id
+                    LEFT JOIN (
+                        SELECT track_id,
+                               SUM(winner_odds_sum) AS odds_sum,
+                               SUM(winner_cnt) AS odds_cnt
+                        FROM track_post_stats
+                        GROUP BY track_id
+                    ) o ON o.track_id = t.track_id
+                    WHERE t.country = 'SE' AND ts.races > 1000
+                    """,
+                )
+                peers = cur.fetchall() or []
+            except Exception:
+                conn.rollback()
+    except Exception:
+        return None
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    starts = int((ea or {}).get('starts') or 0)
+    races = (ea or {}).get('races') or 0
+    avg_odds = (
+        round(float(odds_sum) / int(odds_cnt), 1)
+        if odds_sum is not None and odds_cnt else None
+    )
+    median = (ea or {}).get('median_winner_odds')
+    metrics = {
+        'gal_rate': _pct((ea or {}).get('gals'), starts),
+        'avg_winner_odds': avg_odds,
+        'median_winner_odds': (
+            round(float(median), 2) if median is not None else None
+        ),
+        'fav_win_rate': _pct((ea or {}).get('fav_wins'), (ea or {}).get('fav_races')),
+        'upset_rate': _pct((ea or {}).get('upset_races'), (ea or {}).get('odds_races')),
+    }
+    ranks = {}
+    if peers:
+        peer_rows = []
+        for p in peers:
+            p_starts = int(p.get('starts') or 0)
+            p_avg = (
+                round(float(p['odds_sum']) / int(p['odds_cnt']), 1)
+                if p.get('odds_sum') is not None and p.get('odds_cnt') else None
+            )
+            p_med = p.get('median_winner_odds')
+            peer_rows.append({
+                'track_id': p['track_id'],
+                'gal_rate': _pct(p.get('gals'), p_starts),
+                'avg_winner_odds': p_avg,
+                'median_winner_odds': (
+                    round(float(p_med), 2) if p_med is not None else None
+                ),
+                'fav_win_rate': _pct(p.get('fav_wins'), p.get('fav_races')),
+                'upset_rate': _pct(p.get('upset_races'), p.get('odds_races')),
+            })
+        if any(p['track_id'] == tid for p in peer_rows):
+            for key in metrics:
+                ranks[key] = _rank_desc(peer_rows, key, tid)
+    return {
+        'track_id': tid,
+        'name': (row.get('name') or '').strip().title(),
+        'country': row.get('country'),
+        'track_length_m': row.get('track_length_m'),
+        'home_stretch_m': row.get('home_stretch_m'),
+        'num_open_stretches': row.get('num_open_stretches'),
+        'track_width_m': row.get('track_width_m'),
+        'auto_car_wings': row.get('auto_car_wings'),
+        'surface': row.get('surface'),
+        'races': races,
+        **metrics,
+        'ranks': ranks,
+    }
+
+
 def _game_context(game_id):
     """Header facts for a game page, keyed off the ATG game id.
 
@@ -1463,6 +1747,7 @@ def _game_context(game_id):
     data = _fetch_atg_calendar(date_str)
     game_info = None
     track_name = None
+    track_country = None
 
     if data:
         games_raw = data.get('games', {})
@@ -1479,7 +1764,9 @@ def _game_context(game_id):
                     # Get track name
                     for tid in game.get('tracks', []):
                         if tid in track_map:
-                            track_name = track_map[tid].get('name', '')
+                            t = track_map[tid]
+                            track_name = t.get('name', '')
+                            track_country = t.get('countryCode') or t.get('country')
                             break
                     break
             if game_info:
@@ -1527,8 +1814,11 @@ def _game_context(game_id):
         'game_id': game_id,
         'game_type_id': game_type_id,
         'game_type_label': game_type_label,
-        'track_name': track_name or '',
+        'game_type_brand': _game_type_brand(game_type_id),
+        'track_name': (track_name or '').strip().title(),
+        'track_country': (track_country or 'SE') if track_name else '',
         'track_code': track_code,
+        'track_passport': _track_passport(track_name, track_code),
         'race_count': race_count,
         'time_display': time_display,
         'date_str': date_str,
@@ -2324,16 +2614,42 @@ def api_watchlist_status(horse_id):
 #                 there is no official per-coupon cost cap, so this is the
 #                 practical upper bound we surface in the UI.
 # Mirrored client-side in _layout.html (COUPON_GAME_RULES) — keep in sync.
+# pay_tiers: ATG pays these "N rätt" levels. tier_share is the split of the
+# 65% net pool, used only when ATG has not yet published live tier pots.
 _COUPON_GAME_RULES = {
-    'V86':  {'legs': 8, 'line_price': 0.25, 'max_systems': 5000},
-    'V85':  {'legs': 8, 'line_price': 0.50, 'max_systems': 5000},
-    'V75':  {'legs': 7, 'line_price': 0.50, 'max_systems': 5000},
-    'GS75': {'legs': 7, 'line_price': 1.00, 'max_systems': 5000},
-    'V64':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000},
-    'V65':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000},
-    'V5':   {'legs': 5, 'line_price': 1.00, 'max_systems': 500},
-    'V4':   {'legs': 4, 'line_price': 2.00, 'max_systems': 500},
+    'V86':  {'legs': 8, 'line_price': 0.25, 'max_systems': 5000,
+             'pay_tiers': (5, 6, 7, 8)},
+    'V85':  {'legs': 8, 'line_price': 0.50, 'max_systems': 5000,
+             'pay_tiers': (5, 6, 7, 8)},
+    'V75':  {'legs': 7, 'line_price': 0.50, 'max_systems': 5000,
+             'pay_tiers': (5, 6, 7)},
+    'GS75': {'legs': 7, 'line_price': 1.00, 'max_systems': 5000,
+             'pay_tiers': (5, 6, 7)},
+    'V64':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000,
+             'pay_tiers': (4, 5, 6)},
+    'V65':  {'legs': 6, 'line_price': 1.00, 'max_systems': 2000,
+             'pay_tiers': (5, 6)},
+    'V5':   {'legs': 5, 'line_price': 1.00, 'max_systems': 500,
+             'pay_tiers': (5,)},
+    'V4':   {'legs': 4, 'line_price': 2.00, 'max_systems': 500,
+             'pay_tiers': (4,)},
 }
+_COUPON_RTP = 0.65
+_COUPON_TIER_SHARE = {
+    'V86':  {5: 0.35, 6: 0.15, 7: 0.20, 8: 0.30},
+    'V85':  {5: 0.35, 6: 0.15, 7: 0.20, 8: 0.30},
+    'V75':  {5: 0.40, 6: 0.20, 7: 0.40},
+    'GS75': {5: 0.40, 6: 0.20, 7: 0.40},
+    'V64':  {4: 0.40, 5: 0.20, 6: 0.40},
+    'V65':  {5: 0.50, 6: 0.50},
+    'V5':   {5: 1.00},
+    'V4':   {4: 1.00},
+}
+
+
+# Mirrors REDUCED_MIN / REDUCED_MAX in the game page's Reduced module.
+_REDUCED_MIN = 1.0
+_REDUCED_MAX = 200.0
 
 
 def _clean_reduction(raw, legs) -> dict | None:
@@ -2342,7 +2658,7 @@ def _clean_reduction(raw, legs) -> dict | None:
     `raw` is what the game page's `Reduced.plan()` produced. Weights and caps
     are the user's intent; coverage and retention are recomputed here rather
     than trusted, so a saved coupon can never claim a discount its own
-    numbers do not support.
+    numbers do not support — nor charge for depth it did not ask for.
 
     Returns None when the coupon is a plain unweighted system.
     """
@@ -2356,6 +2672,7 @@ def _clean_reduction(raw, legs) -> dict | None:
     out_legs = []
     weighted = False
     reduced = False
+    levered = False
 
     for raw_leg in raw_legs:
         if not isinstance(raw_leg, dict):
@@ -2387,14 +2704,16 @@ def _clean_reduction(raw, legs) -> dict | None:
         if any(abs(v - even) > 0.05 for v in weights.values()):
             weighted = True
 
-        # A cap only counts while it is genuinely below the weight; at or
-        # above it, it is not a reduction at all.
-        caps = {n: v for n, v in numbers(raw_leg.get('caps')).items()
-                if v < weights[n] - 0.05}
-        if caps:
-            reduced = True
+        # A cap is an override of the weight in either direction: below it
+        # the pick is reduced, above it levered. Sitting back on the weight
+        # is neither, so it does not count.
+        caps = {n: min(max(v, _REDUCED_MIN), _REDUCED_MAX)
+                for n, v in numbers(raw_leg.get('caps')).items()
+                if abs(v - weights[n]) >= 0.05}
+        reduced = reduced or any(v < weights[n] for n, v in caps.items())
+        levered = levered or any(v > weights[n] for n, v in caps.items())
 
-        coverage = {n: min(weights[n], caps.get(n, weights[n])) for n in picks}
+        coverage = {n: caps.get(n, weights[n]) for n in picks}
         rank_order = [str(k) for k in (raw_leg.get('rankOrder') or [])
                       if isinstance(k, (str, int))]
         reserves = []
@@ -2413,22 +2732,23 @@ def _clean_reduction(raw, legs) -> dict | None:
             'weights': {str(n): round(v, 4) for n, v in sorted(weights.items())},
             'caps': {str(n): round(v, 4) for n, v in sorted(caps.items())},
             'coverage': {str(n): round(v, 4) for n, v in sorted(coverage.items())},
-            'retention': round(
-                max(0.0, min(1.0, sum(coverage.values()) / 100.0)), 6),
+            'retention': round(max(0.0, sum(coverage.values()) / 100.0), 6),
             'reserves': reserves[:2],
             'rankOrder': rank_order,
         })
 
-    if not out_legs or not (weighted or reduced):
+    if not out_legs or not (weighted or reduced or levered):
         return None
 
+    # An untouched leg's coverage sums to 100, so it multiplies in as 1.0.
     retention = 1.0
     for leg in out_legs:
-        retention *= leg['retention'] if reduced else 1.0
+        retention *= leg['retention']
 
     return {
         'weighted': weighted,
         'reduced': reduced,
+        'levered': levered,
         'retention': round(retention, 6),
         'legs': out_legs,
     }
@@ -2519,11 +2839,12 @@ def api_coupons_save():
         })
         num_lines *= len(numbers)
 
-    # A reduced system pays for fewer rows than the full one, so price it on
-    # what it actually covers rather than on the picks alone.
+    # A moved system does not pay for the picks alone: reducing buys fewer
+    # rows than the full coupon, levering buys a horse's rows more than once.
+    # Either way the price is what ATG would charge for what was built.
     full_lines = num_lines
     reduction = _clean_reduction(body.get('reduction'), clean)
-    if reduction and reduction['reduced']:
+    if reduction and (reduction['reduced'] or reduction['levered']):
         num_lines = max(1, round(full_lines * reduction['retention']))
     cost = round(num_lines * rule['line_price'], 2)
 
@@ -2664,7 +2985,7 @@ def api_reduced_solve():
 def api_reduced_atg_file():
     """The same system as an ATG Filinlämning document.
 
-    The four hex digits on the end of the file name are a CRC16 of the
+    The four hex digits on the end of the file name are a CRC-16/ARC of the
     contents; ATG checks them on upload to spot an edited file.
     """
     body = request.get_json(silent=True) or {}
@@ -3283,6 +3604,62 @@ def track_page(track_id):
                 round(float(odds_agg['odds_sum']) / int(odds_agg['odds_cnt']), 1)
                 if odds_agg and odds_agg['odds_cnt'] else None
             )
+
+            median_winner_odds = ea.get('median_winner_odds') if ea else None
+            upset_races = ea.get('upset_races') if ea else None
+            odds_races = ea.get('odds_races') if ea else None
+            if median_winner_odds is None:
+                cur.execute("""
+                    SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY e.odds) AS median_winner_odds,
+                           COUNT(*) FILTER (WHERE e.odds >= 10)                AS upset_races,
+                           COUNT(*)                                            AS odds_races
+                    FROM race r
+                    JOIN entry e ON e.race_id = r.race_id
+                    WHERE r.track_id = %s
+                      AND e.placement_text = '1'
+                      AND NOT COALESCE(e.disqualified, false)
+                      AND e.odds > 0
+                """, (track_id,))
+                ow = cur.fetchone()
+                median_winner_odds = ow['median_winner_odds'] if ow else None
+                upset_races = ow['upset_races'] if ow else None
+                odds_races = ow['odds_races'] if ow else None
+
+            fav_wins = ea.get('fav_wins') if ea else None
+            fav_races = ea.get('fav_races') if ea else None
+            if fav_races is None:
+                cur.execute(
+                    f"""
+                    WITH started AS (
+                        SELECT e.race_id, e.odds, e.placement_text, e.disqualified,
+                               (
+                                   NOT e.withdrawn
+                                   AND COALESCE(e.placement_text, '') !~ {_STARTED_RE}
+                               ) AS started
+                        FROM race r JOIN entry e ON e.race_id = r.race_id
+                        WHERE r.track_id = %s
+                    ),
+                    per_race AS (
+                        SELECT race_id,
+                               MIN(odds) FILTER (WHERE started AND odds > 0) AS fav_odds,
+                               MIN(odds) FILTER (
+                                   WHERE placement_text = '1'
+                                     AND NOT COALESCE(disqualified, false)
+                                     AND odds > 0
+                               ) AS winner_odds
+                        FROM started
+                        GROUP BY race_id
+                    )
+                    SELECT COUNT(*) FILTER (WHERE fav_odds IS NOT NULL) AS fav_races,
+                           COUNT(*) FILTER (WHERE fav_odds IS NOT NULL
+                                              AND winner_odds = fav_odds) AS fav_wins
+                    FROM per_race
+                    """,
+                    (track_id,),
+                )
+                fav_row = cur.fetchone()
+                fav_wins = fav_row['fav_wins'] if fav_row else None
+                fav_races = fav_row['fav_races'] if fav_row else None
     finally:
         conn.close()
 
@@ -3317,6 +3694,12 @@ def track_page(track_id):
         'gal_rate_auto': _rate(ea['gals_auto'], ea['starts_auto']),
         'gal_rate_volt': _rate(ea['gals_volt'], ea['starts_volt']),
         'avg_winner_odds': avg_winner_odds,
+        'median_winner_odds': (round(float(median_winner_odds), 2)
+                               if median_winner_odds is not None else None),
+        'upset_rate':      (_rate(int(upset_races or 0), int(odds_races))
+                            if odds_races else None),
+        'fav_win_rate':    (_rate(int(fav_wins or 0), int(fav_races))
+                            if fav_races else None),
     }
     return render_template('track.html', track=track, active_tab='stable_search')
 
@@ -3828,7 +4211,9 @@ def api_stats_tracks():
                        ts.races,
                        ts.starts, ts.gals,
                        ts.starts_auto, ts.gals_auto,
-                       ts.starts_volt, ts.gals_volt
+                       ts.starts_volt, ts.gals_volt,
+                       ts.fav_races, ts.fav_wins,
+                       ts.median_winner_odds, ts.upset_races, ts.odds_races
                 FROM track t
                 JOIN track_stats ts ON ts.track_id = t.track_id
                 WHERE t.country = 'SE'
@@ -3878,6 +4263,10 @@ def api_stats_tracks():
             'galrate_auto': _rate(t['gals_auto'], t['starts_auto']),
             'galrate_volt': _rate(t['gals_volt'], t['starts_volt']),
             'avg_winner_odds': avg_odds,
+            'median_winner_odds': (round(float(t['median_winner_odds']), 2)
+                                   if t.get('median_winner_odds') is not None else None),
+            'upset_rate': _rate(t.get('upset_races') or 0, t.get('odds_races')),
+            'fav_win_rate': _rate(t.get('fav_wins') or 0, t.get('fav_races')),
             'top_post': tp[0] if tp else None,
             'top_post_rel': tp[1] if tp else None,
             'starts': g_starts or 0,
@@ -3888,7 +4277,10 @@ def api_stats_tracks():
         for key, col in (('races_min', 'races'), ('races_max', 'races'),
                          ('galrate_min', 'galrate'), ('galrate_max', 'galrate'),
                          ('length_min', 'length'), ('length_max', 'length'),
-                         ('odds_min', 'avg_winner_odds'), ('odds_max', 'avg_winner_odds')):
+                         ('odds_min', 'avg_winner_odds'), ('odds_max', 'avg_winner_odds'),
+                         ('fav_min', 'fav_win_rate'), ('fav_max', 'fav_win_rate'),
+                         ('medodds_min', 'median_winner_odds'), ('medodds_max', 'median_winner_odds'),
+                         ('upset_min', 'upset_rate'), ('upset_max', 'upset_rate')):
             v = _f(key)
             if v is None:
                 continue
@@ -3914,6 +4306,9 @@ def api_stats_tracks():
         'races': lambda r: r['races'] or 0,
         'galrate': lambda r: (r['galrate'] is None, r['galrate'] or 0),
         'avg_winner_odds': lambda r: (r['avg_winner_odds'] is None, r['avg_winner_odds'] or 0),
+        'fav_win_rate': lambda r: (r['fav_win_rate'] is None, r['fav_win_rate'] or 0),
+        'median_winner_odds': lambda r: (r['median_winner_odds'] is None, r['median_winner_odds'] or 0),
+        'upset_rate': lambda r: (r['upset_rate'] is None, r['upset_rate'] or 0),
     }
     keyfn = keymap.get(sort, keymap['races'])
     reverse = request.args.get('dir', 'desc') != 'asc'
@@ -3946,15 +4341,43 @@ def api_stats_track_options():
 
 
 _POST_MIN_STARTS_VIZ = 50  # ignore thin posts in the visualisation
+_TPS_COLS_CACHE = None
+_STARTED_RE = (
+    r"'^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|"
+    r"erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'"
+)
+_DIST_BOUNDS = {'short': (None, 1700), 'medium': (1701, 2250), 'long': (2251, None)}
+
+
+def _tps_cols(cur):
+    global _TPS_COLS_CACHE
+    if _TPS_COLS_CACHE is None:
+        cur.execute(
+            """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'track_post_stats'
+            """
+        )
+        _TPS_COLS_CACHE = {r['column_name'] for r in cur.fetchall()}
+    return _TPS_COLS_CACHE
+
+
+def _rate(row, col, min_starts=_POST_MIN_STARTS_VIZ):
+    if not row or not row['starts'] or int(row['starts']) < min_starts:
+        return None
+    return round(100.0 * float(row[col]) / float(row['starts']), 2)
 
 
 @app.route('/api/stats/track-posts')
 def api_stats_track_posts():
-    """Per-post win%/gal% for one track + the cross-track SE average + global
-    max per post (for consistent bar scaling). Caps auto at 12 posts (13-15
-    are statistical noise in autostart). Volt shows all 15.
+    """Per-post win%/gal% for one track + the cross-track SE average + single
+    global max across ALL posts (for uniform bar scaling) + global gal% average
+    (for the horizontal reference line).
 
-    ?track_id=&method=auto|volt&metric=win|gal."""
+    Always returns both metrics so the track-page toggle can switch without a
+    refetch. `value`/`avg`/`global_max` stay metric-specific for older callers.
+
+    ?track_id=&method=auto|volt&metric=win|gal&breed=V|K&dist=short|medium|long"""
     track_id = _i('track_id')
     method = request.args.get('method', 'auto')
     if method not in ('auto', 'volt'):
@@ -3962,82 +4385,208 @@ def api_stats_track_posts():
     metric = request.args.get('metric', 'win')
     if metric not in ('win', 'gal'):
         metric = 'win'
+    breed = request.args.get('breed')
+    if breed not in ('V', 'K'):
+        breed = None
+    dist = request.args.get('dist')
+    if dist not in ('short', 'medium', 'long'):
+        dist = None
     auto_val = (method == 'auto')
     max_post = 12 if auto_val else 15
 
     conn = get_db()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            # this track
-            this = {}
-            if track_id is not None:
-                cur.execute(
-                    """
-                    SELECT post, starts, wins, gals
-                    FROM track_post_stats
-                    WHERE track_id = %s AND auto = %s AND post <= %s
-                    """,
-                    (track_id, auto_val, max_post),
-                )
-                for r in cur.fetchall():
-                    this[r['post']] = r
-            # cross-track average per post (SE, >1000 races, per-post >=50 starts)
-            cur.execute(
-                """
-                SELECT tps.post,
-                       SUM(tps.starts) AS starts,
-                       SUM(tps.wins)   AS wins,
-                       SUM(tps.gals)   AS gals
-                FROM track_post_stats tps
-                JOIN track t       ON t.track_id = tps.track_id
-                JOIN track_stats ts ON ts.track_id = tps.track_id
-                WHERE t.country = 'SE' AND ts.races > 1000
-                      AND tps.auto = %s AND tps.post <= %s
-                      AND tps.starts >= %s
-                GROUP BY tps.post
-                """,
-                (auto_val, max_post, _POST_MIN_STARTS_VIZ),
-            )
-            avg = {r['post']: r for r in cur.fetchall()}
+            cur.execute("SET LOCAL statement_timeout = '20000'")
+            cols = _tps_cols(cur)
+            has_breed = 'breed_code' in cols
+            has_dist = 'dist_band' in cols
+            need_live = (breed and not has_breed) or (dist and not has_dist)
 
-            # global max per post across all qualifying SE tracks (for bar ceiling)
-            col = 'wins' if metric == 'win' else 'gals'
-            cur.execute(
-                f"""
-                SELECT tps.post,
-                       MAX(100.0 * tps.{col} / NULLIF(tps.starts, 0)) AS max_val
-                FROM track_post_stats tps
-                JOIN track t       ON t.track_id = tps.track_id
-                JOIN track_stats ts ON ts.track_id = tps.track_id
-                WHERE t.country = 'SE' AND ts.races > 1000
-                      AND tps.auto = %s AND tps.post <= %s
-                      AND tps.starts >= %s
-                GROUP BY tps.post
-                """,
-                (auto_val, max_post, _POST_MIN_STARTS_VIZ),
-            )
-            maxvals = {r['post']: float(r['max_val']) if r['max_val'] else None
-                       for r in cur.fetchall()}
+            this, avg = {}, {}
+            global_max_win, global_max_gal = 25.0, 25.0
+            global_avg_gal = None
+            source = 'live' if need_live else 'mv'
+
+            if need_live:
+                def _dist_sql(col='COALESCE(e.distance, r.distance)'):
+                    if not dist:
+                        return '', ()
+                    lo, hi = _DIST_BOUNDS[dist]
+                    if lo and hi:
+                        return f" AND {col} BETWEEN %s AND %s", (lo, hi)
+                    if lo:
+                        return f" AND {col} >= %s", (lo,)
+                    return f" AND {col} <= %s", (hi,)
+
+                def _live(track_sql, track_params, group_by='e.program_number', extra=''):
+                    dist_sql, dist_p = _dist_sql()
+                    breed_sql = " AND COALESCE(h.breed_code, 'V') = %s" if breed else ""
+                    horse_join = "LEFT JOIN horse h ON h.horse_id = e.horse_id" if breed else ""
+                    sql = f"""
+                        SELECT e.program_number AS post, {extra}
+                               COUNT(*) FILTER (WHERE q.started) AS starts,
+                               COUNT(*) FILTER (WHERE e.placement_text = '1'
+                                                AND NOT COALESCE(e.disqualified,false)) AS wins,
+                               COUNT(*) FILTER (WHERE q.started AND e.galopp) AS gals
+                        FROM race r
+                        JOIN entry e ON e.race_id = r.race_id
+                        {horse_join}
+                        CROSS JOIN LATERAL (SELECT (
+                            NOT e.withdrawn
+                            AND COALESCE(e.placement_text, '') !~ {_STARTED_RE}
+                        ) AS started) q
+                        WHERE {track_sql}
+                              AND e.auto = %s
+                              AND e.program_number BETWEEN 1 AND %s
+                              {breed_sql}{dist_sql}
+                        GROUP BY {group_by}
+                    """
+                    params = track_params + (auto_val, max_post)
+                    if breed:
+                        params += (breed,)
+                    params += dist_p
+                    cur.execute(sql, params)
+                    return cur.fetchall()
+
+                if track_id is not None:
+                    for r in _live("r.track_id = %s", (track_id,)):
+                        this[r['post']] = r
+
+                se_sql = """
+                    r.track_id IN (
+                        SELECT t.track_id FROM track t
+                        JOIN track_stats ts ON ts.track_id = t.track_id
+                        WHERE t.country = 'SE' AND ts.races > 1000
+                    )
+                """
+                all_rows = _live(se_sql, (), group_by='r.track_id, e.program_number',
+                                 extra='r.track_id,')
+                avg_agg = {}
+                max_win = max_gal = 0.0
+                tot_gals = tot_starts = 0
+                for r in all_rows:
+                    p = r['post']
+                    starts = r['starts'] or 0
+                    if p not in avg_agg:
+                        avg_agg[p] = {'post': p, 'starts': 0, 'wins': 0, 'gals': 0}
+                    avg_agg[p]['starts'] += starts
+                    avg_agg[p]['wins'] += (r['wins'] or 0)
+                    avg_agg[p]['gals'] += (r['gals'] or 0)
+                    if starts >= _POST_MIN_STARTS_VIZ:
+                        wr = 100.0 * float(r['wins']) / starts
+                        gr = 100.0 * float(r['gals']) / starts
+                        if wr > max_win:
+                            max_win = wr
+                        if gr > max_gal:
+                            max_gal = gr
+                        tot_gals += r['gals'] or 0
+                        tot_starts += starts
+                avg = {p: v for p, v in avg_agg.items()
+                       if (v['starts'] or 0) >= _POST_MIN_STARTS_VIZ}
+                global_max_win = round(max_win, 2) if max_win > 0 else 25.0
+                global_max_gal = round(max_gal, 2) if max_gal > 0 else 25.0
+                global_avg_gal = (round(100.0 * tot_gals / tot_starts, 2)
+                                  if tot_starts > 0 else None)
+            else:
+                extra = ""
+                extra_p: tuple = ()
+                if breed and has_breed:
+                    extra += " AND tps.breed_code = %s"
+                    extra_p += (breed,)
+                if dist and has_dist:
+                    extra += " AND tps.dist_band = %s"
+                    extra_p += (dist,)
+
+                if track_id is not None:
+                    cur.execute(
+                        f"""
+                        SELECT tps.post, SUM(tps.starts) AS starts,
+                               SUM(tps.wins) AS wins, SUM(tps.gals) AS gals
+                        FROM track_post_stats tps
+                        WHERE tps.track_id = %s AND tps.auto = %s AND tps.post <= %s{extra}
+                        GROUP BY tps.post
+                        """,
+                        (track_id, auto_val, max_post) + extra_p,
+                    )
+                    for r in cur.fetchall():
+                        this[r['post']] = r
+
+                cur.execute(
+                    f"""
+                    SELECT tps.post, SUM(tps.starts) AS starts,
+                           SUM(tps.wins) AS wins, SUM(tps.gals) AS gals
+                    FROM track_post_stats tps
+                    JOIN track t       ON t.track_id = tps.track_id
+                    JOIN track_stats ts ON ts.track_id = tps.track_id
+                    WHERE t.country = 'SE' AND ts.races > 1000
+                          AND tps.auto = %s AND tps.post <= %s{extra}
+                    GROUP BY tps.post
+                    HAVING SUM(tps.starts) >= %s
+                    """,
+                    (auto_val, max_post) + extra_p + (_POST_MIN_STARTS_VIZ,),
+                )
+                avg = {r['post']: r for r in cur.fetchall()}
+
+                cur.execute(
+                    f"""
+                    SELECT MAX(win_rate) AS global_max_win,
+                           MAX(gal_rate) AS global_max_gal,
+                           100.0 * SUM(gals) / NULLIF(SUM(starts), 0) AS global_avg_gal
+                    FROM (
+                        SELECT tps.track_id, tps.post,
+                               SUM(tps.starts) AS starts,
+                               SUM(tps.wins)   AS wins,
+                               SUM(tps.gals)   AS gals,
+                               100.0 * SUM(tps.wins) / NULLIF(SUM(tps.starts), 0) AS win_rate,
+                               100.0 * SUM(tps.gals) / NULLIF(SUM(tps.starts), 0) AS gal_rate
+                        FROM track_post_stats tps
+                        JOIN track t       ON t.track_id = tps.track_id
+                        JOIN track_stats ts ON ts.track_id = tps.track_id
+                        WHERE t.country = 'SE' AND ts.races > 1000
+                              AND tps.auto = %s AND tps.post <= %s{extra}
+                        GROUP BY tps.track_id, tps.post
+                        HAVING SUM(tps.starts) >= %s
+                    ) per
+                    """,
+                    (auto_val, max_post) + extra_p + (_POST_MIN_STARTS_VIZ,),
+                )
+                row = cur.fetchone() or {}
+                if row.get('global_max_win'):
+                    global_max_win = round(float(row['global_max_win']), 2)
+                if row.get('global_max_gal'):
+                    global_max_gal = round(float(row['global_max_gal']), 2)
+                if row.get('global_avg_gal') is not None:
+                    global_avg_gal = round(float(row['global_avg_gal']), 2)
     finally:
         conn.close()
 
-    def val(r):
-        if not r or not r['starts'] or int(r['starts']) < _POST_MIN_STARTS_VIZ:
-            return None
-        num = float(r['wins'] if metric == 'win' else r['gals'])
-        return round(100 * num / float(r['starts']), 2)
-
     posts = []
     for p in range(1, max_post + 1):
+        row = this.get(p)
+        avg_row = avg.get(p)
+        win_v, gal_v = _rate(row, 'wins'), _rate(row, 'gals')
+        win_a, gal_a = _rate(avg_row, 'wins'), _rate(avg_row, 'gals')
         posts.append({
             'post': p,
-            'value': val(this.get(p)),
-            'starts': (this.get(p) or {}).get('starts') or 0,
-            'avg': val(avg.get(p)),
-            'max': round(maxvals.get(p) or 0, 2),
+            'value': win_v if metric == 'win' else gal_v,
+            'avg': win_a if metric == 'win' else gal_a,
+            'starts': (row or {}).get('starts') or 0,
+            'win': win_v, 'gal': gal_v,
+            'win_avg': win_a, 'gal_avg': gal_a,
         })
-    return jsonify({'track_id': track_id, 'method': method, 'metric': metric,
-                    'max_post': max_post, 'posts': posts})
+    global_max = global_max_win if metric == 'win' else global_max_gal
+    return jsonify({
+        'track_id': track_id, 'method': method, 'metric': metric,
+        'max_post': max_post, 'breed': breed, 'dist': dist, 'source': source,
+        'global_max': global_max,
+        'global_max_win': global_max_win,
+        'global_max_gal': global_max_gal,
+        'global_avg': global_avg_gal if metric == 'gal' else None,
+        'global_avg_gal': global_avg_gal,
+        'posts': posts,
+    })
+
 
 
 @app.route('/api/horse/<int:horse_id>/offspring')
@@ -4287,6 +4836,49 @@ _RACE_CACHE_TTL_UPCOMING = 45    # seconds — live odds update every ~30s
 _RACE_CACHE_TTL_PAST     = 3600  # 1 hour for finished races
 
 
+# ---------------------------------------------------------------------------
+# Pre-race tipster comments (ATG)
+# ---------------------------------------------------------------------------
+
+_tips_comment_cache: dict[str, tuple[float, dict]] = {}
+_TIPS_COMMENT_TTL = 900  # 15 minutes — written once per raceday, not live data
+
+
+@app.route('/api/race/atg/<path:atg_race_id>/tips')
+def race_tips_by_atg(atg_race_id):
+    """Pre-race tipster comment per starter, keyed by program number.
+
+    Keyed off the ATG race id alone so it also answers for racedays that have
+    not been imported into `race` yet — those are exactly the upcoming cards
+    this is wanted for."""
+    import time as _t
+    import httpx as _httpx
+    from core.config import ATG_HEADERS, ATG_TIPS_COMMENTS_URL
+
+    now = _t.time()
+    cached = _tips_comment_cache.get(atg_race_id)
+    if cached and now - cached[0] < _TIPS_COMMENT_TTL:
+        return jsonify(cached[1])
+
+    out: dict[str, str] = {}
+    try:
+        resp = _httpx.get(
+            ATG_TIPS_COMMENTS_URL.format(atg_race_id=atg_race_id),
+            headers=ATG_HEADERS, timeout=10.0,
+        )
+        if resp.status_code == 200:
+            for c in (resp.json() or {}).get('comments') or []:
+                num, text = c.get('startNumber'), (c.get('text') or '').strip()
+                if num is not None and text:
+                    out[str(num)] = text
+    except Exception:
+        # A missing tipster column is cosmetic; never fail the start list over it.
+        return jsonify({}), 200
+
+    _tips_comment_cache[atg_race_id] = (now, out)
+    return jsonify(out)
+
+
 def _race_entries(*, race_id=None, atg_race_id=None):
     import time as _time_mod
     _cache_key = f'race:{race_id or atg_race_id}'
@@ -4347,6 +4939,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                        e.time_seconds                  AS time_val,
                        e.odds,
                        e.prize_kr                      AS prize,
+                       e.earnings_pre,
                        e.disqualified                  AS dq,
                        e.galopp                        AS gal,
                        e.withdrawn,
@@ -4472,7 +5065,8 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                                  AND NOT COALESCE(e.disqualified, false)
                                  AND NOT e.galopp
                                  AND """ + _NOT_QUALIFIER + """
-                           ) AS clean_wins
+                           ) AS clean_wins,
+                           COALESCE(SUM(e.prize_kr), 0) AS prize
                     FROM entry e
                     JOIN race  r2 ON r2.race_id = e.race_id
                     WHERE e.horse_id = ANY(%s)
@@ -4487,13 +5081,15 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                         'wins':   srow['wins'] or 0,
                         'clean_starts': srow['clean_starts'] or 0,
                         'clean_wins':   srow['clean_wins'] or 0,
+                        'prize': int(srow['prize'] or 0),
                     }
 
             rows = []
             for r in entry_rows:
                 pre = stats_pre.get(r['horse_id'],
                                     {'starts': 0, 'wins': 0,
-                                     'clean_starts': 0, 'clean_wins': 0})
+                                     'clean_starts': 0, 'clean_wins': 0,
+                                     'prize': 0})
                 pt = r['placement_text'] or ''
                 qual = bool(_re_mod.match(_QUALIFIER_RE, pt))
                 contributes_start = (not r['withdrawn']) and (not qual)
@@ -4505,6 +5101,11 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                 clean_won_this_race = won_this_race and (not r['gal'])
                 post_clean_starts = pre['clean_starts'] + (1 if clean_this_race else 0)
                 post_clean_wins   = pre['clean_wins']   + (1 if clean_won_this_race else 0)
+                # Lifetime stake: prefer the as-of-race figure written at
+                # import, fall back to summing prize_kr over earlier starts.
+                pre_prize = int(r['earnings_pre'] if r['earnings_pre'] is not None
+                                else (pre['prize'] or 0))
+                post_prize = pre_prize + (int(r['prize'] or 0) if r['prize'] else 0)
                 ped = ped_map.get(r['horse_id'], {})
                 rows.append({
                     'entry_id': r['entry_id'],
@@ -4572,6 +5173,8 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'pre_galadj_wins':    pre['clean_wins'],
                     'post_galadj_starts': post_clean_starts,
                     'post_galadj_wins':   post_clean_wins,
+                    'pre_prize_kr': pre_prize,
+                    'post_prize_kr': post_prize,
                 })
     finally:
         conn.close()

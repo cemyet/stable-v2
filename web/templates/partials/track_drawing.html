@@ -1,0 +1,434 @@
+<script>
+/* Shared overhead track SVG — used on the track page and the game hero. */
+(function () {
+const TRACK_BASE = {
+  surface: '#a89b88',
+  surfaceShade: '#8a7e6d',
+  grass: '#5f9440',
+  water: '#41616f'
+};
+
+const TRACK_PROFILES = {
+  /* Sand oval. Circular warm-up ring in the left half of the infield and a
+     long sinuous pond system with fountains across the centre-right. */
+  solvalla: {
+    straightM: 220,
+    surface: '#b6aa97',
+    surfaceShade: '#8d8270',
+    grass: '#5f9c3d',
+    water: '#3d6373',
+    infield(f) {
+      const P = f.P;
+      return `
+        <g stroke="${f.apron}" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
+          <path d="M ${P(0.07, 0.44)} C ${P(0.13, 0.30)} ${P(0.19, 0.24)} ${P(0.27, 0.25)}
+                   C ${P(0.37, 0.26)} ${P(0.46, 0.33)} ${P(0.56, 0.40)}"
+            stroke-width="${f.v(0.085)}"/>
+          <path d="M ${P(0.23, 0.29)} C ${P(0.21, 0.40)} ${P(0.24, 0.47)} ${P(0.31, 0.51)}"
+            stroke-width="${f.v(0.07)}"/>
+          <path d="M ${P(0.14, 0.62)} C ${P(0.32, 0.73)} ${P(0.54, 0.79)} ${P(0.73, 0.76)}
+                   C ${P(0.83, 0.74)} ${P(0.88, 0.69)} ${P(0.92, 0.62)}"
+            stroke-width="${f.v(0.085)}"/>
+          <path d="M ${P(0.60, 0.775)} C ${P(0.67, 0.88)} ${P(0.80, 0.89)} ${P(0.87, 0.80)}
+                   C ${P(0.90, 0.755)} ${P(0.91, 0.70)} ${P(0.905, 0.655)}"
+            stroke-width="${f.v(0.06)}"/>
+        </g>
+        <circle cx="${f.x(0.21)}" cy="${f.y(0.20)}" r="${f.u(0.070)}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.u(0.016)}"/>
+        ${f.scrub([[0.21, 0.20]], 0.075)}
+        ${f.ribbon([[0.285, 0.515, 0.020], [0.35, 0.530, 0.042], [0.42, 0.545, 0.052],
+                    [0.48, 0.550, 0.028], [0.55, 0.558, 0.024], [0.61, 0.565, 0.058],
+                    [0.68, 0.568, 0.062], [0.75, 0.562, 0.034], [0.81, 0.550, 0.020],
+                    [0.855, 0.542, 0.020]], 3)}
+        ${f.scrub([[0.40, 0.15], [0.66, 0.13], [0.86, 0.24],
+                   [0.13, 0.50], [0.44, 0.90], [0.72, 0.90]], 0.055)}
+        <circle cx="${f.x(0.53)}" cy="${f.y(0.45)}" r="${f.u(0.022)}" fill="${f.water}"/>
+        ${f.fountain(0.53, 0.45, 0.055)}
+        ${f.fountain(0.42, 0.545, 0.055)}
+        ${f.fountain(0.665, 0.565, 0.075)}`;
+    }
+  },
+
+  /* Sweden's only mile track (1609 m). Home stretch was lengthened from
+     218 m to 285 m in 2021, so the finish now sits at the end of the
+     bottom straight. Near-black asphalt, scrubby olive infield, a lake
+     along the back stretch and an inner training oval on the right. */
+  tingsryd: {
+    straightM: 285,
+    surface: '#333b41',
+    surfaceShade: '#22282d',
+    grass: '#7c8055',
+    water: '#3a4a54',
+    infield(f) {
+      const P = f.P;
+      return `
+        ${f.scrub([[0.55, 0.14], [0.80, 0.22], [0.12, 0.62],
+                   [0.30, 0.90], [0.62, 0.88], [0.86, 0.80]], 0.06, '#5c6135')}
+        ${f.ribbon([[0.11, 0.145, 0.045], [0.19, 0.150, 0.090], [0.27, 0.170, 0.075],
+                    [0.35, 0.195, 0.040], [0.43, 0.235, 0.022], [0.52, 0.295, 0.020],
+                    [0.61, 0.355, 0.032], [0.70, 0.415, 0.070], [0.78, 0.475, 0.048],
+                    [0.86, 0.545, 0.038], [0.92, 0.615, 0.072], [0.96, 0.680, 0.040]], 6)}
+        <path d="${f.stadium(f.x(0.296), f.x(0.532), f.y(0.615), f.v(0.318))}"
+          fill="#87845c" opacity="0.35"/>
+        <path d="${f.stadium(f.x(0.296), f.x(0.532), f.y(0.615), f.v(0.318))}"
+          fill="none" stroke="#434b53" stroke-width="${f.v(0.049)}"/>
+        <rect x="${f.x(0.21)}" y="${f.y(0.385)}" width="${f.u(0.18)}" height="${f.v(0.21)}"
+          rx="1.5" fill="#4e8a39"/>
+        <rect x="${f.x(0.415)}" y="${f.y(0.45)}" width="${f.u(0.13)}" height="${f.v(0.29)}"
+          rx="1.5" fill="#a9a58c" opacity="0.7"/>`;
+    }
+  },
+
+  /* Sand training paddocks fill the left of the infield, with a dark
+     comma-shaped pond low on the green right-hand side. */
+  åby: {
+    surface: '#a79d8e',
+    surfaceShade: '#857c6f',
+    grass: '#5f9440',
+    water: '#2f4a44',
+    infield(f) {
+      const sand = '#cdc5b1';
+      return `
+        <path d="${f.stadium(f.x(0.30), f.x(0.68), f.y(0.48), f.v(0.36))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.035)}" opacity="0.65"/>
+        ${f.pond(0.20, 0.31, 0.110, 0.150, 9, sand)}
+        ${f.pond(0.24, 0.55, 0.140, 0.135, 12, sand)}
+        ${f.pond(0.47, 0.28, 0.110, 0.115, 6, sand)}
+        ${f.pond(0.70, 0.585, 0.100, 0.145, 5)}
+        ${f.scrub([[0.55, 0.13], [0.82, 0.22], [0.86, 0.70], [0.42, 0.88]], 0.05)}`;
+    }
+  },
+
+  /* Rust-red dirt surface; a large sand jumping arena fills the middle of
+     the infield, ringed by a training loop. */
+  mantorp: {
+    surface: '#9d6a51',
+    surfaceShade: '#7c5340',
+    grass: '#5f9440',
+    water: '#3d6373',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.36), f.x(0.64), f.y(0.50), f.v(0.33))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.04)}" opacity="0.7"/>
+        <rect x="${f.x(0.35)}" y="${f.y(0.34)}" width="${f.u(0.30)}" height="${f.v(0.32)}"
+          rx="1.5" fill="#cdbfa3"/>
+        ${f.scrub([[0.14, 0.28], [0.14, 0.74], [0.86, 0.28], [0.86, 0.74]], 0.05)}`;
+    }
+  },
+
+  /* Dark asphalt oval around a green infield with a rust-coloured
+     training track looping through it. */
+  rättvik: {
+    surface: '#4c5257',
+    surfaceShade: '#383d41',
+    grass: '#62a03f',
+    water: '#3d6373',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.38), f.x(0.62), f.y(0.50), f.v(0.32))}"
+          fill="none" stroke="#94684e" stroke-width="${f.v(0.055)}"/>
+        ${f.scrub([[0.13, 0.30], [0.15, 0.75], [0.87, 0.32], [0.85, 0.74]], 0.055)}`;
+    }
+  },
+
+  /* Dark asphalt; service loop around the infield with a circular
+     turnaround at one end. */
+  bollnäs: {
+    surface: '#4f5559',
+    surfaceShade: '#3b4044',
+    grass: '#7d8a58',
+    water: '#3d6373',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.36), f.x(0.64), f.y(0.50), f.v(0.34))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.038)}" opacity="0.7"/>
+        <circle cx="${f.x(0.30)}" cy="${f.y(0.50)}" r="${f.u(0.052)}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.u(0.013)}" opacity="0.8"/>
+        ${f.scrub([[0.62, 0.22], [0.78, 0.72], [0.20, 0.80]], 0.05, '#5f6b3d')}`;
+    }
+  },
+
+  /* Dark asphalt; warm-up ring to the left and a small fountain pond in
+     the middle of a bright green infield. */
+  östersund: {
+    surface: '#4d5358',
+    surfaceShade: '#3a3f43',
+    grass: '#63a044',
+    water: '#3f6b74',
+    infield(f) {
+      return `
+        <circle cx="${f.x(0.24)}" cy="${f.y(0.46)}" r="${f.u(0.058)}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.u(0.014)}"/>
+        ${f.pond(0.55, 0.52, 0.055, 0.135, 5)}
+        ${f.fountain(0.55, 0.52, 0.085)}
+        ${f.scrub([[0.78, 0.25], [0.84, 0.72], [0.40, 0.85]], 0.05)}`;
+    }
+  },
+
+  /* Reddish dirt; pale training loop inside the infield with a pond
+     off to one side. */
+  dannero: {
+    surface: '#96705a',
+    surfaceShade: '#775846',
+    grass: '#63a044',
+    water: '#3f6b74',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.42), f.x(0.66), f.y(0.54), f.v(0.28))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.04)}" opacity="0.75"/>
+        ${f.pond(0.30, 0.26, 0.075, 0.135, 7)}
+        ${f.scrub([[0.80, 0.22], [0.86, 0.68]], 0.05)}`;
+    }
+  },
+
+  /* Tan dirt; training loop with a fenced paddock inside it. */
+  årjäng: {
+    surface: '#a89073',
+    surfaceShade: '#87735c',
+    grass: '#63a044',
+    water: '#3d6373',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.38), f.x(0.62), f.y(0.50), f.v(0.30))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.042)}" opacity="0.8"/>
+        <rect x="${f.x(0.38)}" y="${f.y(0.40)}" width="${f.u(0.24)}" height="${f.v(0.22)}"
+          rx="1.5" fill="none" stroke="${f.apron}" stroke-width="${f.v(0.022)}" opacity="0.9"/>
+        ${f.scrub([[0.14, 0.32], [0.16, 0.76], [0.86, 0.30], [0.84, 0.74]], 0.05)}`;
+    }
+  },
+
+  /* Light sand; a broad open grass infield crossed only by a service loop. */
+  axevalla: {
+    surface: '#b0a184',
+    surfaceShade: '#8d8169',
+    grass: '#63a044',
+    water: '#3d6373',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.36), f.x(0.64), f.y(0.50), f.v(0.32))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.03)}" opacity="0.55"/>
+        ${f.scrub([[0.15, 0.28], [0.17, 0.75], [0.85, 0.30], [0.83, 0.73]], 0.05)}`;
+    }
+  },
+
+  /* The trot oval sits inside the gallop track; green infield with sand
+     paddocks and a dark pond. */
+  jägersro: {
+    surface: '#a79d8e',
+    surfaceShade: '#857c6f',
+    grass: '#5f9440',
+    water: '#33504e',
+    infield(f) {
+      return `
+        <path d="${f.stadium(f.x(0.36), f.x(0.64), f.y(0.50), f.v(0.33))}"
+          fill="none" stroke="${f.apron}" stroke-width="${f.v(0.035)}" opacity="0.65"/>
+        ${f.pond(0.30, 0.40, 0.100, 0.150, 9, '#cdc5b1')}
+        ${f.pond(0.66, 0.58, 0.085, 0.140, 4)}
+        ${f.scrub([[0.55, 0.18], [0.85, 0.30], [0.20, 0.80]], 0.05)}`;
+    }
+  }
+};
+
+function drawTrackSVG(trackName, lengthM, homeStretchM, numOpenStretches, widthM) {
+  if (!lengthM || !homeStretchM) return '';
+
+  const key = String(trackName || '').trim().toLowerCase();
+  const profile = TRACK_PROFILES[key] || {};
+  const surface = profile.surface || TRACK_BASE.surface;
+  const surfaceShade = profile.surfaceShade || TRACK_BASE.surfaceShade;
+  const grassFill = profile.grass || TRACK_BASE.grass;
+  const waterFill = profile.water || TRACK_BASE.water;
+  const apronFill = 'rgb(217,205,189)';
+
+  /* straightM is the full home straight; homeStretchM ("upplopp") is the
+     part of it that runs from the last turn to the finish line. */
+  const straightM = Math.max(profile.straightM || homeStretchM, homeStretchM);
+  const curveCirc = Math.max(lengthM - 2 * straightM, 40);
+  const R = curveCirc / (2 * Math.PI);
+
+  const pad = 22;
+  const targetW = 420;
+  const sc = (targetW - 2 * pad) / (straightM + 2 * R);
+  const sW = straightM * sc;
+  const sR = R * sc;
+  const trackW = Math.min(Math.max((widthM || 24) * sc, 7), 34);
+  const railW = Math.min(Math.max(5 * sc, 2.5), 7);
+
+  const w = sW + 2 * sR + 2 * pad;
+  const h = 2 * sR + 2 * pad;
+  const cx1 = pad + sR;
+  const cx2 = pad + sR + sW;
+  const cy = pad;
+  const centerY = cy + sR;
+  const homeY = cy + 2 * sR;
+  const finishX = cx1 + sW * Math.min(homeStretchM / straightM, 1);
+  const homeStripeW = finishX - cx1;
+  const dirtInner = homeY - trackW / 2;
+
+  const uid = 't' + Math.random().toString(36).slice(2, 8);
+
+  function stadiumPath(x1, x2, y, r) {
+    return [
+      `M ${x2} ${y - r}`,
+      `A ${r} ${r} 0 0 1 ${x2} ${y + r}`,
+      `L ${x1} ${y + r}`,
+      `A ${r} ${r} 0 0 1 ${x1} ${y - r}`,
+      'Z'
+    ].join(' ');
+  }
+  const oval = r => stadiumPath(cx1, cx2, centerY, r);
+
+  /* Closed catmull-rom through the points, emitted as cubic beziers. */
+  function smoothClosed(p) {
+    const n = p.length;
+    const at = i => p[(i % n + n) % n];
+    let d = `M ${at(0)[0].toFixed(1)} ${at(0)[1].toFixed(1)}`;
+    for (let i = 0; i < n; i++) {
+      const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+      d += ` C ${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)}`
+         + ` ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)}`
+         + ` ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    }
+    return d + ' Z';
+  }
+
+  const trackInnerR = Math.max(sR - trackW / 2, 4);
+  const apronInnerR = Math.max(trackInnerR - railW, 3);
+
+  const fieldLeft = cx1 - apronInnerR;
+  const fieldTop = centerY - apronInnerR;
+  const fieldW = (cx2 + apronInnerR) - fieldLeft;
+  const fieldH = 2 * apronInnerR;
+
+  const f = {
+    x: u => fieldLeft + u * fieldW,
+    y: v => fieldTop + v * fieldH,
+    u: n => n * fieldW,
+    v: n => n * fieldH,
+    P: (u, v) => `${(fieldLeft + u * fieldW).toFixed(1)} ${(fieldTop + v * fieldH).toFixed(1)}`,
+    stadium: stadiumPath,
+    water: waterFill,
+    apron: apronFill,
+    /* Flat concentric ripples — a fountain seen straight down. A radial
+       gradient here reads as a glossy sphere, which looks wrong. */
+    fountain: (u, v, rFrac) => {
+      const cx = (fieldLeft + u * fieldW).toFixed(1);
+      const cy = (fieldTop + v * fieldH).toFixed(1);
+      const r = rFrac * fieldH;
+      return `<g fill="#ffffff">`
+        + `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" opacity="0.16"/>`
+        + `<circle cx="${cx}" cy="${cy}" r="${(r * 0.58).toFixed(1)}" opacity="0.3"/>`
+        + `<circle cx="${cx}" cy="${cy}" r="${(r * 0.26).toFixed(1)}" opacity="0.8"/>`
+        + `</g>`;
+    },
+
+    /* Closed blob with a deterministic wobble, so ponds get a natural
+       shoreline instead of reading as an ellipse. */
+    pond: (u, v, ru, rv, seed, color) => {
+      const cx = fieldLeft + u * fieldW;
+      const cy = fieldTop + v * fieldH;
+      let s = (seed || 1) * 7919;
+      const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+      const p = [];
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        const k = 0.7 + rnd() * 0.55;
+        p.push([cx + Math.cos(a) * ru * fieldW * k, cy + Math.sin(a) * rv * fieldH * k]);
+      }
+      return `<path d="${smoothClosed(p)}" fill="${color || waterFill}"/>`;
+    },
+
+    /* Sinuous water: a centre line of [u, v, half-height] samples, walked
+       out along the top edge and back along the bottom. Each bank gets a
+       deterministic wobble so the shoreline is ragged rather than vector-smooth. */
+    ribbon: (pts, seed) => {
+      let s = (seed || 1) * 7919;
+      const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+      const bank = sign => pts.map(([u, v, hw]) => {
+        const k = 0.72 + rnd() * 0.62;
+        return [fieldLeft + (u + (rnd() - 0.5) * 0.012) * fieldW,
+                fieldTop + (v + sign * hw * k) * fieldH];
+      });
+      const top = bank(-1);
+      const bottom = bank(1).reverse();
+      return `<path d="${smoothClosed(top.concat(bottom))}" fill="${waterFill}"/>`;
+    },
+
+    /* Loose clumps of trees / scrub — three overlapping discs per spot. */
+    scrub: (list, rFrac, color) => {
+      const r = rFrac * fieldH;
+      const body = list.map(([u, v]) => {
+        const cx = fieldLeft + u * fieldW;
+        const cy = fieldTop + v * fieldH;
+        return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}"/>`
+          + `<circle cx="${(cx - r * 0.85).toFixed(1)}" cy="${(cy + r * 0.4).toFixed(1)}" r="${(r * 0.7).toFixed(1)}"/>`
+          + `<circle cx="${(cx + r * 0.9).toFixed(1)}" cy="${(cy - r * 0.25).toFixed(1)}" r="${(r * 0.62).toFixed(1)}"/>`;
+      }).join('');
+      return `<g fill="${color || '#33642a'}" opacity="0.38">${body}</g>`;
+    }
+  };
+
+  const infield = profile.infield ? profile.infield(f) : '';
+
+  const nOpen = numOpenStretches || 0;
+  const openGap = 4.8;
+  const openOff = 5.2;
+  const homeApronW = nOpen > 0 ? openOff + (nOpen - 1) * openGap + 3.2 : railW;
+
+  let openStretchMark = '';
+  for (let i = 0; i < nOpen; i++) {
+    const y = dirtInner - openOff - i * openGap;
+    openStretchMark += `<line x1="${cx1}" y1="${y}" x2="${finishX}" y2="${y}"
+      stroke="#f5d000" stroke-width="1.3" stroke-linecap="butt"
+      stroke-dasharray="2.2 1.6" opacity="0.85"/>`;
+  }
+
+  const hsY = homeY - trackW / 2;
+  const stripe = Math.max(trackW * 0.42, 4);
+
+  /* White inner rail, but skip the bottom straight when there is an open
+     stretch so the hairline does not sit on top of the extra lanes. */
+  const rr = trackInnerR;
+  const whiteRail = nOpen > 0
+    ? `M ${cx2} ${centerY - rr} A ${rr} ${rr} 0 0 1 ${cx2} ${centerY + rr}
+       M ${cx1} ${centerY + rr} A ${rr} ${rr} 0 0 1 ${cx1} ${centerY - rr}
+       L ${cx2} ${centerY - rr}`
+    : oval(rr);
+
+      return `<svg viewBox="0 0 ${w.toFixed(1)} ${h.toFixed(1)}" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <defs>
+      <clipPath id="field-${uid}"><path d="${oval(apronInnerR)}"/></clipPath>
+      <clipPath id="home-${uid}">
+        <rect x="${cx1}" y="${hsY}" width="${homeStripeW}" height="${trackW}"/>
+      </clipPath>
+      <pattern id="stripes-${uid}" patternUnits="userSpaceOnUse"
+        width="${(stripe * 2).toFixed(2)}" height="${(stripe * 2).toFixed(2)}"
+        patternTransform="rotate(-40)">
+        <rect width="${stripe.toFixed(2)}" height="${(stripe * 2).toFixed(2)}" fill="${surfaceShade}"/>
+        <rect x="${stripe.toFixed(2)}" width="${stripe.toFixed(2)}" height="${(stripe * 2).toFixed(2)}" fill="${surface}"/>
+      </pattern>
+    </defs>
+
+    <path d="${oval(apronInnerR)}" fill="${grassFill}"/>
+    <g clip-path="url(#field-${uid})">${infield}</g>
+
+    <path d="${oval(trackInnerR)} ${oval(apronInnerR)}" fill="${apronFill}" fill-rule="evenodd"/>
+    <rect x="${cx1}" y="${(dirtInner - homeApronW).toFixed(1)}" width="${sW.toFixed(1)}"
+      height="${homeApronW.toFixed(1)}" fill="${nOpen > 0 ? surface : apronFill}"/>
+
+    <path d="${oval(sR)}" stroke="${surface}" stroke-width="${trackW.toFixed(1)}"
+      fill="none" stroke-linejoin="round"/>
+    <rect x="${cx1}" y="${hsY}" width="${homeStripeW}" height="${trackW}"
+      fill="url(#stripes-${uid})" clip-path="url(#home-${uid})"/>
+    <path d="${whiteRail}" fill="none" stroke="#ffffff" stroke-width="0.7" opacity="0.45"/>
+
+    ${openStretchMark}
+    <line x1="${finishX}" y1="${(homeY - trackW / 2 - 4).toFixed(1)}"
+      x2="${finishX}" y2="${(homeY + trackW / 2 + 4).toFixed(1)}"
+      stroke="#c42828" stroke-width="2.2" stroke-linecap="butt"/>
+  </svg>`;
+}
+
+  window.drawTrackSVG = drawTrackSVG;
+})();
+</script>

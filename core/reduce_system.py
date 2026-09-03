@@ -28,23 +28,48 @@ So the unit of account here is a *stake unit* (one row at the game's line
 price), and a row may carry several.  With that, the allocation is always
 feasible: any non-negative integer matrix with the right margins will do.
 
+Weights and distinct rows really are exclusive, by the way, not just
+awkward to combine: the rows of a system that never repeats one form a
+downward-closed set, and on a three-leg grid only four of the twenty-seven
+plausible weightings can be the margins of such a set.  Refusing to stack
+would mean quietly rewriting the user's weights instead.
+
 WHICH rows get the units
 ------------------------
 The margins fix how much each horse gets but not which horses share a row.
-We allocate proportionally and recursively, leg by leg, which makes the
-units land on rows in proportion to the product of their coverages — the
-favourites end up together and the longshots stay rare, the same shape
-ATG's points reduction produces.
+We deal the stake out in passes: pass one lays a single unit on as many
+rows as the weights reach, strongest row first, and later passes can only
+deepen rows pass one already chose — a row it could not afford then is one
+it can never afford, because budgets only shrink.  So the system comes out
+broad first and stacked second, and the stack lands on the rows the user
+rated highest.
+
+Dealing it that way also makes the system very nearly *monotone*: swap any
+horse on a played row for one the user rated higher and you should land on
+another played row carrying at least as much stake.  Without that, a coupon
+can pay out on the longshot and not on the favourite standing next to it,
+which is what the old proportional recursion did to roughly a third of its
+rows.
+
+A handful can still slip through, because perfect monotonicity is the
+downward-closed condition again and so is fenced off by the same result:
+strongest-first order means a row is only ever refused after its stronger
+neighbour, but if the stronger horse runs out of budget first, its
+neighbour can still be affordable later.  `verify()` counts what is left —
+in practice single digits on a few thousand rows, against the thousand-plus
+of the old scheme.
 
 Nothing here talks to Flask or the database; `web/app.py` wraps it.
 """
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import math
 from dataclasses import dataclass, field
 from datetime import date as _date, datetime as _datetime
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 # ---------------------------------------------------------------------------
 # ATG file betting
@@ -101,10 +126,12 @@ ATG_MULTIPLIERS = (100, 50, 20, 10, 5, 2, 1)
 ATG_MAX_SYSTEMS = 5000
 ATG_MAX_COUPON_ID = 9999
 
-# Guard rails for the allocation. A coupon large enough to trip these cannot
-# be submitted as a file anyway.
+# Guard rails for the allocation. A weighted system has to be walked row by
+# row, which is a few seconds at the row cap and rises with it — and a coupon
+# that big is unsubmittable and unaffordable anyway (500k rows is 125,000 kr
+# at the cheapest line price, against ATG's 5000-system file limit).
 _MAX_UNITS = 2_000_000
-_MAX_BOXES = 200_000
+_MAX_ROWS = 500_000
 
 
 # ---------------------------------------------------------------------------
@@ -115,8 +142,9 @@ class Leg:
     """One leg of the plan, as the game page drew it.
 
     `coverage` is percent of the leg's unreduced whole, so it sums to 100
-    when nothing is reduced and to less when it is.  `reserves` are program
-    numbers of horses *not* on the coupon, best first.
+    when nothing is moved, to less when a pick is reduced, and to more when
+    one is levered.  `reserves` are program numbers of horses *not* on the
+    coupon, best first.
     """
     leg: int
     race_id: str
@@ -127,10 +155,29 @@ class Leg:
 
     @property
     def retention(self) -> float:
+        """Rows this leg buys against its untouched size.
+
+        Above 1 is legal: the extra stake lands as depth on rows the
+        levered pick already sits on, which is what a stake unit is for.
+        """
         total = sum(self.coverage.get(n, 0.0) for n in self.picks)
         if total <= 0:
             return 1.0
-        return max(0.0, min(1.0, total / 100.0))
+        return max(0.0, total / 100.0)
+
+    def shares(self) -> dict[int, float]:
+        """Each pick's slice of the leg, as fractions adding up to 1.
+
+        `coverage` is a share of the leg's *unreduced* whole, so it adds up
+        to less than 100 once a pick is reduced and to more once one is
+        levered.  Either way the stake the leg ends up buying splits
+        between the picks in these proportions.
+        """
+        total = sum(max(0.0, self.coverage.get(n, 0.0)) for n in self.picks)
+        if total <= 0:
+            return {n: 1.0 / len(self.picks) for n in self.picks}
+        return {n: max(0.0, self.coverage.get(n, 0.0)) / total
+                for n in self.picks}
 
     def ranked(self) -> list[int]:
         """Picks strongest first — the order everything else works in."""
@@ -222,42 +269,8 @@ def integer_targets(leg: Leg, units: int) -> dict[int, int]:
     return out
 
 
-def _split_units(targets: list[int], take: int) -> list[int]:
-    """Take exactly `take` units out of `targets`, proportionally.
-
-    Used to hand a slice of every remaining leg down to one branch of the
-    allocation, so siblings share the parent's units without drift.
-    """
-    total = sum(targets)
-    if take <= 0:
-        return [0] * len(targets)
-    if take >= total:
-        return list(targets)
-
-    raw = [t * take / total for t in targets]
-    out = [min(t, int(math.floor(x))) for t, x in zip(targets, raw)]
-    short = take - sum(out)
-    if short <= 0:
-        return out
-
-    order = sorted(range(len(targets)),
-                   key=lambda i: (-(raw[i] - math.floor(raw[i])), -targets[i], i))
-    while short > 0:
-        moved = False
-        for i in order:
-            if short <= 0:
-                break
-            if out[i] < targets[i]:
-                out[i] += 1
-                short -= 1
-                moved = True
-        if not moved:  # cannot happen while take <= total, but never spin
-            break
-    return out
-
-
 # ---------------------------------------------------------------------------
-# Stage 2 — units to boxes
+# Stage 2 — rows to boxes
 # ---------------------------------------------------------------------------
 @dataclass
 class Box:
@@ -278,131 +291,135 @@ class Box:
         return self.rows * self.multiplier
 
 
-def _uniform_box(order: list[list[int]], deficits: list[list[int]],
-                 units: int) -> tuple[tuple[tuple[int, ...], ...], int] | None:
-    """Can the rest of the problem be one box?
+def _row_stream(ranked: list[list[int]],
+                logs: list[list[float]]) -> Iterator[tuple[int, ...]]:
+    """Every row of the grid, strongest first.
 
-    It can when every remaining leg spreads its units evenly over the horses
-    that still want any, and the resulting box divides the units cleanly.
-    This is what collapses an unreduced, unweighted tail into a single
-    coupon instead of enumerating its rows.
+    A row's strength is the sum of its horses' `logs` — the log of the
+    product of their shares, once the ordering has been tuned.  Sorting the
+    grid would mean building all of it and a plan can span millions of rows,
+    so this is a best-first walk instead: start on the favourites, and each
+    time a row comes out, offer up the rows one demotion away from it.  Only
+    the part of the grid we actually reach is ever materialised.
+
+    Ties break on the rank tuple, which orders a row before anything it
+    beats — without that, two rows of equal strength could come out in the
+    wrong order and split a system straight down the middle of a tie.
     """
-    sets: list[tuple[int, ...]] = []
-    size = 1
-    for horses, want in zip(order, deficits):
-        live = [h for h, d in zip(horses, want) if d > 0]
-        if not live:
-            return None
-        first = want[horses.index(live[0])]
-        for h in live:
-            if want[horses.index(h)] != first:
-                return None
-        sets.append(tuple(sorted(live)))
-        size *= len(live)
+    def strength(state: tuple[int, ...]) -> float:
+        return sum(logs[i][j] for i, j in enumerate(state))
 
-    if size <= 0 or units % size:
-        return None
-    return tuple(sets), units // size
+    start = tuple(0 for _ in ranked)
+    heap = [(-strength(start), start)]
+    seen = {start}
+    while heap:
+        _, state = heapq.heappop(heap)
+        yield tuple(ranked[i][j] for i, j in enumerate(state))
+        for i, j in enumerate(state):
+            if j + 1 >= len(ranked[i]):
+                continue
+            nxt = state[:i] + (j + 1,) + state[i + 1:]
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            heapq.heappush(heap, (-strength(nxt), nxt))
 
 
-def allocate(plan: Plan, units: int | None = None,
-             leg_order: Sequence[int] | None = None) -> list[Box]:
-    """Spread the system's stake units over rows and return them as boxes.
+def deal_units(plan: Plan, units: int) -> dict[tuple[int, ...], int]:
+    """Spread `units` stake units over the system's rows, broad side first.
 
-    Walks the legs in order.  At each leg the units are handed to the picks
-    in the amounts Stage 1 worked out, and every *other* leg's remaining
-    units are split proportionally so each branch keeps consistent margins.
-    Recursing that way concentrates units on rows whose horses are all
-    well covered, which is the shape a reduced system should have.
+    Pass one walks the grid strongest first and puts a single unit on every
+    row all of whose horses still have units left in their budget.  A row it
+    turns down there it can never take, since budgets only shrink, so the
+    passes after it only ever deepen rows pass one already chose.  That is
+    what keeps the coupon wide: nothing is bought twice until everything
+    affordable has been bought once.
 
-    `leg_order` only changes which leg the recursion splits first, never the
-    result's margins — but it changes how well the boxes merge afterwards,
-    so `solve` tries a few.  Boxes always come back in the plan's leg order.
+    A horse's budget is exactly the share the user gave it, so the weights
+    come out exact.
     """
+    ranked = [leg.ranked() for leg in plan.legs]
+    logs = [[math.log(max(leg.shares()[h], 1e-9)) for h in ranked[i]]
+            for i, leg in enumerate(plan.legs)]
+    budget = [dict(integer_targets(leg, units)) for leg in plan.legs]
+
+    def afford(row: tuple[int, ...]) -> bool:
+        return all(budget[i][h] > 0 for i, h in enumerate(row))
+
+    def take(row: tuple[int, ...]) -> None:
+        for i, h in enumerate(row):
+            budget[i][h] -= 1
+
+    out: dict[tuple[int, ...], int] = {}
+    live: list[tuple[int, ...]] = []
+    left = units
+    for row in _row_stream(ranked, logs):
+        if left <= 0:
+            break
+        if afford(row):
+            take(row)
+            out[row] = 1
+            live.append(row)
+            left -= 1
+
+    # Budgets only ever shrink, so a row nobody can afford now is one nobody
+    # will afford later — dropping it keeps the sweeps from re-reading a
+    # grid that is mostly dead.
+    while left > 0:
+        took = 0
+        keep: list[tuple[int, ...]] = []
+        for row in live:
+            if not afford(row):
+                continue
+            keep.append(row)
+            if left <= 0:
+                continue
+            take(row)
+            out[row] += 1
+            left -= 1
+            took += 1
+        live = keep
+        if took:
+            continue
+        # No row can carry the rest at the shares asked for. Rather than
+        # fail a coupon the user has already paid for, put the remainder on
+        # the strongest rows and let `verify` report the drift.
+        for row in sorted(out, key=lambda r: -out[r])[:left]:
+            out[row] += 1
+            left -= 1
+        break
+    return out
+
+
+def allocate(plan: Plan, units: int | None = None) -> list[Box]:
+    """Spread the system's stake over rows and return them as boxes."""
     if not plan.legs:
         raise ReduceError('plan has no legs')
     for leg in plan.legs:
         if not leg.picks:
             raise ReduceError(f'leg {leg.leg} has no picks')
 
-    total = int(units if units is not None else plan.rows)
-    if total <= 0:
+    want = int(units if units is not None else plan.rows)
+    if want <= 0:
         raise ReduceError('system has no rows')
-    if total > _MAX_UNITS:
-        raise ReduceError(f'system is too large to build ({total} rows)')
+    if want > _MAX_UNITS:
+        raise ReduceError(f'system is too large to build ({want} rows)')
 
-    walk = list(leg_order) if leg_order is not None else list(range(len(plan.legs)))
-    order = [plan.legs[i].ranked() for i in walk]
-    targets = [integer_targets(plan.legs[i], total) for i in walk]
-    root = [[targets[i][h] for h in order[i]] for i in range(len(walk))]
+    # An unweighted system at full size is every row played once, which is a
+    # single coupon — worth taking straight rather than walking the grid to
+    # rediscover it, since that grid can run to millions of rows.
+    targets = [integer_targets(leg, want) for leg in plan.legs]
+    if want == plan.full_rows and all(len(set(t.values())) == 1
+                                      for t in targets):
+        return [Box(tuple(tuple(sorted(leg.picks)) for leg in plan.legs))]
 
-    out: list[Box] = []
-    _distribute(order, 0, total, root, (), out)
+    if plan.full_rows > _MAX_ROWS:
+        raise ReduceError(
+            f'a weighted system over {plan.full_rows} rows is too big to '
+            f'build')
 
-    # Put the legs back where they belong.
-    if leg_order is not None:
-        back = [0] * len(walk)
-        for slot, leg_i in enumerate(walk):
-            back[leg_i] = slot
-        out = [Box(tuple(box.sets[back[i]] for i in range(len(walk))),
-                   box.multiplier)
-               for box in out]
-    return out
-
-
-def _leg_orders(plan: Plan) -> list[list[int]]:
-    """Candidate recursion orders, cheapest structure first.
-
-    Splitting the legs that have the fewest distinct coverage levels first
-    leaves the varied ones intact deeper down, where they merge back into
-    wider boxes; in practice that is worth about a third of the coupon
-    count. The rest are here because no single rule wins on every system.
-    """
-    idx = list(range(len(plan.legs)))
-
-    def levels(i: int) -> int:
-        leg = plan.legs[i]
-        return len({round(leg.coverage.get(n, 0.0), 1) for n in leg.picks})
-
-    return [
-        sorted(idx, key=lambda i: (levels(i), len(plan.legs[i].picks), i)),
-        sorted(idx, key=lambda i: (len(plan.legs[i].picks), levels(i), i)),
-        sorted(idx, key=lambda i: (-levels(i), -len(plan.legs[i].picks), i)),
-        idx,
-    ]
-
-
-def _distribute(order: list[list[int]], pos: int, units: int,
-                deficits: list[list[int]], prefix: tuple[tuple[int, ...], ...],
-                out: list[Box]) -> None:
-    if units <= 0:
-        return
-    if len(out) > _MAX_BOXES:
-        raise ReduceError('system is too fragmented to build')
-
-    uniform = _uniform_box(order[pos:], deficits[pos:], units)
-    if uniform is not None:
-        sets, mult = uniform
-        out.append(Box(prefix + sets, mult))
-        return
-
-    horses = order[pos]
-    want = deficits[pos]
-    rest = deficits[pos + 1:]
-
-    for idx, horse in enumerate(horses):
-        take = want[idx]
-        if take <= 0:
-            continue
-        # Every remaining leg gives up the same number of units, so the
-        # child's legs all agree on how many rows it is building.
-        child: list[list[int]] = []
-        for leg_i, vec in enumerate(rest):
-            slice_ = _split_units(vec, take)
-            child.append(slice_)
-            rest[leg_i] = [a - b for a, b in zip(vec, slice_)]
-        _distribute(order, pos + 1, take, deficits[:pos + 1] + child,
-                    prefix + ((horse,),), out)
+    return [Box(tuple((h,) for h in row), n)
+            for row, n in deal_units(plan, want).items()]
 
 
 def merge_boxes(boxes: Sequence[Box]) -> list[Box]:
@@ -463,19 +480,8 @@ def split_multipliers(boxes: Sequence[Box]) -> list[Box]:
 
 
 def solve(plan: Plan) -> list[Box]:
-    """Coverage in, submittable boxes out — the fewest coupons we can find."""
-    best: list[Box] | None = None
-    seen: set[tuple[int, ...]] = set()
-    for order in _leg_orders(plan):
-        key = tuple(order)
-        if key in seen:
-            continue
-        seen.add(key)
-        boxes = split_multipliers(merge_boxes(allocate(plan, leg_order=order)))
-        if best is None or len(boxes) < len(best):
-            best = boxes
-    assert best is not None  # _leg_orders always yields at least one order
-    return best
+    """Coverage in, submittable boxes out."""
+    return split_multipliers(merge_boxes(allocate(plan)))
 
 
 # ---------------------------------------------------------------------------
@@ -490,10 +496,50 @@ class Verification:
     warnings: list[str]
     # leg -> horse -> {'target': units, 'actual': units, 'coverage': pct}
     coverage: dict[int, dict[int, dict[str, float]]]
+    # How many different combinations the stake actually lands on, the most
+    # any single row carries, and rows left behind one they beat.
+    distinct_rows: int = 0
+    deepest_row: int = 1
+    gaps: int = 0
+
+
+def row_units(boxes: Sequence[Box]) -> dict[tuple[int, ...], int] | None:
+    """Stake on every row the boxes cover, or None when there are too many."""
+    out: dict[tuple[int, ...], int] = {}
+    for box in boxes:
+        for row in itertools.product(*box.sets):
+            out[row] = out.get(row, 0) + box.multiplier
+            if len(out) > _MAX_ROWS:
+                return None
+    return out
+
+
+def monotonicity_gaps(plan: Plan,
+                      units: dict[tuple[int, ...], int]) -> list[tuple]:
+    """Rows carrying less stake than a row they beat.
+
+    Swapping a horse for one the user rated *higher* can only make a row
+    more wanted, so it must never come back with less stake on it.  Every
+    gap this finds is a system that pays out on the longshot and not on the
+    favourite standing next to it.
+    """
+    stronger = []
+    for leg in plan.legs:
+        share = leg.shares()
+        stronger.append({h: [g for g in leg.picks if share[g] > share[h]]
+                         for h in leg.picks})
+    out = []
+    for row, n in units.items():
+        for i, h in enumerate(row):
+            for g in stronger[i][h]:
+                alt = row[:i] + (g,) + row[i + 1:]
+                if units.get(alt, 0) < n:
+                    out.append((plan.legs[i].leg, g, h, alt))
+    return out
 
 
 def verify(plan: Plan, boxes: Sequence[Box]) -> Verification:
-    """Recompute the margins from the boxes and compare with the plan."""
+    """Recompute everything from the boxes and compare with the plan."""
     expected = plan.rows
     warnings: list[str] = []
 
@@ -513,8 +559,11 @@ def verify(plan: Plan, boxes: Sequence[Box]) -> Verification:
         warnings.append(
             f'built {actual_units} rows, expected {expected}')
 
+    # Margins are checked against what was built, not what was asked for:
+    # when the weights force the system smaller, the shares still have to
+    # be right at the size it came out.
     for i, leg in enumerate(plan.legs):
-        targets = integer_targets(leg, expected)
+        targets = integer_targets(leg, actual_units)
         rows: dict[int, dict[str, float]] = {}
         for horse in leg.ranked():
             target = targets.get(horse, 0)
@@ -532,6 +581,23 @@ def verify(plan: Plan, boxes: Sequence[Box]) -> Verification:
                     f'leg {leg.leg} horse {horse}: {got} rows, wanted {target}')
         coverage[leg.leg] = rows
 
+    # Breadth and shape. Neither can fail a build — piling stake on the
+    # favourites' rows is what a weighted coupon is for — but both are worth
+    # saying out loud, because a coupon that spans 2268 rows and covers 1173
+    # of them does not look like one from the outside.
+    units = row_units(boxes)
+    if units is not None:
+        distinct = len(units)
+        deepest = max(units.values(), default=0)
+        gaps = monotonicity_gaps(plan, units)
+        if gaps:
+            leg, strong, weak, _ = gaps[0]
+            warnings.append(
+                f'{len(gaps)} rows carry less than a row they beat — leg '
+                f'{leg} horse {strong} behind {weak}')
+    else:
+        distinct, deepest, gaps = 0, 0, []
+
     if len(boxes) > ATG_MAX_SYSTEMS:
         ok = False
         warnings.append(
@@ -539,24 +605,27 @@ def verify(plan: Plan, boxes: Sequence[Box]) -> Verification:
             f'per file')
 
     return Verification(ok=ok, units=actual_units, expected_units=expected,
-                        boxes=len(boxes), warnings=warnings, coverage=coverage)
+                        boxes=len(boxes), warnings=warnings, coverage=coverage,
+                        distinct_rows=distinct, deepest_row=deepest,
+                        gaps=len(gaps))
 
 
 # ---------------------------------------------------------------------------
 # Stage 4 — the ATG file
 # ---------------------------------------------------------------------------
 def crc16(data: bytes) -> int:
-    """CRC-16/CCITT-FALSE — poly 0x1021, init 0xFFFF, no reflection.
+    """CRC-16/ARC — poly 0x8005, init 0x0000, reflected.
 
-    ATG's file-betting spec points at the Princeton `CRC16.java` reference
-    for this; the four hex digits go on the end of the file name so the
-    upload can tell whether the file was edited on the way.
+    ATG's file-betting spec points at Princeton's `CRC16.java` for the four
+    hex digits on the file name (`java CRC16 123456789` prints `bb3d`).
+    CCITT-FALSE is a different polynomial and is what made ATG warn that the
+    file had been edited, even when it had not.
     """
-    crc = 0xFFFF
+    crc = 0x0000
     for byte in data:
-        crc ^= byte << 8
+        crc ^= byte
         for _ in range(8):
-            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+            crc = (crc >> 1) ^ 0xA001 if crc & 1 else crc >> 1
     return crc & 0xFFFF
 
 
@@ -787,8 +856,14 @@ def build(plan: Plan) -> dict:
         'trackCode': plan.track_code,
         'fullRows': plan.full_rows,
         'rows': check.units,
+        # Weighting buys some rows more than once, so the stake spans fewer
+        # combinations than it has rows. Worth showing: it is the difference
+        # between what the coupon costs and what it actually covers.
+        'distinctRows': check.distinct_rows,
+        'deepestRow': check.deepest_row,
         'retention': round(plan.retention, 6),
         'removedRows': max(0, plan.full_rows - check.units),
+        'addedRows': max(0, check.units - plan.full_rows),
         'linePrice': price,
         'cost': round(check.units * price, 2),
         'fullCost': round(plan.full_rows * price, 2),

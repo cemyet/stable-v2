@@ -95,6 +95,14 @@
       --accent-reduce-bright: #ffe89a;
       --accent-reduce-deep: color-mix(in srgb, var(--accent-first) 85%, white);
       --accent-reduce-mute: #f2e6c2;
+
+      /* Levering a pick — reduce's mirror, so the same four roles in the
+         cyan the small pools already use. `bright` is the row fill, `mute`
+         the band between weight and coverage. */
+      --accent-lever: #2f96d8;
+      --accent-lever-bright: #bfe6ff;
+      --accent-lever-deep: #2478b0;
+      --accent-lever-mute: #cfe6f4;
     }
 
     html {
@@ -4260,8 +4268,9 @@
       background-color: var(--hover);
     }
 
-    /* Horse page — passport divider: darker bone, not black. */
-    .horse-passport {
+    /* Horse / track passport divider: darker bone, not black. */
+    .horse-passport,
+    .track-passport {
       border-bottom-color: #ddd8cc !important;
     }
     .source-chip {
@@ -4639,6 +4648,20 @@
         drop-shadow(0 0 22px rgba(253, 224, 90, 0.32))
         drop-shadow(0 0 40px rgba(255, 244, 160, 0.18));
     }
+    .coupon-sphere.is-levered:not(.is-incomplete) {
+      filter:
+        drop-shadow(0 0 8px rgba(79, 177, 238, 0.48))
+        drop-shadow(0 0 22px rgba(120, 200, 250, 0.32))
+        drop-shadow(0 0 40px rgba(180, 226, 255, 0.18));
+    }
+    /* Both at once: neither halo would be honest, so the sphere takes white
+       and lets the yellow and cyan pools inside say which is which. */
+    .coupon-sphere.is-mixed:not(.is-incomplete) {
+      filter:
+        drop-shadow(0 0 8px rgba(255, 255, 255, 0.62))
+        drop-shadow(0 0 22px rgba(255, 255, 255, 0.4))
+        drop-shadow(0 0 40px rgba(255, 255, 255, 0.22));
+    }
     .coupon-sphere .sphere-btn__label {
       flex-direction: column;
       display: flex;
@@ -4683,7 +4706,7 @@
     }
     .coupon-receipt {
       position: relative; z-index: 1;
-      width: 100%; max-width: 440px; max-height: calc(100vh - 80px);
+      width: 100%; max-width: 480px; max-height: calc(100vh - 80px);
       overflow-y: auto;
       background: var(--coupon-fill);
       color: var(--coupon-ink);
@@ -4749,6 +4772,7 @@
     }
     .coupon-receipt__details .total { font-weight: 700; color: var(--coupon-ink); }
     .coupon-receipt__reduced { color: var(--accent-reduce); font-weight: 600; }
+    .coupon-receipt__reduced.is-levered { color: var(--accent-lever); }
     .coupon-receipt__name {
       width: 100%; margin-top: 14px;
       font-family: inherit; font-size: 13px; color: var(--coupon-ink);
@@ -4777,6 +4801,9 @@
     }
     .coupon-btn--save:hover { background: #06a80b; }
     .coupon-btn--danger:hover { color: #b00010; background: none; }
+    .coupon-btn[disabled] { opacity: 0.35; cursor: default; }
+    .coupon-btn[disabled]:hover { background: none; }
+    .coupon-btn--save[disabled]:hover { background: #07bc0c; }
     /* The step past saving: on to the summary and the ATG handoff. Carries
        the reduce accent so it reads as the end of that flow. */
     .coupon-btn--continue {
@@ -4784,6 +4811,85 @@
       border-radius: 999px; font-weight: 600;
     }
     .coupon-btn--continue:hover { background: var(--accent-reduce-bright, #ffe89a); }
+
+    /* Result / simulate-on-the-kvitto */
+    table.coupon-receipt__table thead th {
+      text-align: left; font-weight: 700; font-size: 11px; letter-spacing: 0.4px;
+      color: var(--coupon-ink);
+      padding: 4px 6px 8px; border-bottom: 1px solid rgba(89, 89, 83, 0.28);
+    }
+    table.coupon-receipt__table thead th.coupon-receipt__winner { text-align: center; }
+    table.coupon-receipt__table td.coupon-receipt__leg {
+      width: 40px;
+    }
+    table.coupon-receipt__table td.coupon-receipt__leg span,
+    table.coupon-receipt__table .coupon-receipt__leg-no {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 4px;
+      background: var(--coupon-logo-fill); color: #fff;
+      font-size: 12px; font-weight: 700; border-radius: 2px;
+    }
+    table.coupon-receipt__table td.coupon-receipt__winner {
+      width: 52px; text-align: center; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .coupon-receipt__winner-in {
+      width: 2.4em; text-align: center;
+      font: inherit; font-weight: 700; font-variant-numeric: tabular-nums;
+      color: var(--coupon-ink); background: transparent;
+      border: none; outline: none; padding: 2px 0;
+      border-bottom: 1px solid transparent;
+    }
+    .coupon-receipt__winner-in:focus {
+      border-bottom-color: rgba(89, 89, 83, 0.35);
+    }
+    .coupon-receipt--sim .coupon-pick {
+      background: none; border: none; padding: 0; margin: 0;
+      font: inherit; color: inherit; cursor: pointer;
+      line-height: 1.25;
+      appearance: none; -webkit-appearance: none;
+      user-select: none;
+    }
+    .coupon-receipt--sim .coupon-pick--banker { cursor: pointer; }
+    .coupon-pick__num {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 1.35em; height: 1.35em; line-height: 1;
+    }
+    .coupon-pick__num.is-winner {
+      border-radius: 50%;
+      background: #3d9c36;
+      color: #fff;
+      font-weight: 700;
+    }
+    tr.coupon-receipt__summary td {
+      background: var(--coupon-logo-fill); color: #fff;
+      font-weight: 700; border-bottom: none; padding: 8px 6px;
+    }
+    tr.coupon-receipt__summary .coupon-receipt__leg-no { background: transparent; }
+    tr.coupon-receipt__summary.is-hidden { display: none; }
+    .coupon-receipt__payout { margin-top: 16px; }
+    .coupon-receipt__payout[hidden] { display: none; }
+    .coupon-receipt__payout-title {
+      font-weight: 700; font-size: 13px; margin-bottom: 6px;
+    }
+    .coupon-receipt__payout-est {
+      font-weight: 400; font-size: 11px; letter-spacing: 0.2px;
+      color: var(--coupon-ink); opacity: 0.7; margin-left: 6px;
+    }
+    .coupon-receipt__payout table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .coupon-receipt__payout td { padding: 2px 0; }
+    .coupon-receipt__payout-div { text-align: right; padding-left: 12px; white-space: nowrap; }
+    .coupon-receipt__payout-tag {
+      padding-left: 12px; white-space: nowrap; min-width: 4.5em;
+    }
+    .coupon-receipt__payout-tag.is-win { color: #3d9c36; font-weight: 700; }
+    .coupon-receipt__payout-sum {
+      margin-top: 8px; font-weight: 700; font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+    .coupon-receipt__payout-note {
+      margin-top: 8px; font-size: 11px; line-height: 1.5; opacity: 0.75;
+    }
   </style>
 </head>
 <body>
@@ -4916,13 +5022,42 @@
       return esc(t) + galMark;
     }
 
+    // ST/LeTrot pedigree strings mix ISO-2 (`(FR)`, `(US)`) and IOC-3
+    // (`(SWE)`, `(USA)`, `(ITY)`, `(GER)`). Sweden is the site default, so
+    // SE/SWE is always stripped rather than drawn as a flag.
+    const IOC_TO_ISO = {
+      SWE: 'SE', USA: 'US', ITY: 'IT', GER: 'DE', NOR: 'NO',
+      CAN: 'CA', HOL: 'NL', NED: 'NL', FRA: 'FR', DEN: 'DK',
+      DNK: 'DK', FIN: 'FI', BEL: 'BE', AUT: 'AT', SUI: 'CH',
+      CHE: 'CH', ESP: 'ES', GBR: 'GB', IRL: 'IE', AUS: 'AU',
+    };
+
+    function stripCountry(name) {
+      if (!name) return '';
+      return String(name)
+        .replace(/\*/g, '')
+        .replace(/\s*\([A-Za-z]{2,3}\)\s*$/g, '')
+        .trim();
+    }
+
+    function stripPedigreeName(name) {
+      return stripCountry(name).toLowerCase();
+    }
+
+    function normalizeNameCountry(name) {
+      if (!name) return '';
+      let display = String(name).replace(/\*/g, '');
+      display = display.replace(/\(([A-Za-z]{3})\)\s*$/g, (_, code) => {
+        const iso = IOC_TO_ISO[code.toUpperCase()];
+        return iso ? `(${iso})` : '';
+      });
+      return display.replace(/\s*\((?:SE|SWE)\)\s*$/i, '').trim();
+    }
+
     function flagify(name, large) {
       if (!name) return '';
       const cls = large ? 'flag flag-lg' : 'flag';
-      // Strip noise suffixes that are NOT real flags: (SE), (SWE) — SE is the
-      // default flag, so the suffix is just visual clutter. We render the raw
-      // text minus those tokens, then handle real (XX) codes inline.
-      let display = name.replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
+      let display = normalizeNameCountry(name);
       const hasCode = /\([A-Z]{2}\)/.test(display);
       let result = esc(display).replace(/\(([A-Z]{2})\)/g, (_, code) => {
         return `<img class="${cls}" src="https://flagcdn.com/${code.toLowerCase()}.svg" alt="${code}">`;
@@ -5310,24 +5445,24 @@ const BUBBLE_SYMBOL = {
 };
 
 const GAME_TYPES = [
-  { id: 'v64', label: 'V64', ariaLabel: 'V64', svg: V64_LOGO_SVG, plasma: 'orange', hybrid: 'orange', bubbleSymbol: BUBBLE_SYMBOL.wide },
-  { id: 'v85', label: 'V85', ariaLabel: 'V85', svg: V85_LOGO_SVG, plasma: 'blue', hybrid: 'blue', bubbleSymbol: BUBBLE_SYMBOL.wide },
-  { id: 'v86', label: 'V86', ariaLabel: 'V86', svg: V86_LOGO_SVG, plasma: 'purple', hybrid: 'purple', bubbleSymbol: BUBBLE_SYMBOL.wide },
-  { id: 'v4', label: 'V4', ariaLabel: 'V4', svg: V4_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan' },
-  { id: 'v5', label: 'V5', ariaLabel: 'V5', svg: V5_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan' },
-  { id: 'v3', label: 'V3', ariaLabel: 'V3', svg: V3_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan' },
-  { id: 'ld', label: 'LD', ariaLabel: 'Lunch Dubbel', svg: LD_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan' },
-  { id: 'dd', label: 'DD', ariaLabel: 'Dagens Dubbel', svg: DD_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan' },
-  { id: 'vinnare', label: 'Vinnare', ariaLabel: 'Vinnare', svg: VINNARE_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.vinnare },
-  { id: 'gs75', label: 'GS75', ariaLabel: 'Grand Slam 75', svg: GS75_LOGO_SVG, plasma: 'green', hybrid: 'green', bubbleSymbol: BUBBLE_SYMBOL.wider },
-  { id: 'v65', label: 'V65', ariaLabel: 'V65', svg: V65_LOGO_SVG, plasma: 'red', hybrid: 'red', bubbleSymbol: BUBBLE_SYMBOL.wide },
-  { id: 'plats', label: 'Plats', ariaLabel: 'Plats', svg: PLATS_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.widest },
-  { id: 'komb', label: 'Komb', ariaLabel: 'Komb', svg: KOMB_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.widest },
-  { id: 'tvilling', label: 'Tvilling', ariaLabel: 'Tvilling', svg: TVILLING_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.vinnare },
-  { id: 'vp', label: 'V&P', ariaLabel: 'Vinnare och Plats', svg: VP_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.wide },
-  { id: 'trio', label: 'Trio', ariaLabel: 'Trio', svg: TRIO_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.wider },
-  { id: 'h2h', label: 'H2H', ariaLabel: 'Head to Head', svg: H2H_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.wider },
-  { id: 'top7', label: 'Top 7', ariaLabel: 'Top 7', svg: TOP7_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', bubbleSymbol: BUBBLE_SYMBOL.widest },
+  { id: 'v64', label: 'V64', ariaLabel: 'V64', svg: V64_LOGO_SVG, plasma: 'orange', hybrid: 'orange', brand: '#f98314', bubbleSymbol: BUBBLE_SYMBOL.wide },
+  { id: 'v85', label: 'V85', ariaLabel: 'V85', svg: V85_LOGO_SVG, plasma: 'blue', hybrid: 'blue', brand: '#007aff', bubbleSymbol: BUBBLE_SYMBOL.wide },
+  { id: 'v86', label: 'V86', ariaLabel: 'V86', svg: V86_LOGO_SVG, plasma: 'purple', hybrid: 'purple', brand: '#802c7e', bubbleSymbol: BUBBLE_SYMBOL.wide },
+  { id: 'v4', label: 'V4', ariaLabel: 'V4', svg: V4_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee' },
+  { id: 'v5', label: 'V5', ariaLabel: 'V5', svg: V5_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee' },
+  { id: 'v3', label: 'V3', ariaLabel: 'V3', svg: V3_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee' },
+  { id: 'ld', label: 'LD', ariaLabel: 'Lunch Dubbel', svg: LD_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee' },
+  { id: 'dd', label: 'DD', ariaLabel: 'Dagens Dubbel', svg: DD_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee' },
+  { id: 'vinnare', label: 'Vinnare', ariaLabel: 'Vinnare', svg: VINNARE_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.vinnare },
+  { id: 'gs75', label: 'GS75', ariaLabel: 'Grand Slam 75', svg: GS75_LOGO_SVG, plasma: 'green', hybrid: 'green', brand: '#00815c', bubbleSymbol: BUBBLE_SYMBOL.wider },
+  { id: 'v65', label: 'V65', ariaLabel: 'V65', svg: V65_LOGO_SVG, plasma: 'red', hybrid: 'red', brand: '#d43140', bubbleSymbol: BUBBLE_SYMBOL.wide },
+  { id: 'plats', label: 'Plats', ariaLabel: 'Plats', svg: PLATS_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.widest },
+  { id: 'komb', label: 'Komb', ariaLabel: 'Komb', svg: KOMB_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.widest },
+  { id: 'tvilling', label: 'Tvilling', ariaLabel: 'Tvilling', svg: TVILLING_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.vinnare },
+  { id: 'vp', label: 'V&P', ariaLabel: 'Vinnare och Plats', svg: VP_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.wide },
+  { id: 'trio', label: 'Trio', ariaLabel: 'Trio', svg: TRIO_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.wider },
+  { id: 'h2h', label: 'H2H', ariaLabel: 'Head to Head', svg: H2H_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.wider },
+  { id: 'top7', label: 'Top 7', ariaLabel: 'Top 7', svg: TOP7_LOGO_SVG, plasma: 'cyan', hybrid: 'cyan', brand: '#4fb1ee', bubbleSymbol: BUBBLE_SYMBOL.widest },
 ];
 
 const HYBRID_PANEL_GAME_TYPE_IDS = ['v64', 'v85', 'v86', 'v4', 'gs75', 'v65'];
@@ -5335,6 +5470,10 @@ const SPHERE_DEMO_GAME_TYPE_IDS = ['v85', 'v86', 'v4', 'v5', 'gs75', 'v65', 'v3'
 
 function gameTypeById(id) {
   return GAME_TYPES.find(g => g.id === id);
+}
+
+function gameTypeBrand(id) {
+  return gameTypeById(id)?.brand || PLASMA_PALETTE.cyan?.brand || '#4fb1ee';
 }
 
 function svgPlasmaMaskUri(svg) {
@@ -6148,11 +6287,11 @@ function emptySphereBubblesRowHtml(count = 5) {
 }
 
 const PLASMA_PALETTE = {
-  orange: { hot: '249, 131, 20', deep: '249, 90, 0', glow: '255, 160, 50', shine: '255, 200, 100' },
-  blue: { hot: '0, 109, 182', deep: '0, 85, 150', glow: '40, 140, 210', shine: '100, 180, 230' },
-  purple: { hot: '128, 44, 126', deep: '105, 32, 103', glow: '160, 85, 158', shine: '185, 120, 183' },
-  cyan: { hot: '79, 177, 238', deep: '50, 150, 210', glow: '120, 200, 250', shine: '150, 210, 255' },
-  green: { hot: '0, 129, 92', deep: '0, 105, 75', glow: '40, 160, 120', shine: '80, 180, 150' },
+  orange: { hot: '249, 131, 20', deep: '249, 90, 0', glow: '255, 160, 50', shine: '255, 200, 100', brand: '#f98314' },
+  blue: { hot: '0, 109, 182', deep: '0, 85, 150', glow: '40, 140, 210', shine: '100, 180, 230', brand: '#007aff' },
+  purple: { hot: '128, 44, 126', deep: '105, 32, 103', glow: '160, 85, 158', shine: '185, 120, 183', brand: '#802c7e' },
+  cyan: { hot: '79, 177, 238', deep: '50, 150, 210', glow: '120, 200, 250', shine: '150, 210, 255', brand: '#4fb1ee' },
+  green: { hot: '0, 129, 92', deep: '0, 105, 75', glow: '40, 160, 120', shine: '80, 180, 150', brand: '#00815c' },
   /* Green's satellite pool — plays the role cyan plays for blue. */
   lime: { hot: '132, 216, 64', deep: '96, 184, 40', glow: '170, 232, 104', shine: '212, 248, 160' },
   /* Coupon sphere — bright yellow-green, no teal/blue cast. */
@@ -6160,7 +6299,7 @@ const PLASMA_PALETTE = {
   /* Reduced coupon sphere — warm yellow pools; optional third blob uses
      `gold` for a more vibrant accent. */
   yellow: { hot: '246, 200, 16', deep: '222, 166, 0', glow: '253, 224, 90', shine: '255, 244, 160' },
-  red: { hot: '212, 49, 64', deep: '180, 35, 50', glow: '230, 80, 95', shine: '240, 120, 130' },
+  red: { hot: '212, 49, 64', deep: '180, 35, 50', glow: '230, 80, 95', shine: '240, 120, 130', brand: '#d43140' },
   gold: { hot: '255, 214, 0', deep: '255, 168, 0', glow: '255, 232, 64', shine: '255, 250, 120' },
 };
 
@@ -6954,6 +7093,7 @@ window.SPHERE_BEHAVIOR_MAX_SATELLITES = SPHERE_BEHAVIOR_MAX_SATELLITES;
 window.SPHERE_BEHAVIOR_MAX_DEMO_IDS = sphereBehaviorMaxDemoIds('v85');
 window.GAME_TYPES = GAME_TYPES;
 window.gameTypeById = gameTypeById;
+window.gameTypeBrand = gameTypeBrand;
 window.gameTypeSymbolHtml = gameTypeSymbolHtml;
 window.gameTypeSymbolById = gameTypeSymbolById;
 window.hybridPanelRowHtml = hybridPanelRowHtml;
@@ -7002,14 +7142,14 @@ window.trackNameHtml = trackNameHtml;
     // there is no official per-coupon cost cap.
     // Mirrored server-side in web/app.py (_COUPON_GAME_RULES) — keep in sync.
     const COUPON_GAME_RULES = {
-      V86:  { legs: 8, linePrice: 0.25, maxSystems: 5000 },
-      V85:  { legs: 8, linePrice: 0.50, maxSystems: 5000 },
-      V75:  { legs: 7, linePrice: 0.50, maxSystems: 5000 },
-      GS75: { legs: 7, linePrice: 1.00, maxSystems: 5000 },
-      V64:  { legs: 6, linePrice: 1.00, maxSystems: 2000 },
-      V65:  { legs: 6, linePrice: 1.00, maxSystems: 2000 },
-      V5:   { legs: 5, linePrice: 1.00, maxSystems: 500  },
-      V4:   { legs: 4, linePrice: 2.00, maxSystems: 500  },
+      V86:  { legs: 8, linePrice: 0.25, maxSystems: 5000, payTiers: [5, 6, 7, 8] },
+      V85:  { legs: 8, linePrice: 0.50, maxSystems: 5000, payTiers: [5, 6, 7, 8] },
+      V75:  { legs: 7, linePrice: 0.50, maxSystems: 5000, payTiers: [5, 6, 7] },
+      GS75: { legs: 7, linePrice: 1.00, maxSystems: 5000, payTiers: [5, 6, 7] },
+      V64:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [4, 5, 6] },
+      V65:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [5, 6] },
+      V5:   { legs: 5, linePrice: 1.00, maxSystems: 500,  payTiers: [5] },
+      V4:   { legs: 4, linePrice: 2.00, maxSystems: 500,  payTiers: [4] },
     };
 
     const COUPON_DRAFT_KEY = 'couponDraft.v1';
@@ -7030,35 +7170,39 @@ window.trackNameHtml = trackNameHtml;
     }
 
     function couponHorseNameText(raw) {
-      if (!raw) return '';
-      let text = String(raw).replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
-      text = text.replace(/\s*\([A-Z]{2}\)\s*$/g, '').trim();
-      return text.toUpperCase();
+      return stripCountry(raw).toUpperCase();
     }
 
     function couponHorseFlag(raw) {
       if (!raw) return countryFlag('SE');
-      let display = String(raw).replace(/\*/g, '').replace(/\s*\((?:SE|SWE)\)\s*$/i, '');
-      const m = display.match(/\(([A-Z]{2})\)/);
+      const m = normalizeNameCountry(raw).match(/\(([A-Z]{2})\)/);
       return m ? countryFlag(m[1]) : countryFlag('SE');
     }
 
-    function formatCouponBankerPick(number, raw) {
-      const name = couponHorseNameText(raw);
-      if (!name) return `<span class="coupon-pick">${number}</span>`;
-      return `<span class="coupon-pick coupon-pick--banker">${number} ${esc(name)} ${couponHorseFlag(raw)}</span>`;
-    }
-
-    function formatCouponPicks(numbers, horseNames) {
+    function formatCouponPicks(numbers, horseNames, opts = {}) {
       if (!numbers.length) {
         return '<span class="coupon-pick coupon-pick--empty">–</span>';
       }
+      const interactive = !!opts.interactive;
+      const leg = opts.leg || 0;
+      const tag = interactive ? 'button' : 'span';
+      const attrs = n => interactive
+        ? ` type="button" data-pick data-leg="${leg}" data-number="${n}" aria-pressed="false"`
+        : '';
+
       if (numbers.length === 1) {
         const n = numbers[0];
         const raw = horseNames && (horseNames[n] ?? horseNames[String(n)]);
-        if (raw) return formatCouponBankerPick(n, raw);
+        if (raw) {
+          return `<${tag} class="coupon-pick coupon-pick--banker"${attrs(n)}>`
+            + `<span class="coupon-pick__num">${n}</span> `
+            + `${esc(couponHorseNameText(raw))} ${couponHorseFlag(raw)}`
+            + `</${tag}>`;
+        }
       }
-      return numbers.map(n => `<span class="coupon-pick">${n}</span>`).join('');
+      return numbers.map(n =>
+        `<${tag} class="coupon-pick"${attrs(n)}><span class="coupon-pick__num">${n}</span></${tag}>`
+      ).join('');
     }
 
     async function enrichCouponLegNames(legs) {
@@ -7119,27 +7263,32 @@ window.trackNameHtml = trackNameHtml;
          cut through the row list independently. */
       reduction(d) {
         const full = Coupon.lines(d);
-        const blank = { fullRows: full, rows: full, retention: 1, reduced: false };
+        const blank = { fullRows: full, rows: full, retention: 1,
+                        adjusted: false, reduced: false, levered: false };
         if (!d || !window.Reduced || !Reduced.isOn()) return blank;
         if (!Reduced.isReducible(d.gameType)) return blank;
         let retention = 1;
-        let reduced = false;
+        let adjusted = false;
         d.legs.forEach(l => {
           const picks = Coupon.picksFor(d, l.raceId);
           if (!picks.length) return;
           const weights = Reduced.normalize(
             picks, Reduced.weightsFor(l.raceId), Reduced.locksFor(l.raceId));
           const caps = Reduced.activeCapsFor(l.raceId);
-          if (!Reduced.isLegReduced(picks, weights, caps)) return;
-          reduced = true;
+          if (!Reduced.isLegAdjusted(picks, weights, caps)) return;
+          adjusted = true;
           retention *= Reduced.legRetention(picks, weights, caps);
         });
-        if (!reduced) return blank;
+        if (!adjusted) return blank;
+        // A leg reduced and another levered can cancel out; the coupon then
+        // costs what it always did and reads as neither.
         return {
           fullRows: full,
           rows: Math.max(1, Math.round(full * retention)),
           retention,
-          reduced: true,
+          adjusted: true,
+          reduced: retention < 1,
+          levered: retention > 1,
         };
       },
       isReduced(d) { return Coupon.reduction(d).reduced; },
@@ -7254,20 +7403,27 @@ window.trackNameHtml = trackNameHtml;
        is free — the coupon costs the same, the lines just sit on different
        horses.
 
-       Reducing throws lines away. A pick gets a `cap` below its weight and
-       the others do NOT absorb the difference, so the leg's coverage adds
-       up to less than 100. That missing slice is exactly the slice of the
-       system we no longer pay for:
+       Reducing and levering change how many lines there are. A pick gets a
+       `cap` — an override of its weight — and the others do NOT absorb the
+       difference. Below the weight the leg's coverage adds up to less than
+       100 and we stop paying for the missing slice; above it the coverage
+       adds up to more than 100 and we buy that pick a second pass over its
+       rows. The two are one operation read in opposite directions:
 
-         rho_leg = sum over picks of min(weight, cap) / 100      (0..1]
+         rho_leg = sum over picks of (cap or weight) / 100       (0..3]
          rows    = full rows * product of rho_leg over all legs
          cost    = rows * linePrice
 
+       Levering does not need distinct rows to land on: a row can carry
+       several stake units, which is what ATG's `betmultiplier` is for and
+       what the solver deals in. So rho_leg above 1 buys depth on the rows
+       that pick already sits on, strongest first.
+
        Because each row occupies one slot in *every* leg, the coverage in
-       every leg sums to the same row count — so the discount is a property
-       of the whole coupon, not of the leg it was dialled in. Each leg's
-       fills are drawn against its own rho_leg (what the user did there);
-       the coupon sphere carries the combined figure. */
+       every leg sums to the same row count — so the discount (or the
+       surcharge) is a property of the whole coupon, not of the leg it was
+       dialled in. Each leg's fills are drawn against its own rho_leg (what
+       the user did there); the coupon sphere carries the combined figure. */
 
     /* raceId -> ranked row keys (program numbers), strongest first. The
        game page writes it whenever rank mode commits an order; it survives
@@ -7301,8 +7457,14 @@ window.trackNameHtml = trackNameHtml;
     };
     window.RankOrders = RankOrders;
 
-    const REDUCED_KEY = 'stable-reduced-system.v1';
+    // v2: caps hold a multiple of the weight rather than a flat percentage.
+    const REDUCED_KEY = 'stable-reduced-system.v2';
     const REDUCED_MIN = 1;              // a pick never drops to a 0% share
+    /* ...and never climbs past twice the leg's whole. Coverage buys rows
+       linearly but buys *share* with diminishing returns — at 200 a pick in
+       a four-horse leg already owns 73% of the leg for 2.75x the money — so
+       there is nothing above this worth paying for. */
+    const REDUCED_MAX = 200;
 
     // ATG's reduction tool covers the multi-race pools only (V-pools plus
     // Dagens/Lunch Dubbel). Single-race pools — vinnare, plats, tvilling,
@@ -7316,6 +7478,7 @@ window.trackNameHtml = trackNameHtml;
 
     const Reduced = {
       MIN: REDUCED_MIN,
+      MAX: REDUCED_MAX,
       REDUCIBLE: REDUCIBLE_GAME_TYPES,
 
       isReducible(gameType) {
@@ -7405,10 +7568,14 @@ window.trackNameHtml = trackNameHtml;
             const num = Number(n);
             if (Number.isFinite(num) && Number(v) > 0) weights[num] = Number(v);
           });
+          // Saved coupons carry coverage as a percentage of the leg, against
+          // the weights saved beside it — enough to recover the ratio.
           const caps = {};
           Object.entries(leg.caps || {}).forEach(([n, v]) => {
             const num = Number(n);
-            if (Number.isFinite(num) && Number(v) > 0) caps[num] = Number(v);
+            const w = Number(weights[num]);
+            if (!Number.isFinite(num) || !(Number(v) > 0) || !(w > 0)) return;
+            caps[num] = Number(v) / w;
           });
           if (Object.keys(weights).length) d.weights[leg.raceId] = weights;
           if (Object.keys(caps).length) d.caps[leg.raceId] = caps;
@@ -7416,8 +7583,8 @@ window.trackNameHtml = trackNameHtml;
             window.RankOrders.set(leg.raceId, leg.rankOrder);
           }
         });
-        d.on = !!(saved && (saved.weighted || saved.reduced));
-        d.reduce = !!(saved && saved.reduced);
+        d.on = !!(saved && (saved.weighted || saved.reduced || saved.levered));
+        d.reduce = !!(saved && (saved.reduced || saved.levered));
         Reduced.store(d);
       },
 
@@ -7483,26 +7650,50 @@ window.trackNameHtml = trackNameHtml;
         return reducedScaleTo100(out, picks);
       },
 
-      /* ---- reducing ---- */
+      /* ---- reducing and levering ----
 
-      // Caps trimmed to the live picks and never above the pick's weight —
-      // a cap at (or over) the weight is just "not reduced".
-      cleanCaps(picks, weights, caps) {
+         An override is stored as a multiple of the pick's own weight: 0.5 is
+         "half this horse's rows", 2 is "twice them". The ratio rather than
+         the percentage, because it keeps the direction attached to the
+         override — re-weighting the leg afterwards moves the coverage with
+         the weight instead of quietly turning a reduction into a leverage
+         when the weight slides past the number parked next to it. */
+
+      // Stored ratios trimmed to the live picks. One sitting on 1 is neither
+      // a reduction nor a leverage, so it drops out.
+      pruneCaps(picks, caps) {
         const out = {};
         (picks || []).forEach(n => {
+          const r = Number((caps || {})[n]);
+          if (!Number.isFinite(r) || r <= 0) return;
+          if (Math.abs(r - 1) < 0.0005) return;
+          out[n] = Math.min(r, REDUCED_MAX);
+        });
+        return out;
+      },
+
+      /* The same overrides as percentages of the leg — what the fills, the
+         shares and the row count are all drawn against. Ratios in,
+         percentages out, so it is not idempotent: everything downstream
+         takes the stored ratios, never this. */
+      overrides(picks, weights, caps) {
+        const clean = Reduced.pruneCaps(picks, caps);
+        const out = {};
+        Object.keys(clean).forEach(key => {
+          const n = Number(key);
           const w = Number(weights[n]);
-          const c = Number((caps || {})[n]);
-          if (!Number.isFinite(w) || !Number.isFinite(c)) return;
-          if (c >= w - 0.05) return;
-          out[n] = Math.max(REDUCED_MIN, Math.min(c, w));
+          if (!Number.isFinite(w) || w <= 0) return;
+          const cov = Math.max(REDUCED_MIN, Math.min(w * clean[n], REDUCED_MAX));
+          if (Math.abs(cov - w) < 0.05) return;
+          out[n] = cov;
         });
         return out;
       },
 
       // What each pick actually covers, in percent of the leg's unreduced
-      // whole: its weight, or its cap when one is parked below it.
+      // whole: its weight, or the override parked away from it.
       coverage(picks, weights, caps) {
-        const clean = Reduced.cleanCaps(picks, weights, caps);
+        const clean = Reduced.overrides(picks, weights, caps);
         const out = {};
         (picks || []).forEach(n => {
           const w = Number(weights[n]) || 0;
@@ -7511,17 +7702,28 @@ window.trackNameHtml = trackNameHtml;
         return out;
       },
 
-      // Share of this leg's rows still being paid for (1 = nothing reduced).
+      // Rows this leg buys against its untouched size: 1 = nothing moved,
+      // below that it was reduced, above that levered.
       legRetention(picks, weights, caps) {
         if (!picks || !picks.length) return 1;
         const cov = Reduced.coverage(picks, weights, caps);
         const total = picks.reduce((s, n) => s + (cov[n] || 0), 0);
         if (!(total > 0)) return 1;
-        return Math.max(0, Math.min(1, total / 100));
+        return Math.max(0, total / 100);
       },
 
+      // Any override at all — the gate for folding this leg's rho into the
+      // coupon, whichever direction it points.
+      isLegAdjusted(picks, weights, caps) {
+        return Object.keys(Reduced.overrides(picks, weights, caps)).length > 0;
+      },
       isLegReduced(picks, weights, caps) {
-        return Object.keys(Reduced.cleanCaps(picks, weights, caps)).length > 0;
+        const clean = Reduced.overrides(picks, weights, caps);
+        return Object.keys(clean).some(n => clean[n] < (Number(weights[n]) || 0));
+      },
+      isLegLevered(picks, weights, caps) {
+        const clean = Reduced.overrides(picks, weights, caps);
+        return Object.keys(clean).some(n => clean[n] > (Number(weights[n]) || 0));
       },
 
       /* Reserves for one leg: the best-ranked horses the user left off the
@@ -7558,18 +7760,21 @@ window.trackNameHtml = trackNameHtml;
             picks,
             on ? Reduced.weightsFor(l.raceId) : {},
             on ? Reduced.locksFor(l.raceId) : []);
-          const caps = Reduced.cleanCaps(picks, weights, Reduced.activeCapsFor(l.raceId));
-          const coverage = Reduced.coverage(picks, weights, caps);
-          const retention = Reduced.legRetention(picks, weights, caps);
+          // The stored ratios are what every helper below reads; `caps` is
+          // the same thing as percentages, for the wire.
+          const stored = Reduced.activeCapsFor(l.raceId);
+          const coverage = Reduced.coverage(picks, weights, stored);
+          const retention = Reduced.legRetention(picks, weights, stored);
           return {
             leg: l.leg,
             raceId: l.raceId,
             picks,
             weights,
-            caps,
+            caps: Reduced.overrides(picks, weights, stored),
             coverage,
             retention,
-            reduced: Object.keys(caps).length > 0,
+            reduced: Reduced.isLegReduced(picks, weights, stored),
+            levered: Reduced.isLegLevered(picks, weights, stored),
             groups: reducedRankGroups(picks, coverage),
             reserves: Reduced.reservesFor(l.raceId, picks),
             rankOrder: (window.RankOrders && window.RankOrders.get(l.raceId)) || [],
@@ -7591,6 +7796,7 @@ window.trackNameHtml = trackNameHtml;
           retention,
           rows,
           removedRows: Math.max(0, fullRows - rows),
+          addedRows: Math.max(0, rows - fullRows),
         };
       },
     };
@@ -7634,6 +7840,10 @@ window.trackNameHtml = trackNameHtml;
                               + ' sphere-btn--dual-plasma';
     const COUPON_SPHERE_PLASMA_STYLE = dualPlasmaStyle(['bright', 'bright']);
     const COUPON_SPHERE_REDUCED_PLASMA_STYLE = dualPlasmaStyle(['yellow', 'yellow', 'gold']);
+    const COUPON_SPHERE_LEVERED_PLASMA_STYLE = dualPlasmaStyle(['cyan', 'cyan', 'blue']);
+    /* A system that reduces some legs and levers others is genuinely both, so
+       the sphere carries both pools rather than picking a side. */
+    const COUPON_SPHERE_MIXED_PLASMA_STYLE = dualPlasmaStyle(['yellow', 'cyan', 'gold']);
 
     function couponSphereInnerHtml(cost = '', meta = '') {
       return '<span class="sphere-btn__glint-orbit" aria-hidden="true">' +
@@ -7668,17 +7878,12 @@ window.trackNameHtml = trackNameHtml;
       el.setAttribute('aria-label', 'coupon');
       el.setAttribute('style', COUPON_SPHERE_PLASMA_STYLE);
       el.innerHTML = couponSphereInnerHtml();
+      // An unfinished coupon opens too. It cannot be saved or handed on, but
+      // the receipt is where clear lives, and being stuck with a half-built
+      // sphere until you go and empty it by hand is worse than the shake.
       el.addEventListener('click', () => {
         triggerSphereClickFlash(el);
-        const d = Coupon.load();
-        if (!d) return;
-        if (!Coupon.isComplete(d)) {
-          el.classList.remove('is-shake');
-          void el.offsetWidth;
-          el.classList.add('is-shake');
-          return;
-        }
-        Coupon.showOverlay();
+        if (Coupon.load()) Coupon.showOverlay();
       });
       document.body.appendChild(el);
       return el;
@@ -7712,22 +7917,33 @@ window.trackNameHtml = trackNameHtml;
       const red = Coupon.reduction(d);
       el.classList.remove('is-hidden');
       el.classList.toggle('is-incomplete', !complete);
-      // A reduced system swings the sphere from lime to yellow, and trades the
-      // game-type label for how much of the full system is left.
+      // A reduced system swings the sphere from lime to yellow and a levered
+      // one to cyan, and either trades the game-type label for how far the
+      // system has moved off its full size.
+      const mixed = red.reduced && red.levered;
       el.classList.toggle('is-reduced', red.reduced);
-      el.setAttribute('style', red.reduced
-        ? COUPON_SPHERE_REDUCED_PLASMA_STYLE
+      el.classList.toggle('is-levered', red.levered);
+      el.classList.toggle('is-mixed', mixed);
+      el.setAttribute('style', mixed ? COUPON_SPHERE_MIXED_PLASMA_STYLE
+        : red.reduced ? COUPON_SPHERE_REDUCED_PLASMA_STYLE
+        : red.levered ? COUPON_SPHERE_LEVERED_PLASMA_STYLE
         : COUPON_SPHERE_PLASMA_STYLE);
       el.querySelector('.coupon-sphere__cost').textContent = couponAmount(Coupon.cost(d));
-      const cut = Math.round((1 - red.retention) * 100);
+      const swing = Math.round((red.retention - 1) * 100);
+      const swingText = `${swing < 0 ? '−' : '+'}${Math.abs(swing)}%`;
+      const moved = red.reduced || red.levered;
       el.querySelector('.coupon-sphere__meta').textContent = !complete
         ? `${Coupon.filledLegs(d)}/${d.legs.length}`
-        : red.reduced ? `−${cut}%` : d.gameType.toLowerCase();
+        : moved ? swingText : d.gameType.toLowerCase();
+      const movedWord = mixed ? 'reduced and levered'
+        : red.reduced ? 'reduced' : 'levered';
       el.title = !complete
         ? `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`
-        : red.reduced
-          ? `${d.gameType} reduced — ${couponKr(Coupon.cost(d))}`
-            + ` · ${red.rows} of ${red.fullRows} rows (−${cut}%)`
+        : moved
+          ? `${d.gameType} ${movedWord} — ${couponKr(Coupon.cost(d))}`
+            + (swing < 0
+                ? ` · ${red.rows} of ${red.fullRows} rows (${swingText})`
+                : ` · ${red.rows} rows against a full ${red.fullRows} (${swingText})`)
             + ` · full system ${couponKr(Coupon.fullCost(d))}`
           : `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`;
       requestAnimationFrame(() => positionCouponSphere(el));
@@ -7738,7 +7954,278 @@ window.trackNameHtml = trackNameHtml;
       if (el && !el.classList.contains('is-hidden')) positionCouponSphere(el);
     });
 
-    /* ---- receipt overlay (draft: save/clear · view: read-only) ---- */
+    /* ---- result / simulate: click numbers on a finished coupon ---- */
+
+    function couponSolveBody(coupon, legs) {
+      const redLegs = ((coupon && coupon.reduction) || {}).legs || [];
+      const byRace = {};
+      redLegs.forEach(l => { byRace[l.raceId] = l; });
+      return {
+        gameId: coupon.gameId,
+        gameType: coupon.gameType,
+        gameDate: coupon.gameDate || '',
+        trackName: coupon.trackName || '',
+        legs: legs.map(l => {
+          const info = byRace[l.raceId] || {};
+          const picks = (l.numbers || []).slice();
+          const raw = info.coverage || {};
+          const coverage = {};
+          picks.forEach(n => {
+            const v = raw[n] != null ? raw[n] : raw[String(n)];
+            coverage[n] = v != null ? Number(v) : (100 / Math.max(1, picks.length));
+          });
+          return {
+            leg: l.leg,
+            raceId: l.raceId,
+            picks,
+            coverage,
+            reserves: info.reserves || [],
+          };
+        }),
+      };
+    }
+
+    function couponFlatBoxes(legs) {
+      return [{
+        legs: legs.map(l => ({ leg: l.leg, numbers: (l.numbers || []).slice() })),
+        multiplier: 1,
+      }];
+    }
+
+    function couponStakeHits(boxes, winners) {
+      if (!boxes || !boxes.length) return [];
+      const nLegs = boxes[0].legs.length;
+      const total = Array(nLegs + 1).fill(0);
+      boxes.forEach(box => {
+        let poly = [1];
+        box.legs.forEach(leg => {
+          const w = winners[leg.leg];
+          const nums = (leg.numbers || []).map(Number);
+          const has = (w != null && nums.includes(Number(w))) ? 1 : 0;
+          const miss = nums.length - has;
+          const next = Array(poly.length + 1).fill(0);
+          poly.forEach((c, k) => {
+            next[k] += c * miss;
+            next[k + 1] += c * has;
+          });
+          poly = next;
+        });
+        const m = box.multiplier || 1;
+        poly.forEach((c, k) => { total[k] += c * m; });
+      });
+      return total;
+    }
+
+    function couponCrowdProfile(probs) {
+      let poly = [1];
+      probs.forEach(pi => {
+        const p = Math.min(0.999, Math.max(0.001, pi));
+        const next = Array(poly.length + 1).fill(0);
+        poly.forEach((c, k) => {
+          next[k] += c * (1 - p);
+          next[k + 1] += c * p;
+        });
+        poly = next;
+      });
+      return poly;
+    }
+
+    function couponImpliedWinner(picks, marketLeg) {
+      if (!marketLeg) return null;
+      const picked = new Set(picks);
+      const live = (marketLeg.starts || []).filter(s => !s.scratched);
+      const rest = live.filter(s => !picked.has(s.number));
+      const pool = rest.length ? rest : live;
+      let best = null;
+      pool.forEach(s => {
+        if (!best || (s.pct || 0) > (best.pct || 0)) best = s;
+      });
+      return best ? best.number : null;
+    }
+
+    function couponWinnerProb(picks, winner, marketLeg) {
+      let w = winner;
+      if (w == null) w = couponImpliedWinner(picks, marketLeg);
+      const start = marketLeg && (marketLeg.starts || []).find(s => s.number === Number(w));
+      return Math.max((start && start.pct) || 0.1, 0.1) / 100;
+    }
+
+    function couponOfficialLine(market) {
+      if (!market || !market.legs || !market.legs.length) return null;
+      const winners = {};
+      for (const leg of market.legs) {
+        if (leg.winner == null) return null;
+        winners[leg.leg] = leg.winner;
+      }
+      return winners;
+    }
+
+    function couponSameWinners(a, b) {
+      if (!a || !b) return false;
+      const keys = Object.keys(b);
+      return keys.length > 0 && keys.every(k => Number(a[k]) === Number(b[k]));
+    }
+
+    function couponDividends(state) {
+      const market = state.market;
+      const tiers = (market && market.payTiers && market.payTiers.length)
+        ? market.payTiers
+        : (state.payTiers || []);
+      const official = couponOfficialLine(market);
+      if (official && couponSameWinners(state.winners, official) && market.resultPayouts) {
+        const div = {};
+        tiers.forEach(t => { div[t] = Number(market.resultPayouts[t] || market.resultPayouts[String(t)] || 0); });
+        return { div, estimated: false, tiers };
+      }
+      if (!market || !market.turnover) return { div: {}, estimated: true, tiers };
+
+      const byLeg = {};
+      (market.legs || []).forEach(l => { byLeg[l.leg] = l; });
+      const probs = state.legs.map(l =>
+        couponWinnerProb(l.numbers, state.winners[l.leg], byLeg[l.leg]));
+      const profile = couponCrowdProfile(probs);
+      const units = market.turnover / (state.linePrice || 1);
+      const div = {};
+      tiers.forEach(t => {
+        const pot = Number((market.tierPools && (market.tierPools[t] || market.tierPools[String(t)])) || 0);
+        div[t] = pot / Math.max(profile[t] * units, 1);
+      });
+      return { div, estimated: true, tiers };
+    }
+
+    function couponPayoutHtml(state) {
+      const marked = state.legs.filter(l => state.winners[l.leg] != null).length;
+      if (!marked) return '';
+      if (!state.boxes.length) {
+        return '<div class="coupon-receipt__payout-title">Vinstberäkning</div>'
+          + '<div class="coupon-receipt__payout-est">räknar…</div>';
+      }
+      const hits = couponStakeHits(state.boxes, state.winners);
+      const { div, estimated, tiers } = couponDividends(state);
+      const nLegs = state.legs.length;
+      const top = tiers.length ? tiers[tiers.length - 1] : nLegs;
+      let sum = 0;
+      const rows = tiers.slice().reverse().map(t => {
+        const units = hits[t] || 0;
+        const payout = div[t];
+        const hasDiv = Number.isFinite(payout);
+        if (hasDiv) sum += units * payout;
+        const unitLabel = `${t} rätt: ${Math.round(units)} ×`;
+        const divLabel = hasDiv
+          ? `${Math.round(payout).toLocaleString('sv-SE')}\u00a0kr`
+          : '–';
+        let tag = '';
+        let tagCls = '';
+        if (units > 0) { tag = 'Vinst!'; tagCls = ' is-win'; }
+        else if (t === top) { tag = 'Jackpot'; }
+        return `<tr>
+          <td>${unitLabel}</td>
+          <td class="coupon-receipt__payout-div">${divLabel}</td>
+          <td class="coupon-receipt__payout-tag${tagCls}">${tag}</td>
+        </tr>`;
+      }).join('');
+
+      const allMarked = marked === nLegs;
+      const allOnCoupon = allMarked && state.legs.every(
+        l => l.numbers.map(Number).includes(Number(state.winners[l.leg])));
+      const dropped = allOnCoupon && (hits[nLegs] || 0) < 0.5;
+      // Every horse is on the coupon and the row still is not: the weights
+      // did not stretch to this particular combination of them. Say which
+      // part is missing, or it reads as a bug in the system builder.
+      const note = dropped
+        ? '<div class="coupon-receipt__payout-note">alla hästarna är med, '
+          + 'men just den här kombinationen ryms inte i viktningen</div>'
+        : '';
+      const est = estimated
+        ? '<span class="coupon-receipt__payout-est">uppskattad</span>'
+        : '';
+      const sumHtml = Object.keys(div).length
+        ? `<div class="coupon-receipt__payout-sum">Summa: ${couponAmount(sum)}\u00a0kr</div>`
+        : '';
+      return `
+        <div class="coupon-receipt__payout-title">Vinstberäkning${est}</div>
+        <table><tbody>${rows}</tbody></table>
+        ${sumHtml}
+        ${note}`;
+    }
+
+    function paintCouponSim(ov, state) {
+      ov.querySelectorAll('[data-pick]').forEach(el => {
+        const on = Number(state.winners[el.dataset.leg]) === Number(el.dataset.number);
+        const badge = el.querySelector('.coupon-pick__num') || el;
+        badge.classList.toggle('is-winner', on);
+        el.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      ov.querySelectorAll('[data-winner-leg]').forEach(input => {
+        const w = state.winners[Number(input.dataset.winnerLeg)];
+        const next = w == null ? '' : String(w);
+        if (document.activeElement !== input && input.value !== next) input.value = next;
+      });
+      const nHit = state.legs.filter(
+        l => l.numbers.map(Number).includes(Number(state.winners[l.leg]))).length;
+      const nMarked = state.legs.filter(l => state.winners[l.leg] != null).length;
+      const summary = ov.querySelector('tr.coupon-receipt__summary');
+      if (summary) {
+        summary.classList.toggle('is-hidden', nMarked === 0);
+        const cell = summary.querySelector('.coupon-receipt__summary-cell');
+        if (cell) cell.textContent = `${nHit} rätt`;
+      }
+      const payout = ov.querySelector('.coupon-receipt__payout');
+      if (payout) {
+        const html = couponPayoutHtml(state);
+        payout.innerHTML = html;
+        payout.hidden = !html;
+      }
+    }
+
+    function bindCouponSim(ov, state) {
+      ov.querySelectorAll('[data-pick]').forEach(el => {
+        el.addEventListener('click', ev => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const leg = Number(el.dataset.leg);
+          const n = Number(el.dataset.number);
+          state.winners[leg] = state.winners[leg] === n ? null : n;
+          paintCouponSim(ov, state);
+        });
+      });
+      ov.querySelectorAll('[data-winner-leg]').forEach(input => {
+        const apply = () => {
+          const leg = Number(input.dataset.winnerLeg);
+          const raw = String(input.value || '').trim();
+          const n = parseInt(raw, 10);
+          state.winners[leg] = (Number.isInteger(n) && n >= 1 && n <= 20) ? n : null;
+          paintCouponSim(ov, state);
+        };
+        input.addEventListener('change', apply);
+        input.addEventListener('keydown', e => {
+          if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        });
+      });
+    }
+
+    async function loadCouponSim(ov, state, coupon) {
+      const [solved, market] = await Promise.all([
+        fetch('/api/reduced/solve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(couponSolveBody(coupon, state.legs)),
+        }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/atg/game/${encodeURIComponent(coupon.gameId)}/pool`)
+          .then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      if (!ov.isConnected) return;
+      state.boxes = (solved && solved.coupons) ? solved.coupons : couponFlatBoxes(state.legs);
+      state.market = market;
+      if (market && !Object.values(state.winners).some(v => v != null)) {
+        (market.legs || []).forEach(l => {
+          if (l.winner != null) state.winners[l.leg] = l.winner;
+        });
+      }
+      paintCouponSim(ov, state);
+    }
+
+    /* ---- receipt overlay (draft: save/clear · view: read-only + simulate) ---- */
 
     function closeCouponOverlay() {
       const ov = document.getElementById('couponOverlay');
@@ -7777,35 +8264,58 @@ window.trackNameHtml = trackNameHtml;
       const counts = legs.map(l => Math.max(1, l.numbers.length));
       const lines = counts.reduce((a, b) => a * b, 1);
       const linePrice = view ? view.linePrice : rule.linePrice;
-      // A reduced coupon pays for fewer rows than the full system spans.
-      // Saved ones carry the system they were built with; drafts read it
-      // straight off the live reduced state.
+      // A reduced coupon pays for fewer rows than the full system spans, a
+      // levered one for more. Saved coupons carry the system they were built
+      // with; drafts read it straight off the live reduced state.
       const saved = view && view.reduction;
       const red = view
-        ? (saved && saved.reduced
-            ? { reduced: true, retention: saved.retention, rows: view.numLines }
+        ? (saved && (saved.reduced || saved.levered)
+            ? { reduced: !!saved.reduced, levered: !!saved.levered,
+                retention: saved.retention, rows: view.numLines }
             : null)
         : Coupon.reduction(d);
-      const rows = red && red.reduced ? red.rows : (view ? view.numLines : lines);
+      const moved = !!(red && (red.reduced || red.levered));
+      const rows = moved ? red.rows : (view ? view.numLines : lines);
       const cost = view ? view.cost : rows * linePrice;
       const complete = view ? true : Coupon.isComplete(d);
+      const sim = !!view;
       const reducible = window.Reduced && Reduced.isReducible(gameType);
 
       const symbol = typeof gameTypeSymbolById === 'function'
         ? gameTypeSymbolById(gameType.toLowerCase(), { size: 'panel' })
         : `<span>${esc(gameType)}</span>`;
 
+      const headHtml = sim ? `<thead><tr>
+          <th class="coupon-receipt__leg">AVD</th>
+          <th>Hästar</th>
+          <th class="coupon-receipt__winner">Vinnare</th>
+        </tr></thead>` : '';
+
       const rowsHtml = legs.map(l => {
-        const nums = formatCouponPicks(l.numbers, l.horseNames);
-        // Back to the leg on the game page, where the picks were made.
-        const href = l.raceId
+        const nums = formatCouponPicks(l.numbers, l.horseNames, {
+          interactive: sim, leg: l.leg,
+        });
+        const href = (!sim && l.raceId)
           ? ` data-leg-href="/game/${encodeURIComponent(gameId)}?race=${encodeURIComponent(l.raceId)}"`
           : '';
+        const winnerCell = sim
+          ? `<td class="coupon-receipt__winner">
+               <input class="coupon-receipt__winner-in" data-winner-leg="${l.leg}"
+                      inputmode="numeric" maxlength="2" autocomplete="off"
+                      aria-label="vinnare avd ${l.leg}">
+             </td>`
+          : '';
         return `<tr${href}>
-          <td class="coupon-receipt__leg">${l.leg}</td>
+          <td class="coupon-receipt__leg"><span class="coupon-receipt__leg-no">${l.leg}</span></td>
           <td><div class="coupon-receipt__nums">${nums}</div></td>
+          ${winnerCell}
         </tr>`;
       }).join('');
+
+      const summaryHtml = sim ? `<tr class="coupon-receipt__summary is-hidden">
+          <td class="coupon-receipt__leg"><span class="coupon-receipt__leg-no">=</span></td>
+          <td colspan="2" class="coupon-receipt__summary-cell"></td>
+        </tr>` : '';
 
       const dateLabel = [trackName, gameDate].filter(Boolean).join(' · ');
       const defaultName = view ? (view.name || '') :
@@ -7814,9 +8324,11 @@ window.trackNameHtml = trackNameHtml;
       const detailsHtml = `
         <div class="coupon-receipt__details">
           <div>${counts.join(' × ')} = ${lines.toLocaleString('sv-SE')} lines</div>
-          ${red && red.reduced ? `<div class="coupon-receipt__reduced">reduced to
+          ${moved ? `<div class="coupon-receipt__reduced${red.levered ? ' is-levered' : ''}">${
+            red.levered ? 'levered' : 'reduced'} to
             ${rows.toLocaleString('sv-SE')} rows
-            (−${Math.round((1 - red.retention) * 100)}%)</div>` : ''}
+            (${red.retention < 1 ? '−' : '+'}${
+              Math.abs(Math.round((red.retention - 1) * 100))}%)</div>` : ''}
           <div>${rows.toLocaleString('sv-SE')} × ${couponKr(linePrice)} = ${couponKr(rows * linePrice)}</div>
           <div class="total">total: ${couponKr(cost)}</div>
           ${view && view.status ? `<div>status: ${esc(view.status)}${view.payout != null ? ` · payout: ${couponKr(view.payout)}` : ''}</div>` : ''}
@@ -7843,7 +8355,8 @@ window.trackNameHtml = trackNameHtml;
              <button type="button" class="coupon-btn coupon-btn--danger" data-coupon-clear>clear</button>
              <button type="button" class="coupon-btn" data-coupon-close>close</button>
              ${window.BUILDER_ONLY ? '' : `
-             <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save>save</button>`}
+             <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save
+                     ${complete ? '' : 'disabled title="every leg needs a horse first"'}>save</button>`}
              ${continueHtml}
            </div>`;
 
@@ -7852,7 +8365,7 @@ window.trackNameHtml = trackNameHtml;
       ov.className = 'coupon-overlay';
       ov.innerHTML = `
         <div class="coupon-overlay__backdrop" data-coupon-close></div>
-        <div class="coupon-receipt" role="dialog" aria-label="${esc(gameType)} coupon">
+        <div class="coupon-receipt${sim ? ' coupon-receipt--sim' : ''}" role="dialog" aria-label="${esc(gameType)} coupon">
           <div class="coupon-receipt__head">
             <div>
               <div class="coupon-receipt__game">${symbol}</div>
@@ -7863,8 +8376,10 @@ window.trackNameHtml = trackNameHtml;
             </div>
           </div>
           <table class="coupon-receipt__table">
-            <tbody>${rowsHtml}</tbody>
+            ${headHtml}
+            <tbody>${rowsHtml}${summaryHtml}</tbody>
           </table>
+          <div class="coupon-receipt__payout" hidden></div>
           ${detailsHtml}
           ${actionsHtml}
         </div>`;
@@ -7878,6 +8393,24 @@ window.trackNameHtml = trackNameHtml;
         tr.addEventListener('click', () => {
           window.location.href = tr.dataset.legHref;
         }));
+
+      if (sim) {
+        const simCoupon = view || {
+          gameId, gameType, gameDate, trackName,
+          selections: legs,
+          reduction: window.Reduced ? Reduced.plan(d) : null,
+        };
+        const state = {
+          legs,
+          boxes: [],
+          winners: {},
+          market: null,
+          payTiers: rule.payTiers || [],
+          linePrice,
+        };
+        bindCouponSim(ov, state);
+        loadCouponSim(ov, state, simCoupon);
+      }
 
       const clearBtn = ov.querySelector('[data-coupon-clear]');
       if (clearBtn) clearBtn.addEventListener('click', () => {

@@ -89,6 +89,9 @@
         <div class="fld"><label>gal% <span class="val" id="vGal"></span></label><div id="sGal"></div></div>
         <div class="fld"><label>length (m) <span class="val" id="vLen"></span></label><div id="sLen"></div></div>
         <div class="fld"><label>avg winner odds <span class="val" id="vOdds"></span></label><div id="sOdds"></div></div>
+        <div class="fld"><label>fav win% <span class="val" id="vFav"></span></label><div id="sFav"></div></div>
+        <div class="fld"><label>med odds <span class="val" id="vMedOdds"></span></label><div id="sMedOdds"></div></div>
+        <div class="fld"><label>upset% <span class="val" id="vUpset"></span></label><div id="sUpset"></div></div>
       </div>
       <div class="filters__actions">
         <button class="btn" id="applyBtn">apply</button>
@@ -112,6 +115,9 @@
           <th>gal% (a)</th>
           <th>gal% (v)</th>
           <th data-sort="avg_winner_odds">avg odds</th>
+          <th data-sort="median_winner_odds">med odds</th>
+          <th data-sort="fav_win_rate">fav win%</th>
+          <th data-sort="upset_rate">upset%</th>
           <th>top post</th>
           <th>top post (rel)</th>
         </tr>
@@ -149,10 +155,9 @@
     const res = await fetch(`/api/stats/track-posts?track_id=${vizTrack}&method=${method}&metric=${metric}`);
     const data = await res.json();
     const posts = data.posts;
-    // Scale: each post's bar goes to 100% at the global max for that position.
+    const scale = data.global_max || 1;
     barsEl.innerHTML = posts.map(p => {
       const has = p.value != null;
-      const scale = p.max || 1;
       const w = has ? Math.min((p.value / scale) * 100, 100) : 0;
       const avgPos = p.avg != null ? Math.min((p.avg / scale) * 100, 100) : null;
       const col = barColor(p.value, p.avg, metric);
@@ -187,6 +192,9 @@
     gal:   S.makeSlider(document.getElementById('sGal'),   { min: 0, max: 50, dual: true, valEl: vGal, fmt: v => v + '%' }),
     len:   S.makeSlider(document.getElementById('sLen'),   { min: 600, max: 1200, step: 10, dual: true, valEl: vLen }),
     odds:  S.makeSlider(document.getElementById('sOdds'),  { min: 0, max: 20, step: 0.5, dual: true, valEl: vOdds }),
+    fav:     S.makeSlider(document.getElementById('sFav'),     { min: 0, max: 60, dual: true, valEl: vFav, fmt: v => v + '%' }),
+    medodds: S.makeSlider(document.getElementById('sMedOdds'), { min: 0, max: 10, step: 0.1, dual: true, valEl: vMedOdds }),
+    upset:   S.makeSlider(document.getElementById('sUpset'),   { min: 0, max: 40, dual: true, valEl: vUpset, fmt: v => v + '%' }),
   };
 
   const state = { sort: 'races', dir: 'desc', applied: false };
@@ -198,6 +206,9 @@
     S.addBounds(p, 'galrate', sl.gal.bounds());
     S.addBounds(p, 'length', sl.len.bounds());
     S.addBounds(p, 'odds', sl.odds.bounds());
+    S.addBounds(p, 'fav', sl.fav.bounds());
+    S.addBounds(p, 'medodds', sl.medodds.bounds());
+    S.addBounds(p, 'upset', sl.upset.bounds());
     return p;
   }
 
@@ -218,6 +229,9 @@
       <td class="muted">${S.pct(r.galrate_auto)}</td>
       <td class="muted">${S.pct(r.galrate_volt)}</td>
       <td>${r.avg_winner_odds != null ? r.avg_winner_odds.toFixed(1) : '–'}</td>
+      <td>${r.median_winner_odds != null ? r.median_winner_odds.toFixed(2) : '–'}</td>
+      <td>${S.pct(r.fav_win_rate)}</td>
+      <td>${S.pct(r.upset_rate)}</td>
       <td>${r.top_post != null ? r.top_post : '–'}</td>
       <td>${r.top_post_rel != null ? r.top_post_rel : '–'}</td>
     </tr>`;

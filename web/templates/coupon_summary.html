@@ -6,9 +6,8 @@ Summary of a finished weighted / reduced coupon, and the handoff to ATG.
 The system itself lives in the browser: the coupon draft plus the weights,
 caps and rank order the game page stored. This page reads them, asks
 /api/reduced/solve to turn the per-horse coverage into mathematical
-sub-coupons, and offers three ways out — the ATG file (exact), typing the
-sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
-(one coupon, approximate).
+sub-coupons, and hands the result over as an ATG file — the only route that
+plays the system exactly as it was built, so it is the only one offered.
 #}
 
 {% block title %}summary - {{ game_type_label }} - stable{% endblock %}
@@ -16,27 +15,47 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
 {% block extra_style %}
   .sum-wrap { width: 100%; max-width: 900px; margin: 0 auto; }
 
+  /* Header follows the game page: the pool as a small label over the track
+     as the title. Rules on this page are the app's white hairlines — the
+     near-black --border belongs to form controls, not to page furniture. */
   .sum-head {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    gap: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 20px; padding-bottom: 18px;
+    border-bottom: 1px solid var(--list-line, #ffffff);
   }
-  .sum-head__symbol .game-type-symbol svg { height: 38px; width: auto; }
+  .sum-head__pool {
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    text-transform: lowercase; color: var(--fg-muted);
+  }
+  .sum-head__title {
+    margin: 4px 0 0; font-size: 30px; line-height: 1.1;
+    letter-spacing: 0.25px; color: var(--fg-heading);
+  }
   .sum-head__where {
-    margin-top: 10px; font-size: 12px; color: var(--fg-muted);
-    letter-spacing: 0.5px;
+    margin-top: 8px; font-size: 12px; color: var(--fg-muted);
+    letter-spacing: 0.5px; font-variant-numeric: tabular-nums;
   }
   .sum-head__figures { text-align: right; font-variant-numeric: tabular-nums; }
-  .sum-head__cost { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .sum-head__cost {
+    font-size: 26px; font-weight: 700; line-height: 1.1;
+    color: var(--fg-heading);
+  }
   .sum-head__rows { font-size: 11px; color: var(--fg-muted); margin-top: 6px; }
-  .sum-head__saved {
+  .sum-head__spread {
+    font-size: 11px; color: var(--fg-muted); margin-top: 2px;
+    border-bottom: 1px dotted var(--fg-muted); display: inline-block;
+    cursor: help;
+  }
+  .sum-head__swing {
     font-size: 11px; font-weight: 600; margin-top: 4px;
     color: var(--accent-reduce, #d29b00);
   }
+  .sum-head__swing.is-lev { color: var(--accent-lever, #2f96d8); }
 
-  .sum-section { margin-top: 26px; }
+  .sum-section { margin-top: 30px; }
   .sum-section__title {
-    font-size: 11px; letter-spacing: 0.5px; font-weight: 600;
-    color: var(--fg-muted); margin-bottom: 10px;
+    font-size: 11px; letter-spacing: 0; font-weight: 600;
+    text-transform: lowercase; color: var(--fg-muted); margin-bottom: 10px;
   }
 
   .sum-note {
@@ -46,7 +65,7 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
   .sum-note a { color: inherit; }
 
   .sum-warn {
-    margin-top: 16px; padding: 10px 14px; border-radius: 8px;
+    margin-top: 16px; padding: 10px 14px;
     border: 1px solid #b00010; color: #b00010; font-size: 11.5px;
     line-height: 1.7;
   }
@@ -54,87 +73,69 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
   table.sum-legs { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.sum-legs th {
     text-align: left; font-weight: 400; color: var(--fg-muted);
-    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    padding: 6px 8px; border-bottom: 1px solid var(--list-line, #ffffff);
     letter-spacing: 0.5px; white-space: nowrap;
   }
   table.sum-legs td {
-    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    padding: 6px 8px; border-bottom: 1px solid var(--list-line, #ffffff);
     white-space: nowrap;
   }
   table.sum-legs td.num, table.sum-legs th.num {
     text-align: right; font-variant-numeric: tabular-nums;
   }
-  table.sum-legs tr.sum-leg-first td { border-top: 1px solid var(--border); }
+  table.sum-legs tr.sum-leg-first td {
+    border-top: 1px solid var(--list-line, #ffffff);
+  }
   table.sum-legs td.sum-legno {
     font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
     vertical-align: top;
   }
   table.sum-legs td.muted { color: var(--fg-muted); }
   .sum-name { text-transform: uppercase; letter-spacing: 0.3px; }
-  .sum-letter {
+  .sum-mark {
     display: inline-block; min-width: 15px; text-align: center;
     font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
     color: var(--fg-muted);
   }
   .sum-cut { color: var(--accent-reduce, #d29b00); font-weight: 600; }
+  .sum-lev { color: var(--accent-lever, #2f96d8); font-weight: 600; }
   .sum-reserve td { color: var(--fg-muted); font-style: italic; }
   .sum-reserve .sum-name { font-style: normal; }
   /* Rounding pushes a horse a fraction off what was drawn; show it rather
      than let it pass silently. */
   .sum-drift { color: #b00010; }
 
-  .sum-boxes {
-    font-size: 12px; font-variant-numeric: tabular-nums;
-    max-height: 340px; overflow-y: auto;
-    border: 1px solid var(--border); border-radius: 8px;
+  /* Square, transparent, pearl double edge — the app's panel, same as the
+     cards on home and the stats shells. */
+  .sum-file { padding: 18px 20px; }
+  .sum-file__title {
+    font-size: 13px; font-weight: 600; letter-spacing: 0;
+    text-transform: lowercase; color: var(--fg-muted);
   }
-  .sum-box {
-    display: flex; gap: 10px; align-items: baseline;
-    padding: 5px 12px; border-bottom: 1px solid var(--border);
+  .sum-file__row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 14px;
   }
-  .sum-box:last-child { border-bottom: none; }
-  .sum-box__no { color: var(--fg-muted); min-width: 38px; }
-  .sum-box__legs { flex: 1; letter-spacing: 0.3px; }
-  .sum-box__legs b { font-weight: 600; }
-  .sum-box__mult {
-    color: var(--accent-reduce, #d29b00); font-weight: 700; min-width: 26px;
-    text-align: right;
-  }
-  .sum-box__rows { color: var(--fg-muted); min-width: 60px; text-align: right; }
+  .sum-file__note { margin-top: 12px; }
 
-  .sum-actions { display: grid; gap: 14px; margin-top: 8px; }
-  .sum-action {
-    border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
-  }
-  .sum-action--primary { border-color: var(--accent-reduce, #d29b00); }
-  .sum-action__title {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.3px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .sum-action__body { margin-top: 8px; }
-  .sum-action ol { margin: 8px 0 0; padding-left: 20px; }
-  .sum-action li { margin-bottom: 4px; }
-
+  /* Ghost button, app pattern: square with the pearl ring, black on hover.
+     The primary fills instead of tinting — the accents are the system's
+     colours and mean reduced / levered, not "press me". */
   .sum-btn {
-    font-family: inherit; font-size: 11px; letter-spacing: 1.5px;
-    text-transform: lowercase; padding: 9px 20px; cursor: pointer;
-    border: 1px solid var(--border); background: none; color: inherit;
-    border-radius: 999px; text-decoration: none; display: inline-block;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font-family: inherit; font-size: 12px; letter-spacing: 0.5px;
+    text-transform: lowercase; padding: 8px 20px; cursor: pointer;
+    border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.92));
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92);
+    border-radius: 0; background: none; color: var(--fg);
+    text-decoration: none; display: inline-block;
+    transition: background 0.15s, color 0.15s;
   }
-  .sum-btn:hover { background: var(--hover); }
+  .sum-btn:hover { color: var(--accent-glow, #000); }
   .sum-btn--primary {
-    background: var(--accent-reduce, #d29b00); border-color: transparent;
-    color: #1a1400; font-weight: 600;
+    background: var(--fg-heading); color: var(--bg); font-weight: 600;
   }
-  .sum-btn--primary:hover { background: var(--accent-reduce-bright, #ffe89a); }
+  .sum-btn--primary:hover { background: var(--fg); color: var(--bg); }
   .sum-btn[disabled] { opacity: 0.4; cursor: default; }
-
-  .sum-back {
-    display: inline-block; margin-bottom: 18px; font-size: 11px;
-    letter-spacing: 0.5px; color: var(--fg-muted); text-decoration: none;
-  }
-  .sum-back:hover { color: inherit; }
 
   .sum-empty {
     margin-top: 40px; text-align: center; font-size: 12.5px;
@@ -143,8 +144,8 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
 {% endblock %}
 
 {% block content %}
+  <a class="page-back" href="/game/{{ game_id }}" aria-label="Back"></a>
   <div class="sum-wrap">
-    <a class="sum-back" href="/game/{{ game_id }}">← back to {{ game_type_label }}</a>
     <div id="sumMount"></div>
     <div class="sum-empty" id="sumEmpty">reading your coupon…</div>
   </div>
@@ -216,28 +217,39 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
   /* ── rendering ───────────────────────────────────────────────────────── */
 
   function headHtml(solved) {
-    const symbol = typeof gameTypeSymbolById === 'function'
-      ? gameTypeSymbolById(GAME_TYPE.toLowerCase(), { size: 'panel' })
-      : `<span>${esc(GAME_TYPE)}</span>`;
-    const where = [TRACK_NAME, GAME_DATE].filter(Boolean).join(' · ');
     const off = solved.fullRows - solved.rows;
+    // Weighting buys favourites' rows more than once, so the stake spans
+    // fewer combinations than it has rows. Say so — otherwise a row that is
+    // simply not on the coupon looks like a bug in the row count.
+    const stacked = solved.distinctRows && solved.distinctRows < solved.rows;
+    // A reduced system saves against the full coupon, a levered one costs
+    // more than it. Both are worth stating, in the colour of the direction.
+    const swing = off === 0 ? '' : off > 0
+      ? `<div class="sum-head__swing">−${nf(off)} rows
+           · ${couponKr(solved.fullCost - solved.cost)} saved</div>`
+      : `<div class="sum-head__swing is-lev">+${nf(-off)} rows
+           · ${couponKr(solved.cost - solved.fullCost)} over a full system</div>`;
     return `
       <div class="sum-head">
         <div>
-          <div class="sum-head__symbol">${symbol}</div>
-          <div class="sum-head__where">${esc(where)}</div>
+          <div class="sum-head__pool">${esc(GAME_TYPE.toLowerCase())} summary</div>
+          <h1 class="sum-head__title">${esc(TRACK_NAME || GAME_TYPE)}</h1>
+          <div class="sum-head__where">${esc(GAME_DATE || '')}</div>
         </div>
         <div class="sum-head__figures">
           <div class="sum-head__cost">${couponKr(solved.cost)}</div>
           <div class="sum-head__rows">${nf(solved.rows)} rows
             in ${nf(solved.couponCount)} coupon${solved.couponCount === 1 ? '' : 's'}</div>
-          ${off > 0 ? `<div class="sum-head__saved">−${nf(off)} rows
-            · ${couponKr(solved.fullCost - solved.cost)} saved</div>` : ''}
+          ${stacked ? `<div class="sum-head__spread" title="A weighted coupon
+            stakes its favourites' rows more than once; the deepest row here
+            carries ${nf(solved.deepestRow)}.">over ${nf(solved.distinctRows)}
+            different combinations</div>` : ''}
+          ${swing}
         </div>
       </div>`;
   }
 
-  function legsHtml(solved, details, recipeByLeg, capsByRace) {
+  function legsHtml(solved, details, movedByRace) {
     // Rounding to whole rows cannot land closer than one row, so only call it
     // drift when a horse is further off its weight than that.
     const grain = Math.max(0.5, 100 / Math.max(1, solved.rows));
@@ -245,8 +257,7 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
 
     solved.legs.forEach((leg) => {
       const names = (details[leg.raceId] || {}).names || {};
-      const letters = recipeByLeg[leg.leg] || {};
-      const caps = capsByRace[leg.raceId] || {};
+      const moved = movedByRace[leg.raceId] || {};
 
       leg.picks.forEach((n, j) => {
         const horse = leg.horses[String(n)] || {};
@@ -258,11 +269,11 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
         rows.push(`
           <tr class="${j === 0 ? 'sum-leg-first' : ''}">
             <td class="sum-legno">${j === 0 ? leg.leg : ''}</td>
-            <td><span class="sum-letter">${esc(letters[n] || '')}</span></td>
+            <td></td>
             <td class="num">${n}</td>
             <td class="sum-name">${esc(names[n] || '')}</td>
             <td class="num">${pct(wanted)}</td>
-            <td class="num${caps[n] != null ? ' sum-cut' : ' muted'}">${
+            <td class="num${moved[n] ? ' ' + moved[n] : ' muted'}">${
               pct(leg.coverage[String(n)] ?? 0)}</td>
             <td class="num${Math.abs(built - wanted) > grain ? ' sum-drift' : ' muted'}">${pct(built)}</td>
             <td class="num muted">${nf(horse.actual ?? 0)}</td>
@@ -273,20 +284,12 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
         rows.push(`
           <tr class="sum-reserve">
             <td></td>
-            <td><span class="sum-letter">r${j + 1}</span></td>
+            <td><span class="sum-mark">r${j + 1}</span></td>
             <td class="num">${n}</td>
             <td class="sum-name">${esc(names[n] || '')}</td>
             <td class="num" colspan="4">reserve</td>
           </tr>`);
       });
-
-      if (!(leg.reserves || []).length) {
-        rows.push(`
-          <tr class="sum-reserve">
-            <td></td><td colspan="7">no reserves — rank this leg on the game
-              page and the two best unpicked horses become r1 / r2</td>
-          </tr>`);
-      }
     });
 
     return `
@@ -302,110 +305,24 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
       </table>`;
   }
 
-  function boxesHtml(solved) {
-    const items = solved.coupons.map((c, i) => `
-      <div class="sum-box">
-        <span class="sum-box__no">${i + 1}</span>
-        <span class="sum-box__legs">${c.legs.map(l =>
-          `<b>${l.numbers.join(',')}</b>`).join(' — ')}</span>
-        <span class="sum-box__mult">${c.multiplier > 1 ? '×' + c.multiplier : ''}</span>
-        <span class="sum-box__rows">${nf(c.units)} rows</span>
-      </div>`).join('');
-    return `<div class="sum-boxes">${items}</div>`;
-  }
-
-  function recipeHtml(recipe, solved) {
-    if (!recipe || !recipe.letters.length) return '';
-    const groups = recipe.letters.map(l => {
-      const byLetter = {};
-      l.horses.forEach(h => {
-        (byLetter[h.letter] = byLetter[h.letter] || []).push(h.number);
-      });
-      const parts = Object.entries(byLetter)
-        .map(([letter, nums]) => `${letter}: ${nums.join(', ')}`).join(' · ');
-      return `<div>leg ${l.leg} — ${esc(parts)}</div>`;
-    }).join('');
-
-    const conds = recipe.conditions.length
-      ? recipe.conditions.map(c => c.min > 0
-          ? `at least ${c.min} ${c.letter}-winner${c.min === 1 ? '' : 's'}`
-          : `at most ${c.max} ${c.letter}-winner${c.max === 1 ? '' : 's'}`).join(', ')
-      : 'no conditions come close — the file is the only faithful route here';
-
-    const diff = recipe.rows - solved.rows;
+  // The file is the only handoff that plays the system exactly as built, so
+  // it is the only one here: a button and the page it goes to.
+  function fileHtml(solved) {
     return `
-      <div class="sum-note" style="margin-bottom:10px">
-        rank the horses like this on ATG's page:
-      </div>
-      <div class="sum-note">${groups}</div>
-      <div class="sum-note" style="margin-top:10px">
-        then set <b>${esc(conds)}</b> — ${nf(recipe.rows)} rows,
-        ${diff === 0 ? 'the same as' : (diff > 0 ? `${nf(diff)} more than` : `${nf(-diff)} fewer than`)}
-        your system.
-        ${recipe.points ? `Or use points, 1 for A up to 4 for D, capped at
-          ${recipe.points.max} — ${nf(recipe.points.rows)} rows.` : ''}
-      </div>`;
-  }
-
-  function actionsHtml(solved) {
-    const tooMany = solved.couponCount > 200;
-    return `
-      <div class="sum-actions">
-        <div class="sum-action sum-action--primary">
-          <div class="sum-action__title">download the ATG file</div>
-          <div class="sum-action__body sum-note">
-            Your system exactly as built — every coupon, every reserve.
-            <ol>
-              <li>download the file below</li>
-              <li>open <a href="${esc(UPLOAD_URL)}" target="_blank"
-                  rel="noopener">atg.se/spel/reducerat</a> and choose
-                  filinlämning</li>
-              <li>upload it and check the total before paying</li>
-            </ol>
-            The four characters before <code>.xml</code> are a checksum ATG
-            uses to spot an edited file, so keep the name as it downloads.
-          </div>
-          <div style="margin-top:14px">
-            <button type="button" class="sum-btn sum-btn--primary"
-                    data-download>download ${esc(GAME_TYPE)} file</button>
-          </div>
+      <div class="sum-file glass-panel">
+        <div class="sum-file__title">${nf(solved.couponCount)}
+          coupon${solved.couponCount === 1 ? '' : 's'},
+          ${nf(solved.rows)} rows, reserves included</div>
+        <div class="sum-file__row">
+          <button type="button" class="sum-btn sum-btn--primary"
+                  data-download>download ${esc(GAME_TYPE)} file</button>
+          <a class="sum-btn" href="${esc(UPLOAD_URL)}" target="_blank"
+             rel="noopener">atg filinlämning</a>
         </div>
-
-        <div class="sum-action">
-          <div class="sum-action__title">enter the coupons by hand</div>
-          <div class="sum-action__body sum-note">
-            The same ${nf(solved.couponCount)} coupons, typed in one by one.
-            ${tooMany ? 'At this many that is a long evening — the file is the sane route.' : ''}
-            A coupon marked ×2 is played twice, which is how a horse gets more
-            than its even share of the rows.
-          </div>
-          <div style="margin-top:12px">${boxesHtml(solved)}</div>
+        <div class="sum-file__note sum-note">
+          keep the filename — the four characters before
+          <code>.xml</code> are ATG's checksum
         </div>
-
-        <div class="sum-action">
-          <div class="sum-action__title">use ATG's own reduction</div>
-          <div class="sum-action__body">
-            <div class="sum-note" style="margin-bottom:10px">
-              One coupon instead of ${nf(solved.couponCount)}, but ATG's
-              conditions work on whole rows, not on individual horses — this
-              lands near the same size and shape, not on the same system.
-            </div>
-            ${recipeHtml(solved.recipe, solved)}
-            <div style="margin-top:14px">
-              <a class="sum-btn" href="${esc(UPLOAD_URL)}" target="_blank"
-                 rel="noopener">open ATG reducerat</a>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  function reserveNote() {
-    return `
-      <div class="sum-note" style="margin-top:14px">
-        Reserves are set per leg in the file, so pick “egna reserver” on ATG
-        rather than “topprankad” — otherwise ATG replaces a scratched horse by
-        betting percentage instead of by your ranking.
       </div>`;
   }
 
@@ -442,15 +359,18 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
       return;
     }
 
-    const recipeByLeg = {};
-    (solved.recipe?.letters || []).forEach(l => {
-      recipeByLeg[l.leg] = {};
-      l.horses.forEach(h => { recipeByLeg[l.leg][h.number] = h.letter; });
+    // Which picks were actually moved off their weight, and which way — only
+    // the builder knows, the solver sees a coverage and cannot tell an
+    // override from a low or high weight.
+    const movedByRace = {};
+    plan.legs.forEach(l => {
+      const out = {};
+      Object.entries(l.caps || {}).forEach(([n, v]) => {
+        const w = Number((l.weights || {})[n]);
+        if (w > 0) out[n] = Number(v) < w ? 'sum-cut' : 'sum-lev';
+      });
+      movedByRace[l.raceId] = out;
     });
-    // Which picks were actually capped — only the builder knows, the solver
-    // sees a coverage and cannot tell a cap from a low weight.
-    const capsByRace = {};
-    plan.legs.forEach(l => { capsByRace[l.raceId] = l.caps || {}; });
 
     empty.textContent = '';
     mount.innerHTML = `
@@ -459,12 +379,10 @@ sub-coupons in by hand (exact, tedious), and ATG's own reduction conditions
         solved.warnings.slice(0, 6).map(esc).join('<br>')}</div>` : ''}
       <div class="sum-section">
         <div class="sum-section__title">your system</div>
-        ${legsHtml(solved, details, recipeByLeg, capsByRace)}
-        ${reserveNote()}
+        ${legsHtml(solved, details, movedByRace)}
       </div>
       <div class="sum-section">
-        <div class="sum-section__title">play it</div>
-        ${actionsHtml(solved)}
+        ${fileHtml(solved)}
       </div>`;
 
     const dl = mount.querySelector('[data-download]');

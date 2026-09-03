@@ -695,7 +695,8 @@ CREATE UNIQUE INDEX ON person_career_stats (role, person_id);
 
 -- =====================================================================
 -- TRACK_STATS — per-track aggregates for the track pages (galopp rates by
--- start method, win/field stats). Avoids scanning a track's entire entry
+-- start method, favorite-win rate, median winner odds, upset rate).
+-- Avoids scanning a track's entire entry
 -- slice (Solvalla alone is ~300k rows) on every page load. The `started`
 -- predicate is the same NOT-withdrawn / NOT-qualifier filter used by
 -- person_career_stats, so counts are consistent across the app.
@@ -703,24 +704,69 @@ CREATE UNIQUE INDEX ON person_career_stats (role, person_id);
 -- =====================================================================
 DROP MATERIALIZED VIEW IF EXISTS track_stats CASCADE;
 CREATE MATERIALIZED VIEW track_stats AS
-SELECT r.track_id,
-       COUNT(DISTINCT e.race_id)                                 AS races,
-       MIN(r.race_date)                                          AS first_date,
-       MAX(r.race_date)                                          AS last_date,
-       COUNT(*) FILTER (WHERE q.started)                         AS starts,
-       COUNT(*) FILTER (WHERE q.started AND e.galopp)            AS gals,
-       COUNT(*) FILTER (WHERE q.started AND e.auto)              AS starts_auto,
-       COUNT(*) FILTER (WHERE q.started AND e.auto AND e.galopp) AS gals_auto,
-       COUNT(*) FILTER (WHERE q.started AND e.auto = false)              AS starts_volt,
-       COUNT(*) FILTER (WHERE q.started AND e.auto = false AND e.galopp) AS gals_volt
-FROM race r
-JOIN entry e ON e.race_id = r.race_id
-CROSS JOIN LATERAL (SELECT (
-        NOT e.withdrawn
-        AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
-    ) AS started) q
-WHERE r.track_id IS NOT NULL
-GROUP BY r.track_id;
+WITH started AS (
+    SELECT r.track_id, r.race_id, r.race_date,
+           e.galopp, e.auto, e.odds, e.placement_text, e.disqualified,
+           (
+               NOT e.withdrawn
+               AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+           ) AS started
+    FROM race r
+    JOIN entry e ON e.race_id = r.race_id
+    WHERE r.track_id IS NOT NULL
+),
+per_track AS (
+    SELECT track_id,
+           COUNT(DISTINCT race_id)                                          AS races,
+           MIN(race_date)                                                   AS first_date,
+           MAX(race_date)                                                   AS last_date,
+           COUNT(*) FILTER (WHERE started)                                  AS starts,
+           COUNT(*) FILTER (WHERE started AND galopp)                       AS gals,
+           COUNT(*) FILTER (WHERE started AND auto)                         AS starts_auto,
+           COUNT(*) FILTER (WHERE started AND auto AND galopp)              AS gals_auto,
+           COUNT(*) FILTER (WHERE started AND auto = false)                 AS starts_volt,
+           COUNT(*) FILTER (WHERE started AND auto = false AND galopp)      AS gals_volt
+    FROM started
+    GROUP BY track_id
+),
+-- Favorite = lowest odds among starters with odds > 0. A race is a fav
+-- win when the official winner carried that same price (co-favorites
+-- both count if either wins).
+per_race_fav AS (
+    SELECT track_id, race_id,
+           MIN(odds) FILTER (WHERE started AND odds > 0) AS fav_odds,
+           MIN(odds) FILTER (
+               WHERE placement_text = '1'
+                 AND NOT COALESCE(disqualified, false)
+                 AND odds > 0
+           ) AS winner_odds
+    FROM started
+    GROUP BY track_id, race_id
+),
+fav AS (
+    SELECT track_id,
+           COUNT(*) FILTER (WHERE fav_odds IS NOT NULL) AS fav_races,
+           COUNT(*) FILTER (WHERE fav_odds IS NOT NULL AND winner_odds = fav_odds) AS fav_wins
+    FROM per_race_fav
+    GROUP BY track_id
+)
+SELECT p.track_id, p.races, p.first_date, p.last_date,
+       p.starts, p.gals, p.starts_auto, p.gals_auto, p.starts_volt, p.gals_volt,
+       f.fav_races, f.fav_wins,
+       wo.median_winner_odds, wo.upset_races, wo.odds_races
+FROM per_track p
+LEFT JOIN fav f ON f.track_id = p.track_id
+LEFT JOIN (
+    SELECT track_id,
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY odds) AS median_winner_odds,
+           COUNT(*) FILTER (WHERE odds >= 10) AS upset_races,
+           COUNT(*) AS odds_races
+    FROM started
+    WHERE placement_text = '1'
+      AND NOT COALESCE(disqualified, false)
+      AND odds > 0
+    GROUP BY track_id
+) wo ON wo.track_id = p.track_id;
 
 CREATE UNIQUE INDEX ON track_stats (track_id);
 
@@ -1306,15 +1352,22 @@ CREATE INDEX ON person_stats (role, prize DESC);
 CREATE INDEX ON person_stats (role, starts DESC);
 CREATE INDEX ON person_stats (role, wins DESC);
 
--- ===== track_post_stats — per (track, method, post) aggregates ==============
--- Powers the track browse + post-position visualisation. Tiny (≈ tracks×2×15),
--- so method totals / top-post / cross-track relative rank are all derived in
--- the query layer from this one MV.
+-- ===== track_post_stats — per (track, method, post, breed, dist) aggregates ===
+-- Powers the track browse + post-position visualisation. Tiny
+-- (≈ tracks×2×15×2×3), so method totals / top-post / cross-track relative rank
+-- are all derived in the query layer from this one MV.
 DROP MATERIALIZED VIEW IF EXISTS track_post_stats CASCADE;
 CREATE MATERIALIZED VIEW track_post_stats AS
 SELECT r.track_id,
        e.auto,
        e.program_number AS post,
+       COALESCE(h.breed_code, 'V') AS breed_code,
+       CASE
+         WHEN COALESCE(e.distance, r.distance) IS NULL THEN 'medium'
+         WHEN COALESCE(e.distance, r.distance) <= 1700 THEN 'short'
+         WHEN COALESCE(e.distance, r.distance) <= 2250 THEN 'medium'
+         ELSE 'long'
+       END AS dist_band,
        COUNT(*) FILTER (WHERE q.started)                                         AS starts,
        COUNT(*) FILTER (WHERE e.placement_text = '1' AND NOT COALESCE(e.disqualified,false)) AS wins,
        COUNT(*) FILTER (WHERE e.placement_text IN ('1','2','3') AND NOT COALESCE(e.disqualified,false)) AS placed,
@@ -1323,6 +1376,7 @@ SELECT r.track_id,
        COUNT(*)    FILTER (WHERE e.placement_text = '1' AND NOT COALESCE(e.disqualified,false) AND e.odds > 0) AS winner_cnt
 FROM race r
 JOIN entry e ON e.race_id = r.race_id
+LEFT JOIN horse h ON h.horse_id = e.horse_id
 CROSS JOIN LATERAL (SELECT (
         NOT e.withdrawn
         AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
@@ -1330,14 +1384,16 @@ CROSS JOIN LATERAL (SELECT (
 WHERE r.track_id IS NOT NULL
   AND e.auto IS NOT NULL
   AND e.program_number BETWEEN 1 AND 15
-GROUP BY r.track_id, e.auto, e.program_number;
+GROUP BY r.track_id, e.auto, e.program_number, COALESCE(h.breed_code, 'V'),
+         CASE
+           WHEN COALESCE(e.distance, r.distance) IS NULL THEN 'medium'
+           WHEN COALESCE(e.distance, r.distance) <= 1700 THEN 'short'
+           WHEN COALESCE(e.distance, r.distance) <= 2250 THEN 'medium'
+           ELSE 'long'
+         END;
 
--- (track_id, auto, post) is the natural key (see GROUP BY + the NOT NULL /
--- BETWEEN guards above) and all three are non-null, so a UNIQUE index is valid.
--- It is REQUIRED for REFRESH MATERIALIZED VIEW CONCURRENTLY, and its leading
--- track_id column still serves the track-browse filter (no separate index
--- needed).
-CREATE UNIQUE INDEX ON track_post_stats (track_id, auto, post);
+-- Natural key. REQUIRED for REFRESH MATERIALIZED VIEW CONCURRENTLY.
+CREATE UNIQUE INDEX ON track_post_stats (track_id, auto, post, breed_code, dist_band);
 """
 
 

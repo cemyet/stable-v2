@@ -118,8 +118,16 @@ DEFAULT_USER_AGENT = (
 # ---------------------------------------------------------------------------
 
 ST_HORSE_URL = "https://sportapp.travsport.se/sportinfo/horse/ts{horse_id}/basic"
+
+# Host note (2026-08): `api.travsport.se` stopped serving `/webapi/*` — its
+# router now answers a plain-text Go "404 page not found" for every path,
+# including the root. The same routes live on `sportapp.travsport.se/webapi`,
+# which is what the React app itself calls. That host is gated by a
+# proof-of-work bot check, so every request needs the clearance cookie from
+# `scrapers.st_clearance` (see that module for the why).
+ST_WEBAPI_HOST = "https://sportapp.travsport.se"
 ST_RACE_API_BASE = (
-    "https://api.travsport.se/webapi/raceinfo/results"
+    ST_WEBAPI_HOST + "/webapi/raceinfo/results"
     "/organisation/TROT/sourceofdata/SPORT/racedayid/{race_day_id}"
 )
 
@@ -128,7 +136,7 @@ ST_RACE_API_BASE = (
 # rest from these api.travsport.se endpoints (discovered from the app JS).
 # Keys mirror v1's parse_horse_page data_type names so etl.import_st can reuse
 # the v1 field map. `{horse_id}` is the TravSport horse id (== our st_id).
-ST_API_BASE = "https://api.travsport.se/webapi"
+ST_API_BASE = ST_WEBAPI_HOST + "/webapi"
 ST_HORSE_API_ENDPOINTS = {
     "horse-basic-information": "horses/basicinformation/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
     "race-results":           "horses/results/organisation/TROT/sourceofdata/SPORT/horseid/{horse_id}",
@@ -146,12 +154,26 @@ ST_HEADERS = {
 
 ST_RACE_HEADERS = {
     "User-Agent": DEFAULT_USER_AGENT,
-    "Accept": "application/json",
+    # Bare `application/json` is enough to be served, but the bot check
+    # answers a bare header set with 403, so mirror what the React app sends.
+    "Accept": "application/json, text/plain, */*",
     "Accept-Language": "sv-SE,sv;q=0.9,en;q=0.8",
+    "Referer": ST_WEBAPI_HOST + "/sportinfo",
+    "Origin": ST_WEBAPI_HOST,
 }
 
 ST_RACE_CONCURRENCY = 15
 ST_RACE_BATCH_SIZE = 100
+
+# Clearance cookie for the bot-protected /webapi host. Minted by a real
+# browser (scrapers.st_clearance) and cached here so a nightly run solves the
+# challenge once instead of per request. The check binds the cookie to the
+# user agent, so the cache stores both.
+ST_CLEARANCE_CACHE = Path(__file__).resolve().parent.parent / "logs" / "st_clearance.json"
+ST_CLEARANCE_TTL_S = int(os.environ.get("ST_CLEARANCE_TTL_S", "1800"))
+# Browser used to solve the challenge. "chrome" drives the installed Google
+# Chrome, so we don't carry a separate Playwright browser download.
+ST_CLEARANCE_BROWSER_CHANNEL = os.environ.get("ST_CLEARANCE_BROWSER_CHANNEL", "chrome")
 
 # ---------------------------------------------------------------------------
 # ATG ("atg")
@@ -161,6 +183,15 @@ ATG_BASE = "https://www.atg.se/services/racinginfo/v1/api"
 ATG_CALENDAR_URL = ATG_BASE + "/calendar/day/{date}"
 ATG_RACE_URL = ATG_BASE + "/races/{atg_race_id}"
 ATG_GAME_URL = ATG_BASE + "/games/{atg_game_id}"
+
+# Pre-race tipster comments, one per starter ("Snabb ut och höjer sig barfota.
+# Räknas."). These live on a different host than the racing-info API and are the
+# only free source of the full text — travrondenspel.se paywalls its equivalent
+# down to a ~150-char teaser.
+ATG_TIPS_COMMENTS_URL = (
+    "https://horse-betting-info.prod.c1.atg.cloud"
+    "/api-public/v0/races/{atg_race_id}/tips-comments"
+)
 
 ATG_HEADERS = {
     "User-Agent": DEFAULT_USER_AGENT,

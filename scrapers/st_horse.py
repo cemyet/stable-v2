@@ -27,6 +27,7 @@ from psycopg2.extras import Json
 
 from core import config
 from core.db import buffer_insert
+from scrapers import st_clearance
 
 log = logging.getLogger(__name__)
 
@@ -41,8 +42,14 @@ _PRIMARY = "horse-basic-information"
 
 def make_client() -> httpx.Client:
     limits = httpx.Limits(max_keepalive_connections=0)
+    clearance = st_clearance.get()
+    headers = dict(config.ST_RACE_HEADERS)
+    # The bot check binds its cookie to the user agent that solved the
+    # challenge, so send the browser's UA rather than our configured default.
+    headers["User-Agent"] = clearance.user_agent
     return httpx.Client(
-        headers=config.ST_RACE_HEADERS,  # Accept: application/json
+        headers=headers,
+        cookies=clearance.cookies,
         follow_redirects=True,
         timeout=httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=10.0),
         limits=limits,
@@ -54,6 +61,46 @@ class _HardTimeout(Exception):
 
 
 _HARD_TIMEOUT_S = 45  # must exceed httpx read timeout (30s) + SSL overhead
+
+# Fingerprints of the bot check answering instead of the API. Without this the
+# HTML interstitial parses as "200 but no JSON", which every caller files as an
+# empty passport — a total outage that looks like missing upstream data.
+_CHALLENGE_MARKERS = (
+    "pow-challenge",
+    "botprotection-resources",
+    "Threat Protection",
+)
+
+# Status we report for a request the bot check refused to let through. Not a
+# real upstream answer, so it must never be cached as "this horse is gone".
+BLOCKED_STATUS = 403
+
+
+def _is_bot_challenge(r: httpx.Response) -> bool:
+    """True when the bot check answered instead of the API.
+
+    Arrives either as a 403 block page or as an HTTP 200 "Verifying..."
+    interstitial where JSON was expected. Both are HTML.
+    """
+    if "json" in (r.headers.get("content-type") or "").lower():
+        return False
+    if r.status_code not in (200, BLOCKED_STATUS):
+        return False
+    head = r.text[:2000]
+    return any(m in head for m in _CHALLENGE_MARKERS)
+
+
+def _refresh_clearance(client: httpx.Client) -> bool:
+    """Re-solve the challenge and update `client`'s cookie + UA in place."""
+    try:
+        clearance = st_clearance.get(force_refresh=True)
+    except st_clearance.ClearanceError as exc:
+        log.warning("st clearance refresh failed: %r", exc)
+        return False
+    client.headers["User-Agent"] = clearance.user_agent
+    for name, value in clearance.cookies.items():
+        client.cookies.set(name, value)
+    return True
 
 
 def _get_json(client: httpx.Client, url: str, *, retries: int | None = None
@@ -99,6 +146,13 @@ def _get_json(client: httpx.Client, url: str, *, retries: int | None = None
             signal.signal(signal.SIGALRM, prev_handler)
 
         status = r.status_code
+        if _is_bot_challenge(r):
+            # Cookie expired (or never worked): solve the challenge again and
+            # retry with the fresh one before treating this as a failure.
+            if attempt < retries and _refresh_clearance(client):
+                continue
+            log.warning("st %s -> bot challenge, no usable clearance", url)
+            return BLOCKED_STATUS, None
         if status == 429 and attempt < retries:
             time.sleep(config.RETRY_BACKOFF ** (attempt + 2))
             continue

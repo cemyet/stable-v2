@@ -177,11 +177,6 @@
   const S = STAT;
   S.bindPanel(document.getElementById('filters'));
 
-  function stripCountry(name) {
-    if (!name) return '';
-    return name.replace(/\*/g, '').replace(/\s*\([A-Z]{2}\)/, '');
-  }
-
   const segBreed    = S.seg(document.getElementById('segBreed'));
   const segStatus   = S.seg(document.getElementById('segStatus'));
   const segBreeding = S.seg(document.getElementById('segBreeding'));
