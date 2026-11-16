@@ -151,9 +151,12 @@ _BUILDER_ENDPOINTS = frozenset({
     # What those pages fetch.
     'home_upcoming',        # /play — which tracks race on a given day
     'atg_game_panels',      # game page — the legs of a game
+    'atg_game_agent',       # game page — the coupon agent's coupon
     'race_detail_by_atg',   # start list rows
     'race_live_by_atg',     # live odds and scratchings
     'horse_races',          # expanded history + the GPS column
+    'horse_ratings',        # horse cards — ratings, for a horse in a named field
+    'horse_bloodline',      # horse cards — bloodline, for a horse in a named field
     # The reduced-system solver behind the summary page.
     'api_reduced_solve', 'api_reduced_atg_file',
 })
@@ -1690,6 +1693,8 @@ def atg_game_agent(game_id):
     against xodds), then 'live' (xedge over the win odds)."""
     import time
     from datetime import datetime
+    if _builder_past(_atg_embedded_date(game_id, game=True)):
+        return jsonify({'error': 'not found'}), 404
     cache_key = f'atg_agent_{game_id}'
     hit = _leaderboard_cache.get(cache_key)
     if hit and time.time() - hit[0] < _AGENT_TTL:
