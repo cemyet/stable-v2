@@ -152,6 +152,7 @@ _BUILDER_ENDPOINTS = frozenset({
     'home_upcoming',        # /play — which tracks race on a given day
     'atg_game_panels',      # game page — the legs of a game
     'atg_game_agent',       # game page — the coupon agent's coupon
+    'atg_agents',           # game page — the agent switcher
     'race_detail_by_atg',   # start list rows
     'race_live_by_atg',     # live odds and scratchings
     'horse_races',          # expanded history + the GPS column
@@ -1685,17 +1686,51 @@ def atg_game_pool(game_id):
 _AGENT_TTL = 60
 
 
+@app.route('/api/atg/agents')
+def atg_agents():
+    """Registered coupon agents, newest first, with their forward-test ROI
+    per policy — overall and by game type — for the game page's switcher.
+    'live' is the race-day policy, 'preliminary' the days-ahead one and
+    'liveOnForecasts' the race-day sizing run on days-ahead numbers."""
+    runs = {'live': 'test', 'preliminary': 'preliminary', 'liveOnForecasts': 'live_on_forecasts'}
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT model_id, name, metrics FROM ml_model WHERE target = 'coupon_agent'
+                           ORDER BY created_at DESC, model_id DESC""")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    agents = []
+    for r in rows:
+        m = r['metrics'] or {}
+        roi = {}
+        for key, run in runs.items():
+            res = m.get(run) or {}
+            if res.get('roi') is None:
+                continue
+            roi[key] = {'all': res['roi'],
+                        'byType': {t['type']: t['roi'] for t in res.get('by_type') or [] if t.get('roi') is not None}}
+        agents.append({'id': r['model_id'], 'name': r['name'], 'roi': roi})
+    return jsonify({'agents': agents})
+
+
 @app.route('/api/atg/game/<game_id>/agent')
 def atg_game_agent(game_id):
     """The coupon agent's coupon for an open game (core/coupon_agent.py):
     picks, weights, stake units and copies for the builder to start from.
     Until every leg's win pool holds money it is 'preliminary' (xwin
-    against xodds), then 'live' (xedge over the win odds)."""
+    against xodds), then 'live' (xedge over the win odds).
+
+    ?model=<id> picks a registered agent other than the newest;
+    ?size=live sizes a preliminary coupon with the race-day policy."""
     import time
     from datetime import datetime
     if _builder_past(_atg_embedded_date(game_id, game=True)):
         return jsonify({'error': 'not found'}), 404
-    cache_key = f'atg_agent_{game_id}'
+    model_id = request.args.get('model', type=int)
+    size_live = request.args.get('size') == 'live'
+    cache_key = f'atg_agent_{game_id}_{model_id or 0}_{int(size_live)}'
     hit = _leaderboard_cache.get(cache_key)
     if hit and time.time() - hit[0] < _AGENT_TTL:
         return jsonify(hit[1])
@@ -1715,7 +1750,8 @@ def atg_game_agent(game_id):
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""SELECT model_id, name, slice_def->'policy' AS policy FROM ml_model
-                           WHERE target = 'coupon_agent' ORDER BY created_at DESC, model_id DESC LIMIT 1""")
+                           WHERE target = 'coupon_agent' AND (%s::int IS NULL OR model_id = %s)
+                           ORDER BY created_at DESC, model_id DESC LIMIT 1""", (model_id, model_id))
             agent = cur.fetchone()
             cur.execute("""SELECT DISTINCT ON (target) target, model_id FROM ml_model
                            WHERE target IN ('xwin', 'xodds', 'xedge')
@@ -1739,13 +1775,15 @@ def atg_game_agent(game_id):
     try:
         game, mode, alt, facts = CA.live_game(data, preds, rule['line_price'], _COUPON_TIER_SHARE[game_type],
                                               (est.get('tracks') or {}).get(track) or est.get('all'), _COUPON_RTP)
-        out = CA.suggest(game, alt, policy[mode])
+        sized = 'live' if size_live and 'live' in policy else mode
+        out = CA.suggest(game, alt, policy[sized])
     except (ValueError, KeyError) as exc:
         return jsonify({'error': str(exc)}), 409
     for leg, picks in zip(facts['legs'], out.pop('legs')):
         leg['picks'] = picks
     out.update({'gameId': game_id, 'gameType': game_type, 'model': {'id': agent['model_id'], 'name': agent['name']},
-                'mode': 'live' if mode == 'live' else 'preliminary', 'legs': facts['legs'],
+                'mode': 'live' if mode == 'live' else 'preliminary',
+                'sizing': 'live' if sized == 'live' else 'preliminary', 'legs': facts['legs'],
                 'turnover': facts['turnover'], 'turnoverUsed': facts['turnover_used'],
                 'linePrice': rule['line_price'], 'at': datetime.now().isoformat(timespec='seconds')})
     _leaderboard_cache[cache_key] = (time.time(), out)

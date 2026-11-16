@@ -521,18 +521,45 @@
     --sl-lock-fill: var(--accent-lever, #2f96d8);
     --sl-band-tint: var(--accent-lever-bright, #bfe6ff);
   }
-  /* The coupon agent's own picks (the game page's agent button), still at
-     the coverage it gave them: the green pick palette in red. */
+  /* The coupon agent's own picks (the game page's build sphere), still at
+     the coverage it gave them: solid ink instead of the green wipe — black
+     by day, white at night (--sl-agent-ink, game.html). The fill stops
+     partway along a weighted row, so the text is white blended by
+     difference: white over the ink, ink over the paper, whichever side of
+     the edge a letter lands. Flags would invert with it, so the ones on
+     the light side are inverted back: past the edge by day (.is-off-ink,
+     paintAgent), on the ink at night (game.html). */
   .sl-row.is-picked.is-agent {
-    --sl-ink-fill: #ffc4cb;
-    --sl-thumb-fill: rgb(232, 28, 56);
-    --sl-badge-ink: #e3122f;
+    --sl-agent-ink: #121316;
+    --sl-agent-on: #ffffff;
+    --sl-ink-fill: var(--sl-agent-ink);
+    --sl-thumb-fill: var(--sl-agent-ink);
+    --sl-badge-ink: var(--sl-agent-ink);
   }
+  .sl-row.is-picked.is-agent .sl-row__ink::before {
+    background:
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 55%),
+      var(--sl-agent-ink);
+    box-shadow: none;
+  }
+  .sl-row.is-picked.is-agent .sl-row__cells {
+    mix-blend-mode: difference;
+  }
+  .sl-row.is-picked.is-agent .sl-row__cells,
+  .sl-row.is-picked.is-agent .sl-row__cells * {
+    color: #fff !important;
+    text-shadow: none !important;
+  }
+  .sl-row.is-picked.is-agent .sl-row__cells *:not(img.flag) { filter: none !important; }
+  .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa),
+  .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa) * {
+    color: rgba(255, 255, 255, 0.66) !important;
+  }
+  .sl-row.is-picked.is-agent .sl-row__cells img.flag.is-off-ink { filter: invert(1); }
   .sl-row.is-picked.is-agent .sl-row__badge {
-    filter:
-      drop-shadow(0 0 1px rgb(255, 150, 162))
-      drop-shadow(0 0 3px rgba(240, 48, 72, 0.45));
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
   }
+  .sl-row.is-picked.is-agent .sl-badge__digit { color: var(--sl-agent-on); }
 
   /* The band always spans weight ↔ coverage; which of the two is on the left
      is the whole difference between a cut and a levered row.
@@ -3639,10 +3666,10 @@
       paintAgent(picks, weights, systemCaps());
     }
 
-    /* A pick still exactly where the coupon agent put it (the game page's
-       agent button) paints red instead of green: picked, at the coverage
-       the agent gave it. */
-    function paintAgent(picks, weights, caps) {
+  /* A pick still exactly where the coupon agent put it (the game page's
+     build sphere) paints in ink instead of green: picked, at the coverage
+     the agent gave it. */
+  function paintAgent(picks, weights, caps) {
       const want = (window.AgentCoupon && gameId) ? AgentCoupon.legFor(gameId, raceId) : null;
       const match = new Set();
       if (want && picks.length) {
@@ -3654,8 +3681,34 @@
           if (Number.isFinite(w) && Math.abs((Number(cov[n]) || 0) - w) < 0.05) match.add(n);
         });
       }
+      const sl = slRoot();
+      const partial = !!(sl && sl.classList.contains('is-reduced'));
       container.querySelectorAll('[data-sl-pick]').forEach(row => {
-        row.classList.toggle('is-agent', match.has(parseInt(row.dataset.slPick, 10)));
+        const on = match.has(parseInt(row.dataset.slPick, 10));
+        row.classList.toggle('is-agent', on);
+        agentFlags(row, on && partial);
+      });
+    }
+
+    /* Flags past the ink's edge sit on the paper, where the difference
+       blend would invert them; mark them so the CSS inverts them back. */
+    function agentFlags(row, partial) {
+      const flags = row.querySelectorAll('.sl-row__cells img.flag');
+      if (!flags.length) return;
+      if (!partial) {
+        flags.forEach(f => f.classList.remove('is-off-ink'));
+        return;
+      }
+      const cs = getComputedStyle(row);
+      const fill = parseFloat(row.style.getPropertyValue('--sl-fill'));
+      const share = Number.isFinite(fill) ? Math.max(0, Math.min(1, fill)) : 1;
+      const left = parseFloat(cs.getPropertyValue('--sl-track-l')) || 0;
+      const right = parseFloat(cs.getPropertyValue('--sl-side-r')) || 0;
+      const box = row.getBoundingClientRect();
+      const edge = box.left + left + share * (box.width - left - right);
+      flags.forEach(f => {
+        const b = f.getBoundingClientRect();
+        f.classList.toggle('is-off-ink', b.left + b.width / 2 > edge);
       });
     }
 
