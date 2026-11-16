@@ -67,11 +67,14 @@ ATG_SYNC_DAYS = 5
 # no window). Kept generous so late-arriving cross-source race variants still get
 # caught.
 CLEANUP_SINCE_DAYS = 14
-# Forward window (today + tomorrow) for ATG start lists. These upcoming cards
-# are needed before feature refresh + ML scoring so race pages can show xgal
-# before the races have been run. Result catch-up below re-fetches them later
-# when ATG advances the same race ids to status="results".
-ATG_UPCOMING_DAYS = 2
+# Forward window (today + 6 days) for ATG start lists. These upcoming cards
+# are needed before feature refresh + ML scoring so race pages (and the home
+# watchlist) show predictions before the races have been run. Big Saturday
+# cards are published about a week ahead; days not yet published list no races.
+# Cards still upcoming are re-fetched every run so late driver changes and
+# scratches land; result catch-up re-fetches them once ATG advances them to
+# status="results".
+ATG_UPCOMING_DAYS = 7
 
 # Cutover switch (Phase 3). When True, the bridge stops shelling out to v1's
 # `--mode st` and instead owns ST ingestion natively via
@@ -268,7 +271,7 @@ def run_native_ingest(conn, run_id: int) -> dict:
             d = date.today() + timedelta(days=i)
             c = atg_scraper.scrape_day(
                 conn, d.isoformat(), statuses=atg_scraper.ACTIVE_STATUSES,
-                skip_done=True,
+                skip_done=True, refetch_statuses=frozenset({"upcoming", "ongoing"}),
                 log=lambda m: _log(conn, run_id, f"[atg]   {m}"))
             upcoming["days"] += 1
             for k in ("races_listed", "ok", "missing", "failed", "skipped"):
@@ -864,7 +867,8 @@ def _refresh_entry_features(conn) -> None:
 
 
 def _score_upcoming() -> None:
-    """Refresh upcoming-race galopp-risk predictions (ml_prediction).
+    """Refresh upcoming-race predictions (ml_prediction): galopp risk, xlead,
+    xodds, xwin.
 
     Runs in the ML venv as a subprocess so this job's interpreter doesn't need
     the ML stack. Best-effort: a failure never aborts the update run."""
@@ -880,6 +884,23 @@ def _score_upcoming() -> None:
                        cwd=str(repo), timeout=600, check=False)
     except Exception as exc:
         print(f"[score_upcoming] failed: {exc!r}", flush=True)
+
+
+def _eval_pools() -> None:
+    """Re-score the live race models' pool ROI as new results arrive
+    (scripts/eval_pools.py, ML venv). Best-effort, like _score_upcoming."""
+    try:
+        import subprocess
+        from pathlib import Path
+        repo = Path(__file__).resolve().parent.parent
+        venv_py = repo / '.venv-ml' / 'bin' / 'python'
+        if not venv_py.exists():
+            print('[eval_pools] ML venv not found, skipping', flush=True)
+            return
+        subprocess.run([str(venv_py), '-m', 'scripts.eval_pools'],
+                       cwd=str(repo), timeout=900, check=False)
+    except Exception as exc:
+        print(f"[eval_pools] failed: {exc!r}", flush=True)
 
 
 def _v2_counts(conn) -> dict:
@@ -1189,6 +1210,21 @@ def run_all(conn, run_id: int, *, abort_on_error: bool = False) -> dict:
              f"[all] race comments FAILED: {exc!r}\n{traceback.format_exc()}")
         s_comments = {"error": repr(exc)}
     summary["phases"].append({"phase": "comments", "result": s_comments})
+
+    # Pool results (what each game paid, the public's stake shares), then the
+    # race models' ROI against them. Kept out of `phases`: a backtest input
+    # going stale never makes the run a failure.
+    _set_phase(conn, run_id, "Pool results (ATG games) + model ROI")
+    _log(conn, run_id, "\n[all] === pool results ===")
+    try:
+        from scrapers import atg_games
+        summary["atg_games"] = atg_games.scrape_window(
+            conn, days_back=4, log=lambda m: _log(conn, run_id, m))
+    except Exception as exc:
+        conn.rollback()
+        summary["atg_games"] = {"error": repr(exc)}
+        _log(conn, run_id, f"[all] pool results failed: {exc!r}")
+    _eval_pools()
 
     _set_phase(conn, run_id, "4/4 Cleanup (dedup + heal)")
     _log(conn, run_id, "\n[all] === phase 4/4 — cleanup (dedup + heal) ===")

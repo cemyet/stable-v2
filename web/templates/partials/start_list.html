@@ -21,9 +21,11 @@
     /* Driver/trainer lane — shared with history column widths. */
     --sl-drv-w: 58px;
     --sl-people-gap: 6px;
-    /* Keeps trainer+form pinned while driver slides right. */
+    /* Keeps trainer pinned while driver slides right. */
     --sl-people-inset: 40px;
-    --sl-eq-nudge: 8px;
+    /* Cycle column (gal% / xodds / xlead / xwin): room for odds past 100. */
+    --sl-cyc-w: 56px;
+    --sl-cyc-inset: 7px;
     /* Bone-white paper — shared by entry rows and (on game) history. */
     --sl-paper: color-mix(in srgb, var(--bg, #f4f3ec) 32%, white);
     --sl-paper-rest: color-mix(in srgb, var(--sl-paper) 99%, black 1%);
@@ -168,7 +170,27 @@
   /* Where an even split would land this leg's thumbs — 0.25 on four picks.
      The same number on every row, so the ticks stack into one line down the
      leg and reading over/underweight is a glance. */
+  /* Secondary leverage is an added segment: the target row's own live thumb
+     is its left edge and a separate aim thumb is its right edge. */
+  @property --sl-aim-start {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
+  @property --sl-aim-end {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
   @property --sl-even {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
+  /* Where every incoming lever, stacked, puts this row — coverage plus
+     the aimed extras. Same track as the even tick, so a pile-up past
+     the weight is a glance. */
+  @property --sl-aim-sum {
     syntax: '<number>';
     inherits: true;
     initial-value: 0;
@@ -190,6 +212,7 @@
     --sl-weight: 1;
     --sl-cut: 1;
     --sl-even: 0;
+    --sl-aim-sum: 0;
     --sl-thumb-half: 2px;
     --sl-track-l: 0px;
   }
@@ -213,6 +236,9 @@
   .sl.is-reduced .sl-row__evenmark {
     transition: --sl-even 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
   }
+  .sl.is-reduced .sl-row__aimsum {
+    transition: --sl-aim-sum 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
   .sl.is-reduced .sl-badge {
     transition: background-color 0.28s ease,
                 --sl-cut 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
@@ -222,6 +248,7 @@
   .sl.is-weighting .sl-row__cutband,
   .sl.is-weighting .sl-row__cutveil,
   .sl.is-weighting .sl-row__evenmark,
+  .sl.is-weighting .sl-row__aimsum,
   .sl.is-weighting .sl-system-lock,
   .sl.is-weighting .sl-badge,
   .sl.is-weighting .sl-row.is-weighting .sl-row__badge,
@@ -229,6 +256,7 @@
   .sl-row.is-fill-jump .sl-row__cutband,
   .sl-row.is-fill-jump .sl-row__cutveil,
   .sl-row.is-fill-jump .sl-row__evenmark,
+  .sl-row.is-fill-jump .sl-row__aimsum,
   .sl-row.is-fill-jump .sl-system-lock,
   .sl-row.is-fill-jump .sl-badge,
   .sl-row.is-fill-jump .sl-system-handle {
@@ -330,6 +358,88 @@
       inset 0 0 14px rgba(255, 255, 255, 0.28);
   }
 
+  /* ── win chance ───────────────────────────────────────────────────────
+     Rank mode's percentage tool. A white fill under the row text runs from
+     the start of the weight track as far as the horse's chance of winning,
+     out of the same track a weight uses, and its edge is dragged like a
+     weight thumb. --sl-chance-r is the track's right inset — 0 until the
+     weights gutter opens on that side. */
+  @property --sl-chance {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0;
+  }
+  .sl-row {
+    --sl-chance: 0;
+    --sl-chance-r: 0px;
+  }
+  .sl-row__chance {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--sl-track-l, 0px);
+    width: calc(var(--sl-chance) * (100% - var(--sl-track-l, 0px) - var(--sl-chance-r)));
+    background: linear-gradient(
+      to bottom,
+      #fff 0%,
+      rgba(255, 255, 255, 0.94) 100%
+    );
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.9);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition:
+      opacity 0.28s ease,
+      --sl-chance 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-rank-ready.is-rank-tool-pct .sl-row__chance { opacity: 1; }
+  .sl-chance-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: clamp(
+      calc(var(--sl-track-l, 0px) + 11px),
+      calc(
+        var(--sl-track-l, 0px)
+        + var(--sl-chance) * (100% - var(--sl-track-l, 0px) - var(--sl-chance-r))
+      ),
+      calc(100% - var(--sl-chance-r))
+    );
+    width: 22px;
+    margin: 0 0 0 -11px;
+    padding: 0;
+    border: 0;
+    background: none;
+    display: none;
+    cursor: ew-resize;
+    touch-action: none;
+    z-index: 4;
+    transition: --sl-chance 0.42s cubic-bezier(0.2, 0.72, 0.3, 1);
+  }
+  .sl.is-rank-ready.is-rank-tool-pct .sl-chance-handle { display: block; }
+  .sl-chance-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: color-mix(in srgb, var(--panel-ink, #17171a) 38%, transparent);
+    transition: width 0.14s ease, margin-left 0.14s ease, background-color 0.14s ease;
+  }
+  .sl-chance-handle:hover::before,
+  .sl-row.is-chance-held .sl-chance-handle::before {
+    background: color-mix(in srgb, var(--panel-ink, #17171a) 62%, transparent);
+  }
+  .sl-row.is-chance-held .sl-chance-handle::before {
+    width: 6px;
+    margin-left: -3px;
+  }
+  .sl.is-chance-dragging .sl-row__chance,
+  .sl.is-chance-dragging .sl-chance-handle { transition: opacity 0.28s ease; }
+  .sl.is-chance-dragging { cursor: ew-resize; }
+
   /* ── reducing and levering ─────────────────────────────────────────────
      Weighting moves lines between the picks in a leg and always adds up to
      the whole. Reducing gives lines up: the pick is capped below its weight
@@ -349,7 +459,8 @@
 
      Past 100 the track has no more room, so the thumb wraps: just over 100
      it starts again at the left and walks the same 0–100 as the overflow
-     (100 → 0, 200 → 100). The weight bar stays put. Crossing 100 therefore
+     (100 → 0, 200 → 100), and again for every hundred after that. The
+     weight bar stays put. Crossing 100 therefore
      looks like a reduced row in cyan, and the two views still agree at
      exactly 100. */
   .sl-row.is-cut {
@@ -361,12 +472,66 @@
     --sl-lock-fill: var(--accent-reduce-bright, #ffe89a);
     --sl-band-tint: var(--accent-reduce-bright, #ffe89a);
   }
+  .sl.is-aim-slope {
+    --accent-lever: #ff2a9a;
+    --accent-lever-bright: #ffd0ea;
+    --accent-lever-deep: #a91968;
+    --accent-lever-mute: #f1cfe2;
+  }
+  .sl.is-aim-auto {
+    --accent-lever: #477b59;
+    --accent-lever-bright: #cce5d3;
+    --accent-lever-deep: #315f45;
+    --accent-lever-mute: #d3e2d7;
+  }
+  .sl.is-aim-market {
+    --accent-lever: #12b36a;
+    --accent-lever-bright: #d7f8e6;
+    --accent-lever-deep: #0b7a48;
+    --accent-lever-mute: #d4f0e0;
+  }
+  .sl.is-aim-cascade {
+    --accent-lever: #5c616a;
+    --accent-lever-bright: #e7e9ed;
+    --accent-lever-deep: #3a3e46;
+    --accent-lever-mute: #d8dbe1;
+  }
+  .sl.is-aim-uniform {
+    --accent-lever: #b44cff;
+    --accent-lever-bright: #f3e4ff;
+    --accent-lever-deep: #6b2d9b;
+    --accent-lever-mute: #ead8f6;
+  }
+  .sl.is-aim-top {
+    --accent-lever: #ffc34a;
+    --accent-lever-bright: #ffe8bd;
+    --accent-lever-deep: #b85a00;
+    --accent-lever-mute: #f4dfc4;
+  }
+  .sl.is-aim-multiplied {
+    --accent-lever: #ff2d2d;
+    --accent-lever-bright: #ffd6d2;
+    --accent-lever-deep: #a3160f;
+    --accent-lever-mute: #f4d2ce;
+  }
   .sl-row.is-lev {
     --sl-ink-fill: var(--accent-lever-bright, #bfe6ff);
     --sl-thumb-fill: var(--accent-lever-deep, #2478b0);
     --sl-badge-cut: var(--accent-lever, #2f96d8);
     --sl-lock-fill: var(--accent-lever, #2f96d8);
     --sl-band-tint: var(--accent-lever-bright, #bfe6ff);
+  }
+  /* The coupon agent's own picks (the game page's agent button), still at
+     the coverage it gave them: the green pick palette in red. */
+  .sl-row.is-picked.is-agent {
+    --sl-ink-fill: #ffc4cb;
+    --sl-thumb-fill: rgb(232, 28, 56);
+    --sl-badge-ink: #e3122f;
+  }
+  .sl-row.is-picked.is-agent .sl-row__badge {
+    filter:
+      drop-shadow(0 0 1px rgb(255, 150, 162))
+      drop-shadow(0 0 3px rgba(240, 48, 72, 0.45));
   }
 
   /* The band always spans weight ↔ coverage; which of the two is on the left
@@ -428,6 +593,202 @@
   .sl.is-reduced.is-system-ready .sl-row.is-picked.is-lev .sl-row__cutband {
     display: block;
   }
+  /* ---- aiming a lever ----
+     The levered pick's extra stake is a sub-coupon of its own, and this is
+     that sub-coupon's added segment in some *other* leg. It starts at the
+     row's existing coverage thumb and extends right by the amount of this
+     lever assigned to the row. Kept under the row cells so names and figures
+     remain crisp. */
+  /* On a reduced row the secondary segment first walks the released
+     yellow, then (if it still has length) continues as ordinary blue.
+     Overlaying cyan on yellow looked like a fog; these two bands sit
+     side by side instead. */
+  .sl-row__aimmix {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(
+      var(--sl-track-l, 0px)
+      + min(var(--sl-aim-start), var(--sl-aim-end), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    right: calc(
+      100% - var(--sl-track-l, 0px)
+      - min(var(--sl-aim-end), var(--sl-weight))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    display: none;
+    pointer-events: none;
+    z-index: 1;
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.3) 0%,
+        rgba(255, 255, 255, 0.08) 40%,
+        rgba(255, 255, 255, 0) 72%
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        var(--accent-reduce-bright, #ffe89a) 0 2px,
+        var(--accent-lever-bright, #bfe6ff) 2px 6px
+      );
+    box-shadow:
+      inset 0 8px 9px -8px rgba(255, 255, 255, 0.98),
+      inset 0 -8px 9px -8px rgba(255, 255, 255, 0.88);
+  }
+  .sl-row__aimband {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(
+      var(--sl-track-l, 0px)
+      + var(--sl-aim-start)
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    right: calc(
+      100% - var(--sl-track-l, 0px)
+      - var(--sl-aim-end)
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    display: none;
+    pointer-events: none;
+    z-index: 1;
+    /* Incoming allocation, not this row's own lever. Same hatch in every
+       mode; the strokes are that mode's deep shade, the wash its bright. */
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.32) 0%,
+        rgba(255, 255, 255, 0.1) 42%,
+        rgba(255, 255, 255, 0) 74%
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        color-mix(in srgb, var(--accent-lever-deep, #2478b0) 42%, transparent) 0 2px,
+        transparent 2px 6px
+      ),
+      color-mix(in srgb, var(--accent-lever-bright, #bfe6ff) 28%, transparent);
+    box-shadow:
+      inset 0 8px 9px -8px rgba(255, 255, 255, 0.98),
+      inset 0 -8px 9px -8px rgba(255, 255, 255, 0.88);
+  }
+  /* Past the old weight only — the released yellow is the mix band. */
+  .sl-row.is-cut .sl-row__aimband {
+    left: calc(
+      var(--sl-track-l, 0px)
+      + min(var(--sl-aim-end), max(var(--sl-aim-start), var(--sl-weight)))
+        * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+  }
+  .sl.is-aiming .sl-row.is-picked .sl-row__aimband { display: block; }
+  .sl.is-aiming.is-aim-cascade .sl-row:not(.sl-row--scratched) .sl-row__aimband { display: block; }
+  .sl.is-aiming .sl-row.is-picked.is-cut .sl-row__aimmix { display: block; }
+  /* A leg with one pick has nowhere to aim — the whole sub-coupon goes
+     through that horse whatever anybody drags. */
+  .sl.is-aiming.is-aim-forced .sl-row .sl-row__aimband,
+  .sl.is-aiming.is-aim-forced .sl-row .sl-row__aimmix { display: none; }
+
+  /* In aim mode a levered row is how you pick which primary lever owns
+     the secondary segments. The hatch sits under the cells, so the whole
+     row takes the click — not only the band. */
+  .sl.is-aim-mode.is-reducing.is-system-ready
+      .sl-row.is-picked.is-lev {
+    cursor: pointer;
+  }
+
+  /* Dedicated right edge of the secondary segment. The ordinary coverage
+     thumb stays where it was, making the base/secondary split unambiguous. */
+  .sl-aim-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: clamp(
+      calc(var(--sl-track-l, 0px) + 11px),
+      calc(
+        var(--sl-track-l, 0px)
+        + var(--sl-aim-end)
+          * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      ),
+      calc(100% - var(--sl-side-r, 0px))
+    );
+    width: 22px;
+    margin: 0 0 0 -11px;
+    padding: 0;
+    border: 0;
+    background: none;
+    display: none;
+    cursor: ew-resize;
+    touch-action: none;
+    overflow: visible;
+    z-index: 5;
+    font: inherit;
+    --sl-thumb-fill: var(--accent-lever-deep, #2478b0);
+  }
+  .sl-aim-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--accent-lever-deep, #2478b0);
+  }
+  .sl.is-aiming:not(.is-aim-forced) .sl-row.is-picked .sl-aim-handle {
+    display: block;
+  }
+  .sl.is-aiming .sl-row.is-picked .sl-system-handle {
+    pointer-events: none;
+  }
+  /* Build-tab thumb tools pick which handle is live without changing what
+     the rows display. Weight sits on the base-share bar; reduce keeps the
+     coverage thumb; aim keeps the secondary edge. */
+  .sl.is-thumb-weight .sl-row.is-picked .sl-system-handle {
+    pointer-events: auto;
+    left: clamp(
+      calc(var(--sl-track-l, 0px) + 11px),
+      calc(
+        var(--sl-track-l, 0px)
+        + var(--sl-weight) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+      ),
+      calc(100% - var(--sl-side-r, 0px))
+    );
+  }
+  .sl.is-thumb-reduce .sl-row.is-picked .sl-system-handle {
+    pointer-events: auto;
+  }
+  .sl.is-thumb-weight .sl-aim-handle,
+  .sl.is-thumb-reduce .sl-aim-handle,
+  .sl.is-thumb-aim .sl-system-handle {
+    pointer-events: none;
+  }
+  /* Select and brush take over the row: its handles stop catching the
+     pointer so a press anywhere lands on the row itself. The brush also
+     quiets the rank gutter, since it only picks. */
+  .sl:is(.is-select-tool, .is-brush) :is(.sl-aim-handle, .sl-system-handle, .sl-system-lock, .sl-chance-handle),
+  .sl.is-brush :is(.sl-rank-handle, .sl-rank-mark) {
+    pointer-events: none;
+  }
+  .sl:is(.is-select-tool, .is-brush) .sl-row:not(.sl-row--head) {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .sl.is-brush .sl-row:not(.sl-row--head),
+  .sl.is-brush .sl-row:not(.sl-row--head) * {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3Zm13.71-9.37-1.34-1.34a1 1 0 0 0-1.41 0L9 12.25 11.75 15l8.96-8.96a1 1 0 0 0 0-1.41Z' fill='%232a2c33' stroke='white' stroke-width='1.4' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E") 2 19, crosshair !important;
+  }
+  .sl-row.is-aim-weighting .sl-aim-handle::before {
+    width: 8px;
+    margin-left: -4px;
+    box-shadow:
+      inset 0 0 6px rgba(255, 255, 255, 0.55),
+      inset 0 0 14px rgba(255, 255, 255, 0.28);
+  }
+  .sl-row.is-aim-weighting [data-system-readout] { display: none; }
+  .sl-row.is-aim-weighting [data-aim-readout] { display: block; }
+  .sl-row.is-aim-weighting.is-readout-left [data-aim-readout] {
+    transform: translate(calc(-100% - 11px), -50%);
+  }
 
   /* Wash over the striped band so row ink (shoes, gal%, names) recedes
      against the yellow fill instead of sitting full-strength on the hatch. */
@@ -447,7 +808,7 @@
     );
     display: none;
     pointer-events: none;
-    z-index: 2;
+    z-index: 1;
     background: color-mix(in srgb, var(--sl-band-tint, #ffe89a) 42%, white);
     opacity: 0.38;
   }
@@ -479,6 +840,31 @@
     );
   }
   .sl.is-reduced.is-system-ready .sl-row.is-picked.has-even .sl-row__evenmark {
+    display: block;
+  }
+
+  /* Stacked incoming aim — same dashed reading as the even tick, in the
+     active mode's lever colour. */
+  .sl-row__aimsum {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(
+      var(--sl-track-l, 0px)
+      + var(--sl-aim-sum) * (100% - var(--sl-track-l, 0px) - var(--sl-side-r, 0px))
+    );
+    width: 1px;
+    margin-left: -0.5px;
+    display: none;
+    pointer-events: none;
+    z-index: 3;
+    background: repeating-linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--accent-lever, #2f96d8) 82%, white) 0 3px,
+      transparent 3px 6px
+    );
+  }
+  .sl.is-reduced.is-system-ready .sl-row.has-aim-sum .sl-row__aimsum {
     display: block;
   }
 
@@ -555,9 +941,11 @@
   .sl-row.is-picked.is-lev .sl-row__badge {
     filter:
       drop-shadow(0 0 calc(1px + 2px * var(--sl-lev-glow))
-        rgb(191 230 255 / calc(0.55 + 0.45 * var(--sl-lev-glow))))
+        color-mix(in srgb, var(--accent-lever-bright, #bfe6ff)
+          calc(55% + 45% * var(--sl-lev-glow)), transparent))
       drop-shadow(0 0 calc(3px + 9px * var(--sl-lev-glow))
-        rgb(47 150 216 / calc(0.28 + 0.42 * var(--sl-lev-glow))));
+        color-mix(in srgb, var(--accent-lever, #2f96d8)
+          calc(28% + 42% * var(--sl-lev-glow)), transparent));
   }
   /* Digit hairline matches the gold pie wedge, not a separate ink. */
   .sl-row.is-picked.is-cut .sl-badge__digit,
@@ -593,7 +981,8 @@
       drop-shadow(0 0 calc(3px + 5px * var(--sl-lev-glow))
         rgb(255 255 255 / calc(0.7 + 0.3 * var(--sl-lev-glow))))
       drop-shadow(0 0 calc(2px + 10px * var(--sl-lev-glow))
-        rgb(140 214 255 / calc(0.2 + 0.6 * var(--sl-lev-glow))));
+        color-mix(in srgb, var(--accent-lever-bright, #bfe6ff)
+          calc(20% + 60% * var(--sl-lev-glow)), transparent));
     box-shadow: none;
   }
   /* The share number takes the row's colour too — it now reads the coverage,
@@ -751,6 +1140,31 @@
   }
   .sl-row.is-picked .sl-badge__digit { color: #fff; }
 
+  /* Selected: marching dashes around the sphere — a ring of conic dashes
+     that turns, so the gaps travel. */
+  .sl-row__badge::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(#1f7bff 0deg 13deg, transparent 13deg 24deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.6px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.6px));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .sl-row.is-selected .sl-row__badge::after {
+    opacity: 1;
+    animation: sl-select-march 9s linear infinite;
+  }
+  @keyframes sl-select-march {
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sl-row.is-selected .sl-row__badge::after { animation: none; }
+  }
+
   /* Reserve badge — small "1" or "2" at the top-right edge of the sphere. */
   .sl-row__reserve-badge {
     position: absolute;
@@ -867,11 +1281,33 @@
     color: var(--panel-ink, var(--sl-ink-muted)) !important;
     text-shadow: none;
   }
-  .sl-c-tform {
-    flex: 0 0 48px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    color: var(--sl-ink-muted);
+  /* A driver put up after the declarations reads red, like changed gear;
+     a horse's first start for a new trainer reads gold, like first-time
+     gear. Hovering the name keeps its colour, only lifts it. */
+  .sl-row:not(.sl-row--head) .sl-c-drv.is-changed,
+  .sl-row:not(.sl-row--head) .sl-c-drv.is-changed:hover,
+  .sl-row:not(.sl-row--head) .sl-c-drv.is-changed:hover a {
+    color: var(--accent-warn) !important;
+  }
+  .sl-row:not(.sl-row--head):hover .sl-c-drv.is-changed,
+  .sl-row:not(.sl-row--head):hover .sl-c-drv.is-changed a {
+    color: color-mix(in srgb, var(--accent-warn) 72%, white) !important;
+  }
+  .sl-row:not(.sl-row--head).is-picked .sl-c-drv.is-changed,
+  .sl-row:not(.sl-row--head).is-picked .sl-c-drv.is-changed a {
+    color: #ff5252 !important;
+  }
+  .sl-row:not(.sl-row--head) .sl-c-trn.is-new,
+  .sl-row:not(.sl-row--head) .sl-c-trn.is-new:hover,
+  .sl-row:not(.sl-row--head) .sl-c-trn.is-new:hover a {
+    color: var(--accent-first) !important;
+    text-shadow: var(--accent-first-glow);
+  }
+  /* Short names fit the lane; clipping here would box the glow in. */
+  .sl-row:not(.sl-row--head) .sl-c-trn.is-new { overflow: visible; }
+  .sl-row:not(.sl-row--head).is-picked .sl-c-trn.is-new {
+    text-shadow: none;
+    filter: var(--accent-first-bloom);
   }
   .sl-c-eq {
     flex: 0 0 60px;
@@ -883,9 +1319,6 @@
     align-items: center;
     color: var(--sl-ink);
     transition: color 0.15s ease;
-    /* Slide the pair toward right-aligned GPS so it sits midway
-       between centered form and the GPS figures. */
-    margin-left: var(--sl-eq-nudge);
   }
   .sl-c-eq .shoes { min-width: 31px; }
   .sl-c-eq .sl-sulky {
@@ -895,26 +1328,74 @@
   .sl-c-eq .sl-sulky--empty { visibility: hidden; }
   .sl-c-gps {
     flex: 0 0 46px;
-    margin-left: calc(var(--sl-eq-nudge) * -1);
+    min-width: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--sl-ink-muted);
     transition: color 0.15s ease;
   }
+  /* The cycle column runs as a lane: a faint game-type wash with hairline
+     edges, half a gutter wider than the column on each side, continued by
+     the leg footer's ‹ label ›. Fixed width, so a long value never pushes
+     the columns beside it. */
   .sl-c-gal {
-    flex: 0 0 44px;
-    text-align: right;
+    --sl-lane-rgb: var(--panel-hybrid-from-rgb, 90, 120, 160);
+    flex: 0 0 var(--sl-cyc-w);
+    min-width: 0;
+    /* Right-aligned, but set in from the lane edge so values sit nearer its middle. */
+    padding-right: var(--sl-cyc-inset);
+    box-sizing: border-box;
+    align-self: stretch;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
     color: var(--sl-ink-muted);
     transition: color 0.15s ease;
   }
-  /* win%/clean% — wide enough for 100%/100%. Extra left margin lifts
-     the pair off gal%; the gap before row% shrinks by the same amount
-     so the trail width (and the prev-races alignment) stays put. */
+  .sl-c-gal::before {
+    content: '';
+    position: absolute;
+    inset: 0 -6px;
+    z-index: -1;
+    pointer-events: none;
+    background: rgba(var(--sl-lane-rgb), 0.07);
+    box-shadow:
+      inset 1px 0 rgba(var(--sl-lane-rgb), 0.16),
+      inset -1px 0 rgba(var(--sl-lane-rgb), 0.16);
+    transition: background-color 0.2s ease;
+  }
+  .sl-row--head .sl-c-gal > span { font-weight: 600; }
+  .sl-row--head .sl-c-gal .sl-sort-caret {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 7px;
+    height: 5px;
+    transform: translateY(-40%);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .sl-row--head .sl-c-gal::before {
+    background: linear-gradient(180deg, rgba(var(--sl-lane-rgb), 0.16), rgba(var(--sl-lane-rgb), 0.08));
+  }
+  /* The game header pads its titles down; the lane covers that gap too,
+     so it meets the race panel instead of stopping at the title text. */
+  .game-leg .sl-row--head .sl-c-gal::before { top: -10px; }
+  .sl-row:not(.sl-row--head):hover .sl-c-gal::before {
+    background-color: rgba(var(--sl-lane-rgb), 0.11);
+  }
+  /* win% alone — clean% rides in the value's tooltip. */
   .sl-c-win {
-    flex: 0 0 72px;
-    margin-left: 16px;
-    text-align: center;
+    flex: 0 0 44px;
+    min-width: 0;
+    text-align: right;
     font-variant-numeric: tabular-nums;
     transition: color 0.15s ease;
   }
@@ -922,20 +1403,27 @@
     color: var(--panel-ink, var(--sl-ink-muted));
     transition: color 0.15s ease, font-weight 0.15s ease;
   }
-  .sl-c-win .sl-pct-w1 { font-weight: 400; }
-  .sl-c-win .sl-pct-w2 { font-weight: 500; }
-  .sl-c-win .sl-pct-w3 { font-weight: 600; }
-  .sl-c-win .sl-pct-w4 { font-weight: 700; }
-  .sl-c-win .sl-pct-w5 { font-weight: 800; }
-  .sl-c-win .sl-win-clean {
-    color: var(--sl-ink-muted);
-    font-weight: 400;
+  .sl-c-win .sl-pct-w1, .sl-c-gal .sl-pct-w1 { font-weight: 400; }
+  .sl-c-win .sl-pct-w2, .sl-c-gal .sl-pct-w2 { font-weight: 500; }
+  .sl-c-win .sl-pct-w3, .sl-c-gal .sl-pct-w3 { font-weight: 600; }
+  .sl-c-win .sl-pct-w4, .sl-c-gal .sl-pct-w4 { font-weight: 700; }
+  .sl-c-win .sl-pct-w5, .sl-c-gal .sl-pct-w5 { font-weight: 800; }
+  /* xodds / xlead: panel ink, weighted by the field share behind the value. */
+  .sl-c-gal .sl-x {
+    color: var(--panel-ink, var(--sl-ink-muted));
+    transition: color 0.15s ease, font-weight 0.15s ease;
   }
-  .sl-c-win .sl-win-clean > span {
-    transition: font-weight 0.15s ease;
+  .sl-c-gal.is-cycled > * { animation: sl-col-cycle 0.42s ease; }
+  @keyframes sl-col-cycle {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sl-c-gal.is-cycled > * { animation: none; }
   }
   .sl-c-sek {
     flex: 0 0 44px;
+    min-width: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--sl-ink-muted);
@@ -947,6 +1435,7 @@
   }
   .sl-c-pct {
     flex: 0 0 52px;
+    min-width: 0;
     text-align: right;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
@@ -993,6 +1482,7 @@
   }
   .sl-c-odds {
     flex: 0 0 44px;
+    min-width: 0;
     text-align: right;
     color: var(--sl-ink-muted);
     font-variant-numeric: tabular-nums;
@@ -1014,24 +1504,6 @@
     text-align: center;
   }
 
-  .sl-row:not(.sl-row--head):hover .sl-gal-mid {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 48%, white);
-  }
-  .sl-row:not(.sl-row--head):hover .sl-gal-hi {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
-  }
-  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 48%, white);
-  }
-  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-hot-hi {
-    color: color-mix(in srgb, var(--accent-hot) 58%, white);
-  }
-  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold) 48%, white);
-  }
-  .sl-row:not(.sl-row--head):hover .sl-c-tform .sform-cold-hi {
-    color: color-mix(in srgb, var(--accent-cold) 58%, white);
-  }
   .sl-row:not(.sl-row--head):hover .sl-pct-trend.up.t1 {
     color: color-mix(in srgb, var(--accent-hot, #249740) 58%, var(--panel-ink, #17171a));
   }
@@ -1122,44 +1594,12 @@
     filter: var(--accent-first-bloom);
     opacity: 1;
   }
-  .sl-gal-lo, .sl-gal-empty {
+  .sl-gal-empty {
     color: var(--sl-ink-muted);
     font-weight: 400;
-    transition: color 0.15s ease, font-weight 0.15s ease;
   }
-  .sl-gal-mid {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
-    font-weight: 600;
-  }
-  .sl-gal-hi {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
-    font-weight: 700;
-  }
-  /* Form follows gal%: muted rest, then two steps of mix + weight. */
-  .sl-c-tform .sform-lo {
-    color: var(--sl-ink-muted);
-    font-weight: 400;
-    transition: color 0.15s ease, font-weight 0.15s ease;
-  }
-  .sl-c-tform .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 42%, white);
-    font-weight: 600;
-  }
-  .sl-c-tform .sform-hot-hi {
-    color: color-mix(in srgb, var(--accent-hot) 58%, white);
-    font-weight: 700;
-  }
-  .sl-c-tform .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
-    font-weight: 600;
-  }
-  .sl-c-tform .sform-cold-hi {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
-    font-weight: 700;
-  }
-
-  /* Market share and odds are hidden until asked for — an eye reveals one row,
-     the footer eye reveals the whole card. */
+  /* Market share and odds show by default; the footer eye hides them for
+     the whole card, and a hidden row's eye reveals that row alone. */
   .sl-pct__val.is-hidden,
   .sl-odds__val.is-hidden { display: none; }
   .sl-pct__eye,
@@ -1224,8 +1664,8 @@
   .sl-row--head:hover { background: transparent; }
   .sl-row--head .sl-row__cells { color: inherit; font-size: 11px; }
   .sl-row--head .sl-row__cells span { color: inherit; }
-  .sl-row--head .sl-c-gps .gps-toggle,
-  .sl-row--head .sl-c-gal[data-gal-toggle],
+  .sl-row--head .sl-c-gal.is-toggle,
+  .sl-row--head .sl-c-gal.is-sortable,
   .sl-row--head .sl-pick-toggle { cursor: pointer; }
   .sl-row--head .sl-c-pct,
   .sl-row--head .sl-c-odds { cursor: default; }
@@ -1251,6 +1691,7 @@
 
   /* Volt starts run in distance groups — mark where the tillägg begins. */
   .sl-tillagg {
+    position: relative;
     padding: 5px 12px;
     font-size: 10px;
     letter-spacing: 1.5px;
@@ -1258,6 +1699,58 @@
     color: color-mix(in srgb, var(--panel-ink, var(--fg-muted)) 52%, white);
     background: var(--hover);
     border-bottom: 1px solid var(--list-line, var(--border));
+  }
+
+  /* Springspår — on a Swedish volt start, posts 6 and 7 of each distance
+     group stand on the spring track. Each of those rows carries the same
+     wash in from its left edge, tinted with the game type's own colour, and
+     it stays on when the list is ranked. Opening the list and the hero's
+     tick sweep a faint white light across the row. */
+  @property --sl-fire-sweep { syntax: '<percentage>'; inherits: true; initial-value: -30%; }
+  @property --sl-fire-glow { syntax: '<number>'; inherits: true; initial-value: 0; }
+  .sl-row__fire {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    --sl-fire-glow: 0;
+    transition: opacity 0.28s ease;
+  }
+  .sl-row.is-spring .sl-row__fire::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0) 36%,
+      rgba(255, 255, 255, 0.9) 50%,
+      rgba(255, 255, 255, 0) 64%,
+      transparent 100%);
+    background-size: 46% 100%;
+    background-repeat: no-repeat;
+    background-position: var(--sl-fire-sweep) 0;
+    opacity: var(--sl-fire-glow);
+  }
+  .sl-row.is-spring .sl-row__fire::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--game-type-brand, #f98314) 16%, transparent) 0,
+      color-mix(in srgb, var(--game-type-brand, #f98314) 5%, transparent) 28%,
+      transparent 54%);
+  }
+  @keyframes slFirePulse {
+    0% { --sl-fire-sweep: -30%; --sl-fire-glow: 0; }
+    10% { --sl-fire-glow: 0.2; }
+    78% { --sl-fire-sweep: 130%; --sl-fire-glow: 0.2; }
+    100% { --sl-fire-sweep: 130%; --sl-fire-glow: 0; }
+  }
+  .sl.is-fire-pulse .sl-row__fire {
+    animation: slFirePulse 2.4s cubic-bezier(0.33, 0, 0.3, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sl.is-fire-pulse .sl-row__fire { animation: none; }
   }
 
   .sl-empty {
@@ -1313,18 +1806,6 @@
       0 0 12px rgba(255, 255, 255, 0.55),
       0 0 24px rgba(255, 255, 255, 0.28);
   }
-  .game-leg table.sl-prev-races tbody tr:hover .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 48%, white);
-  }
-  .game-leg table.sl-prev-races tbody tr:hover .sform-hot-hi {
-    color: color-mix(in srgb, var(--accent-hot) 58%, white);
-  }
-  .game-leg table.sl-prev-races tbody tr:hover .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold) 48%, white);
-  }
-  .game-leg table.sl-prev-races tbody tr:hover .sform-cold-hi {
-    color: color-mix(in srgb, var(--accent-cold) 58%, white);
-  }
   table.sl-prev-races tbody tr,
   table.sl-prev-races tbody tr:hover {
     cursor: pointer;
@@ -1371,42 +1852,35 @@
   table.sl-prev-races .sl-sulky { color: var(--sl-prev-ink, var(--fg)); font-size: 11px; letter-spacing: 0.2px; }
   table.sl-prev-races .sl-sulky.sulky-changed { color: var(--accent-warn); }
   table.sl-prev-races .sl-sulky.sulky-debut { color: var(--accent-first); }
-  /* Locked right stack (do not change eq/prize/comment — keeps them pinned):
-     eq | inset (eq→win%) | comment (win%→gutter).
-     Driver is pinned under main .sl-c-drv, then trainer+form before eq.
-     The right trail is gps + gal + win%/clean% + kkr + gap + pct + odds. */
+  /* Columns line up with the row above: driver and trainer, then eq in
+     the trainer's wake, gps, and odds in the cycle lane (same wash, same
+     edges). Prize and comment fill the rest. The right trail is the row's
+     width past the lane: win% + tkr + gap + pct + odds, their gutters and
+     the row's padding. */
   .game-leg table.sl-prev-races {
     table-layout: fixed;
     width: 100%;
     --sl-prev-gap: 12px;
     --sl-prev-drv: var(--sl-drv-w, 58px);
     --sl-prev-trn: 78px;
-    --sl-prev-form: 48px;
-    --sl-prev-gal: 44px;
     /* gap + trainer — matches main .sl-people-gap */
     --sl-prev-trn-col: calc(var(--sl-people-gap, 2px) + var(--sl-prev-trn));
     /* inset before driver col — keeps drv aligned with main table */
     --sl-prev-pre-drv: calc(var(--sl-people-inset, 44px) - 16px);
-    /* form lane — left pad dropped so driver can sit 12px further right */
-    --sl-prev-form-col: calc(var(--sl-prev-form) + var(--sl-prev-gap));
-    --sl-prev-eq: calc(60px + var(--sl-eq-nudge, 8px));
-    --sl-prev-gps: 46px;
-    /* gap after eq + gps — nudge stolen from this gap, same as main .sl-c-gps */
-    --sl-prev-gps-col: calc(var(--sl-prev-gap) - var(--sl-eq-nudge, 8px) + var(--sl-prev-gps));
-    /* gap + gal — odds sits under gal% */
-    --sl-prev-odds-col: calc(var(--sl-prev-gap) + var(--sl-prev-gal));
-    /* Old prize minus the gal lane we just gave to odds */
-    --sl-prev-prize: calc(46px + 44px + (3 * var(--sl-prev-gap)) - var(--sl-prev-odds-col));
-    --sl-prev-comment-inset: calc(
-      var(--sl-prev-gap) + var(--sl-prev-gps) + var(--sl-prev-odds-col) + var(--sl-prev-prize)
-    );
+    /* eq sits flush against trainer — the row's gutter falls inside trainer */
+    --sl-prev-eq: 60px;
+    /* gutter + gps + half a gutter up to the lane */
+    --sl-prev-gps-col: calc(var(--sl-prev-gap) + 46px + (var(--sl-prev-gap) / 2));
+    /* the lane: the cycle column and half a gutter either side */
+    --sl-prev-odds-col: calc(var(--sl-cyc-w, 56px) + var(--sl-prev-gap));
+    --sl-prev-prize: 64px;
     --sl-prev-trail: calc(
-      46px + 44px + 16px + 72px + 44px + 8px + 52px + 44px
-      + (7 * var(--sl-prev-gap))
+      44px + 44px + 8px + 52px + 44px
+      + (5 * var(--sl-prev-gap))
       + 12px
     );
     --sl-prev-comment: calc(
-      var(--sl-prev-trail) - var(--sl-prev-comment-inset) + var(--sl-side-r, 0px)
+      var(--sl-prev-trail) - (var(--sl-prev-gap) / 2) - var(--sl-prev-prize) + var(--sl-side-r, 0px)
     );
     --sl-prev-date: var(--sl-side-l, 84px);
     /* pad + .sl-c-num + gap — track starts under the horse name */
@@ -1416,7 +1890,6 @@
   .game-leg table.sl-prev-races col.sl-prev-col-num { width: var(--sl-prev-num); }
   .game-leg table.sl-prev-races col.sl-prev-col-eq { width: var(--sl-prev-eq); }
   .game-leg table.sl-prev-races col.sl-prev-col-gps { width: var(--sl-prev-gps-col); }
-  .game-leg table.sl-prev-races col.sl-prev-col-form { width: var(--sl-prev-form-col); }
   .game-leg table.sl-prev-races col.sl-prev-col-odds { width: var(--sl-prev-odds-col); }
   .game-leg table.sl-prev-races col.sl-prev-col-prize { width: var(--sl-prev-prize); }
   .game-leg table.sl-prev-races col.sl-prev-col-comment { width: var(--sl-prev-comment); }
@@ -1431,7 +1904,7 @@
   .game-leg table.sl-prev-races col.sl-prev-col-trn { width: var(--sl-prev-trn-col); }
   .game-leg table.sl-prev-races col.sl-prev-col-flex { width: auto; }
   .game-leg table.sl-prev-races td.sl-prev-eq {
-    padding-left: var(--sl-eq-nudge, 8px);
+    padding-left: 0;
     padding-right: 0;
   }
   .game-leg table.sl-prev-races td.sl-prev-eq .sl-prev-eq__inner {
@@ -1446,8 +1919,8 @@
     visibility: hidden;
   }
   .game-leg table.sl-prev-races td.sl-prev-gps {
-    padding-left: calc(var(--sl-prev-gap) - var(--sl-eq-nudge, 8px));
-    padding-right: 0;
+    padding-left: var(--sl-prev-gap);
+    padding-right: calc(var(--sl-prev-gap) / 2);
     box-sizing: border-box;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -1536,43 +2009,18 @@
   .game-leg table.sl-prev-races td.sl-prev-time {
     color: var(--sl-prev-ink);
   }
-  .game-leg table.sl-prev-races td.sl-prev-form {
-    padding-left: 0;
-    padding-right: var(--sl-prev-gap);
-    box-sizing: border-box;
-    text-align: center;
-    font-size: 13px;
-    line-height: 1.2;
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    color: var(--sl-prev-ink-muted, var(--fg-muted));
-  }
-  .game-leg table.sl-prev-races td.sl-prev-form .sform-lo {
-    color: var(--sl-prev-ink-muted, var(--fg-muted));
-    font-weight: 400;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-form .sform-hot {
-    color: color-mix(in srgb, var(--accent-hot) 42%, white);
-    font-weight: 600;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-form .sform-hot-hi {
-    color: color-mix(in srgb, var(--accent-hot) 58%, white);
-    font-weight: 700;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-form .sform-cold {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 42%, white);
-    font-weight: 600;
-  }
-  .game-leg table.sl-prev-races td.sl-prev-form .sform-cold-hi {
-    color: color-mix(in srgb, var(--accent-cold, #b00010) 58%, white);
-    font-weight: 700;
-  }
   .game-leg table.sl-prev-races td.sl-prev-odds {
-    padding-left: var(--sl-prev-gap);
-    padding-right: 0;
+    --sl-lane-rgb: var(--panel-hybrid-from-rgb, 90, 120, 160);
+    padding-left: 0;
+    padding-right: calc(var(--sl-prev-gap) / 2 + var(--sl-cyc-inset, 7px));
+    box-sizing: border-box;
     text-align: right;
     font-size: 11.5px;
     font-variant-numeric: tabular-nums;
+    background: rgba(var(--sl-lane-rgb), 0.07);
+    box-shadow:
+      inset 1px 0 rgba(var(--sl-lane-rgb), 0.16),
+      inset -1px 0 rgba(var(--sl-lane-rgb), 0.16);
   }
   table.sl-prev-races .dq,
   table.sl-prev-races .withdrew { color: var(--sl-prev-ink-muted, var(--fg-muted)); }
@@ -1636,10 +2084,73 @@
   /* ── cross-leg state ─────────────────────────────────────────────────── */
 
   const instances = new Set();
+
+  // Parts of a row with a job of their own; a click anywhere else on it
+  // opens or closes the horse's last starts.
+  const ROW_CONTROLS = 'a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-col-head], [data-sl-pick-toggle], [data-rank-handle], [data-rank-mark], [data-chance-handle], [data-rank-seam], [data-rank-toggle], [data-system-toggle], [data-system-share], [data-system-handle], [data-system-lock], [data-aim-handle]';
+
+  // Asks the game dock to show the bulb for what the list just switched on.
+  function showDockFamily(family) {
+    window.dispatchEvent(new CustomEvent('dock:show', { detail: { family } }));
+  }
+  let reservesModeOn = false;
+
+  function applyReservesMode(on) {
+    reservesModeOn = !!on;
+    instances.forEach(x => {
+      if (typeof x.setReservesMode === 'function') x.setReservesMode(reservesModeOn);
+    });
+  }
+
+  window.ReservesMode = {
+    isOn() { return reservesModeOn; },
+    set(on) { applyReservesMode(on); },
+    toggle() { applyReservesMode(!reservesModeOn); },
+  };
   const prevRacesCache = {};          // horseId -> last starts (shared by all legs)
-  let pctRevealed = false;            // market share veil, page-wide
-  let oddsRevealed = false;           // odds veil, page-wide
+  let pctRevealed = true;             // market share veil, page-wide
+  let oddsRevealed = true;            // odds veil, page-wide
   let galMode = localStorage.getItem('galModelMode') || 'track';
+
+  /* The gal column cycles through derived values, page-wide, stepped by
+     the leg footer's ‹ label ›. */
+  const COL_CYCLE_STORE = 'stable-gal-cycle';
+  const COL_CYCLE = [
+    { key: 'gal', label: 'gal%', desc: 'galopp risk' },
+    { key: 'xodds', label: 'xodds', desc: 'the win odds the field\'s past prices point to' },
+    { key: 'xlead', label: 'xlead', desc: 'chance to be in front after 100–150 m' },
+    { key: 'xwin', label: 'xwin', desc: 'win chance, from xodds, xlead and the form behind them' },
+  ];
+  let colMode = (() => {
+    let k;
+    try { k = localStorage.getItem(COL_CYCLE_STORE); } catch (_) {}
+    return COL_CYCLE.some(m => m.key === k) ? k : 'gal';
+  })();
+  // Modes whose column header sorts the list (highest share first).
+  const COL_SORTABLE = new Set(['xwin', 'xodds']);
+
+  function colMeta() {
+    return COL_CYCLE.find(m => m.key === colMode) || COL_CYCLE[0];
+  }
+
+  function setColMode(key) {
+    colMode = key;
+    try { localStorage.setItem(COL_CYCLE_STORE, key); } catch (_) {}
+    instances.forEach(x => x.refreshGal(true));
+  }
+
+  function stepCol(dir) {
+    const n = COL_CYCLE.length;
+    const i = COL_CYCLE.findIndex(m => m.key === colMode);
+    setColMode(COL_CYCLE[(i + dir + n) % n].key);
+  }
+
+  function stepGps(dir) {
+    const n = PREV_GPS_METRICS.length;
+    const i = PREV_GPS_METRICS.findIndex(m => m.key === gpsMetric().key);
+    try { localStorage.setItem(PREV_GPS_STORE, PREV_GPS_METRICS[(i + dir + n) % n].key); } catch (_) {}
+    instances.forEach(x => x.refreshGps());
+  }
 
   /* raceId -> ranked row keys, strongest first. The store lives in
      _layout.html (see RankOrders) so a saved coupon can restore an order
@@ -1771,23 +2282,11 @@
     return shortName(full || s);
   }
 
-  function personCell(short, full, href) {
+  function personCell(short, full, href, note) {
     if (!short) return '';
-    if (!href) return `<span title="${esc(full || '')}">${esc(short)}</span>`;
-    return `<a href="${esc(href)}" title="${esc(full || '')}">${esc(short)}</a>`;
-  }
-
-  // Trainer form: avg finishing percentile of recent runners (100 = wins).
-  // Same two-step mix + weight as gal% — 65/75 hot, 40/30 cold.
-  function tformCell(v) {
-    if (v == null) return '';
-    const n = v / 10;
-    let cls = 'sform-lo';
-    if (n >= 75) cls = 'sform-hot-hi';
-    else if (n >= 65) cls = 'sform-hot';
-    else if (n <= 30) cls = 'sform-cold-hi';
-    else if (n <= 40) cls = 'sform-cold';
-    return `<span class="${cls}">${n.toFixed(1)}</span>`;
+    const title = esc([full, note].filter(Boolean).join(' · '));
+    if (!href) return `<span title="${title}">${esc(short)}</span>`;
+    return `<a href="${esc(href)}" title="${title}">${esc(short)}</a>`;
   }
 
   function winPctNum(e, which) {
@@ -1830,21 +2329,14 @@
     return Math.round((w / s) * 100);
   }
 
-  function cleanPct(e, which) {
-    const n = cleanPctNum(e, which);
-    return n == null ? '' : n + '%';
-  }
-
-  // One cell: win%/clean%. Win uses panel-ink + weight steps; clean keeps
-  // muted ink with the same weight tiers. The slash stays regular weight.
-  function winCleanPct(e, which) {
+  // Win% in panel-ink with weight steps; the win rate over clean starts
+  // (no galopp, no DQ) is the value's tooltip.
+  function winPctCell(e, which) {
     const n = winPctNum(e, which);
     if (n == null) return '';
-    const win = `<span class="sl-win-pct ${pctWeightClass(n)}">${n}%</span>`;
     const cn = cleanPctNum(e, which);
-    if (cn == null) return win;
-    const clean = `<span class="${pctWeightClass(cn)}">${cn}%</span>`;
-    return `${win}<span class="sl-win-clean">/${clean}</span>`;
+    const title = cn == null ? '' : ` title="${cn}% clean"`;
+    return `<span class="sl-win-pct ${pctWeightClass(n)}"${title}>${n}%</span>`;
   }
 
   // Lifetime earnings in thousands of kronor — 4000 → 4, 790900 → 791.
@@ -1859,12 +2351,13 @@
     return e.xgal_track ?? e.xgal_general;
   }
 
+  // Panel ink like the other cycle values; weight climbs with the risk.
   function galCell(e) {
     const risk = activeXgal(e);
     if (risk == null) return '<span class="sl-gal-empty"></span>';
     const p = risk * 100;
-    const cls = p >= 25 ? 'sl-gal-hi' : p >= 15 ? 'sl-gal-mid' : 'sl-gal-lo';
-    return `<span class="${cls}">${p.toFixed(0)}%</span>`;
+    const w = p >= 40 ? 'sl-pct-w4' : p >= 25 ? 'sl-pct-w3' : p >= 15 ? 'sl-pct-w2' : 'sl-pct-w1';
+    return `<span class="sl-x ${w}">${p.toFixed(0)}%</span>`;
   }
 
   function pctTrendStep(trend) {
@@ -2016,7 +2509,6 @@
         <td class="sl-prev-gap" aria-hidden="true"></td>
         <td class="muted sl-prev-drv">${esc(r.driver_short || r.driver_name || '')}</td>
         <td class="muted sl-prev-trn">${esc(displayPersonShort(r.trainer_short, r.trainer_name))}</td>
-        <td class="sl-prev-form" title="trainer form">${tformCell(r.tf_perf)}</td>
         <td class="sl-prev-eq"><span class="sl-prev-eq__inner">${shoeCells(r)}${sulkyCell(r)}</span></td>
         <td class="muted num sl-prev-gps" data-prev-gps-cell${gpsCellAttrs(gps)}>${esc(gps[gpsMetric().key] || '')}</td>
         <td class="muted sl-prev-odds" title="odds">${esc(r.odds_text || '')}</td>
@@ -2036,7 +2528,6 @@
         <col class="sl-prev-col-flex">
         <col class="sl-prev-col-drv">
         <col class="sl-prev-col-trn">
-        <col class="sl-prev-col-form">
         <col class="sl-prev-col-eq">
         <col class="sl-prev-col-gps">
         <col class="sl-prev-col-odds">
@@ -2072,7 +2563,7 @@
     let upcoming = false;
     let destroyed = false;
 
-    const inst = { raceId, container, sync, refreshGps, refreshGal, refreshPct, refreshOdds, syncReduced };
+    const inst = { raceId, container, sync, refreshGps, refreshGal, isSorted: () => !!sortKey, refreshPct, refreshOdds, syncReduced, syncThumbEdit, syncCursorTool, syncSelected, syncRank, syncRankOrder, rankPaintMarks, refreshAgent, setReservesMode: toggleReservesMode, resetBuild, closeHistoryOn };
     instances.add(inst);
 
     function couponCtx() {
@@ -2104,6 +2595,7 @@
         (a.number == null ? 999 : a.number) - (b.number == null ? 999 : b.number));
 
       if (upcoming) await loadLive();
+      publishField();
       if (destroyed) return null;
       render();
       loadGpsInBackground();
@@ -2118,23 +2610,103 @@
         if (!r.ok) return;
         const d = await r.json();
         (d.starts || []).forEach(s => { if (s.number != null) live[s.number] = s; });
+        publishField();
       } catch (_) { /* market is a bonus, not a requirement */ }
+    }
+
+    function publishField() {
+      const horses = [];
+      const market = {};
+      entries.forEach(e => {
+        if (e.number == null || e.withdrawn) return;
+        const s = live[e.number];
+        if (s && s.scratched) return;
+        horses.push(Number(e.number));
+        if (s && s.betDist != null) market[e.number] = Number(s.betDist);
+      });
+      window.RaceFields = window.RaceFields || { byRace: {} };
+      RaceFields.byRace[raceId] = { horses, market };
+    }
+
+    function inField(e) {
+      const s = live[e.number];
+      return !(e.withdrawn || (s && s.scratched));
+    }
+
+    const COL_FIELD = { xodds: 'xodds_p', xlead: 'xlead', xwin: 'xwin' };
+
+    /* Sorting by xwin/xodds is a view over rank mode, never a ranking: it
+       is not stored, and clearing it brings back the saved order. Moving
+       a row while sorted adopts the sorted order as the ranking. */
+    let sortKey = null;              // the COL_SORTABLE mode the list is sorted by
+    let sortOwnsRank = false;        // rank mode was off until the sort turned it on
+
+    // Stored shares cover the declared field; scratches hand theirs back.
+    function colShare(e, f) {
+      if (e[f] == null || !inField(e)) return null;
+      let tot = 0;
+      entries.forEach(x => { if (x[f] != null && inField(x)) tot += x[f]; });
+      return tot > 0 ? e[f] / tot : null;
+    }
+
+    function colCell(e) {
+      if (colMode === 'gal') return galCell(e);
+      const f = COL_FIELD[colMode];
+      const p = f ? colShare(e, f) : null;
+      if (p == null) return '<span class="sl-gal-empty"></span>';
+      const n = p * 100;
+      const w = pctWeightClass(n);
+      if (colMode === 'xlead') {
+        return `<span class="sl-x ${w}" title="${n.toFixed(1)}% to lead after 100–150 m">${n < 0.5 ? '0' : n.toFixed(0)}%</span>`;
+      }
+      const s = live[e.number];
+      const market = s && s.winOdds != null ? ` · market ${s.winOdds.toFixed(2)}` : '';
+      if (colMode === 'xwin') {
+        return `<span class="sl-x ${w}" title="${n.toFixed(1)}% to win · fair odds ${Math.min(999, 1 / p).toFixed(2)}${market}">${n < 0.5 ? '0' : n.toFixed(0)}%</span>`;
+      }
+      const odds = Math.min(999, Math.max(1.01, (raceData?.xodds_payout || 0.85) / p));
+      return `<span class="sl-x ${w}" title="xodds ${odds.toFixed(2)}${market}">${odds.toFixed(2)}</span>`;
+    }
+
+    function colHeadLabel() {
+      if (colMode !== 'gal') return colMeta().label;
+      if (!raceData?.gal_models?.has_track_model) return 'gal%';
+      return galMode === 'general' ? 'xgal' : 'xgal*';
+    }
+
+    function colHeadTitle() {
+      if (colMode === 'gal' && raceData?.gal_models?.has_track_model) return 'click to switch galopp model';
+      if (sortKey === colMode) return `${colMeta().desc} — click to restore your ranking`;
+      if (COL_SORTABLE.has(colMode)) return `${colMeta().desc} — click to sort`;
+      return colMeta().desc;
+    }
+
+    function colHeadClass() {
+      let cls = 'sl-c-gal';
+      if (colMode === 'gal' && raceData?.gal_models?.has_track_model) cls += ' is-toggle';
+      if (COL_SORTABLE.has(colMode)) cls += ' is-sortable';
+      if (sortKey && sortKey === colMode) cls += ' is-sorted';
+      return cls;
+    }
+
+    function colHeadInner() {
+      const caret = sortKey && sortKey === colMode
+        ? '<svg class="sl-sort-caret" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>'
+        : '';
+      return `<span>${esc(colHeadLabel())}</span>${caret}`;
     }
 
     function headHtml() {
       const m = gpsMetric();
-      const galMeta = raceData?.gal_models;
-      const galClickable = !!galMeta?.has_track_model;
-      const galLabel = galClickable ? (galMode === 'general' ? 'xgal' : 'xgal*') : 'gal%';
       const numHead = pickableEntries().length
         ? `<button type="button" class="sl-pick-toggle" data-sl-pick-toggle>${esc(pickToggleLabel())}</button>`
         : '#';
       return `<div class="sl-row sl-row--head">
         <button type="button" class="sl-rank-toggle" data-rank-toggle title="ranking mode" aria-label="ranking mode">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h4v5H2v-5Zm7-5h4v10H9V12Zm7-5h4v15h-4V7ZM2 20h4v1H2v-1Zm7 0h4v1H9v-1Zm7 0h4v1h-4v-1Z"/></svg>
+          ${typeof rankToggleHtml === 'function' ? rankToggleHtml() : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h4v5H2v-5Zm7-5h4v10H9V12Zm7-5h4v15h-4V7ZM2 20h4v1H2v-1Zm7 0h4v1H9v-1Zm7 0h4v1h-4v-1Z"/></svg>'}
         </button>
         <button type="button" class="sl-system-toggle" data-system-toggle title="weights" aria-label="weights">
-          <span class="sl-system-toggle__omega" aria-hidden="true">ω</span>
+          ${typeof weightsToggleHtml === 'function' ? weightsToggleHtml() : '<span class="sl-system-toggle__omega" aria-hidden="true">ω</span>'}
         </button>
         <div class="sl-row__cells">
           <span class="sl-c-num">${numHead}</span>
@@ -2143,14 +2715,11 @@
             <span class="sl-c-drv">driver</span>
             <span class="sl-c-trn">trainer</span>
           </span>
-          <span class="sl-c-tform" title="trainer form">form</span>
           <span class="sl-c-eq"></span>
-          <span class="sl-c-gps" title="xLabs GPS — ${esc(m.desc)}. Click to switch metric.">
-            <button type="button" class="gps-toggle" data-prev-gps-th>${esc(m.label)}</button>
-          </span>
-          <span class="sl-c-gal"${galClickable ? ' data-gal-toggle role="button" tabindex="0" title="click to switch galopp model"' : ''}>${galLabel}</span>
-          <span class="sl-c-win" title="win%/clean%">win%</span>
-          <span class="sl-c-sek" title="lifetime earnings, thousands of kronor">kkr</span>
+          <span class="sl-c-gps" data-gps-head title="xLabs GPS — ${esc(m.desc)}">gps</span>
+          <span class="${colHeadClass()}" data-col-head role="button" tabindex="0" title="${esc(colHeadTitle())}">${colHeadInner()}</span>
+          <span class="sl-c-win" title="win% — hover a value for its clean%">win%</span>
+          <span class="sl-c-sek" title="lifetime earnings, thousands of kronor">tkr</span>
           <span class="sl-c-gap" aria-hidden="true"></span>
           <span class="sl-c-pct" title="row%">${PCT_MARK}</span>
           <span class="sl-c-odds">odds</span>
@@ -2158,10 +2727,32 @@
       </div>`;
     }
 
+    // Springspår is a Swedish volt thing: posts 6 and 7 counted within each
+    // distance group, which is not the same as start numbers 6 and 7.
+    function springTrack() {
+      return String(raceData?.country || '').toUpperCase() === 'SE'
+        && raceData?.start_method === 'V';
+    }
+
+    function onSpring(e, s) {
+      const post = Number(e.post != null ? e.post : s && s.post);
+      return post === 6 || post === 7;
+    }
+
     function rowHtml(e) {
       const s = live[e.number];
       const scratched = !!(e.withdrawn || (s && s.scratched));
       const pickable = upcoming && !scratched && e.number != null;
+      const spring = !scratched && springTrack() && onSpring(e, s);
+      // The card we hold may predate a driver change; the live pool names
+      // whoever drives now.
+      const swap = s && s.driverChanged ? s : null;
+      const drvShort = swap ? swap.driverShort : (e.driver_short || e.driver_name);
+      const drvFull = swap ? swap.driverName : e.driver_name;
+      const drvId = swap ? swap.driverId : e.driver_id;
+      const drvNote = swap && swap.originalDriverName
+        ? `replaces ${swap.originalDriverName}`
+        : (e.driver_changed ? 'changed after declaration' : '');
       const which = upcoming ? 'pre' : 'post';
       const lead = pickable
         ? `<span class="sl-c-num"></span>`
@@ -2176,12 +2767,14 @@
         : '';
       const pctHidden = pctRevealed ? '' : ' is-hidden';
       const oddsHidden = oddsRevealed ? '' : ' is-hidden';
-      return `<div class="sl-row${scratched ? ' sl-row--scratched' : ''}"
+      return `<div class="sl-row${scratched ? ' sl-row--scratched' : ''}${spring ? ' is-spring' : ''}"
                    data-rank-key="${esc(rankKeyFor(e))}"
                    ${e.number != null ? `data-num="${esc(e.number)}"` : ''}
                    ${pickable ? `data-sl-pick="${e.number}"` : ''}
                    ${e.horse_id ? `data-horse-id="${e.horse_id}"` : ''}>
         ${pickable ? '<span class="sl-row__ink" aria-hidden="true"></span>' : ''}
+        ${scratched ? '' : '<span class="sl-row__chance" aria-hidden="true"></span>'}
+        ${springTrack() ? '<span class="sl-row__fire" aria-hidden="true"></span>' : ''}
         ${badge}
         <button type="button" class="sl-rank-handle" data-rank-handle tabindex="-1"
                 aria-label="rank ${esc(e.horse_name || e.number || '')}">
@@ -2191,25 +2784,31 @@
             <rect x="0" y="9.7" width="56" height="1.7" rx="0.85"/>
           </svg>
         </button>
-        ${pickable ? '<span class="sl-row__cutband" aria-hidden="true"></span><span class="sl-row__cutveil" aria-hidden="true"></span><span class="sl-row__evenmark" aria-hidden="true"></span>' : ''}
+        ${scratched ? '' : `<button type="button" class="sl-rank-mark" data-rank-mark tabindex="-1"
+                aria-label="grade ${esc(e.horse_name || e.number || '')}"></button>
+        <button type="button" class="sl-chance-handle" data-chance-handle tabindex="-1"
+                aria-label="win chance ${esc(e.horse_name || e.number || '')}"></button>`}
+        ${pickable ? '<span class="sl-row__cutband" aria-hidden="true"></span><span class="sl-row__cutveil" aria-hidden="true"></span><span class="sl-row__evenmark" aria-hidden="true"></span><span class="sl-row__aimsum" aria-hidden="true"></span><span class="sl-row__aimmix" aria-hidden="true"></span><span class="sl-row__aimband" aria-hidden="true"></span>' : ''}
         ${scratched ? '' : '<span class="sl-system-share" data-system-share aria-hidden="true">0</span>'}
         ${pickable ? `<button type="button" class="sl-system-lock" data-system-lock tabindex="-1"
                 aria-label="weight ${esc(e.horse_name || e.number || '')}"></button>` : ''}
         ${pickable ? `<button type="button" class="sl-system-handle" data-system-handle tabindex="-1"
                 aria-label="weight ${esc(e.horse_name || e.number || '')}"><span
                 class="sl-system-readout" data-system-readout aria-hidden="true"></span></button>` : ''}
+        ${pickable ? `<button type="button" class="sl-aim-handle" data-aim-handle tabindex="-1"
+                aria-label="aim leverage at ${esc(e.horse_name || e.number || '')}"><span
+                class="sl-system-readout" data-aim-readout aria-hidden="true"></span></button>` : ''}
         <div class="sl-row__cells">
           ${lead}
           <span class="sl-c-horse">${horseCell(e)}</span>
           <span class="sl-c-people">
-            <span class="sl-c-drv">${personCell(e.driver_short || e.driver_name, e.driver_name, e.driver_id ? `/driver/${e.driver_id}` : null)}</span>
-            <span class="sl-c-trn">${personCell(e.trainer_short || e.trainer_name, e.trainer_name, e.trainer_id ? `/trainer/${e.trainer_id}` : null)}</span>
+            <span class="sl-c-drv${drvNote ? ' is-changed' : ''}">${personCell(drvShort, drvFull, drvId ? `/driver/${drvId}` : null, drvNote)}</span>
+            <span class="sl-c-trn${e.trainer_new ? ' is-new' : ''}">${personCell(e.trainer_short || e.trainer_name, e.trainer_name, e.trainer_id ? `/trainer/${e.trainer_id}` : null, e.trainer_new ? 'new trainer' : '')}</span>
           </span>
-          <span class="sl-c-tform">${tformCell(e.tf_perf)}</span>
           <span class="sl-c-eq">${shoeCells(e)}${sulkyCell(e)}</span>
           <span class="sl-c-gps" data-prev-gps-cell${gpsCellAttrs(e._gps)}>${esc((e._gps && e._gps[gpsMetric().key]) || '')}</span>
-          <span class="sl-c-gal" data-gal-cell>${galCell(e)}</span>
-          <span class="sl-c-win">${winCleanPct(e, which)}</span>
+          <span class="sl-c-gal" data-gal-cell>${colCell(e)}</span>
+          <span class="sl-c-win">${winPctCell(e, which)}</span>
           <span class="sl-c-sek">${sekCell(e, which)}</span>
           <span class="sl-c-gap" aria-hidden="true"></span>
           <span class="sl-c-pct" data-pct-cell><span class="sl-pct__val${pctHidden}">${pctCell(s)}</span><span class="sl-pct__eye" aria-hidden="true">${EYE_CLOSED}</span></span>
@@ -2247,6 +2846,10 @@
       // the row expansion rides the unfold, so it skips the stagger wave.
       syncReduced({ animate: false });
       syncPrevFocus();
+      toggleReservesMode(reservesModeOn);
+      syncRank();
+      syncCursorTool();
+      syncSelected();
     }
 
     function wire() {
@@ -2259,13 +2862,32 @@
           const toggle = async ev => {
             ev.stopPropagation();
             ev.preventDefault();
+            if (cursorTool() === 'select') {
+              selectClick(row, ev.shiftKey);
+              return;
+            }
             if (reservesActive) {
               handleReserveClick(row, number);
+              return;
+            }
+            if (ev.shiftKey && row.classList.contains('is-picked')) {
+              const kept = pickTrimAt(row);
+              if (kept.length !== currentPicks().length) await setLegPicks(kept);
+              return;
+            }
+            const run = ev.shiftKey ? pickRunTo(row) : null;
+            if (run) {
+              run.forEach(removeFromReserves);
+              await setLegPicks([...new Set([...currentPicks(), ...run])]);
               return;
             }
             removeFromReserves(number);
             await pick(row, number);
           };
+          // A mouse press must not focus the badge: once it holds focus, the
+          // next Shift press counts as keyboard use and paints the focus
+          // ring. It also keeps shift-click from selecting text across rows.
+          badge.addEventListener('mousedown', ev => ev.preventDefault());
           badge.addEventListener('click', toggle);
           badge.addEventListener('keydown', ev => {
             if (ev.key !== 'Enter' && ev.key !== ' ') return;
@@ -2276,10 +2898,27 @@
 
       container.querySelectorAll('.sl-row[data-horse-id]').forEach(row => {
         row.addEventListener('click', ev => {
-          if (ev.target.closest('a, .sl-row__badge, [data-pct-cell], [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-prev-gps-th], [data-gal-toggle], [data-sl-pick-toggle], [data-rank-handle], [data-rank-seam], [data-rank-toggle], [data-system-toggle], [data-system-share], [data-system-handle], [data-system-lock]')) return;
+          if (ev.target.closest(ROW_CONTROLS)) return;
           toggleHistory(row);
         });
       });
+
+      // A host can open its own view of the horse from the name; a modified
+      // click still goes to the horse page.
+      if (typeof opts.onHorse === 'function') {
+        container.querySelectorAll('.sl-row[data-num] .sl-c-horse__name').forEach(nameEl => {
+          nameEl.addEventListener('click', ev => {
+            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+            if (cursorTool() !== 'cursor') return;
+            const row = nameEl.closest('.sl-row');
+            const entry = entries.find(x => String(x.number) === row.dataset.num);
+            if (!entry) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            opts.onHorse({ entry, row, nameEl, raceId, raceData, live: live[entry.number] || null });
+          });
+        });
+      }
 
       // Market share: a cell reveals its row; the footer eye reveals every leg.
       container.addEventListener('click', ev => {
@@ -2300,26 +2939,18 @@
         }
       }, true);
 
-      const gpsBtn = container.querySelector('[data-prev-gps-th]');
-      if (gpsBtn) gpsBtn.addEventListener('click', ev => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const i = PREV_GPS_METRICS.findIndex(m => m.key === gpsMetric().key);
-        const next = PREV_GPS_METRICS[(i + 1) % PREV_GPS_METRICS.length].key;
-        try { localStorage.setItem(PREV_GPS_STORE, next); } catch (_) {}
-        instances.forEach(x => x.refreshGps());
-      });
-
-      const galBtn = container.querySelector('[data-gal-toggle]');
-      if (galBtn) {
-        const cycle = () => {
+      const colHead = container.querySelector('[data-col-head]');
+      if (colHead) {
+        const act = () => {
+          if (COL_SORTABLE.has(colMode)) { sortToggle(); return; }
+          if (colMode !== 'gal' || !raceData?.gal_models?.has_track_model) return;
           galMode = galMode === 'track' ? 'general' : 'track';
           try { localStorage.setItem('galModelMode', galMode); } catch (_) {}
           instances.forEach(x => x.refreshGal());
         };
-        galBtn.addEventListener('click', ev => { ev.stopPropagation(); cycle(); });
-        galBtn.addEventListener('keydown', ev => {
-          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); cycle(); }
+        colHead.addEventListener('click', ev => { ev.stopPropagation(); act(); });
+        colHead.addEventListener('keydown', ev => {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); act(); }
         });
       }
 
@@ -2327,7 +2958,7 @@
       const leg = container.closest('.game-leg');
       if (leg) {
         leg.addEventListener('reserves:toggled', ev => {
-          toggleReservesMode(ev.detail.on);
+          applyReservesMode(!!(ev.detail && ev.detail.on));
         });
         const footEye = leg.querySelector('[data-pct-toggle]');
         if (footEye && !footEye.dataset.slPctBound) {
@@ -2347,6 +2978,38 @@
             setOddsRevealed(!oddsRevealed);
           });
         }
+        const colCycle = leg.querySelector('[data-col-cycle]');
+        if (colCycle && !colCycle.dataset.slCycleBound) {
+          colCycle.dataset.slCycleBound = '1';
+          colCycle.addEventListener('click', ev => {
+            const b = ev.target.closest('[data-col-step]');
+            if (!b) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            stepCol(Number(b.dataset.colStep));
+          });
+        }
+        const colLabel = leg.querySelector('[data-col-cycle-label]');
+        if (colLabel) {
+          colLabel.textContent = colMeta().label;
+          colLabel.title = colMeta().desc;
+        }
+        const gpsCycle = leg.querySelector('[data-gps-cycle]');
+        if (gpsCycle && !gpsCycle.dataset.slCycleBound) {
+          gpsCycle.dataset.slCycleBound = '1';
+          gpsCycle.addEventListener('click', ev => {
+            const b = ev.target.closest('[data-gps-step]');
+            if (!b) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            stepGps(Number(b.dataset.gpsStep));
+          });
+        }
+        const gpsLabel = leg.querySelector('[data-gps-cycle-label]');
+        if (gpsLabel) {
+          gpsLabel.textContent = gpsMetric().label;
+          gpsLabel.title = gpsMetric().desc;
+        }
       }
       paintReserveBadges();
 
@@ -2365,8 +3028,12 @@
           ev.preventDefault();
           ev.stopPropagation();
           // Rank and weights/reduce stack. Either can be on, both, or neither.
-          if (rankIsActive()) rankDeactivate();
-          else rankActivate();
+          // Like weighting, rank mode is coupon-wide and flips every leg.
+          const on = window.RankMode ? !RankMode.isOn() : !rankIsActive();
+          if (window.RankMode) RankMode.setOn(on);
+          else if (on) rankActivate();
+          else rankDeactivate();
+          if (on) showDockFamily('rank');
         });
       }
 
@@ -2376,9 +3043,11 @@
           ev.preventDefault();
           ev.stopPropagation();
           // Weighting is coupon-wide, so this flips every leg, not just this one.
-          if (window.Reduced) Reduced.setOn(!reducedOn());
-          else if (systemIsActive()) systemDeactivate();
-          else systemActivate();
+          const on = window.Reduced ? !reducedOn() : !systemIsActive();
+          if (window.Reduced) Reduced.setOn(on);
+          else if (on) systemActivate();
+          else systemDeactivate();
+          if (on) showDockFamily('reduce');
         });
       }
     }
@@ -2402,6 +3071,28 @@
     let rankWired = false;
 
     function slRoot() { return container.querySelector('.sl'); }
+
+    // The leg footer's tools row widens with the gutters, so it rides at the
+    // tail of the expand / collapse wave.
+    function legFootRow() {
+      return container.closest('.game-leg')?.querySelector('.game-leg__foot-row') || null;
+    }
+
+    // Gutters open and close top→bottom, 30ms per row. Returns a reset.
+    const GUTTER_WAVE_MS = 30;
+    function gutterWaveMs(wave) { return wave.length * GUTTER_WAVE_MS + 350; }
+    function staggerGutterWave(wave, targets) {
+      wave.forEach((el, i) => {
+        targets(el).forEach(t => { t.style.transitionDelay = `${i * GUTTER_WAVE_MS / 1000}s`; });
+      });
+      return () => wave.forEach(el => {
+        targets(el).forEach(t => { t.style.transitionDelay = ''; });
+      });
+    }
+
+    let rankCloseTimer = null;
+    let systemCloseTimer = null;
+
     function rankIsActive() {
       const sl = slRoot();
       return !!sl && sl.classList.contains('is-ranked');
@@ -2428,7 +3119,7 @@
     }
 
     // Move rows (with any open history panel) into the given order.
-    function rankCommit(rows) {
+    function rankArrange(rows) {
       const sl = slRoot();
       if (!sl) return;
       const units = rows.map(row => ({ row, prev: rankPrevOf(row) }));
@@ -2438,7 +3129,123 @@
         if (u.prev) frag.appendChild(u.prev);
       });
       sl.appendChild(frag);
-      rankOrders.set(raceId, rows.map(rankKeyOf));
+    }
+
+    // Start order with scratched horses sunk.
+    function rankStartOrder() {
+      const rows = rankRows();
+      const base = rankBaseOrder ? rankBaseOrder.filter(el => rows.includes(el)) : rows;
+      rows.forEach(r => { if (!base.includes(r)) base.push(r); });
+      const scratched = r => r.classList.contains('sl-row--scratched');
+      return [...base.filter(r => !scratched(r)), ...base.filter(scratched)];
+    }
+
+    // A race nobody has ranked opens on the market's order: most played
+    // first by row%, or by earnings before the betting opens. Scratched
+    // horses sink and ties keep the start order.
+    function rankAutoOrder() {
+      const base = rankStartOrder();
+      const scratched = r => r.classList.contains('sl-row--scratched');
+      const active = base.filter(r => !scratched(r));
+      const byNum = new Map(entries.map(e => [String(e.number), e]));
+      const rowPct = r => Number(live[r.dataset.num]?.betDist);
+      const earned = r => {
+        const e = byNum.get(r.dataset.num);
+        return Number(e && (upcoming ? e.pre_prize_kr : e.post_prize_kr));
+      };
+      const score = active.some(r => rowPct(r) > 0) ? rowPct : earned;
+      const valueOf = r => (Number.isFinite(score(r)) ? score(r) : -1);
+      const at = new Map(base.map((r, i) => [r, i]));
+      active.sort((a, b) => (valueOf(b) - valueOf(a)) || (at.get(a) - at.get(b)));
+      return [...active, ...base.filter(scratched)];
+    }
+
+    function rankByAuto(list) {
+      const at = new Map(rankAutoOrder().map((r, i) => [r, i]));
+      return [...list].sort((a, b) => (at.get(a) ?? Infinity) - (at.get(b) ?? Infinity));
+    }
+
+    // Highest share first (lowest xodds); no value and scratched sink.
+    function sortRows() {
+      const f = COL_FIELD[sortKey];
+      const byNum = new Map(entries.map(e => [String(e.number), e]));
+      const base = rankStartOrder();
+      const at = new Map(base.map((r, i) => [r, i]));
+      const share = r => {
+        const e = byNum.get(r.dataset.num);
+        const p = e && f ? colShare(e, f) : null;
+        return p == null ? -1 : p;
+      };
+      const scratched = r => r.classList.contains('sl-row--scratched');
+      const active = base.filter(r => !scratched(r));
+      active.sort((a, b) => (share(b) - share(a)) || (at.get(a) - at.get(b)));
+      return [...active, ...base.filter(scratched)];
+    }
+
+    function sortPaintHead() {
+      const head = container.querySelector('.sl-row--head .sl-c-gal');
+      if (!head) return;
+      head.className = colHeadClass();
+      head.innerHTML = colHeadInner();
+      head.title = colHeadTitle();
+    }
+
+    function sortToggle() {
+      if (sortKey) { sortClear(); return; }
+      sortKey = colMode;
+      sortPaintHead();
+      const on = window.RankMode ? RankMode.isOn() : rankIsActive();
+      if (!on) {
+        // rankActivate lays the sort out once the gutter has opened.
+        sortOwnsRank = true;
+        if (window.RankMode) RankMode.setOn(true);
+        else rankActivate();
+        showDockFamily('rank');
+        return;
+      }
+      if (rankIsReady()) rankAnimate(() => rankArrange(sortRows()));
+    }
+
+    function sortClear() {
+      if (!sortKey) return;
+      sortKey = null;
+      const owned = sortOwnsRank;
+      sortOwnsRank = false;
+      sortPaintHead();
+      if (!rankIsActive()) return;
+      if (owned && ![...instances].some(x => x.isSorted())) {
+        // Back to the saved order before leaving, so the exit doesn't store the sort.
+        rankArrange(rankOpeningOrder());
+        if (window.RankMode) RankMode.setOn(false);
+        else rankDeactivate();
+        return;
+      }
+      rankAnimate(() => rankArrange(rankOpeningOrder()));
+    }
+
+    // A row moved while sorted: the sorted order becomes the ranking.
+    function sortAdopt() {
+      if (!sortKey) return;
+      sortKey = null;
+      sortOwnsRank = false;
+      sortPaintHead();
+    }
+
+    // The market's order is nobody's opinion either, so it is not stored
+    // while nothing else is. Rank mode opens on every leg at once, and
+    // saving it there would hand out reserves instead of leaving them
+    // unset, and freeze an order that should follow the market.
+    function rankSave(rows) {
+      const keys = rows.map(rankKeyOf);
+      const plain = rankAutoOrder().map(rankKeyOf);
+      const same = keys.length === plain.length && keys.every((k, i) => k === plain[i]);
+      if (same && !(rankOrders.get(raceId) || []).length) return;
+      rankOrders.set(raceId, keys);
+    }
+
+    function rankCommit(rows) {
+      rankArrange(rows);
+      rankSave(rows);
     }
 
     // Reorder under a FLIP so rows glide from where they were to where they land.
@@ -2482,15 +3289,21 @@
        window.Reduced and every leg simply follows it. */
 
     let systemDrag = null;
+    let systemDropAt = 0;
     let systemWired = false;
 
-    function reducedOn() { return !!(window.Reduced && Reduced.isOn()); }
+    // Weighting belongs to the coupon being built: while another game's
+    // build is in progress, this game's lists stay plain.
+    function reducedOn() {
+      if (!window.Reduced || !Reduced.isOn()) return false;
+      const d = window.Coupon ? Coupon.load() : null;
+      return !(d && gameId && d.gameId !== gameId);
+    }
 
     // Reduce mode: a thumb dragged below its weight parks a cap there and the
     // other picks stay put, instead of absorbing the slack.
     function reducingOn() {
-      return !!(window.Reduced && Reduced.isOn() && Reduced.isReducing()
-                && Reduced.isReducible(gameType));
+      return reducedOn() && Reduced.isReducing() && Reduced.isReducible(gameType);
     }
 
     function systemIsActive() {
@@ -2501,8 +3314,9 @@
     function systemWave() {
       const sl = slRoot();
       if (!sl) return [];
-      return [...sl.children].filter(el =>
-        el.classList.contains('sl-row') || el.classList.contains('sl-tillagg'));
+      return [...[...sl.children].filter(el =>
+        el.classList.contains('sl-row') || el.classList.contains('sl-tillagg')),
+        legFootRow()].filter(Boolean);
     }
 
     function systemStaggerTargets(el) {
@@ -2545,19 +3359,71 @@
        between them, which is what the badge slices its pie on.
 
        Above 100 the coverage no longer fits the track, so the thumb wraps:
-       --sl-fill is the overflow (0 at 100, 1 at 200) and the weight bar
+       --sl-fill is the overflow (0 at 100, 1 at 200, lapping again for
+       every hundred after) and the weight bar
        stays on the pick's own share. Crossing 100 therefore looks like a
        reduced row in cyan, and the two views still agree at exactly 100. */
+    /* Round each horse so the printed numbers add up to the rounded total.
+       Rounding each 33.333 to 33 first makes three equal horses read 99
+       and paints the leg as reduced. */
+    function displayCoverage(picks, live, caps) {
+      const parts = (picks || []).map(n => {
+        const w = Math.max(0, Number(live && live[n]) || 0);
+        const cap = caps && caps[n] != null ? Number(caps[n]) : w;
+        const value = Math.max(0, Number.isFinite(cap) ? cap : 0);
+        const base = Math.floor(value + 1e-8);
+        return { n, show: base, frac: value - base };
+      });
+      const raw = (picks || []).reduce((sum, n) => {
+        const w = Math.max(0, Number(live && live[n]) || 0);
+        const cap = caps && caps[n] != null ? Number(caps[n]) : w;
+        return sum + Math.max(0, Number.isFinite(cap) ? cap : 0);
+      }, 0);
+      const target = Math.round(raw);
+      let short = target - parts.reduce((sum, row) => sum + row.show, 0);
+      const high = parts.slice().sort((a, b) => b.frac - a.frac || a.n - b.n);
+      let i = 0;
+      while (short > 0 && high.length && i < high.length * 4) {
+        high[i % high.length].show += 1;
+        short -= 1;
+        i += 1;
+      }
+      const low = parts.slice().sort((a, b) => a.frac - b.frac || b.show - a.show);
+      i = 0;
+      while (short < 0 && low.length && i < low.length * 4) {
+        const donor = low[i % low.length];
+        i += 1;
+        if (donor.show <= 0) continue;
+        donor.show -= 1;
+        short += 1;
+      }
+      const text = {};
+      parts.forEach(row => { text[row.n] = row.show; });
+      return { text, total: target };
+    }
+
+    /* Where a coverage sits on the track. Past 100 the thumb laps: every
+       further hundred starts again from the left, so 150 and 250 sit where
+       50 does. */
+    function systemLapEdge(cov) {
+      if (cov <= 100) return cov;
+      const r = cov % 100;
+      return r < 1e-9 ? 100 : r;
+    }
+
     function systemPaint(weights, picks, locks, caps) {
       const picked = new Set(picks);
       const locked = new Set(locks || []);
       const reduced = reducedOn();
       const cut = window.Reduced ? Reduced.overrides(picks, weights, caps) : {};
+      const aim = systemAimPaint(weights, picks, caps);
+      const extras = systemAimSum(weights, picks, caps);
       // Where a flat split would put every thumb in the leg. A lone pick has
       // nothing to be even against, so it gets no tick.
       const even = picks.length > 1 ? 100 / picks.length : 0;
-      // Headroom above 100, which is what the lever bloom is measured against.
-      const levTop = Math.max(1, (window.Reduced ? Reduced.MAX : 200) - 100);
+      // The lever bloom is full at twice the leg; deeper levers stay at full.
+      const levTop = 100;
+      const shown = displayCoverage(picks, weights, cut);
       container.querySelectorAll('[data-system-share]').forEach(el => {
         const row = el.closest('.sl-row');
         const num = parseInt(row?.dataset.slPick, 10);
@@ -2567,7 +3433,8 @@
         const cov = cap != null ? cap : w;
         const isCut = cap != null && cap < w;
         const isLev = cap != null && cap > w;
-        el.textContent = String(Math.round(cov));
+        el.textContent = String(on && shown.text[num] != null
+          ? shown.text[num] : Math.round(cov));
         el.classList.toggle('is-on', on);
         el.classList.toggle('is-locked', on && locked.has(num));
         el.classList.toggle('is-cut', isCut);
@@ -2582,9 +3449,29 @@
         const wasOn = row.dataset.fillOn === '1';
         row.dataset.fillOn = on ? '1' : '0';
         row.classList.toggle('has-even', on && reduced && even > 0);
+        row.classList.toggle('is-aim-anchor', !!aim && aim.anchor === num);
+        const ownEdge = systemLapEdge(cov);
+        if (aim && aim.shares) {
+          // Secondary leverage is drawn after this row's own live coverage.
+          // A reduced row therefore mixes blue strokes into its yellow
+          // released segment first; an already-levered row starts after its
+          // own cyan segment. Values beyond the track wait for the same
+          // second-lap gesture primary leverage uses.
+          const extra = aim.amount * (Math.max(0, aim.shares[num] || 0) / 100);
+          row.style.setProperty('--sl-aim-start',
+                                String(Math.max(0, Math.min(1, ownEdge / 100))));
+          row.style.setProperty('--sl-aim-end',
+                                String(Math.max(0, Math.min(1, (ownEdge + extra) / 100))));
+        } else {
+          row.style.setProperty('--sl-aim-start', '0');
+          row.style.setProperty('--sl-aim-end', '0');
+        }
+        const piled = reduced ? Math.max(0, Number(extras[num]) || 0) : 0;
+        row.classList.toggle('has-aim-sum', reduced && piled > 0.05);
+        row.style.setProperty('--sl-aim-sum',
+          String(Math.max(0, Math.min(1, (ownEdge + piled) / 100))));
         if (on && reduced) {
-          const overflow = cov > 100;
-          const fill = Math.max(0, Math.min(1, (overflow ? cov - 100 : cov) / 100));
+          const fill = Math.max(0, Math.min(1, systemLapEdge(cov) / 100));
           const weightEdge = Math.max(0, Math.min(1, w / 100));
           if (!wasOn) row.classList.add('is-fill-jump');
           row.style.setProperty('--sl-fill', String(fill));
@@ -2616,17 +3503,111 @@
       refreshFootSum(weights, cut);
     }
 
+    /* What this leg should draw while some lever is being aimed.
+
+       Three answers: nothing, when no lever has focus or weighting is off;
+       an anchor, when the focused lever lives in this very race and the
+       leg only has to say which row it is; or a set of shares, when this is
+       one of the legs the lever is pointed at. `base` is where the stake
+       would land untouched, `shares` where it has been aimed — the two
+       ends of the striped band. */
+    /* Incoming extras from every foreign lever, stacked. The sum tick
+       reads this; the focused lever's stripes still come from systemAimPaint. */
+    function systemAimSum(weights, picks, caps) {
+      if (!window.Reduced || !reducedOn() || !reducingOn() || !picks.length) {
+        return {};
+      }
+      const cov = Reduced.coverage(picks, weights, caps);
+      const focus = window.LeverFocus ? LeverFocus.active() : null;
+      const live = (focus && systemDrag && systemDrag.aiming && systemDrag.nextAim)
+        ? { raceId: focus.raceId, horse: focus.horse, shares: systemDrag.nextAim }
+        : null;
+      return Reduced.aimedExtras(raceId, picks, weights, cov, live);
+    }
+
+    function systemAimPaint(weights, picks, caps) {
+      const sl = slRoot();
+      const focus = window.LeverFocus ? LeverFocus.active() : null;
+      const live = focus && reducedOn() && reducingOn();
+      const target = live && focus.raceId !== raceId;
+      const aimMode = target && window.Reduced
+        ? Reduced.aimModeFor(focus.raceId, focus.horse, raceId)
+        : 'custom';
+      if (sl) {
+        sl.classList.toggle('is-aim-mode',
+                            !!(live && window.LeverFocus && LeverFocus.isOn()));
+        sl.classList.toggle('is-aiming', !!target);
+        sl.classList.toggle('is-aim-slope', !!target && aimMode === 'slope');
+        sl.classList.toggle('is-aim-auto', !!target && aimMode === 'auto');
+        sl.classList.toggle('is-aim-market', !!target && aimMode === 'market');
+        sl.classList.toggle('is-aim-cascade', !!target && aimMode === 'cascade');
+        sl.classList.toggle('is-aim-uniform', !!target && aimMode === 'uniform');
+        sl.classList.toggle('is-aim-top', !!target && aimMode === 'top');
+        sl.classList.toggle('is-aim-multiplied', !!target && aimMode === 'multiplied');
+        sl.classList.toggle('is-aim-forced',
+          !!target && picks.length < 2 && aimMode !== 'cascade' && aimMode !== 'multiplied');
+      }
+      if (!live) return null;
+      if (focus.raceId === raceId) {
+        // Drag the anchor back under its own weight and there is no longer a
+        // sub-coupon to aim, so the mode lets itself go.
+        const cov = window.Reduced ? Reduced.coverage(picks, weights, caps) : {};
+        const w = Number(weights[focus.horse]) || 0;
+        if (!(picks.includes(focus.horse) && (cov[focus.horse] || 0) > w + 0.05)) {
+          LeverFocus.clear();
+          return null;
+        }
+        return { anchor: focus.horse, shares: null };
+      }
+      if (!window.Reduced || !picks.length) return null;
+
+      // The sub-coupon spreads over this leg's *base* coverage — the shape
+      // the leg has before anything of its own is levered — so a horse the
+      // user cut here still takes correspondingly less of the lever.
+      const cov = Reduced.coverage(picks, weights, caps);
+      const base = {};
+      let total = 0;
+      picks.forEach(n => {
+        const v = Math.max(0, Math.min(cov[n] || 0, Number(weights[n]) || 0));
+        base[n] = v;
+        total += v;
+      });
+      if (total <= 0) return null;
+      picks.forEach(n => { base[n] = base[n] / total * 100; });
+
+      const amount = Math.max(0, Number(focus.amount) || 0);
+      return {
+        anchor: null,
+        base,
+        coverage: cov,
+        amount,
+        // Mid-drag the stripes follow the pointer, not the stored aim.
+        shares: (systemDrag && systemDrag.aiming && systemDrag.nextAim)
+          ? systemDrag.nextAim
+          : Reduced.aimShares(focus.raceId, focus.horse, raceId, picks, base,
+                              { amount, weights, coverage: cov }),
+      };
+    }
+
     /* The number that rides the thumb. Only the row being dragged carries
        one, and it flips to the left of the thumb once the thumb is far
        enough over that the number would run off the row. */
     function systemPaintReadout(cut, weights) {
       const { row, num } = systemDrag;
-      const el = row.querySelector('[data-system-readout]');
+      const el = row.querySelector(systemDrag.aiming
+        ? '[data-aim-readout]' : '[data-system-readout]');
       if (!el) return;
+      // While aiming, the thumb is carrying the row's share of the lever.
+      if (systemDrag.aiming && systemDrag.nextAim) {
+        const share = Math.max(0, Math.min(systemDrag.nextAim[num] || 0, 100));
+        el.textContent = String(Math.round(share));
+        row.classList.toggle('is-readout-left', share / 100 > 0.86);
+        return;
+      }
       const w = Math.max(0, Number(weights[num]) || 0);
       const cov = cut[num] != null ? cut[num] : w;
       el.textContent = String(Math.round(cov));
-      const visual = cov > 100 ? (cov - 100) / 100 : cov / 100;
+      const visual = systemLapEdge(cov) / 100;
       row.classList.toggle('is-readout-left',
                            Math.max(0, Math.min(1, visual)) > 0.86);
     }
@@ -2643,12 +3624,7 @@
       const live = weights || systemWeights(picks);
       const caps = cut
         || (window.Reduced ? Reduced.overrides(picks, live, systemCaps()) : {});
-      let total = 0;
-      picks.forEach(n => {
-        const w = Math.max(0, Number(live[n]) || 0);
-        const cap = caps[n] != null ? caps[n] : null;
-        total += Math.round(cap != null ? cap : w);
-      });
+      const total = displayCoverage(picks, live, caps).total;
       el.textContent = String(total);
       el.classList.toggle('is-cut', reducingOn() && total < 100);
       el.classList.toggle('is-lev', reducingOn() && total > 100);
@@ -2656,20 +3632,51 @@
 
     function refreshSystemShares() {
       const picks = currentPicks();
-      systemPaint(systemWeights(picks), picks, systemLocks(), systemCaps());
+      const weights = systemWeights(picks);
+      systemPaint(weights, picks, systemLocks(), systemCaps());
       const sl = slRoot();
       if (sl) sl.classList.toggle('is-reducing', reducingOn());
+      paintAgent(picks, weights, systemCaps());
+    }
+
+    /* A pick still exactly where the coupon agent put it (the game page's
+       agent button) paints red instead of green: picked, at the coverage
+       the agent gave it. */
+    function paintAgent(picks, weights, caps) {
+      const want = (window.AgentCoupon && gameId) ? AgentCoupon.legFor(gameId, raceId) : null;
+      const match = new Set();
+      if (want && picks.length) {
+        const cov = reducedOn() && window.Reduced
+          ? Reduced.coverage(picks, weights, caps)
+          : Object.fromEntries(picks.map(n => [n, 100 / picks.length]));
+        picks.forEach(n => {
+          const w = Number(want[n]);
+          if (Number.isFinite(w) && Math.abs((Number(cov[n]) || 0) - w) < 0.05) match.add(n);
+        });
+      }
+      container.querySelectorAll('[data-sl-pick]').forEach(row => {
+        row.classList.toggle('is-agent', match.has(parseInt(row.dataset.slPick, 10)));
+      });
+    }
+
+    function refreshAgent() {
+      const picks = currentPicks();
+      paintAgent(picks, systemWeights(picks), systemCaps());
     }
 
     function systemActivate({ animate = true } = {}) {
       const sl = slRoot();
       if (!sl || sl.classList.contains('is-system')) return;
+      if (systemCloseTimer) {
+        clearTimeout(systemCloseTimer);
+        systemCloseTimer = null;
+        sl.classList.remove('is-system-closing');
+      }
       const wave = systemWave();
       const rows = [...sl.querySelectorAll('.sl-row:not(.sl-row--head)')];
+      let resetWave = () => {};
       if (animate) {
-        wave.forEach((el, i) => {
-          systemStaggerTargets(el).forEach(t => { t.style.transitionDelay = `${i * 0.03}s`; });
-        });
+        resetWave = staggerGutterWave(wave, systemStaggerTargets);
         rows.forEach((row, i) => {
           const share = row.querySelector('[data-system-share]');
           if (share) share.style.transitionDelay = `${0.08 + i * 0.03}s`;
@@ -2686,30 +3693,44 @@
       });
       if (!animate) return;
       setTimeout(() => {
-        wave.forEach(el => {
-          systemStaggerTargets(el).forEach(t => { t.style.transitionDelay = ''; });
-        });
+        resetWave();
         rows.forEach(row => {
           const share = row.querySelector('[data-system-share]');
           if (share) share.style.transitionDelay = '';
         });
-      }, wave.length * 30 + 350);
+      }, gutterWaveMs(wave));
     }
 
     function systemDeactivate() {
       const sl = slRoot();
       if (!sl) return;
       systemDragEnd();
+      const wave = systemWave();
+      const resetWave = staggerGutterWave(wave, systemStaggerTargets);
+      sl.classList.add('is-system-closing');
+      clearTimeout(systemCloseTimer);
+      systemCloseTimer = setTimeout(() => {
+        systemCloseTimer = null;
+        resetWave();
+        sl.classList.remove('is-system-closing');
+      }, gutterWaveMs(wave));
       sl.classList.remove('is-system', 'is-system-ready', 'is-reduced',
-                          'is-weighting', 'is-reducing');
+                          'is-weighting', 'is-reducing', 'is-aim-mode',
+                          'is-aiming', 'is-aim-forced', 'is-aim-slope',
+                          'is-aim-auto', 'is-aim-market',
+                          'is-aim-cascade', 'is-aim-uniform', 'is-aim-top',
+                          'is-aim-multiplied');
       // Back to a classic system: every pick carries the full width again.
       sl.querySelectorAll('.sl-row').forEach(row => {
         row.style.setProperty('--sl-fill', '1');
         row.style.setProperty('--sl-weight', '1');
         row.style.setProperty('--sl-cut', '1');
         row.style.setProperty('--sl-even', '0');
+        row.style.setProperty('--sl-aim-sum', '0');
         row.style.setProperty('--sl-lev-glow', '0');
-        row.classList.remove('is-cut', 'is-lev', 'has-even');
+        row.style.setProperty('--sl-aim-start', '0');
+        row.style.setProperty('--sl-aim-end', '0');
+        row.classList.remove('is-cut', 'is-lev', 'has-even', 'has-aim-sum', 'is-aim-anchor');
       });
       refreshFootSum();
     }
@@ -2724,7 +3745,180 @@
       if (want && !have) systemActivate({ animate });
       else if (!want && have) systemDeactivate();
       else if (want) refreshSystemShares();
+      syncThumbEdit();
     }
+
+    function thumbMode() {
+      return (window.ThumbEdit && ThumbEdit.get()) || null;
+    }
+
+    function syncThumbEdit() {
+      const sl = slRoot();
+      if (!sl) return;
+      const mode = thumbMode();
+      sl.classList.toggle('is-thumb-reduce', mode === 'reduce');
+      sl.classList.toggle('is-thumb-weight', mode === 'weight');
+      sl.classList.toggle('is-thumb-aim', mode === 'aim');
+    }
+
+    /* ── cursor tools ────────────────────────────────────────────────────
+       The dock's cursor / select / brush. The cursor leaves everything as
+       it is; select turns a row click into marking the horse; the brush
+       only picks — a press paints picks on, or off when it starts on a
+       pick, across every row the pointer passes. */
+
+    function cursorTool() {
+      return (window.CursorTool && CursorTool.get()) || 'cursor';
+    }
+
+    function syncCursorTool() {
+      const sl = slRoot();
+      if (!sl) return;
+      const tool = cursorTool();
+      sl.classList.toggle('is-select-tool', tool === 'select');
+      sl.classList.toggle('is-brush', tool === 'brush');
+      if (tool !== 'brush') brushEnd();
+    }
+
+    function syncSelected() {
+      const set = new Set(window.Selections ? Selections.numbersFor(raceId) : []);
+      container.querySelectorAll('[data-sl-pick]').forEach(row => {
+        row.classList.toggle('is-selected', set.has(parseInt(row.dataset.slPick, 10)));
+      });
+    }
+
+    function horseNameOf(number) {
+      return entries.find(e => e.number === number)?.horse_name || '';
+    }
+
+    // Shift works as it does for picks: a run from the nearest selected row,
+    // or trimmed back to this one when it is already selected.
+    function selectClick(row, shift) {
+      if (!window.Selections) return;
+      const number = parseInt(row.dataset.slPick, 10);
+      if (!Number.isFinite(number)) return;
+      if (shift) {
+        const on = row.classList.contains('is-selected');
+        const run = on ? rowRunTrim(row, 'is-selected') : rowRunTo(row, 'is-selected');
+        if (run) {
+          const keep = on ? run : [...new Set([...Selections.numbersFor(raceId), ...run])];
+          Selections.setRace(raceId, keep.map(n => ({ number: n, name: horseNameOf(n) })));
+          return;
+        }
+      }
+      Selections.toggle(raceId, number, horseNameOf(number));
+    }
+
+    let brush = null;
+
+    function brushRowAt(x, y) {
+      const el = document.elementFromPoint(x, y);
+      const row = el && el.closest('.sl-row[data-sl-pick]');
+      return row && container.contains(row) ? row : null;
+    }
+
+    function brushPaint(row) {
+      if (!brush || !row) return;
+      const number = parseInt(row.dataset.slPick, 10);
+      if (!Number.isFinite(number) || brush.picks.has(number) === brush.on) return;
+      if (brush.on) {
+        brush.picks.add(number);
+        brush.added.add(number);
+      } else {
+        brush.picks.delete(number);
+        brush.added.delete(number);
+      }
+      setPicked(row, brush.on);
+      brush.dirty = true;
+    }
+
+    function brushStart(row, ev) {
+      brushEnd();
+      brush = {
+        on: !row.classList.contains('is-picked'),
+        picks: new Set(currentPicks()),
+        added: new Set(),
+        pointerId: ev.pointerId,
+        x: ev.clientX,
+        y: ev.clientY,
+        dirty: false,
+      };
+      brushPaint(row);
+      window.addEventListener('pointermove', brushMove);
+      window.addEventListener('pointerup', brushRelease);
+      window.addEventListener('pointercancel', brushRelease);
+    }
+
+    // Walk the segment since the last event so a quick swipe can't skip a
+    // row between two samples.
+    function brushMove(ev) {
+      if (!brush || ev.pointerId !== brush.pointerId) return;
+      const dx = ev.clientX - brush.x;
+      const dy = ev.clientY - brush.y;
+      const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 6));
+      for (let i = 1; i <= steps; i++) {
+        brushPaint(brushRowAt(brush.x + dx * i / steps, brush.y + dy * i / steps));
+      }
+      brush.x = ev.clientX;
+      brush.y = ev.clientY;
+    }
+
+    function brushRelease(ev) {
+      if (!brush || (ev && ev.pointerId !== brush.pointerId)) return;
+      brushEnd({ commit: true });
+    }
+
+    // The rows are painted as the brush passes; the coupon takes the whole
+    // stroke at once. A declined "start new coupon?" paints them back.
+    async function brushEnd({ commit = false } = {}) {
+      window.removeEventListener('pointermove', brushMove);
+      window.removeEventListener('pointerup', brushRelease);
+      window.removeEventListener('pointercancel', brushRelease);
+      const b = brush;
+      brush = null;
+      if (!b || !b.dirty) return;
+      if (!commit) {
+        sync();
+        return;
+      }
+      b.added.forEach(removeFromReserves);
+      await setLegPicks([...b.picks]);
+      sync();
+    }
+
+    // Captured ahead of every other list handler, so the active tool
+    // decides what a press or click means before rows and handles do.
+    function toolPointerDown(ev) {
+      if (cursorTool() !== 'brush') return;
+      const sl = slRoot();
+      if (!sl || !sl.contains(ev.target) || ev.target.closest('[data-sl-pick-toggle]')) return;
+      ev.stopImmediatePropagation();
+      const row = ev.target.closest('.sl-row[data-sl-pick]');
+      if (!row || ev.button !== 0) return;
+      ev.preventDefault();
+      brushStart(row, ev);
+    }
+
+    function toolClick(ev) {
+      const tool = cursorTool();
+      if (tool === 'cursor') return;
+      const sl = slRoot();
+      if (!sl || !sl.contains(ev.target)) return;
+      if (tool === 'brush') {
+        if (ev.target.closest('[data-sl-pick-toggle]')) return;
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        return;
+      }
+      const row = ev.target.closest('.sl-row[data-sl-pick]');
+      if (!row || ev.target.closest('[data-rank-handle], [data-rank-mark], [data-rank-seam]')) return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      selectClick(row, ev.shiftKey);
+    }
+
+    container.addEventListener('pointerdown', toolPointerDown, true);
+    container.addEventListener('click', toolClick, true);
 
     /* ── dragging a weight ── */
 
@@ -2798,10 +3992,23 @@
       return Math.max(Reduced.MIN, Math.min(best, Reduced.MAX));
     }
 
+    /* A free drag lands on a whole percent. A landmark the snap caught keeps
+       its exact value: an equal share of three is 33.33…, and rounding it
+       would quietly rank one of the three above the others. */
+    function systemWholePct(raw, snapped) {
+      if (snapped !== raw) return snapped;
+      return Math.max(Reduced.MIN, Math.min(Math.round(raw), Reduced.MAX));
+    }
+
     function systemDragStart(ev) {
       if (ev.button != null && ev.button !== 0) return;
-      const handle = ev.target.closest('[data-system-handle]');
+      const aimHandle = ev.target.closest('[data-aim-handle]');
+      const handle = aimHandle || ev.target.closest('[data-system-handle]');
       if (!handle || !reducedOn() || systemDrag) return;
+      const tool = thumbMode();
+      if (tool === 'select') return;
+      if (aimHandle && tool && tool !== 'aim') return;
+      if (!aimHandle && tool === 'aim') return;
       const row = handle.closest('.sl-row');
       if (!row || !row.classList.contains('is-picked')) return;
       const num = parseInt(row.dataset.slPick, 10);
@@ -2811,16 +4018,32 @@
       const picks = currentPicks();
       const base = systemWeights(picks);
       const caps = systemStoredCaps();
+      // A leg being aimed at hands its thumb over to the lever: the gesture
+      // moves this row's share of the sub-coupon and leaves its own
+      // coverage — and so the coupon's price — exactly where it was.
+      const aim = systemAimPaint(base, picks, systemCaps());
+      const aiming = !!aimHandle && !!(aim && aim.shares) && picks.length > 1;
+      if (aimHandle && !aiming) return;
       systemDrag = {
         row,
         num,
         base,
         picks,
+        aiming,
+        aimBase: aiming ? aim.base : null,
+        aimShares: aiming ? aim.shares : null,
+        aimCoverage: aiming ? aim.coverage : null,
+        aimAmount: aiming ? aim.amount : 0,
+        nextAim: null,
         locks: systemLocks(),
         caps,
         // Reduce mode is fixed for the whole drag, so a mode flip mid-gesture
         // can't turn a coverage move into a re-weight halfway through.
-        reducing: reducingOn(),
+        // Build-tab thumb tools pick the gesture without flipping coupon mode.
+        reducing: aiming ? false
+          : tool === 'reduce' ? true
+          : tool === 'weight' ? false
+          : reducingOn(),
         // Coverage moves relative to where it already stood, so a thumb that
         // has wrapped past 100 carries on from its value instead of being
         // re-read off its position — which down there means a reduction.
@@ -2833,6 +4056,7 @@
       };
       slRoot()?.classList.add('is-weighting');
       row.classList.add('is-weighting');
+      row.classList.toggle('is-aim-weighting', aiming);
       try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
       systemDragMove(ev);
     }
@@ -2856,6 +4080,21 @@
       const track = systemFillTrack(row);
       const raw = ((ev.clientX - track.left) / track.width) * 100;
 
+      if (systemDrag.aiming) {
+        // Zero-sum inside the leg: what this row takes of the lever, the
+        // rest of the leg gives up. The sub-coupon keeps its size, so the
+        // coupon keeps its price — aiming only decides which rows it buys.
+        const cov = Number(systemDrag.aimCoverage[num]) || 0;
+        const start = systemLapEdge(cov);
+        const amount = Math.max(0.001, Number(systemDrag.aimAmount) || 0);
+        const share = (raw - start) * 100 / amount;
+        systemDrag.nextAim = Reduced.applyDrag(
+          picks, systemDrag.aimShares, [], num,
+          Math.max(Reduced.MIN, Math.min(share, 100)));
+        systemPaint(base, picks, locks, caps);
+        return;
+      }
+
       if (reducing) {
         // Reduce mode moves this pick's coverage and nothing else: below the
         // weight it gives rows up, above it buys more. The other picks hold
@@ -2869,9 +4108,9 @@
         const weight = Math.max(0, Number(base[num]) || 0);
         const moved = systemDrag.startCov
           + ((ev.clientX - systemDrag.startX) / track.width) * 100;
-        const pct = systemCoverSnapTarget(
-          base, picks, num,
-          Math.max(Reduced.MIN, Math.min(moved, Reduced.MAX)), weight, caps);
+        const free = Math.max(Reduced.MIN, Math.min(moved, Reduced.MAX));
+        const pct = systemWholePct(
+          free, systemCoverSnapTarget(base, picks, num, free, weight, caps));
         const nextCaps = { ...caps };
         if (weight <= 0 || Math.abs(pct - weight) < 0.05) delete nextCaps[num];
         else nextCaps[num] = pct / weight;
@@ -2881,7 +4120,8 @@
         return;
       }
 
-      const pct = systemSnapTarget(base, locks, picks, num, raw, next);
+      const pct = systemWholePct(
+        raw, systemSnapTarget(base, locks, picks, num, raw, next));
       systemDrag.next = Reduced.applyDrag(picks, base, locks, num, pct);
       // Overrides are held as a multiple of the weight, so they ride the
       // re-weighting instead of lapsing at it.
@@ -2893,8 +4133,23 @@
       if (!systemDrag) return;
       const drag = systemDrag;
       systemDrag = null;
+      systemDropAt = performance.now();
       slRoot()?.classList.remove('is-weighting');
-      drag.row.classList.remove('is-weighting', 'is-readout-left');
+      drag.row.classList.remove(
+        'is-weighting', 'is-aim-weighting', 'is-readout-left');
+      if (drag.aiming) {
+        const focus = window.LeverFocus ? LeverFocus.active() : null;
+        if (drag.nextAim && focus && window.Reduced) {
+          // Back on the neutral mark is not an aim at all — dropping it
+          // there puts the leg back on the plain proportional path instead
+          // of leaving a no-op behind for the solver to split the coupon on.
+          const moved = drag.picks.some(
+            n => Math.abs((drag.nextAim[n] || 0) - (drag.aimBase[n] || 0)) > 0.4);
+          Reduced.setAim(focus.raceId, focus.horse, raceId,
+                         moved ? drag.nextAim : null);
+        }
+        return;
+      }
       if (drag.next && window.Reduced) {
         Reduced.setRace(raceId, drag.next, drag.locks, drag.nextCaps || {});
       }
@@ -2925,10 +4180,39 @@
       systemToggleLock(parseInt(row.dataset.slPick, 10));
     }
 
+    /* Aim mode: clicking a levered row picks that lever as the source.
+       The hatch itself sits under the cells, so the row is the target —
+       badge and thumbs stay free for pick / coverage / secondary drag. */
+    function systemAimClick(ev) {
+      if (!reducedOn() || !reducingOn()
+          || !window.LeverFocus || !LeverFocus.isOn()) return;
+      if (ev.target.closest('[data-aim-handle], [data-system-handle], .sl-row__badge')) {
+        return;
+      }
+      const row = ev.target.closest('.sl-row');
+      if (!row || !row.classList.contains('is-picked')
+          || !row.classList.contains('is-lev')) return;
+      const num = parseInt(row.dataset.slPick, 10);
+      if (!Number.isFinite(num)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      LeverFocus.set(raceId, num);
+    }
+
     function systemWire() {
       if (systemWired) return;
       systemWired = true;
       container.addEventListener('pointerdown', systemDragStart, true);
+      container.addEventListener('click', ev => {
+        // Releasing a coverage or aim thumb is not a row click — the
+        // pointerup would otherwise open that horse's history.
+        if (performance.now() - systemDropAt < 300) {
+          systemDropAt = 0;
+          ev.preventDefault();
+          ev.stopPropagation();
+        }
+      }, true);
+      container.addEventListener('click', systemAimClick, true);
       container.addEventListener('click', systemShareClick, true);
       window.addEventListener('pointermove', systemDragMove);
       window.addEventListener('pointerup', systemDragEnd);
@@ -2949,17 +4233,21 @@
 
     // Opening order when rank mode turns on. Prefer weight/coverage order
     // when this race has shares stored; a lone pick always floats to the
-    // top; otherwise restore the last ranked order (or sink scratched).
-    // Unpicked horses keep their last ranked order in every path — they are
-    // the reserve candidates, so forgetting them forces a full re-rank.
+    // top; otherwise restore the last ranked order, or the market's when
+    // there is none. Unpicked horses keep their last ranked order in every
+    // path — they are the reserve candidates, so forgetting them forces a
+    // full re-rank.
     function rankOpeningOrder() {
       const rows = rankRows();
       const scratched = r => r.classList.contains('sl-row--scratched');
+      const ranked = (rankOrders.get(raceId) || []).length > 0;
+      const order = ranked ? rankBySaved : rankByAuto;
       const active = rows.filter(r => !scratched(r));
-      const sunk = rankBySaved(rows.filter(scratched));
+      const sunk = order(rows.filter(scratched));
       const picked = active.filter(r => r.classList.contains('is-picked'));
-      const rest = rankBySaved(active.filter(r => !r.classList.contains('is-picked')));
-      const savedPos = rankSavedIndex();
+      const rest = order(active.filter(r => !r.classList.contains('is-picked')));
+      const autoAt = ranked ? null : new Map(rankAutoOrder().map((r, i) => [r, i]));
+      const savedPos = ranked ? rankSavedIndex() : (row => autoAt.get(row) ?? Infinity);
 
       const stored = window.Reduced ? Reduced.weightsFor(raceId) : {};
       if (stored && Object.keys(stored).length && picked.length) {
@@ -2996,24 +4284,34 @@
         rows.forEach(r => { if (!out.includes(r)) out.push(r); });
         return out;
       }
-      return [...active, ...sunk];
+      return rankAutoOrder();
+    }
+
+    function rankWave() {
+      const sl = slRoot();
+      if (!sl) return [];
+      const head = sl.querySelector('.sl-row--head');
+      return [head, ...rankRows(), legFootRow()].filter(Boolean);
+    }
+
+    function rankStaggerTargets(el) {
+      const cells = el.querySelector('.sl-row__cells');
+      const badge = el.querySelector('.sl-row__badge');
+      return [el, cells, badge].filter(Boolean);
     }
 
     function rankActivate() {
       const sl = slRoot();
       if (!sl || sl.classList.contains('is-ranked')) return;
+      if (rankCloseTimer) {
+        clearTimeout(rankCloseTimer);
+        rankCloseTimer = null;
+        sl.classList.remove('is-rank-closing');
+      }
       if (!rankBaseOrder) rankBaseOrder = [...sl.children];
-      const head = sl.querySelector('.sl-row--head');
       const rows = rankRows();
-      const wave = [head, ...rows].filter(Boolean);
-      const stagger = el => {
-        const cells = el.querySelector('.sl-row__cells');
-        const badge = el.querySelector('.sl-row__badge');
-        return [el, cells, badge].filter(Boolean);
-      };
-      wave.forEach((el, i) => {
-        stagger(el).forEach(t => { t.style.transitionDelay = `${i * 0.03}s`; });
-      });
+      const wave = rankWave();
+      const resetWave = staggerGutterWave(wave, rankStaggerTargets);
       // Handles follow the same top→bottom wave, a beat after the expand starts.
       rows.forEach((row, i) => {
         const handle = row.querySelector('.sl-rank-handle');
@@ -3026,39 +4324,64 @@
         sl.classList.add('is-rank-ready');
       });
       setTimeout(() => {
-        wave.forEach(el => {
-          stagger(el).forEach(t => { t.style.transitionDelay = ''; });
-        });
+        resetWave();
         rows.forEach(row => {
           const handle = row.querySelector('.sl-rank-handle');
           if (handle) handle.style.transitionDelay = '';
         });
         if (!rankIsActive()) return;
-        rankAnimate(() => rankCommit(rankOpeningOrder()));
-      }, wave.length * 30 + 350);
+        rankAnimate(() => {
+          rankCommit(rankOpeningOrder());
+          if (sortKey) rankArrange(sortRows());
+        });
+      }, gutterWaveMs(wave));
     }
 
-    function rankDeactivate() {
+    function rankDeactivate(opts = {}) {
       const sl = slRoot();
       if (!sl) return;
-      rankOrders.set(raceId, rankRows().map(rankKeyOf));
+      if (opts.save !== false && !sortKey) rankSave(rankRows());
+      if (sortKey) {
+        sortKey = null;
+        sortOwnsRank = false;
+        sortPaintHead();
+      }
       rankClearPick();
       rankHideSeam();
+      const wave = rankWave();
+      const resetWave = staggerGutterWave(wave, rankStaggerTargets);
+      sl.classList.add('is-rank-closing');
       sl.classList.remove('is-ranked', 'is-rank-ready');
       rankSyncToggle();
-      if (!rankBaseOrder) return;
-      const base = rankBaseOrder.filter(el =>
-        el.isConnected && !el.classList.contains('sl-prev'));
-      const prevs = new Map(base.map(el => [el, rankPrevOf(el)]));
-      rankAnimate(() => {
-        const frag = document.createDocumentFragment();
-        base.forEach(el => {
-          frag.appendChild(el);
-          const p = prevs.get(el);
-          if (p) frag.appendChild(p);
+      // The start order comes back only once the gutter has closed: moving a
+      // row in the DOM mid-transition restarts it at its end state, which is
+      // what made the collapse snap.
+      clearTimeout(rankCloseTimer);
+      rankCloseTimer = setTimeout(() => {
+        resetWave();
+        if (!rankBaseOrder) {
+          rankCloseTimer = null;
+          sl.classList.remove('is-rank-closing');
+          return;
+        }
+        const base = rankBaseOrder.filter(el =>
+          el.isConnected && !el.classList.contains('sl-prev'));
+        const prevs = new Map(base.map(el => [el, rankPrevOf(el)]));
+        rankAnimate(() => {
+          const frag = document.createDocumentFragment();
+          base.forEach(el => {
+            frag.appendChild(el);
+            const p = prevs.get(el);
+            if (p) frag.appendChild(p);
+          });
+          sl.appendChild(frag);
         });
-        sl.appendChild(frag);
-      });
+        // Tillägg bars unfold only after the rows have glided home.
+        rankCloseTimer = setTimeout(() => {
+          rankCloseTimer = null;
+          sl.classList.remove('is-rank-closing');
+        }, RANK_MS + 60);
+      }, gutterWaveMs(wave));
     }
 
     /* ── drag to reorder ── */
@@ -3070,11 +4393,11 @@
     }
 
     function rankDragStart(ev) {
-      if (ev.button !== 0 || !rankIsReady() || rankDrag) return;
+      if (ev.button !== 0 || !rankIsReady() || rankDrag || rankTool() !== 'drag') return;
       if (ev.target.closest('[data-rank-seam], a, .sl-row__badge, [data-pct-cell],'
-        + ' [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-prev-gps-th], [data-gal-toggle],'
-        + ' [data-sl-pick-toggle], [data-rank-toggle], [data-system-toggle],'
-        + ' [data-system-share], [data-system-handle], [data-system-lock]')) return;
+        + ' [data-pct-toggle], [data-odds-cell], [data-odds-toggle], [data-col-head],'
+        + ' [data-sl-pick-toggle], [data-rank-toggle], [data-system-toggle], [data-rank-mark],'
+        + ' [data-chance-handle], [data-system-share], [data-system-handle], [data-system-lock]')) return;
       const row = ev.target.closest('.sl-row:not(.sl-row--head)');
       if (!row) return;
       const from = rankRows().indexOf(row);
@@ -3175,7 +4498,9 @@
         u.row.style.transform = '';
         if (u.prev) { u.prev.style.transition = 'none'; u.prev.style.transform = ''; }
       });
+      sortAdopt();
       rankCommit(next);
+      showDockFamily('rank');
       const moved = [];
       seen.forEach((top, el) => {
         if (!el.isConnected) return;
@@ -3214,7 +4539,9 @@
       const next = rows.slice();
       next[ia] = rows[ib];
       next[ib] = rows[ia];
+      sortAdopt();
       rankAnimate(() => rankCommit(next));
+      showDockFamily('rank');
     }
 
     function rankHandleClick(row) {
@@ -3255,7 +4582,7 @@
 
     // Wide horizontal band (gutter through the # column); tight vertically on the seam.
     function rankSeamTrack(ev) {
-      if (!rankIsReady() || rankDrag) { rankHideSeam(); return; }
+      if (!rankIsReady() || rankDrag || rankTool() !== 'drag') { rankHideSeam(); return; }
       const sl = slRoot();
       const rows = rankRows();
       if (rows.length < 2) return;
@@ -3289,19 +4616,32 @@
       rankWired = true;
 
       container.addEventListener('pointerdown', rankDragStart);
+      container.addEventListener('pointerdown', chanceDragStart, true);
       container.addEventListener('pointermove', rankSeamTrack);
       container.addEventListener('pointerleave', rankHideSeam);
+      window.addEventListener('pointermove', chanceDragMove);
+      window.addEventListener('pointerup', chanceDragEnd);
+      window.addEventListener('pointercancel', chanceDragEnd);
 
       container.addEventListener('click', ev => {
         // The click that closes a drag must not also toggle history. Bounded by
         // time so a drag that never produced a click can't eat a later one.
-        if (performance.now() - rankDropAt < 300) {
+        if (performance.now() - Math.max(rankDropAt, chanceDropAt) < 300) {
           rankDropAt = 0;
+          chanceDropAt = 0;
           ev.preventDefault();
           ev.stopPropagation();
           return;
         }
         if (!rankIsReady()) return;
+        const mark = ev.target.closest('[data-rank-mark]');
+        if (mark) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (rankTool() === 'grade') gradeCycle(mark.closest('.sl-row'), ev.shiftKey);
+          return;
+        }
+        if (rankTool() !== 'drag') return;
         const seam = ev.target.closest('[data-rank-seam]');
         if (seam) {
           ev.preventDefault();
@@ -3320,6 +4660,175 @@
           if (row) rankHandleClick(row);
         }
       }, true);
+    }
+
+    /* ── win chance and grade ──
+       Two more readings of the rank gutter, picked from the dock. Win chance
+       is a share of the race: dragging one horse's white fill rescales the
+       rest so the field always adds up to 100. Grade is a plain A–E mark,
+       cycled by clicking the gutter. Neither feeds the coupon yet. */
+
+    const RANK_GRADES = ['A', 'B', 'C', 'D', 'E'];
+    let chanceDrag = null;
+    let chanceDropAt = 0;
+
+    function rankTool() { return window.RankMode ? RankMode.tool() : 'drag'; }
+
+    function chanceField() {
+      return rankRows()
+        .filter(r => !r.classList.contains('sl-row--scratched'))
+        .map(r => parseInt(r.dataset.num, 10))
+        .filter(Number.isFinite);
+    }
+
+    // Stored chances folded onto the live field. A horse with nothing stored
+    // starts at the average of the others; the whole is rescaled to 100.
+    function chanceValues(field = chanceField()) {
+      const out = {};
+      if (!field.length) return out;
+      const stored = (window.RankChances && RankChances.get(raceId)) || {};
+      const valueOf = n => {
+        const v = Number(stored[n]);
+        return Number.isFinite(v) && v >= 0 ? v : null;
+      };
+      const known = field.map(valueOf).filter(v => v != null);
+      const fresh = known.length ? known.reduce((a, b) => a + b, 0) / known.length : 1;
+      field.forEach(n => { out[n] = valueOf(n) ?? fresh; });
+      const sum = field.reduce((s, n) => s + out[n], 0);
+      field.forEach(n => { out[n] = sum > 0 ? out[n] * 100 / sum : 100 / field.length; });
+      return out;
+    }
+
+    // The dragged horse lands on `target`; the others share what is left in
+    // proportion to where they stood when the drag began.
+    function chanceApplyDrag(field, base, num, target) {
+      const out = {};
+      const others = field.filter(n => n !== num);
+      if (!others.length) { out[num] = 100; return out; }
+      out[num] = target;
+      const pool = 100 - target;
+      const sum = others.reduce((s, n) => s + (base[n] || 0), 0);
+      others.forEach(n => {
+        out[n] = sum > 0.0001 ? (base[n] || 0) / sum * pool : pool / others.length;
+      });
+      return out;
+    }
+
+    function rankPaintMarks(values) {
+      const sl = slRoot();
+      if (!sl) return;
+      const tool = rankTool();
+      const field = chanceField();
+      const inField = new Set(field);
+      const chances = values || chanceValues(field);
+      const shown = displayCoverage(field, chances, null).text;
+      const grades = (window.RankGrades && RankGrades.get(raceId)) || {};
+      rankRows().forEach(row => {
+        const n = parseInt(row.dataset.num, 10);
+        const on = inField.has(n);
+        row.style.setProperty('--sl-chance',
+          on ? String(Math.max(0, Math.min(1, (chances[n] || 0) / 100))) : '0');
+        const mark = row.querySelector('[data-rank-mark]');
+        // Drag mode hides the mark; leaving its text alone lets it fade out
+        // instead of blanking first.
+        if (!mark || !on || tool === 'drag') return;
+        const grade = RANK_GRADES.includes(grades[n]) ? grades[n] : '';
+        mark.classList.toggle('is-empty', tool === 'grade' && !grade);
+        mark.innerHTML = tool === 'pct'
+          ? `${shown[n] ?? Math.round(chances[n] || 0)}<span class="sl-rank-mark__unit">%</span>`
+          : (grade || '–');
+        mark.setAttribute('aria-label', tool === 'pct'
+          ? `win chance ${shown[n] ?? ''}%`
+          : `grade ${grade || 'none'}`);
+      });
+    }
+
+    function gradeCycle(row, back) {
+      const n = parseInt(row?.dataset.num, 10);
+      if (!Number.isFinite(n) || !window.RankGrades) return;
+      const grades = { ...(RankGrades.get(raceId) || {}) };
+      const steps = ['', ...RANK_GRADES];
+      const at = Math.max(0, steps.indexOf(grades[n] || ''));
+      const next = steps[(at + (back ? steps.length - 1 : 1)) % steps.length];
+      if (next) grades[n] = next;
+      else delete grades[n];
+      RankGrades.set(raceId, grades);
+    }
+
+    function chanceTrack(row) {
+      const rect = row.getBoundingClientRect();
+      const cs = getComputedStyle(row);
+      const left = parseFloat(cs.getPropertyValue('--sl-track-l')) || 0;
+      const right = parseFloat(cs.getPropertyValue('--sl-chance-r')) || 0;
+      return { left: rect.left + left, width: Math.max(1, rect.width - left - right) };
+    }
+
+    function chanceDragStart(ev) {
+      if (ev.button != null && ev.button !== 0) return;
+      const handle = ev.target.closest('[data-chance-handle]');
+      if (!handle || chanceDrag || !rankIsReady() || rankTool() !== 'pct') return;
+      const row = handle.closest('.sl-row');
+      const num = parseInt(row?.dataset.num, 10);
+      const field = chanceField();
+      if (!field.includes(num)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      chanceDrag = { row, num, field, base: chanceValues(field), next: null };
+      slRoot()?.classList.add('is-chance-dragging');
+      row.classList.add('is-chance-held');
+      try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
+      chanceDragMove(ev);
+    }
+
+    function chanceDragMove(ev) {
+      if (!chanceDrag) return;
+      const { row, num, field, base } = chanceDrag;
+      const track = chanceTrack(row);
+      const raw = (ev.clientX - track.left) / track.width * 100;
+      const target = Math.max(0, Math.min(100, Math.round(raw)));
+      chanceDrag.next = chanceApplyDrag(field, base, num, target);
+      rankPaintMarks(chanceDrag.next);
+    }
+
+    function chanceDragEnd() {
+      if (!chanceDrag) return;
+      const drag = chanceDrag;
+      chanceDrag = null;
+      chanceDropAt = performance.now();
+      slRoot()?.classList.remove('is-chance-dragging');
+      drag.row.classList.remove('is-chance-held');
+      if (!drag.next || !window.RankChances) return;
+      const out = {};
+      drag.field.forEach(n => { out[n] = Math.round((drag.next[n] || 0) * 100) / 100; });
+      RankChances.set(raceId, out);
+    }
+
+    // Follows window.RankMode — on mount and whenever the dock or any leg's
+    // header flips the mode or picks another tool.
+    function syncRank() {
+      const sl = slRoot();
+      if (!sl) return;
+      if (window.RankMode) {
+        const on = RankMode.isOn();
+        if (on && !rankIsActive()) rankActivate();
+        else if (!on && rankIsActive()) rankDeactivate();
+      }
+      const tool = rankTool();
+      sl.classList.toggle('is-rank-tool-pct', tool === 'pct');
+      sl.classList.toggle('is-rank-tool-grade', tool === 'grade');
+      if (tool !== 'drag') {
+        rankClearPick();
+        rankHideSeam();
+      }
+      rankPaintMarks();
+    }
+
+    // A cleared order (the dock's rank reset) puts a ranked list back on
+    // the market's order without storing that as a ranking.
+    function syncRankOrder() {
+      if (!rankIsActive() || rankDrag || sortKey) return;
+      if ((rankOrders.get(raceId) || []).length) return;
+      rankAnimate(() => rankArrange(rankAutoOrder()));
     }
 
     function pickableEntries() {
@@ -3417,9 +4926,12 @@
       let d = Coupon.load();
       if (d && d.gameId === ctx.gameId) return d;
       if (d && Coupon.totalPicks(d) > 0) {
-        const ok = confirm(
-          `start a new ${ctx.gameType} coupon?\n` +
-          `your unsaved ${d.gameType} draft will be discarded.`);
+        const question = `start new ${ctx.gameType}? discard ${d.gameType}?`;
+        const ok = window.gameDockConfirm
+          ? await window.gameDockConfirm(question)
+          : confirm(
+              `start a new ${ctx.gameType} coupon?\n` +
+              `your unsaved ${d.gameType} draft will be discarded.`);
         if (!ok) return null;
       }
       return Coupon.createDraft(ctx);
@@ -3458,6 +4970,38 @@
       refreshSystemShares();
     }
 
+    // Shift-click picks the run from the nearest pick above this row (or
+    // below, when there is none above) down to it, in the order the rows
+    // are shown — so a ranked list fills by rank, not by start number.
+    function pickRunTo(row) { return rowRunTo(row, 'is-picked'); }
+    function pickTrimAt(row) { return rowRunTrim(row, 'is-picked'); }
+
+    function rowRunTo(row, cls) {
+      const rows = [...container.querySelectorAll('[data-sl-pick]')];
+      const at = rows.indexOf(row);
+      if (at < 0) return null;
+      const picked = i => rows[i].classList.contains(cls);
+      let from = -1;
+      for (let i = at - 1; i >= 0 && from < 0; i--) if (picked(i)) from = i;
+      for (let i = at + 1; i < rows.length && from < 0; i++) if (picked(i)) from = i;
+      if (from < 0) return null;
+      return rows.slice(Math.min(from, at), Math.max(from, at) + 1)
+        .map(r => parseInt(r.dataset.slPick, 10))
+        .filter(Number.isFinite);
+    }
+
+    // Shift-click on a pick is the same gesture backwards: the selection
+    // ends at this row, so every pick shown below it is dropped. On the
+    // last pick there is nothing below and nothing changes.
+    function rowRunTrim(row, cls) {
+      const rows = [...container.querySelectorAll('[data-sl-pick]')];
+      const at = rows.indexOf(row);
+      return rows
+        .filter((r, i) => i <= at && r.classList.contains(cls))
+        .map(r => parseInt(r.dataset.slPick, 10))
+        .filter(Number.isFinite);
+    }
+
     async function pick(row, number) {
       const ctx = couponCtx();
       const wanted = !row.classList.contains('is-picked');
@@ -3490,7 +5034,8 @@
             row.style.setProperty('--sl-weight', '1');
             row.style.setProperty('--sl-cut', '1');
             row.style.setProperty('--sl-even', '0');
-            row.classList.remove('is-cut', 'is-lev', 'has-even');
+            row.style.setProperty('--sl-aim-sum', '0');
+            row.classList.remove('is-cut', 'is-lev', 'has-even', 'has-aim-sum');
             row.dataset.fillOn = '0';
           }
         }, 480);
@@ -3537,6 +5082,11 @@
       const sl = slRoot();
       if (sl) sl.classList.toggle('is-reserves', on);
       paintReserveBadges();
+    }
+
+    function resetBuild() {
+      if (rankIsActive()) rankDeactivate({ save: false });
+      toggleReservesMode(false);
     }
 
     function paintReserveBadges() {
@@ -3600,6 +5150,24 @@
       container.dispatchEvent(new CustomEvent('startlist:resize', { bubbles: true }));
     }
 
+    // An open history blurs the rest of the list, so any click closes it —
+    // except one inside it, or one on its own row that toggles it anyway.
+    function closeHistoryOn(target) {
+      const root = container.querySelector('.sl');
+      if (!root) return;
+      let closed = false;
+      root.querySelectorAll('.sl-prev').forEach(prev => {
+        if (prev.contains(target)) return;
+        const row = prev.previousElementSibling;
+        if (row && row.contains(target) && !target.closest(ROW_CONTROLS)) return;
+        prev.remove();
+        closed = true;
+      });
+      if (!closed) return;
+      syncPrevFocus();
+      notifyResize();
+    }
+
     async function toggleHistory(row) {
       const next = row.nextElementSibling;
       if (next && next.classList.contains('sl-prev')) {
@@ -3655,9 +5223,8 @@
       entries.forEach(e => {
         e._gps = e.horse_id ? bestPrevGps(prevRacesCache[e.horse_id], date) : {};
       });
-      const cells = container.querySelectorAll('.sl-row [data-prev-gps-cell]');
-      entries.forEach((e, i) => {
-        const cell = cells[i];
+      entries.forEach(e => {
+        const cell = rowCell(e, '[data-prev-gps-cell]');
         if (!cell) return;
         PREV_GPS_METRICS.forEach(m => {
           const v = e._gps && e._gps[m.key];
@@ -3667,10 +5234,10 @@
       refreshGps();
     }
 
-    /* ── tipster comments (typed out in the leg footer on row hover) ────── */
+    /* ── tipster comments (typed into the dock monitor on row hover) ────── */
 
     let tips = {};  // { programNumber: commentText }
-    let typingAnim = null;
+    const TIP_DELAY_MS = 800;
 
     async function loadTipsInBackground() {
       try {
@@ -3686,96 +5253,68 @@
       container.querySelectorAll('.sl-row[data-num]').forEach(row => {
         const text = tips[row.dataset.num];
         if (!text) return;
-        row.addEventListener('mouseenter', () => startTyping(text));
-        row.addEventListener('mouseleave', stopTyping);
+        row.addEventListener('mouseenter', () => window.DockMonitorNote?.show(row, text, TIP_DELAY_MS));
+        row.addEventListener('mouseleave', () => window.DockMonitorNote?.hide(row));
       });
     }
 
-    function tipsBox() {
-      const leg = container.closest('.game-leg');
-      return leg ? leg.querySelector('.game-leg__tips') : null;
-    }
-
-    // Typed L→R inside a measure-sized line so the caret starts at the left
-    // of the final centered block and the finished text still sits centered.
-    function startTyping(text) {
-      stopTyping();
-      const box = tipsBox();
-      if (!box) return;
-      box.classList.add('is-live');
-      const measure = box.querySelector('.game-leg__tips-measure');
-      const span = box.querySelector('.game-leg__tips-text');
-      const caret = box.querySelector('.game-leg__caret');
-      measure.textContent = text;
-      span.textContent = '';
-
-      const TIP_DELAY_MS = 1000;
-      const CHAR_MS = 22;
-      const SENTENCE_PAUSE_MS = 650;
-      let i = 0;
-
-      function tick() {
-        if (!typingAnim) return;
-        if (i >= text.length) {
-          typingAnim = null;
-          caret.classList.remove('game-leg__caret--typing');
-          return;
-        }
-        const ch = text[i++];
-        span.textContent += ch;
-        if (ch === '.' && text[i] === ' ') {
-          caret.classList.remove('game-leg__caret--typing');
-          typingAnim = setTimeout(() => {
-            if (!typingAnim) return;
-            caret.classList.add('game-leg__caret--typing');
-            typingAnim = setTimeout(tick, CHAR_MS);
-          }, SENTENCE_PAUSE_MS);
-        } else {
-          typingAnim = setTimeout(tick, CHAR_MS);
-        }
-      }
-
-      // Caret blinks at the start position during the hover delay.
-      typingAnim = setTimeout(() => {
-        if (!typingAnim) return;
-        caret.classList.add('game-leg__caret--typing');
-        typingAnim = setTimeout(tick, CHAR_MS);
-      }, TIP_DELAY_MS);
-    }
-
-    function stopTyping() {
-      clearTimeout(typingAnim);
-      typingAnim = null;
-      const box = tipsBox();
-      if (!box) return;
-      box.classList.remove('is-live');
-      const measure = box.querySelector('.game-leg__tips-measure');
-      if (measure) measure.textContent = '';
-      box.querySelector('.game-leg__tips-text').textContent = '';
-      box.querySelector('.game-leg__caret').classList.remove('game-leg__caret--typing');
+    // An entry's cell, found through its row: rank mode reorders the rows,
+    // so the DOM order is not the entries' order.
+    function rowCell(e, sel) {
+      const key = rankKeyFor(e);
+      const row = [...container.querySelectorAll('.sl-row[data-rank-key]')]
+        .find(r => r.dataset.rankKey === key);
+      return row ? row.querySelector(sel) : null;
     }
 
     function refreshGps() {
       const m = gpsMetric();
-      const head = container.querySelector('[data-prev-gps-th]');
-      if (head) {
-        head.textContent = m.label;
-        const wrap = head.closest('.sl-c-gps');
-        if (wrap) wrap.title = `xLabs GPS — ${m.desc}. Click to switch metric.`;
+      const head = container.querySelector('[data-gps-head]');
+      if (head) head.title = `xLabs GPS — ${m.desc}`;
+      const label = container.closest('.game-leg')?.querySelector('[data-gps-cycle-label]');
+      if (label) {
+        label.textContent = m.label;
+        label.title = m.desc;
       }
       container.querySelectorAll('[data-prev-gps-cell]').forEach(cell => {
         cell.textContent = cell.getAttribute('data-gv-' + m.key) || '';
       });
     }
 
-    function refreshGal() {
-      const galClickable = !!raceData?.gal_models?.has_track_model;
+    function refreshGal(fade) {
+      // The sort follows the column between xwin and xodds; elsewhere it ends.
+      if (sortKey && sortKey !== colMode) {
+        if (COL_SORTABLE.has(colMode)) {
+          sortKey = colMode;
+          if (rankIsReady()) rankAnimate(() => rankArrange(sortRows()));
+        } else {
+          sortClear();
+        }
+      }
       const head = container.querySelector('.sl-row--head .sl-c-gal');
-      if (head && galClickable) head.textContent = galMode === 'general' ? 'xgal' : 'xgal*';
-      const cells = container.querySelectorAll('[data-gal-cell]');
-      entries.forEach((e, i) => {
-        if (cells[i]) cells[i].innerHTML = galCell(e);
+      if (head) {
+        head.className = colHeadClass();
+        head.innerHTML = colHeadInner();
+        head.title = colHeadTitle();
+      }
+      const cells = [];
+      entries.forEach(e => {
+        const cell = rowCell(e, '[data-gal-cell]');
+        if (!cell) return;
+        cell.innerHTML = colCell(e);
+        cells.push(cell);
       });
+      const label = container.closest('.game-leg')?.querySelector('[data-col-cycle-label]');
+      if (label) {
+        label.textContent = colMeta().label;
+        label.title = colMeta().desc;
+      }
+      if (fade) {
+        const all = head ? [head, ...cells] : cells;
+        all.forEach(c => c.classList.remove('is-cycled'));
+        void container.offsetWidth;
+        all.forEach(c => c.classList.add('is-cycled'));
+      }
     }
 
     function refreshPct() {
@@ -3813,17 +5352,29 @@
       refreshPickToggle();
       refreshSystemShares();
       paintReserveBadges();
+      const sysBtn = container.querySelector('[data-system-toggle]');
+      if (sysBtn) sysBtn.classList.toggle('is-glitch-ready', picks.length > 0);
       return picks;
     }
 
     function destroy() {
       destroyed = true;
       instances.delete(inst);
-      stopTyping();
+      window.DockMonitorNote?.hide(container);
       systemDrag = null;
       window.removeEventListener('pointermove', systemDragMove);
       window.removeEventListener('pointerup', systemDragEnd);
       window.removeEventListener('pointercancel', systemDragEnd);
+      chanceDrag = null;
+      window.removeEventListener('pointermove', chanceDragMove);
+      window.removeEventListener('pointerup', chanceDragEnd);
+      window.removeEventListener('pointercancel', chanceDragEnd);
+      brush = null;
+      window.removeEventListener('pointermove', brushMove);
+      window.removeEventListener('pointerup', brushRelease);
+      window.removeEventListener('pointercancel', brushRelease);
+      container.removeEventListener('pointerdown', toolPointerDown, true);
+      container.removeEventListener('click', toolClick, true);
       container.innerHTML = '';
     }
 
@@ -3847,7 +5398,51 @@
 
   window.addEventListener('coupon:changed', () => instances.forEach(x => x.sync()));
   window.addEventListener('reduced:changed', () => instances.forEach(x => x.syncReduced()));
+  window.addEventListener('rankorder:changed', () => instances.forEach(x => {
+    x.syncReduced();
+    x.syncRankOrder();
+  }));
+  window.addEventListener('rankmode:changed', () => instances.forEach(x => x.syncRank()));
+  window.addEventListener('rankchance:changed', () => instances.forEach(x => x.rankPaintMarks()));
+  window.addEventListener('rankgrade:changed', () => instances.forEach(x => x.rankPaintMarks()));
+  // Aiming is coupon-wide: the lever is in one leg and its stripes are in
+  // all the others, so every mounted list repaints on a focus change.
+  window.addEventListener('lever:focus', () => instances.forEach(x => x.syncReduced()));
+  window.addEventListener('thumb:edit', () => instances.forEach(x => x.syncThumbEdit()));
+  window.addEventListener('cursortool:changed', () => instances.forEach(x => x.syncCursorTool()));
+  window.addEventListener('selection:changed', () => instances.forEach(x => x.syncSelected()));
+  window.addEventListener('agent:changed', () => instances.forEach(x => x.refreshAgent()));
+  document.addEventListener('click', ev => {
+    instances.forEach(x => x.closeHistoryOn(ev.target));
+  }, true);
+  // The springspår lines flare on the hero's tick and when a list opens.
+  function firePulse(sl) {
+    if (!sl || !sl.querySelector('.sl-row.is-spring')) return;
+    sl.classList.remove('is-fire-pulse');
+    void sl.offsetWidth;
+    sl.classList.add('is-fire-pulse');
+    clearTimeout(sl._firePulse);
+    sl._firePulse = setTimeout(() => sl.classList.remove('is-fire-pulse'), 2600);
+  }
+  document.addEventListener('hero:tick', () => {
+    document.querySelectorAll('.sl').forEach(firePulse);
+  });
+  window.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && window.LeverFocus && LeverFocus.isOn()) {
+      LeverFocus.setOn(false);
+    }
+  });
 
-  window.StartList = { mount, prevRacesCache };
+  window.StartList = {
+    mount,
+    prevRacesCache,
+    firePulse,
+    resetBuild() {
+      instances.forEach(x => {
+        if (typeof x.resetBuild === 'function') x.resetBuild();
+      });
+      applyReservesMode(false);
+    },
+  };
 })();
 </script>

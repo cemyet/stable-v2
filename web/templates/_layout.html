@@ -463,11 +463,16 @@
     }
 
     /* Open/closed caret for expandable panels. */
+    .glass-panel--hybrid .hybrid-panel__caret-slot {
+      flex: none;
+      display: flex;
+      align-items: center;
+      margin-left: 2px;
+    }
     .glass-panel--hybrid .hybrid-panel__caret {
       flex: 0 0 auto;
       width: 9px;
       height: 9px;
-      margin-left: 2px;
       border-right: 1.6px solid rgba(255, 255, 255, 0.9);
       border-bottom: 1.6px solid rgba(255, 255, 255, 0.9);
       transform: rotate(45deg) translate(-1px, -1px);
@@ -484,6 +489,241 @@
       white-space: nowrap;
     }
 
+    /* Segmented race panel — logo / meta / title / picks / starters slots. */
+    .glass-panel--hybrid-segmented {
+      --race-panel-logo-w: 52px;
+      --race-panel-logo-gap: 14px;
+      --race-panel-seg-pad-y: 5px;
+      --race-panel-edge-w: calc(16px + var(--race-panel-logo-w) + var(--race-panel-logo-gap));
+      --race-panel-meta-w: calc(14px + 16ch);
+      --panel-seg-caret: rgb(var(--panel-hybrid-to-rgb));
+      --panel-seg-logo: var(--panel-seg-caret);
+      --panel-seg-picks: color-mix(in srgb, rgb(var(--panel-hybrid-to-rgb)) 30%, var(--panel-muted));
+      --panel-seg-meta: var(--panel-seg-picks);
+      --panel-seg-title: linear-gradient(
+        var(--panel-hybrid-angle, 45deg),
+        color-mix(in srgb, var(--panel-seg-picks) 72%, var(--panel-muted)) 0%,
+        color-mix(in srgb, var(--panel-seg-picks) 65%, var(--panel-muted-to)) 100%
+      );
+    }
+    .glass-panel--hybrid-segmented.glass-panel--hybrid-xp {
+      padding: 0;
+      overflow: hidden;
+      background: var(--panel-seg-meta);
+      border: none !important;
+      box-shadow: 0 0 0 1px color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 20%, white) !important;
+      outline: none;
+      border-radius: 0;
+      filter: brightness(1.06);
+      transition:
+        filter 0.28s ease,
+        box-shadow 0.28s ease,
+        border-color 0.28s ease,
+        transform 0.18s ease;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__logo-slot,
+    .glass-panel--hybrid-segmented .hybrid-panel__meta,
+    .glass-panel--hybrid-segmented .hybrid-panel__center,
+    .glass-panel--hybrid-segmented .hybrid-panel__picks,
+    .glass-panel--hybrid-segmented .hybrid-panel__starters {
+      border: none;
+      box-shadow: none;
+      outline: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__head {
+      display: flex;
+      align-items: stretch;
+      min-height: 52px;
+      width: 100%;
+      min-width: 0;
+      column-gap: 0;
+      grid-template-columns: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__seg-divider {
+      display: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__logo-slot {
+      position: relative;
+      flex: 0 0 var(--race-panel-edge-w);
+      flex-shrink: 0;
+      width: var(--race-panel-edge-w);
+      box-sizing: border-box;
+      padding: var(--race-panel-seg-pad-y) var(--race-panel-logo-gap) var(--race-panel-seg-pad-y) 16px;
+      background: var(--panel-seg-meta);
+      border-radius: 0;
+      overflow: hidden;
+      z-index: 2;
+    }
+    /* Same TL dark triangle as before — painted on meta so clip-path fringe
+       cannot leak the old dark base into the light half or the outer pad. */
+    .glass-panel--hybrid-segmented .hybrid-panel__logo-slot::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--panel-seg-logo);
+      clip-path: polygon(0 0, 100% 0, 0 100%);
+      pointer-events: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-code,
+    .glass-panel--hybrid-segmented .hybrid-panel__picks--summary,
+    .glass-panel--hybrid-segmented .hybrid-panel__race-distance {
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-code {
+      color: rgb(var(--panel-hybrid-from-rgb));
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      text-shadow: none;
+      opacity: 1;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__picks--summary {
+      color: rgb(var(--panel-hybrid-from-rgb));
+      text-shadow: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-distance {
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__meta {
+      flex: 0 0 var(--race-panel-meta-w);
+      flex-shrink: 0;
+      width: var(--race-panel-meta-w);
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 3px;
+      padding: var(--race-panel-seg-pad-y) 14px var(--race-panel-seg-pad-y) 8px;
+      background: var(--panel-seg-meta);
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__center {
+      position: static;
+      inset: auto;
+      left: auto;
+      top: auto;
+      transform: none;
+      flex: 1 1 0;
+      display: block;
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      padding: var(--race-panel-seg-pad-y) 0;
+      background:
+        linear-gradient(to left, var(--panel-seg-picks) 0%, transparent 36%),
+        linear-gradient(to right, var(--panel-seg-picks) 0%, transparent 36%),
+        var(--panel-seg-title);
+      pointer-events: none;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-name {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      width: calc(100% - 2 * (var(--race-panel-edge-w) + var(--race-panel-meta-w)));
+      max-width: none;
+      display: block;
+      overflow: hidden;
+      text-overflow: clip;
+      white-space: nowrap;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.2;
+      color: var(--panel-ink);
+      text-shadow: none;
+      pointer-events: auto;
+      container-type: inline-size;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-name-text {
+      display: block;
+      width: max-content;
+      margin-inline: auto;
+      white-space: nowrap;
+      animation: hybrid-panel-race-name-marquee 8s ease-in-out infinite alternate;
+      animation-delay: 0.8s;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__race-name:hover .hybrid-panel__race-name-text {
+      animation: none;
+      transform: translateX(0);
+    }
+    @keyframes hybrid-panel-race-name-marquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(min(0px, calc(100cqw - 100%))); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .glass-panel--hybrid-segmented .hybrid-panel__race-name-text { animation: none; }
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__trail {
+      grid-column: auto;
+      justify-self: auto;
+      flex: 0 0 auto;
+      flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      min-width: 0;
+      margin-left: 0;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__picks {
+      display: flex;
+      flex: 0 0 var(--race-panel-meta-w);
+      flex-shrink: 0;
+      width: var(--race-panel-meta-w);
+      max-height: none;
+      box-sizing: border-box;
+      align-items: center;
+      justify-content: flex-end;
+      padding: var(--race-panel-seg-pad-y) 8px var(--race-panel-seg-pad-y) 14px;
+      background: var(--panel-seg-picks);
+      overflow: hidden;
+      --pick-h: auto;
+      --picks-row-w: auto;
+      flex-wrap: nowrap;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__picks--summary {
+      font-size: 15px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__starters {
+      position: relative;
+      display: flex;
+      flex: 0 0 var(--race-panel-edge-w);
+      flex-shrink: 0;
+      width: var(--race-panel-edge-w);
+      box-sizing: border-box;
+      align-items: center;
+      justify-content: center;
+      padding: var(--race-panel-seg-pad-y) 16px var(--race-panel-seg-pad-y) var(--race-panel-logo-gap);
+      background: var(--panel-seg-picks);
+      overflow: hidden;
+      z-index: 2;
+    }
+    .glass-panel--hybrid-segmented .hybrid-panel__starters::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--panel-seg-logo);
+      clip-path: polygon(0 100%, 100% 100%, 100% 0);
+      pointer-events: none;
+    }
+    .game-leg__head:hover .glass-panel--hybrid-segmented.glass-panel--hybrid-gradient-only,
+    .game-leg.is-open .glass-panel--hybrid-segmented.glass-panel--hybrid-gradient-only {
+      background: var(--panel-seg-meta);
+      filter: brightness(1.07) saturate(1.04);
+      border-color: color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 42%, transparent) !important;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 20%, white),
+        0 4px 16px color-mix(in srgb, rgb(var(--panel-hybrid-from-rgb)) 14%, transparent),
+        0 10px 28px color-mix(in srgb, rgb(var(--panel-hybrid-to-rgb)) 10%, transparent) !important;
+      transform: translateY(-1px);
+    }
     .glass-panel--hybrid-xp {
       position: relative;
       display: flex;
@@ -4680,6 +4920,19 @@
       font-size: 17px; font-weight: 700; letter-spacing: 0.2px;
       font-variant-numeric: tabular-nums; line-height: 1.05;
       max-width: 92px; text-align: center;
+      display: inline-block;
+      transform-origin: center;
+      transition: transform 0.21s cubic-bezier(0.22, 1.4, 0.36, 1);
+    }
+    /* Held while changes keep coming, so a drag swells once and settles
+       after it stops instead of re-bopping every frame. */
+    .coupon-sphere__cost.is-bopping {
+      transform: scale(1.16);
+      transition-duration: 0.07s;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .coupon-sphere__cost,
+      .coupon-sphere__cost.is-bopping { transform: none; transition: none; }
     }
     .coupon-sphere__meta {
       font-size: 10px; letter-spacing: 1.4px; opacity: 0.9; text-transform: lowercase;
@@ -4773,6 +5026,7 @@
     .coupon-receipt__details .total { font-weight: 700; color: var(--coupon-ink); }
     .coupon-receipt__reduced { color: var(--accent-reduce); font-weight: 600; }
     .coupon-receipt__reduced.is-levered { color: var(--accent-lever); }
+    .coupon-receipt__pool { color: var(--accent-pool, #d8342b); font-weight: 600; }
     .coupon-receipt__name {
       width: 100%; margin-top: 14px;
       font-family: inherit; font-size: 13px; color: var(--coupon-ink);
@@ -4883,6 +5137,7 @@
       padding-left: 12px; white-space: nowrap; min-width: 4.5em;
     }
     .coupon-receipt__payout-tag.is-win { color: #3d9c36; font-weight: 700; }
+    .coupon-receipt__payout-pool td:first-child { color: var(--accent-pool, #d8342b); font-weight: 600; }
     .coupon-receipt__payout-sum {
       margin-top: 8px; font-weight: 700; font-size: 16px;
       font-variant-numeric: tabular-nums;
@@ -5513,6 +5768,86 @@ function gameTypeSymbolById(id, options = {}) {
   return gameTypeSymbolHtml(gt.svg, { ...options, ariaLabel: options.ariaLabel ?? gt.ariaLabel });
 }
 
+const CROSSHAIR_MARK_SVG = `<svg viewBox="0 0 100 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg" overflow="visible" aria-hidden="true"><path fill-rule="evenodd" d="M86 50A36 36 0 0 1 50 86A36 36 0 0 1 14 50A36 36 0 0 1 50 14A36 36 0 0 1 86 50ZM76 50A26 26 0 0 1 50 76A26 26 0 0 1 24 50A26 26 0 0 1 50 24A26 26 0 0 1 76 50ZM66 50A16 16 0 0 1 50 66A16 16 0 0 1 34 50A16 16 0 0 1 50 34A16 16 0 0 1 66 50ZM44 0H56V100H44ZM0 44H100V56H0ZM44 44H56V56H44Z"/></svg>`;
+
+/* Monitor mark: same rings and bars, but the centre reticle is a solid
+   currentColor disc instead of the glowing pupil overlay. */
+const MONITOR_AIM_SVG = `<svg viewBox="0 0 100 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg" overflow="visible" aria-hidden="true"><path fill-rule="evenodd" d="M86 50A36 36 0 0 1 50 86A36 36 0 0 1 14 50A36 36 0 0 1 50 14A36 36 0 0 1 86 50ZM76 50A26 26 0 0 1 50 76A26 26 0 0 1 24 50A26 26 0 0 1 50 24A26 26 0 0 1 76 50ZM66 50A16 16 0 0 1 50 66A16 16 0 0 1 34 50A16 16 0 0 1 50 34A16 16 0 0 1 66 50ZM44 0H56V100H44ZM0 44H100V56H0Z"/><circle cx="50" cy="50" r="6"/></svg>`;
+
+function crosshairPupilSvg(id) {
+  const gid = `crosshair-pupil-${String(id || 'x').replace(/[^a-zA-Z0-9_-]/g, '')}`;
+  return `<svg viewBox="0 0 100 100" fill="currentColor" xmlns="http://www.w3.org/2000/svg" overflow="visible" aria-hidden="true"><defs><radialGradient id="${gid}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff"/><stop offset="24%" stop-color="#fff"/><stop offset="42%" stop-color="#8af6ff"/><stop offset="68%" stop-color="#00e8ff"/><stop offset="88%" stop-color="#00e8ff"/><stop offset="100%" stop-color="#00e8ff"/></radialGradient></defs><circle class="design-glitch__pupil-disc design-glitch__pupil-disc--idle" cx="50" cy="50" r="6"/><circle class="design-glitch__pupil-disc design-glitch__pupil-disc--active" cx="50" cy="50" r="6" fill="url(#${gid})"/></svg>`;
+}
+
+function glitchMarkHtml(svg, { ariaLabel = null, wordmark = false, stableSvg = null } = {}) {
+  const safe = ariaLabel ? String(ariaLabel).replace(/"/g, '&quot;') : null;
+  const aria = safe ? ` role="img" aria-label="${safe}"` : ' aria-hidden="true"';
+  const wordmarkClass = wordmark ? ' design-glitch--wordmark' : '';
+  const pupil = stableSvg ? `<span class="design-glitch__pupil">${stableSvg}</span>` : '';
+  return `<span class="design-glitch${wordmarkClass}"${aria}><span class="design-glitch__plate design-glitch__plate--c">${svg}</span><span class="design-glitch__plate design-glitch__plate--m">${svg}</span><span class="design-glitch__plate design-glitch__plate--y">${svg}</span><span class="design-glitch__mark">${svg}</span>${pupil}</span>`;
+}
+
+function crosshairToggleHtml(id) {
+  return glitchMarkHtml(CROSSHAIR_MARK_SVG, { stableSvg: crosshairPupilSvg(id) });
+}
+
+const REDUCE_PIE_SVG = `<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" overflow="visible" aria-hidden="true"><path class="game-leg__reduce-cut" d="M50 50L95.833 50A45.834 45.834 0 1 1 50 4.167Z"/></svg>`;
+
+function reduceToggleHtml() {
+  return glitchMarkHtml(REDUCE_PIE_SVG);
+}
+
+function reservesToggleHtml() {
+  return glitchMarkHtml('<span class="game-leg__tool-letter">R</span>');
+}
+
+function rankToggleHtml() {
+  return glitchMarkHtml('<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 17h4v5H2v-5Zm7-5h4v10H9V12Zm7-5h4v15h-4V7ZM2 20h4v1H2v-1Zm7 0h4v1H9v-1Zm7 0h4v1h-4v-1Z"/></svg>');
+}
+
+function weightsToggleHtml() {
+  return glitchMarkHtml('<span class="sl-system-toggle__omega" aria-hidden="true">ω</span>');
+}
+
+const CROSSHAIR_BURST_MS = 4400;
+
+function crosshairBurst(btn) {
+  if (!btn || btn.classList.contains('is-on') || btn.disabled) return;
+  if (btn.matches('[data-rank-toggle]') && btn.closest('.sl.is-ranked')) return;
+  if (btn.matches('[data-system-toggle]') && btn.closest('.sl.is-system')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const nodes = btn.querySelectorAll('.design-glitch__plate, .design-glitch__mark');
+  nodes.forEach(el => {
+    el.getAnimations().forEach(a => {
+      a.currentTime = CROSSHAIR_BURST_MS;
+      a.play();
+    });
+  });
+  const holdPaused = btn.matches('[data-rank-toggle]')
+    || (btn.matches('[data-system-toggle]') && !btn.classList.contains('is-glitch-ready'));
+  if (!holdPaused) return;
+  clearTimeout(btn._burstReset);
+  btn._burstReset = setTimeout(() => {
+    if (btn.matches('[data-rank-toggle]') && btn.closest('.sl.is-ranked')) return;
+    if (btn.matches('[data-system-toggle]') && (
+      btn.closest('.sl.is-system') || btn.classList.contains('is-glitch-ready')
+    )) return;
+    btn.querySelectorAll('.design-glitch__plate, .design-glitch__mark').forEach(el => {
+      el.getAnimations().forEach(a => { a.currentTime = 0; a.pause(); });
+    });
+  }, 700);
+}
+
+function initCrosshairToggle(btn) {
+  if (!btn) return;
+  btn.addEventListener('mouseenter', () => crosshairBurst(btn));
+  btn.addEventListener('focus', () => crosshairBurst(btn));
+}
+
+function racePanelLogoSlotHtml() {
+  return '<span class="hybrid-panel__logo-slot" aria-hidden="true"></span>';
+}
+
 function hybridPanelRowHtml(gameType, opts = {}) {
   const {
     xp = false,
@@ -5525,74 +5860,119 @@ function hybridPanelRowHtml(gameType, opts = {}) {
     raceStyle = false,
     noPlasmaFill: noPlasmaFillOpt,
     picksSlot = false,
+    picks = null,
+    pickSummary = false,
+    startersOnly = false,
+    startersSlot = false,
     caret = false,
+    extraClass = '',
+    symbolHtml = null,
+    segDividers = false,
   } = opts;
+  const segDividerHtml = segDividers
+    ? '<span class="hybrid-panel__seg-divider" aria-hidden="true"></span>'
+    : '';
   const noPlasmaFill = noPlasmaFillOpt ?? (xp && !raceStyle);
   const xpClass = xp ? ' glass-panel--hybrid-xp' : '';
   const demoClass = demo ? ' demo-glass demo-glass--hybrid demo-glass--hybrid-lg' : '';
   const raceClass = raceStyle ? ' glass-panel--hybrid-race' : '';
   const gradientOnlyClass = noPlasmaFill ? ' glass-panel--hybrid-gradient-only' : '';
+  const extra = extraClass ? ` ${extraClass}` : '';
   const usePlasma = symbolPlasma || raceStyle;
-  const symbol = gameTypeSymbolHtml(gameType.svg, {
+  const resolvedSymbol = typeof symbolHtml === 'function' ? symbolHtml(gameType) : symbolHtml;
+  const symbol = resolvedSymbol || gameTypeSymbolHtml(gameType.svg, {
     size: 'panel',
     ariaLabel: gameType.ariaLabel,
     plasma: usePlasma,
     plasmaId: gameType.id,
   });
-  const raceNameHtml = `<span class="hybrid-panel__race-name${raceName ? '' : ' is-empty'}">${raceName ? esc(raceName) : ''}</span>`;
+  const raceNameHtml = `<span class="hybrid-panel__race-name${raceName ? '' : ' is-empty'}">${raceName ? `<span class="hybrid-panel__race-name-text">${esc(raceName)}</span>` : ''}</span>`;
+  const pickNums = Array.isArray(picks) ? picks.filter(n => n != null && n !== '') : null;
+  const pickCount = pickNums ? pickNums.length : 0;
+  const picksHtml = startersOnly && starters != null
+    ? `<span class="hybrid-panel__picks hybrid-panel__picks--summary" data-panel-picks data-starters="${starters}" aria-label="${starters} starters">${starters}</span>`
+    : pickSummary && starters != null
+    ? `<span class="hybrid-panel__picks hybrid-panel__picks--summary" data-panel-picks data-starters="${starters}" aria-label="${pickCount} of ${starters} picked">${pickCount} / ${starters}</span>`
+    : pickNums && pickNums.length
+      ? `<span class="hybrid-panel__picks${pickNums.length > 5 ? ' is-dense' : ''}">${
+          pickNums.map(n => `<span class="hybrid-panel__pick">${esc(String(n))}</span>`).join('')
+        }</span>`
+      : picksSlot ? '<span class="hybrid-panel__picks" data-panel-picks></span>' : '';
   // The trail carries the starter count plus, on the game page, the coupon
   // picks for this leg and the open/closed caret.
-  const trailInner = [
-    picksSlot ? '<span class="hybrid-panel__picks" data-panel-picks></span>' : '',
-    starters != null
-      ? `<span class="hybrid-panel__starters" aria-label="${starters} starters">${starters}</span>`
-      : '',
-    caret ? '<span class="hybrid-panel__caret" aria-hidden="true"></span>' : '',
-  ].filter(Boolean).join('');
-  const inner = xp && raceNumber != null
-    ? `<div class="hybrid-panel__head">
-        <div class="hybrid-panel__lead">
-          ${symbol}
-          <div class="hybrid-panel__meta">
+  const trailParts = [
+    picksHtml,
+    !pickSummary && !startersOnly && starters != null
+      ? `<span class="hybrid-panel__starters" data-starters="${starters}" aria-label="${starters} starters">${starters}</span>`
+      : startersSlot ? '<span class="hybrid-panel__starters" aria-hidden="true"></span>' : '',
+    caret ? '<span class="hybrid-panel__caret-slot"><span class="hybrid-panel__caret" aria-hidden="true"></span></span>' : '',
+  ].filter(Boolean);
+  const trailInner = segDividers
+    ? trailParts.join(segDividerHtml)
+    : trailParts.join('');
+  const metaHtml = `<div class="hybrid-panel__meta">
             <span class="hybrid-panel__race-code">${gameType.label}-${raceNumber}</span>
             ${distanceLabel
               ? `<span class="hybrid-panel__race-distance">${esc(distanceLabel)}</span>`
               : ''}
-          </div>
+          </div>`;
+  const inner = xp && raceNumber != null
+    ? (segDividers
+      ? `<div class="hybrid-panel__head">
+        ${symbol}${segDividerHtml}${metaHtml}${segDividerHtml}
+        <div class="hybrid-panel__center">${raceNameHtml}</div>${segDividerHtml}
+        ${trailInner ? `<div class="hybrid-panel__trail">${trailInner}</div>` : ''}
+      </div>`
+      : `<div class="hybrid-panel__head">
+        <div class="hybrid-panel__lead">
+          ${symbol}
+          ${metaHtml}
         </div>
         <div class="hybrid-panel__center">${raceNameHtml}</div>
         ${trailInner ? `<div class="hybrid-panel__trail">${trailInner}</div>` : ''}
-      </div>`
+      </div>`)
     : symbol;
   const plasmaLayer = noPlasmaFill
     ? ''
     : '<span class="glass-panel__plasma" aria-hidden="true"></span>';
-  return `<div class="glass-panel glass-panel--hybrid glass-panel--hybrid-${gameType.hybrid}${xpClass}${raceClass}${gradientOnlyClass}${demoClass}">
+  return `<div class="glass-panel glass-panel--hybrid glass-panel--hybrid-${gameType.hybrid}${xpClass}${raceClass}${gradientOnlyClass}${demoClass}${extra}">
     ${plasmaLayer}
     ${inner}
   </div>`;
 }
 
-function hybridPanelStackHtml(ids = HYBRID_PANEL_GAME_TYPE_IDS, {
-  xp = true,
-  raceNumber = 1,
-  distanceLabel = '2140m auto',
-  raceName = 'Race Title',
-  starters = 12,
-  symbolPlasma = false,
-  raceStyle = false,
-  noPlasmaFill = false,
-} = {}) {
+function hybridPanelStackHtml(ids = HYBRID_PANEL_GAME_TYPE_IDS, opts = {}) {
+  const {
+    xp = true,
+    demo = true,
+    raceNumber = 1,
+    distanceLabel = '2140m auto',
+    raceName = 'Race Title',
+    starters = 12,
+    symbolPlasma = false,
+    raceStyle = false,
+    caret = false,
+    picks = null,
+    extraClass = '',
+    symbolHtml = null,
+  } = opts;
   return ids.map(id => gameTypeById(id)).filter(Boolean).map(gt =>
     hybridPanelRowHtml(gt, {
       xp,
+      demo,
       raceNumber: xp ? raceNumber : null,
       starters: xp ? starters : null,
       raceName: xp ? raceName : null,
       distanceLabel: xp ? distanceLabel : null,
       symbolPlasma,
       raceStyle,
-      noPlasmaFill,
+      caret,
+      picks,
+      extraClass,
+      symbolHtml,
+      ...(Object.prototype.hasOwnProperty.call(opts, 'noPlasmaFill')
+        ? { noPlasmaFill: opts.noPlasmaFill }
+        : {}),
     })
   ).join('');
 }
@@ -5759,7 +6139,7 @@ function buildHybridXpGamePanelsHtml(gameTypeId, races = [], options = {}) {
   return races.map((race, i) =>
     hybridPanelRowHtml(gt, {
       xp: true,
-      demo: true,
+      demo: false,
       raceNumber: race.raceNumber ?? (i + 1),
       starters: race.starters ?? null,
       raceName: race.name || null,
@@ -7096,7 +7476,17 @@ window.gameTypeById = gameTypeById;
 window.gameTypeBrand = gameTypeBrand;
 window.gameTypeSymbolHtml = gameTypeSymbolHtml;
 window.gameTypeSymbolById = gameTypeSymbolById;
+window.CROSSHAIR_MARK_SVG = CROSSHAIR_MARK_SVG;
+window.crosshairPupilSvg = crosshairPupilSvg;
+window.glitchMarkHtml = glitchMarkHtml;
+window.crosshairToggleHtml = crosshairToggleHtml;
+window.reduceToggleHtml = reduceToggleHtml;
+window.reservesToggleHtml = reservesToggleHtml;
+window.rankToggleHtml = rankToggleHtml;
+window.weightsToggleHtml = weightsToggleHtml;
+window.initCrosshairToggle = initCrosshairToggle;
 window.hybridPanelRowHtml = hybridPanelRowHtml;
+window.racePanelLogoSlotHtml = racePanelLogoSlotHtml;
 window.hybridPanelStackHtml = hybridPanelStackHtml;
 window.formPanelDemoHtml = formPanelDemoHtml;
 window.formPanelHtml = formPanelHtml;
@@ -7141,24 +7531,105 @@ window.trackNameHtml = trackNameHtml;
     // maxSystems is ATG's cap per account/competition — informational only,
     // there is no official per-coupon cost cap.
     // Mirrored server-side in web/app.py (_COUPON_GAME_RULES) — keep in sync.
+    // topPool: the coupon can be played for its top tier alone, paying that
+    // tier's dividend times `factor` and nothing below it. Mirrors
+    // ATG_TOP_POOL in core/reduce_system.py.
     const COUPON_GAME_RULES = {
       V86:  { legs: 8, linePrice: 0.25, maxSystems: 5000, payTiers: [5, 6, 7, 8] },
       V85:  { legs: 8, linePrice: 0.50, maxSystems: 5000, payTiers: [5, 6, 7, 8] },
-      V75:  { legs: 7, linePrice: 0.50, maxSystems: 5000, payTiers: [5, 6, 7] },
-      GS75: { legs: 7, linePrice: 1.00, maxSystems: 5000, payTiers: [5, 6, 7] },
-      V64:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [4, 5, 6] },
-      V65:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [5, 6] },
+      V75:  { legs: 7, linePrice: 0.60, maxSystems: 5000, payTiers: [5, 6, 7] },
+      GS75: { legs: 7, linePrice: 1.00, maxSystems: 5000, payTiers: [5, 6, 7],
+              topPool: { label: 'V7', tier: 7, factor: 2.5 } },
+      V64:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [4, 5, 6],
+              topPool: { label: 'V6', tier: 6, factor: 2.5 } },
+      V65:  { legs: 6, linePrice: 1.00, maxSystems: 2000, payTiers: [5, 6],
+              topPool: { label: 'V6', tier: 6, factor: 2.0 } },
       V5:   { legs: 5, linePrice: 1.00, maxSystems: 500,  payTiers: [5] },
       V4:   { legs: 4, linePrice: 2.00, maxSystems: 500,  payTiers: [4] },
     };
 
     const COUPON_DRAFT_KEY = 'couponDraft.v1';
 
+    /* Coupon-wide scale. 1 buys the system as its weights price it; the bar
+       steps it 5% at a time down to 5% and up to double, then plays the
+       whole thing three, five or ten times. Mirrors _COUPON_SCALE_MIN/MAX
+       on the server. */
+    const COUPON_SCALE_STEPS = Object.freeze([
+      ...Array.from({ length: 40 }, (_, i) => (i + 1) / 20), 3, 5, 10]);
+    // core.reduce_system._MAX_UNITS: the solver builds nothing bigger.
+    const COUPON_SCALE_MAX_UNITS = 2000000;
+
+    /* The steps a system of `baseRows` can take, as indexes. Every pick
+       needs a row, so it never drops below its widest leg's picks, and it
+       never climbs past what the solver builds. Neither bound moves 1. */
+    function couponScaleRange(baseRows, minRows) {
+      const rows = s => reducedRoundRows(baseRows * s);
+      const one = COUPON_SCALE_STEPS.indexOf(1);
+      let lo = one;
+      while (lo > 0 && rows(COUPON_SCALE_STEPS[lo - 1]) >= minRows) lo -= 1;
+      let hi = one;
+      while (hi < COUPON_SCALE_STEPS.length - 1
+             && rows(COUPON_SCALE_STEPS[hi + 1]) <= COUPON_SCALE_MAX_UNITS) hi += 1;
+      return { lo, hi };
+    }
+
+    function couponScaleFit(raw, baseRows, minRows) {
+      const v = Number(raw);
+      if (!(v > 0) || v === 1) return 1;
+      const { lo, hi } = couponScaleRange(baseRows, minRows);
+      return Math.min(COUPON_SCALE_STEPS[hi], Math.max(COUPON_SCALE_STEPS[lo], v));
+    }
+
     function couponAmount(v) {
       return Number(v).toLocaleString('sv-SE', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
+    }
+
+    function couponSphereAmount(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return '0.00';
+      const [int, frac] = n.toFixed(2).split('.');
+      return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}.${frac}`;
+    }
+
+    const sphereCostAnim = { raf: 0, current: null, bopTimer: 0 };
+
+    function setCouponSphereCost(el, next) {
+      const node = el && el.querySelector('.coupon-sphere__cost');
+      if (!node) return;
+      const to = Number(next);
+      const target = Number.isFinite(to) ? to : 0;
+      const from = Number.isFinite(sphereCostAnim.current) ? sphereCostAnim.current : target;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const skip = reduceMotion || from === target;
+      if (skip) {
+        cancelAnimationFrame(sphereCostAnim.raf);
+        sphereCostAnim.current = target;
+        node.textContent = couponSphereAmount(target);
+        node.classList.remove('is-bopping');
+        return;
+      }
+      cancelAnimationFrame(sphereCostAnim.raf);
+      node.classList.add('is-bopping');
+      window.clearTimeout(sphereCostAnim.bopTimer);
+      sphereCostAnim.bopTimer = window.setTimeout(() => node.classList.remove('is-bopping'), 290);
+      const t0 = performance.now();
+      const dur = 320;
+      function frame(now) {
+        const t = Math.min(1, (now - t0) / dur);
+        const eased = 1 - (1 - t) * (1 - t);
+        const v = from + (target - from) * eased;
+        sphereCostAnim.current = v;
+        node.textContent = couponSphereAmount(v);
+        if (t < 1) sphereCostAnim.raf = requestAnimationFrame(frame);
+        else {
+          sphereCostAnim.current = target;
+          node.textContent = couponSphereAmount(target);
+        }
+      }
+      sphereCostAnim.raf = requestAnimationFrame(frame);
     }
 
     function couponKr(v) {
@@ -7225,6 +7696,58 @@ window.trackNameHtml = trackNameHtml;
       return out;
     }
 
+    /* Uniform can add horses that are not selected to a lever's sub-coupon.
+       That expansion crosses legs, so product-of-picks × retention is only
+       an estimate. Ask the solver for a lightweight authoritative quote and
+       cache it by the complete live plan. */
+    const couponRowQuote = {
+      key: '',
+      desiredKey: '',
+      rows: null,
+      timer: 0,
+      sequence: 0,
+      // Last quote over the estimate it replaced. New estimates are scaled by
+      // it so a fast run of edits (a slider drag) doesn't flip between the
+      // raw estimate and each quote that lands in a pause.
+      gameId: '',
+      scale: 1,
+    };
+
+    function couponPlanKey(plan) {
+      return JSON.stringify({
+        gameId: plan.gameId,
+        gameType: plan.gameType,
+        scale: plan.scale,
+        legs: plan.legs,
+      });
+    }
+
+    function requestCouponRowQuote(plan, key) {
+      couponRowQuote.desiredKey = key;
+      if (couponRowQuote.key === key && Number.isFinite(couponRowQuote.rows)) return;
+      window.clearTimeout(couponRowQuote.timer);
+      const sequence = ++couponRowQuote.sequence;
+      couponRowQuote.timer = window.setTimeout(async () => {
+        try {
+          const res = await fetch('/api/reduced/quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(plan),
+          });
+          const quote = await res.json().catch(() => ({}));
+          if (!res.ok || sequence !== couponRowQuote.sequence
+              || couponRowQuote.desiredKey !== key) return;
+          const rows = Number(quote.rows);
+          if (!Number.isFinite(rows) || rows < 1) return;
+          couponRowQuote.key = key;
+          couponRowQuote.rows = rows;
+          couponRowQuote.gameId = plan.gameId;
+          couponRowQuote.scale = rows / Math.max(1, Number(plan.rows) || rows);
+          window.dispatchEvent(new CustomEvent('coupon:quote'));
+        } catch (_) { /* Keep the immediate local estimate while offline. */ }
+      }, 140);
+    }
+
     const Coupon = {
       rules: COUPON_GAME_RULES,
 
@@ -7258,40 +7781,91 @@ window.trackNameHtml = trackNameHtml;
         return d.legs.reduce((p, l) => p * Math.max(1, Coupon.picksFor(d, l.raceId).length), 1);
       },
 
-      /* Rows actually paid for once reduction is taken off the full system.
-         Every leg's retention multiplies, because the caps in different legs
-         cut through the row list independently. */
+      /* Rows actually paid for. Reduced.plan supplies an immediate estimate;
+         the cached server quote replaces it once the mathematical plan has
+         been priced, including Uniform's non-picked horses. */
       reduction(d) {
         const full = Coupon.lines(d);
         const blank = { fullRows: full, rows: full, retention: 1,
                         adjusted: false, reduced: false, levered: false };
-        if (!d || !window.Reduced || !Reduced.isOn()) return blank;
-        if (!Reduced.isReducible(d.gameType)) return blank;
-        let retention = 1;
-        let adjusted = false;
-        d.legs.forEach(l => {
-          const picks = Coupon.picksFor(d, l.raceId);
-          if (!picks.length) return;
-          const weights = Reduced.normalize(
-            picks, Reduced.weightsFor(l.raceId), Reduced.locksFor(l.raceId));
-          const caps = Reduced.activeCapsFor(l.raceId);
-          if (!Reduced.isLegAdjusted(picks, weights, caps)) return;
-          adjusted = true;
-          retention *= Reduced.legRetention(picks, weights, caps);
-        });
+        if (!d || !window.Reduced || !Reduced.isReducible(d.gameType)) return blank;
+        // The scale bar works on a plain coupon too: weights off is an even
+        // split, scaled like any other.
+        if (!Reduced.isOn() && Coupon.scale(d) === 1) return blank;
+        const plan = Reduced.plan(d);
+        const reduced = plan.legs.some(l => l.reduced) || plan.scale < 1;
+        const levered = plan.legs.some(l => l.levered) || plan.scale > 1;
+        const adjusted = reduced || levered;
         if (!adjusted) return blank;
-        // A leg reduced and another levered can cancel out; the coupon then
-        // costs what it always did and reads as neither.
+        const key = couponPlanKey(plan);
+        requestCouponRowQuote(plan, key);
+        const quoted = couponRowQuote.key === key
+          ? Number(couponRowQuote.rows) : NaN;
+        const scale = couponRowQuote.gameId === plan.gameId ? couponRowQuote.scale : 1;
+        const rows = Number.isFinite(quoted)
+          ? quoted : Math.max(1, Math.round((Number(plan.rows) || full) * scale));
         return {
           fullRows: full,
-          rows: Math.max(1, Math.round(full * retention)),
-          retention,
+          rows,
+          retention: rows / Math.max(1, full),
           adjusted: true,
-          reduced: retention < 1,
-          levered: retention > 1,
+          reduced,
+          levered,
         };
       },
       isReduced(d) { return Coupon.reduction(d).reduced; },
+
+      /* The coupon-wide scale as stored. plan() holds it to the steps the
+         system can actually take. */
+      SCALE_STEPS: COUPON_SCALE_STEPS,
+      scale(d) {
+        const v = Number(d && d.scale);
+        return v > 0 ? v : 1;
+      },
+      setScale(value) {
+        const d = Coupon.load();
+        if (!d) return 1;
+        const v = Number(value);
+        const step = COUPON_SCALE_STEPS.reduce(
+          (best, s) => (Math.abs(s - v) < Math.abs(best - v) ? s : best), 1);
+        if (step === Coupon.scale(d)) return step;
+        if (step === 1) delete d.scale; else d.scale = step;
+        Coupon.store(d);
+        return step;
+      },
+      /* What the scale bar draws: the steps, the one the coupon is on, how
+         far it can go each way, and what any step would cost. */
+      scaleInfo(d) {
+        const steps = COUPON_SCALE_STEPS;
+        const one = steps.indexOf(1);
+        const rule = Coupon.rule(d);
+        if (!d || !rule || !window.Reduced || !Reduced.isReducible(d.gameType)
+            || !Coupon.totalPicks(d)) {
+          return { steps, value: 1, lo: one, hi: one, enabled: false, costAt: () => 0 };
+        }
+        const plan = Reduced.plan(d);
+        const { lo, hi } = couponScaleRange(plan.baseRows, plan.minRows);
+        const quote = couponRowQuote.gameId === plan.gameId ? couponRowQuote.scale : 1;
+        return {
+          steps,
+          value: plan.scale,
+          lo,
+          hi,
+          enabled: true,
+          costAt: s => Math.max(1, Math.round(
+            reducedRoundRows(plan.baseRows * s) * quote)) * rule.linePrice,
+        };
+      },
+
+      topPool(d) { return (Coupon.rule(d) || {}).topPool || null; },
+      isTopOnly(d) { return !!(d && d.topOnly && Coupon.topPool(d)); },
+      setTopOnly(on) {
+        const d = Coupon.load();
+        if (!d || !Coupon.topPool(d)) return false;
+        if (on) d.topOnly = true; else delete d.topOnly;
+        Coupon.store(d);
+        return !!on;
+      },
       cost(d) {
         const r = Coupon.rule(d);
         return r ? Coupon.reduction(d).rows * r.linePrice : 0;
@@ -7350,6 +7924,9 @@ window.trackNameHtml = trackNameHtml;
           selections,
           horseNames,
         };
+        if (saved.topOnly) draft.topOnly = true;
+        const scale = Number(saved.reduction && saved.reduction.scale);
+        if (scale > 0 && scale !== 1) draft.scale = scale;
         Coupon.store(draft);
         if (window.Reduced) Reduced.restore(saved.reduction);
         return draft;
@@ -7361,9 +7938,12 @@ window.trackNameHtml = trackNameHtml;
         let d = Coupon.load();
         if (!d || d.gameId !== ctx.gameId) {
           if (d && Coupon.totalPicks(d) > 0) {
-            const ok = confirm(
-              `start a new ${ctx.gameType} coupon?\n` +
-              `your unsaved ${d.gameType} draft will be discarded.`);
+            const question = `start new ${ctx.gameType}? discard ${d.gameType}?`;
+            const ok = window.gameDockConfirm
+              ? await window.gameDockConfirm(question)
+              : confirm(
+                  `start a new ${ctx.gameType} coupon?\n` +
+                  `your unsaved ${d.gameType} draft will be discarded.`);
             if (!ok) return null;
           }
           d = await Coupon.createDraft(ctx);
@@ -7410,7 +7990,7 @@ window.trackNameHtml = trackNameHtml;
        adds up to more than 100 and we buy that pick a second pass over its
        rows. The two are one operation read in opposite directions:
 
-         rho_leg = sum over picks of (cap or weight) / 100       (0..3]
+         rho_leg = sum over picks of (cap or weight) / 100
          rows    = full rows * product of rho_leg over all legs
          cost    = rows * linePrice
 
@@ -7454,17 +8034,171 @@ window.trackNameHtml = trackNameHtml;
         try { localStorage.setItem(RANK_ORDER_KEY, JSON.stringify(all)); } catch (_) {}
         window.dispatchEvent(new CustomEvent('rankorder:changed'));
       },
+      clearFor(raceIds) {
+        const all = RankOrders.all();
+        const wanted = new Set((raceIds || []).map(id => String(id)));
+        let changed = false;
+        Object.keys(all).forEach(key => {
+          if (!wanted.has(String(key))) return;
+          delete all[key];
+          changed = true;
+        });
+        if (!changed) return;
+        try { localStorage.setItem(RANK_ORDER_KEY, JSON.stringify(all)); } catch (_) {}
+        window.dispatchEvent(new CustomEvent('rankorder:changed'));
+      },
     };
     window.RankOrders = RankOrders;
+
+    /* Where reserves come from. `rank`: the best-ranked horses left off,
+       as above. `auto`: none are sent, so ATG falls back to the most
+       played horses outside the coupon, as it does on its own coupons. */
+    const RESERVES_SOURCE_KEY = 'stable-reserves-source.v1';
+    const ReservesSource = {
+      MODES: ['rank', 'auto'],
+      get() {
+        try { return localStorage.getItem(RESERVES_SOURCE_KEY) === 'auto' ? 'auto' : 'rank'; }
+        catch (_) { return 'rank'; }
+      },
+      set(mode) {
+        const next = mode === 'auto' ? 'auto' : 'rank';
+        if (next === ReservesSource.get()) return next;
+        try {
+          if (next === 'auto') localStorage.setItem(RESERVES_SOURCE_KEY, next);
+          else localStorage.removeItem(RESERVES_SOURCE_KEY);
+        } catch (_) {}
+        window.dispatchEvent(new CustomEvent('reserves:source', { detail: { mode: next } }));
+        return next;
+      },
+    };
+    window.ReservesSource = ReservesSource;
+
+    /* Rank mode is coupon-wide, like weighting: `on` opens the rank gutter
+       on every leg and `tool` says what the gutter does — drag reorders
+       rows, pct sets each horse's win chance, grade marks it A–E. */
+    const RANK_MODE_KEY = 'stable-rank-mode.v1';
+    const RANK_TOOLS = ['drag', 'pct', 'grade'];
+    const RankMode = {
+      load() {
+        try {
+          const d = JSON.parse(localStorage.getItem(RANK_MODE_KEY));
+          return {
+            on: !!(d && d.on),
+            tool: RANK_TOOLS.includes(d && d.tool) ? d.tool : 'drag',
+          };
+        } catch (_) { return { on: false, tool: 'drag' }; }
+      },
+      store(d) {
+        try { localStorage.setItem(RANK_MODE_KEY, JSON.stringify(d)); } catch (_) {}
+        window.dispatchEvent(new CustomEvent('rankmode:changed'));
+      },
+      isOn() { return RankMode.load().on; },
+      setOn(on) {
+        const d = RankMode.load();
+        if (d.on === !!on) return;
+        d.on = !!on;
+        RankMode.store(d);
+      },
+      tool() { return RankMode.load().tool; },
+      // Picking a tool opens the gutter too; there is nothing to use it on
+      // while rank mode is closed.
+      setTool(tool) {
+        const d = RankMode.load();
+        d.tool = RANK_TOOLS.includes(tool) ? tool : 'drag';
+        d.on = true;
+        RankMode.store(d);
+      },
+    };
+    window.RankMode = RankMode;
+
+    // raceId -> { horse number: value }, one store per rank tool.
+    function rankRaceStore(key, eventName) {
+      const store = {
+        all() {
+          try {
+            const d = JSON.parse(localStorage.getItem(key));
+            return (d && typeof d === 'object') ? d : {};
+          } catch (_) { return {}; }
+        },
+        get(raceId) {
+          const v = store.all()[raceId];
+          return (v && typeof v === 'object') ? v : null;
+        },
+        set(raceId, map) {
+          const all = store.all();
+          if (map && Object.keys(map).length) all[raceId] = map;
+          else delete all[raceId];
+          try { localStorage.setItem(key, JSON.stringify(all)); } catch (_) {}
+          window.dispatchEvent(new CustomEvent(eventName, { detail: { raceId } }));
+        },
+        clearFor(raceIds) {
+          const all = store.all();
+          let changed = false;
+          (raceIds || []).forEach(id => {
+            if (!(String(id) in all)) return;
+            delete all[String(id)];
+            changed = true;
+          });
+          if (!changed) return;
+          try { localStorage.setItem(key, JSON.stringify(all)); } catch (_) {}
+          window.dispatchEvent(new CustomEvent(eventName, { detail: {} }));
+        },
+      };
+      return store;
+    }
+    // Win chance in percent. Visual only for now — nothing in the coupon
+    // or the system reads it.
+    window.RankChances = rankRaceStore('stable-rank-chance.v1', 'rankchance:changed');
+    // A–E grade per horse.
+    window.RankGrades = rankRaceStore('stable-rank-grade.v1', 'rankgrade:changed');
+
+    /* The coupon agent's last coupon per game, from the game page's agent
+       button: per race, the coverage it gave each pick as the builder holds
+       it. A pick still at that coverage paints as the agent's. The newest
+       dozen games are kept. */
+    const AGENT_COUPON_KEY = 'stable-agent-coupon.v1';
+    const AgentCoupon = {
+      all() {
+        try {
+          const d = JSON.parse(localStorage.getItem(AGENT_COUPON_KEY));
+          return (d && typeof d === 'object') ? d : {};
+        } catch (_) { return {}; }
+      },
+      get(gameId) { return AgentCoupon.all()[gameId] || null; },
+      legFor(gameId, raceId) {
+        const g = gameId ? AgentCoupon.get(gameId) : null;
+        return (g && g.legs && g.legs[raceId]) || null;
+      },
+      set(gameId, value) {
+        const all = AgentCoupon.all();
+        if (value) all[gameId] = value;
+        else delete all[gameId];
+        const keep = Object.keys(all)
+          .sort((a, b) => String(all[b].at || '').localeCompare(String(all[a].at || '')))
+          .slice(0, 12);
+        try {
+          localStorage.setItem(AGENT_COUPON_KEY,
+            JSON.stringify(Object.fromEntries(keep.map(k => [k, all[k]]))));
+        } catch (_) {}
+        window.dispatchEvent(new CustomEvent('agent:changed', { detail: { gameId } }));
+      },
+    };
+    window.AgentCoupon = AgentCoupon;
 
     // v2: caps hold a multiple of the weight rather than a flat percentage.
     const REDUCED_KEY = 'stable-reduced-system.v2';
     const REDUCED_MIN = 1;              // a pick never drops to a 0% share
-    /* ...and never climbs past twice the leg's whole. Coverage buys rows
+    /* ...and never climbs past ten times the leg's whole. Coverage buys rows
        linearly but buys *share* with diminishing returns — at 200 a pick in
-       a four-horse leg already owns 73% of the leg for 2.75x the money — so
-       there is nothing above this worth paying for. */
-    const REDUCED_MAX = 200;
+       a four-horse leg already owns 73% of the leg for 2.75x the money — but
+       the depth is the stake on that horse's rows, and a big system may want
+       it. The ceiling only keeps a stray drag from pricing a fortune. */
+    const REDUCED_MAX = 1000;
+    /* Smallest coverage gap, in points of the leg, that still counts as an
+       override. Dragging snaps to the weight from 0.05 away, but a mirrored
+       race keeps weights that sit closer than that, e.g. 16.690 on a
+       six-horse equal base of 16.667. */
+    const REDUCED_EPS = 0.001;
 
     // ATG's reduction tool covers the multi-race pools only (V-pools plus
     // Dagens/Lunch Dubbel). Single-race pools — vinnare, plats, tvilling,
@@ -7472,8 +8206,85 @@ window.trackNameHtml = trackNameHtml;
     const REDUCIBLE_GAME_TYPES = new Set(
       ['V86', 'V85', 'V75', 'GS75', 'V65', 'V64', 'V5', 'V4', 'V3', 'DD', 'LD']);
 
+    /* `targets` is where each levered pick's extra stake is aimed:
+       raceId -> levered horse -> other raceId -> horse -> share. Absent
+       means "spread like the rest of the coupon", which is what levering
+       did before it could be aimed at anything.
+
+       `aimModes` has the same first three keys and makes the policy local
+       to one source lever flowing into one target race. Auto is the absent
+       value. Custom is written as soon as a thumb is moved by hand.
+
+       Multiplied is stored the same way but is a policy of the whole lever:
+       any of its races set to it plays the lever's rows for the top pool
+       alone (V6/V7). Its race keeps Auto's shape until a thumb is dragged,
+       and then the dragged shape — a drag does not turn it into Custom. Only
+       games with a top pool take it, and never as the coupon-wide default. */
+    const AIM_SCHEMA = 3;
+    const AIM_MODES = new Set([
+      'auto', 'custom', 'market', 'slope', 'top', 'uniform', 'cascade', 'multiplied']);
+    function reducedAimMode(value, fallback = 'auto') {
+      let mode = String(value || '').toLowerCase();
+      if (mode === 'pool') mode = 'multiplied';
+      return AIM_MODES.has(mode) ? mode : fallback;
+    }
+
+    function migrateAimStore(d) {
+      if (d.aimSchema >= AIM_SCHEMA) return d;
+      const schema = Number(d.aimSchema) || 0;
+      const rewrite = (node) => {
+        if (!node || typeof node !== 'object') return;
+        Object.keys(node).forEach(key => {
+          const mode = node[key];
+          // Schema 0 called the ranked whole-field fan "uniform".
+          if (schema < 1 && mode === 'uniform') node[key] = 'cascade';
+          // Tactical and semi-tactical had Auto's behavior. Fade was withdrawn
+          // before it had a settled rule. Retiring them removes the override.
+          else if ((schema < 2 && (mode === 'tactical' || mode === 'semi'))
+              || (schema < 3 && mode === 'fade')) {
+            delete node[key];
+          } else {
+            rewrite(mode);
+            if (mode && typeof mode === 'object' && !Object.keys(mode).length) {
+              delete node[key];
+            }
+          }
+        });
+      };
+      rewrite(d.aimModes);
+      if (schema < 1 && d.aimDefault === 'uniform') d.aimDefault = 'cascade';
+      if (schema < 2
+          && (d.aimDefault === 'tactical' || d.aimDefault === 'semi')) {
+        d.aimDefault = 'auto';
+      }
+      d.aimSchema = AIM_SCHEMA;
+      return d;
+    }
+
+    /* A cascade opens one race. Setting it on another destination of the
+       same lever puts the old one back on auto. */
+    function reducedOneCascade(perHorse, keep) {
+      Object.keys(perHorse).forEach(target => {
+        if (target !== keep && perHorse[target] === 'cascade') delete perHorse[target];
+      });
+    }
+
+    function oneCascadePerLever(d) {
+      if (d.aimDefault === 'cascade') d.aimDefault = 'auto';
+      Object.values(d.aimModes).forEach(perRace => {
+        Object.values(perRace || {}).forEach(perHorse => {
+          if (!perHorse || typeof perHorse !== 'object') return;
+          const first = Object.keys(perHorse).find(t => perHorse[t] === 'cascade');
+          if (first) reducedOneCascade(perHorse, first);
+        });
+      });
+      return d;
+    }
+
     function reducedBlank() {
-      return { on: false, reduce: false, weights: {}, locks: {}, caps: {} };
+      return { on: false, reduce: false, weights: {}, locks: {}, caps: {},
+               targets: {}, hand: {}, aimModes: {}, aimDefault: 'auto',
+               aimSchema: AIM_SCHEMA, equal: false, stash: null, slopes: {} };
     }
 
     const Reduced = {
@@ -7489,19 +8300,31 @@ window.trackNameHtml = trackNameHtml;
         try {
           const d = JSON.parse(localStorage.getItem(REDUCED_KEY));
           if (!d || typeof d !== 'object') return reducedBlank();
-          return {
+          return oneCascadePerLever(migrateAimStore({
             on: !!d.on,
             reduce: !!d.reduce,
             weights: d.weights || {},
             locks: d.locks || {},
             caps: d.caps || {},
-          };
+            targets: d.targets || {},
+            hand: (d.hand && typeof d.hand === 'object') ? d.hand : {},
+            aimModes: (d.aimModes && typeof d.aimModes === 'object')
+              ? d.aimModes : {},
+            // Old coupon-wide tactical was only a differently coloured Auto.
+            aimDefault: reducedAimMode(d.aimDefault) === 'multiplied'
+              ? 'auto' : reducedAimMode(d.aimDefault),
+            aimSchema: d.aimSchema || 0,
+            equal: !!d.equal,
+            stash: (d.stash && typeof d.stash === 'object') ? d.stash : null,
+            slopes: (d.slopes && typeof d.slopes === 'object') ? d.slopes : {},
+          }));
         } catch (_) { return reducedBlank(); }
       },
       store(d) {
         localStorage.setItem(REDUCED_KEY, JSON.stringify(d));
         window.dispatchEvent(new CustomEvent('reduced:changed'));
       },
+      reset() { Reduced.store(reducedBlank()); },
       isOn() { return Reduced.load().on; },
       setOn(on) {
         const d = Reduced.load();
@@ -7519,6 +8342,79 @@ window.trackNameHtml = trackNameHtml;
       setReducing(on) {
         const d = Reduced.load();
         d.reduce = !!on;
+        // Reducing depends on weighted rows. Commit both flags together so
+        // listeners never observe the half-enabled state between two stores.
+        if (d.reduce) d.on = true;
+        Reduced.store(d);
+      },
+
+      /* Aim policy belongs to one source lever on one destination. The old
+         coupon-wide accessors remain as a migration fallback only. */
+      aimModeFor(raceId, horse, targetRaceId) {
+        const d = Reduced.load();
+        const perRace = d.aimModes[raceId];
+        const perHorse = perRace && perRace[horse];
+        const explicit = perHorse && perHorse[targetRaceId];
+        if (explicit) return reducedAimMode(explicit);
+        if (Reduced.isHandAim(raceId, horse, targetRaceId)) return 'custom';
+        return reducedAimMode(d.aimDefault);
+      },
+      setAimModeFor(raceId, horse, targetRaceId, mode) {
+        if (!raceId || horse == null || !targetRaceId || raceId === targetRaceId) return;
+        const d = Reduced.load();
+        const clean = reducedAimMode(mode);
+        const perRace = d.aimModes[raceId] || (d.aimModes[raceId] = {});
+        const perHorse = perRace[horse] || (perRace[horse] = {});
+        if (clean === 'auto') {
+          delete perHorse[targetRaceId];
+          d.aimDefault = 'auto';
+        } else {
+          perHorse[targetRaceId] = clean;
+        }
+        // A preset is the policy. A hand drag left underneath would reopen
+        // as Custom and hide the mode that actually produced the shares.
+        // Multiplied keeps the drag: it is the shape it plays.
+        if (clean !== 'custom' && clean !== 'multiplied') {
+          const handRace = d.hand[raceId];
+          const handHorse = handRace && handRace[horse];
+          if (handHorse) {
+            delete handHorse[targetRaceId];
+            if (!Object.keys(handHorse).length) delete handRace[horse];
+            if (!Object.keys(handRace).length) delete d.hand[raceId];
+          }
+        }
+        if (clean === 'cascade') reducedOneCascade(perHorse, targetRaceId);
+        if (!Object.keys(perHorse).length) delete perRace[horse];
+        if (!Object.keys(perRace).length) delete d.aimModes[raceId];
+        Reduced.store(d);
+      },
+      aimMode() { return reducedAimMode(Reduced.load().aimDefault); },
+      setAimMode(mode) {
+        const d = Reduced.load();
+        const clean = reducedAimMode(mode);
+        d.aimDefault = clean === 'multiplied' ? 'auto' : clean;
+        Reduced.store(d);
+      },
+
+      /* Weighting as a two-position switch. `equal` parks every custom
+         weight and lock in one stash and lets `normalize` hand back a flat
+         split; `custom` puts them back untouched, so flipping to equal to
+         look at something is never destructive. */
+      weightMode() { return Reduced.load().equal ? 'equal' : 'custom'; },
+      setWeightMode(mode) {
+        const d = Reduced.load();
+        const equal = mode === 'equal';
+        if (equal === !!d.equal) return;
+        if (equal) {
+          d.stash = { weights: d.weights || {}, locks: d.locks || {} };
+          d.weights = {};
+          d.locks = {};
+        } else {
+          d.weights = (d.stash && d.stash.weights) || {};
+          d.locks = (d.stash && d.stash.locks) || {};
+          d.stash = null;
+        }
+        d.equal = equal;
         Reduced.store(d);
       },
 
@@ -7552,7 +8448,528 @@ window.trackNameHtml = trackNameHtml;
         delete d.weights[raceId];
         delete d.locks[raceId];
         delete d.caps[raceId];
+        delete d.targets[raceId];
+        delete d.hand[raceId];
+        delete d.aimModes[raceId];
+        // Anything aimed *into* this race is pointing at picks that are
+        // about to stop existing, so it goes too.
+        Object.keys(d.targets).forEach(src => {
+          Object.keys(d.targets[src]).forEach(horse => {
+            delete d.targets[src][horse][raceId];
+            if (!Object.keys(d.targets[src][horse]).length) {
+              delete d.targets[src][horse];
+            }
+          });
+          if (!Object.keys(d.targets[src]).length) delete d.targets[src];
+        });
+        [d.hand, d.aimModes].forEach(store => {
+          Object.keys(store).forEach(src => {
+            Object.keys(store[src]).forEach(horse => {
+              delete store[src][horse][raceId];
+              if (!Object.keys(store[src][horse]).length) delete store[src][horse];
+            });
+            if (!Object.keys(store[src]).length) delete store[src];
+          });
+        });
         Reduced.store(d);
+      },
+
+      /* Bring one leg's paid coverage back to exactly 100 without changing
+         its base weights. A short leg adds the missing stake to rows that
+         were not reduced, in proportion to their live coverage (so existing
+         leverage keeps its shape). If every row was reduced, the strongest
+         base-weight row becomes the sink. An overfull leg only gives back
+         existing leverage; reductions are left untouched. */
+      balanceRace(raceId, picks) {
+        const list = (picks || []).slice();
+        if (!raceId || !list.length) return false;
+        const d = Reduced.load();
+        const weights = Reduced.normalize(
+          list, d.weights[raceId] || {}, d.locks[raceId] || []);
+        const stored = Reduced.pruneCaps(list, d.caps[raceId] || {});
+        const coverage = Reduced.coverage(list, weights, stored);
+        const next = { ...coverage };
+        const total = list.reduce((sum, n) => sum + (Number(coverage[n]) || 0), 0);
+
+        if (total < 100 - 0.0005) {
+          let candidates = list.filter(
+            n => (Number(coverage[n]) || 0) >= (Number(weights[n]) || 0) - 0.05);
+          if (!candidates.length) {
+            candidates = [list.reduce((best, n) =>
+              (Number(weights[n]) || 0) > (Number(weights[best]) || 0) ? n : best,
+            list[0])];
+          }
+          let remaining = 100 - total;
+          let open = candidates.slice();
+          for (let pass = 0; pass < 8 && remaining > 0.0005 && open.length; pass++) {
+            const basisTotal = open.reduce(
+              (sum, n) => sum + Math.max(0.0001, Number(next[n]) || Number(weights[n]) || 0),
+              0);
+            let spent = 0;
+            open.forEach(n => {
+              const basis = Math.max(0.0001, Number(next[n]) || Number(weights[n]) || 0);
+              const room = Math.max(0, REDUCED_MAX - (Number(next[n]) || 0));
+              const add = Math.min(room, remaining * basis / basisTotal);
+              next[n] = (Number(next[n]) || 0) + add;
+              spent += add;
+            });
+            remaining -= spent;
+            open = open.filter(n => REDUCED_MAX - (Number(next[n]) || 0) > 0.0005);
+            if (spent < 0.0005) break;
+          }
+        } else if (total > 100 + 0.0005) {
+          const levered = list.filter(
+            n => (Number(coverage[n]) || 0) > (Number(weights[n]) || 0) + 0.05);
+          const extra = levered.reduce(
+            (sum, n) => sum + (Number(coverage[n]) - Number(weights[n])), 0);
+          const remove = Math.min(total - 100, extra);
+          const keep = extra > 0 ? Math.max(0, (extra - remove) / extra) : 0;
+          levered.forEach(n => {
+            const w = Number(weights[n]) || 0;
+            next[n] = w + ((Number(coverage[n]) || w) - w) * keep;
+          });
+        }
+
+        const caps = {};
+        list.forEach(n => {
+          const w = Number(weights[n]) || 0;
+          const cov = Number(next[n]) || w;
+          if (!(w > 0) || Math.abs(cov - w) < 0.05) return;
+          caps[n] = cov / w;
+        });
+        d.on = true;
+        d.reduce = true;
+        if (Object.keys(caps).length) d.caps[raceId] = caps;
+        else delete d.caps[raceId];
+        Reduced.store(d);
+        return true;
+      },
+
+      resetRaceAdjustments(raceId) {
+        if (!raceId) return false;
+        const d = Reduced.load();
+        delete d.caps[raceId];
+        delete d.targets[raceId];
+        delete d.hand[raceId];
+        delete d.aimModes[raceId];
+        Reduced.store(d);
+        return true;
+      },
+
+      /* Equalise only this race. Ratios in caps stay untouched, so a 50%
+         cut or 150% lever remains the same adjustment on the new base. */
+      equalizeRace(raceId, picks) {
+        const list = (picks || []).slice();
+        if (!raceId || !list.length) return false;
+        const equal = {};
+        list.forEach(n => { equal[n] = 100 / list.length; });
+        return Reduced.writeRaceWeights(raceId, equal);
+      },
+
+      /* Base weights on a staircase down the race's rank order: each rank
+         keeps `ratio` of the one above. The ratio is per race. */
+      SLOPE_MIN: 0.1,
+      // Below 1 so the staircase keeps an order to fall back on for
+      // unranked picks; equal weights have their own action.
+      SLOPE_MAX: 0.95,
+      SLOPE_DEFAULT: 0.8,
+
+      slopeRatio(raceId) {
+        const value = Number(Reduced.load().slopes[raceId]);
+        return Number.isFinite(value)
+          ? Math.min(Reduced.SLOPE_MAX, Math.max(Reduced.SLOPE_MIN, value))
+          : Reduced.SLOPE_DEFAULT;
+      },
+
+      slopeRaceWeights(raceId, picks, ratio = Reduced.slopeRatio(raceId)) {
+        const list = (picks || []).map(Number);
+        if (!raceId || list.length < 2) return null;
+        const stored = Reduced.isOn() ? (Reduced.weightsFor(raceId) || {}) : {};
+        const current = Reduced.normalize(
+          list, stored, Reduced.isOn() ? Reduced.locksFor(raceId) : []);
+        // Unranked picks keep their order from the stored weights: the
+        // normalised ones tie at the floor on steep slopes.
+        const order = {};
+        list.forEach(n => {
+          const raw = Number(stored[n]);
+          order[n] = Number.isFinite(raw) ? raw : current[n];
+        });
+        return Reduced.slopeShares(raceId, list, order, ratio);
+      },
+
+      slopeRace(raceId, picks, ratio = Reduced.slopeRatio(raceId)) {
+        const r = Math.round(Math.min(Reduced.SLOPE_MAX,
+          Math.max(Reduced.SLOPE_MIN, Number(ratio) || Reduced.SLOPE_DEFAULT)) * 100) / 100;
+        const slope = Reduced.slopeRaceWeights(raceId, picks, r);
+        return slope ? Reduced.writeRaceWeights(raceId, slope, d => { d.slopes[raceId] = r; }) : false;
+      },
+
+      writeRaceWeights(raceId, weights, extra) {
+        const d = Reduced.load();
+        if (extra) extra(d);
+        d.on = true;
+        d.weights[raceId] = weights;
+        delete d.locks[raceId];
+        // Equal mode parks custom weights in the stash. Update that parked
+        // copy too so returning to custom does not resurrect the old race.
+        if (d.equal && d.stash) {
+          d.stash.weights = d.stash.weights || {};
+          d.stash.locks = d.stash.locks || {};
+          d.stash.weights[raceId] = weights;
+          delete d.stash.locks[raceId];
+        }
+        Reduced.store(d);
+        return true;
+      },
+
+      /* Weights and lev/red are two ways of writing the same coverage.
+         Mirroring a race swaps one for the other and leaves every horse's
+         coverage, and so the rows and the cost, where they were. Unequal
+         weights become an equal base with each difference held as a
+         lev/red. An equal base with lev/red becomes weights in the
+         proportions of its coverage. Coverage that does not add up to 100
+         cannot be written as weights alone, so that gap stays behind as
+         one equal ratio on every pick.
+
+         Null when there is nothing to mirror: a banker, or a race that is
+         already an equal base with no lev/red. */
+      mirrorState(raceId, picks) {
+        const list = (picks || []).map(Number);
+        if (!raceId || list.length < 2) return null;
+        const on = Reduced.isOn();
+        const weights = Reduced.normalize(
+          list,
+          on ? Reduced.weightsFor(raceId) : {},
+          on ? Reduced.locksFor(raceId) : []);
+        const caps = Reduced.activeCapsFor(raceId);
+        const coverage = Reduced.coverage(list, weights, caps);
+        const even = 100 / list.length;
+        const equal = list.every(
+          n => Math.abs((Number(weights[n]) || 0) - even) < REDUCED_EPS);
+        if (equal && !Reduced.isLegAdjusted(list, weights, caps)) return null;
+        return { to: equal ? 'weights' : 'levers', picks: list, coverage };
+      },
+      mirrorRace(raceId, picks) {
+        const state = Reduced.mirrorState(raceId, picks);
+        if (!state) return false;
+        const list = state.picks;
+        const cov = n => Number(state.coverage[n]) || 0;
+        const weights = {};
+        const caps = {};
+        if (state.to === 'levers') {
+          const even = 100 / list.length;
+          list.forEach(n => {
+            weights[n] = even;
+            if (Math.abs(cov(n) - even) >= REDUCED_EPS) caps[n] = cov(n) / even;
+          });
+        } else {
+          const total = list.reduce((sum, n) => sum + cov(n), 0);
+          if (!(total > 0)) return false;
+          list.forEach(n => { weights[n] = cov(n) / total * 100; });
+          if (Math.abs(total - 100) >= REDUCED_EPS) {
+            list.forEach(n => { caps[n] = total / 100; });
+          }
+        }
+        const d = Reduced.load();
+        d.on = true;
+        if (Object.keys(caps).length) d.reduce = true;
+        d.weights[raceId] = weights;
+        delete d.locks[raceId];
+        if (Object.keys(caps).length) d.caps[raceId] = caps;
+        else delete d.caps[raceId];
+        if (d.equal && d.stash) {
+          d.stash.weights = d.stash.weights || {};
+          d.stash.locks = d.stash.locks || {};
+          d.stash.weights[raceId] = weights;
+          delete d.stash.locks[raceId];
+        }
+        Reduced.store(d);
+        return true;
+      },
+
+      /* ---- aiming a lever ----
+         A levered pick buys an extra sub-coupon anchored on itself. These
+         say who rides on it: unnormalised shares over one other race's
+         picks, where nothing stored means "the same shape as the rest of
+         the coupon". Aiming moves stake between rows without changing how
+         many are bought, so it never costs anything. */
+      targetsFor(raceId) { return Reduced.load().targets[raceId] || {}; },
+      aimFor(raceId, horse, targetRaceId) {
+        const per = Reduced.targetsFor(raceId)[horse];
+        return (per && per[targetRaceId]) || null;
+      },
+      setAim(raceId, horse, targetRaceId, shares) {
+        const d = Reduced.load();
+        const per = d.targets[raceId] || (d.targets[raceId] = {});
+        const one = per[horse] || (per[horse] = {});
+        const handRace = d.hand[raceId] || (d.hand[raceId] = {});
+        const handHorse = handRace[horse] || (handRace[horse] = {});
+        const modeRace = d.aimModes[raceId] || (d.aimModes[raceId] = {});
+        const modeHorse = modeRace[horse] || (modeRace[horse] = {});
+        // Dragging under Multiplied reshapes it rather than leaving it.
+        const multiplied = reducedAimMode(modeHorse[targetRaceId]) === 'multiplied';
+        if (shares && Object.keys(shares).length) {
+          one[targetRaceId] = shares;
+          handHorse[targetRaceId] = true;
+          if (!multiplied) modeHorse[targetRaceId] = 'custom';
+        } else {
+          delete one[targetRaceId];
+          delete handHorse[targetRaceId];
+          if (!multiplied) delete modeHorse[targetRaceId];
+        }
+        if (!Object.keys(one).length) delete per[horse];
+        if (!Object.keys(per).length) delete d.targets[raceId];
+        if (!Object.keys(handHorse).length) delete handRace[horse];
+        if (!Object.keys(handRace).length) delete d.hand[raceId];
+        if (!Object.keys(modeHorse).length) delete modeRace[horse];
+        if (!Object.keys(modeRace).length) delete d.aimModes[raceId];
+        Reduced.store(d);
+      },
+      isHandAim(raceId, horse, targetRaceId) {
+        const per = Reduced.load().hand[raceId];
+        return !!(per && per[horse] && per[horse][targetRaceId]);
+      },
+      clearAim(raceId, horse) {
+        const d = Reduced.load();
+        if (d.targets[raceId]) {
+          if (horse == null) delete d.targets[raceId];
+          else delete d.targets[raceId][horse];
+          if (d.targets[raceId] && !Object.keys(d.targets[raceId]).length) {
+            delete d.targets[raceId];
+          }
+        }
+        if (d.hand[raceId]) {
+          if (horse == null) delete d.hand[raceId];
+          else delete d.hand[raceId][horse];
+          if (d.hand[raceId] && !Object.keys(d.hand[raceId]).length) {
+            delete d.hand[raceId];
+          }
+        }
+        if (d.aimModes[raceId]) {
+          if (horse == null) delete d.aimModes[raceId];
+          else delete d.aimModes[raceId][horse];
+          if (d.aimModes[raceId] && !Object.keys(d.aimModes[raceId]).length) {
+            delete d.aimModes[raceId];
+          }
+        }
+        Reduced.store(d);
+      },
+
+      /* Extra stake every foreign lever is sending into one race, in the
+         same percent-of-the-leg units as the weights. Mid-drag the live
+         shares replace that lever's stored ones so the sum tick moves with
+         the thumb. */
+      aimedExtras(targetRaceId, picks, weights, coverage, live = null) {
+        const extra = {};
+        (picks || []).forEach(n => { extra[n] = 0; });
+        if (!window.LeverFocus || !picks || !picks.length) return extra;
+        const base = {};
+        let total = 0;
+        picks.forEach(n => {
+          const v = Math.max(0, Math.min(
+            Number((coverage || {})[n]) || 0, Number((weights || {})[n]) || 0));
+          base[n] = v;
+          total += v;
+        });
+        if (!(total > 0)) return extra;
+        picks.forEach(n => { base[n] = base[n] / total * 100; });
+        LeverFocus.candidates().forEach(l => {
+          if (l.raceId === targetRaceId || !(l.amount > 0)) return;
+          const shares = (live && live.raceId === l.raceId && live.horse === l.horse
+                          && live.shares)
+            ? live.shares
+            : Reduced.aimShares(l.raceId, l.horse, targetRaceId, picks, base, {
+                amount: l.amount, weights, coverage,
+              });
+          Object.keys(shares).forEach(key => {
+            const n = Number(key);
+            const add = l.amount * (Math.max(0, Number(shares[n]) || 0) / 100);
+            if (add > 0) extra[n] = (extra[n] || 0) + add;
+          });
+        });
+        return extra;
+      },
+
+      fieldFor(raceId) {
+        const book = window.RaceFields && RaceFields.byRace[raceId];
+        return book || { horses: [], market: {} };
+      },
+
+      /* Market row% among the picked horses only, renormalised to 100.
+         A horse at 20% of the whole field is not 20% of the lever unless
+         every starter is picked — the other picks' shares have to absorb
+         whatever was left on the bench. */
+      marketShares(picks, market) {
+        const out = {};
+        let total = 0;
+        (picks || []).forEach(n => {
+          const v = Math.max(0, Number((market || {})[n]) || 0);
+          out[n] = v;
+          total += v;
+        });
+        if (!(total > 0)) {
+          const even = 100 / Math.max(1, (picks || []).length);
+          (picks || []).forEach(n => { out[n] = even; });
+          return out;
+        }
+        (picks || []).forEach(n => { out[n] = out[n] / total * 100; });
+        return out;
+      },
+
+      /* Selected horses strongest first. A saved rank is authoritative;
+         coverage supplies a stable fallback for ranks that are not set yet. */
+      rankedPicks(raceId, picks, coverage) {
+        const list = (picks || []).map(Number);
+        const order = (raceId && window.RankOrders && RankOrders.get(raceId)) || [];
+        const seat = new Map();
+        order.forEach((key, index) => {
+          if (!seat.has(String(key))) seat.set(String(key), index);
+        });
+        return list.sort((a, b) => {
+          const ar = seat.has(String(a)) ? seat.get(String(a)) : Infinity;
+          const br = seat.has(String(b)) ? seat.get(String(b)) : Infinity;
+          if (ar !== br) return ar - br;
+          return (Number((coverage || {})[b]) || 0)
+            - (Number((coverage || {})[a]) || 0) || a - b;
+        });
+      },
+
+      /* A geometric staircase: each next rank keeps `ratio` of the
+         preceding rank's share. Aim's slope mode uses the two-thirds default. */
+      slopeShares(raceId, picks, coverage, ratio = 2 / 3) {
+        const ranked = Reduced.rankedPicks(raceId, picks, coverage);
+        const out = {};
+        const weights = ranked.map((_, rank) => Math.pow(ratio, rank));
+        const total = weights.reduce((sum, value) => sum + value, 0);
+        ranked.forEach((n, rank) => {
+          out[n] = total > 0 ? 100 * weights[rank] / total : 0;
+        });
+        return out;
+      },
+
+      /* Put the lever entirely on the user's first-ranked selected horse. */
+      topShares(raceId, picks, coverage) {
+        const ranked = Reduced.rankedPicks(raceId, picks, coverage);
+        const out = {};
+        ranked.forEach((n, rank) => { out[n] = rank === 0 ? 100 : 0; });
+        return out;
+      },
+
+      /* Equal slice of the lever for every starter still in the race,
+         picked or not. Falls back to the picks when the field has not
+         loaded yet. */
+      uniformShares(picks, field) {
+        const list = (field && field.length) ? field : (picks || []);
+        const even = 100 / Math.max(1, list.length);
+        const out = {};
+        list.forEach(n => { out[n] = even; });
+        return out;
+      },
+
+      /* Cascade. Half the lever stays on the selected horses, split by
+         their effective coverage. Equal coverage stays tied; the solver
+         gives a leftover row to the higher rank. The highest ranked
+         outsider keeps the old equal share, and each lower rank tapers.
+         Reordering the race moves these widths with the rank positions. */
+      extendedShares(picks, field, raceId, coverage) {
+        const list = ((field && field.length) ? field : (picks || []))
+          .map(Number)
+          .filter(n => Number.isInteger(n) && n > 0);
+        const selected = (picks || [])
+          .map(Number)
+          .filter(n => list.includes(n));
+        const order = (raceId && window.RankOrders && RankOrders.get(raceId)) || [];
+        const seat = new Map();
+        order.forEach((key, index) => {
+          if (!seat.has(String(key))) seat.set(String(key), index);
+        });
+        const complete = list.length > 0 && list.every(n => seat.has(String(n)));
+        const outsiders = list
+          .filter(n => !selected.includes(n))
+          .sort((a, b) => seat.get(String(a)) - seat.get(String(b)) || a - b);
+        if (!selected.length || !outsiders.length || !complete) {
+          return Reduced.uniformShares(picks, field);
+        }
+        const out = {};
+        const weightOf = n => {
+          const value = Number((coverage || {})[n]);
+          return Number.isFinite(value) && value > 0 ? value : 0;
+        };
+        const baseTotal = selected.reduce((sum, n) => sum + weightOf(n), 0);
+        selected.forEach(n => {
+          out[n] = baseTotal > 0
+            ? 50 * weightOf(n) / baseTotal
+            : 50 / selected.length;
+        });
+        const count = outsiders.length;
+        outsiders.forEach((horse, rank) => {
+          out[horse] = 100 * (count - rank) / (count * (count + 1));
+        });
+        return out;
+      },
+
+      /* The shares a lever's sub-coupon spreads over one other race. A leg
+         aimed by hand keeps what was dragged; otherwise the mode decides. */
+      aimShares(raceId, horse, targetRaceId, picks, coverage, opts = {}) {
+        const stored = Reduced.aimFor(raceId, horse, targetRaceId);
+        const mode = Reduced.aimModeFor(raceId, horse, targetRaceId);
+        if (mode === 'market') {
+          const market = Reduced.fieldFor(targetRaceId).market;
+          const hasMarket = (picks || []).some(
+            n => Math.max(0, Number((market || {})[n]) || 0) > 0);
+          // A restored coupon can be saved before the live market loads.
+          if (!hasMarket && stored && Object.keys(stored).length) return stored;
+          return Reduced.marketShares(picks, market);
+        }
+        if (mode === 'slope') {
+          return Reduced.slopeShares(targetRaceId, picks, opts.coverage || coverage);
+        }
+        if (mode === 'top') {
+          return Reduced.topShares(targetRaceId, picks, opts.coverage || coverage);
+        }
+        if (mode === 'cascade') {
+          const field = Reduced.fieldFor(targetRaceId).horses;
+          // Cascade may include non-picks. On restore those explicit
+          // shares are the only complete list available until StartList
+          // has loaded the target race.
+          if (!field.length && stored && Object.keys(stored).length) return stored;
+          return Reduced.extendedShares(
+            picks, field, targetRaceId, opts.coverage || coverage);
+        }
+        if (mode === 'uniform') {
+          const even = 100 / Math.max(1, (picks || []).length);
+          const out = {};
+          (picks || []).forEach(n => { out[n] = even; });
+          return out;
+        }
+        const drawn = stored && (mode === 'custom' || (mode === 'multiplied'
+          && Reduced.isHandAim(raceId, horse, targetRaceId)));
+        const out = {};
+        let total = 0;
+        (picks || []).forEach(n => {
+          const v = drawn
+            ? Math.max(0, Number(stored[n]) || 0)
+                           : Math.max(0, Number(coverage[n]) || 0);
+          out[n] = v;
+          total += v;
+        });
+        if (total <= 0) {
+          (picks || []).forEach(n => { out[n] = 100 / Math.max(1, picks.length); });
+          return out;
+        }
+        (picks || []).forEach(n => { out[n] = out[n] / total * 100; });
+        return out;
+      },
+
+      incomingLevers(targetRaceId) {
+        if (!targetRaceId || !window.LeverFocus || !Reduced.isReducing()) return [];
+        return LeverFocus.candidates()
+          .filter(l => l.raceId !== targetRaceId && l.amount > 0)
+          .map(l => ({
+            ...l,
+            targetRaceId,
+            aimMode: Reduced.aimModeFor(l.raceId, l.horse, targetRaceId),
+          }));
       },
 
       /* Put a saved system back — the mirror of `plan()`. Locks are not
@@ -7561,6 +8978,11 @@ window.trackNameHtml = trackNameHtml;
       restore(saved) {
         const d = reducedBlank();
         const legs = (saved && saved.legs) || [];
+        // Aiming is saved against leg numbers and lives here against races.
+        const raceByLegNo = {};
+        legs.forEach(leg => {
+          if (leg && leg.raceId && leg.leg != null) raceByLegNo[leg.leg] = leg.raceId;
+        });
         legs.forEach(leg => {
           if (!leg || !leg.raceId) return;
           const weights = {};
@@ -7569,19 +8991,127 @@ window.trackNameHtml = trackNameHtml;
             if (Number.isFinite(num) && Number(v) > 0) weights[num] = Number(v);
           });
           // Saved coupons carry coverage as a percentage of the leg, against
-          // the weights saved beside it — enough to recover the ratio.
+          // the weights saved beside it — enough to recover the ratio. The
+          // four-decimal weights rarely sum to exactly 100 and `normalize`
+          // rescales them, so the ratio is taken against the rescaled weight
+          // or the restored coverage drifts off the saved one.
+          const weightTotal = Object.values(weights).reduce((s, v) => s + v, 0);
+          const weightScale = weightTotal > 0 ? 100 / weightTotal : 1;
           const caps = {};
           Object.entries(leg.caps || {}).forEach(([n, v]) => {
             const num = Number(n);
-            const w = Number(weights[num]);
+            const w = Number(weights[num]) * weightScale;
             if (!Number.isFinite(num) || !(Number(v) > 0) || !(w > 0)) return;
             caps[num] = Number(v) / w;
           });
           if (Object.keys(weights).length) d.weights[leg.raceId] = weights;
           if (Object.keys(caps).length) d.caps[leg.raceId] = caps;
+
+          const aim = {};
+          const hand = {};
+          const modes = {};
+          Object.entries(leg.targets || {}).forEach(([horse, spread]) => {
+            const per = {};
+            Object.entries(spread || {}).forEach(([legNo, shares]) => {
+              const raceId = raceByLegNo[legNo];
+              if (!raceId || raceId === leg.raceId) return;
+              const clean = {};
+              Object.entries(shares || {}).forEach(([h, v]) => {
+                const num = Number(h), val = Number(v);
+                if (Number.isFinite(num) && Number.isFinite(val) && val >= 0) {
+                  clean[num] = val;
+                }
+              });
+              if (Object.keys(clean).length) per[raceId] = clean;
+            });
+            if (Object.keys(per).length) aim[Number(horse)] = per;
+          });
+
+          // A saved policy wins. Only a target with no preset was drawn by
+          // hand, so only that one reopens as Custom.
+          Object.entries(leg.aimModes || {}).forEach(([horse, spread]) => {
+            const num = Number(horse);
+            if (!Number.isFinite(num)) return;
+            const per = modes[num] || (modes[num] = {});
+            Object.entries(spread || {}).forEach(([legNo, rawMode]) => {
+              const raceId = raceByLegNo[legNo];
+              if (!raceId || raceId === leg.raceId) return;
+              const savedSchema = Number(saved && saved.aimSchema) || 0;
+              const legacyMode = String(rawMode || '').toLowerCase();
+              const retired = legacyMode === 'fade'
+                || (savedSchema < 2
+                    && (legacyMode === 'tactical' || legacyMode === 'semi'));
+              if (retired) {
+                delete per[raceId];
+                if (aim[num]) delete aim[num][raceId];
+                return;
+              }
+              let mode = reducedAimMode(rawMode);
+              if (!(saved && saved.aimSchema) && mode === 'uniform') mode = 'cascade';
+              if (mode !== 'auto') per[raceId] = mode;
+            });
+            if (!Object.keys(per).length) delete modes[num];
+          });
+          Object.entries(aim).forEach(([horse, targets]) => {
+            const num = Number(horse);
+            Object.keys(targets).forEach(targetRaceId => {
+              const mode = modes[num] && modes[num][targetRaceId];
+              // Multiplied only carries shares when they were dragged.
+              if (mode && mode !== 'custom' && mode !== 'multiplied') return;
+              if (!hand[num]) hand[num] = {};
+              hand[num][targetRaceId] = true;
+              if (!modes[num]) modes[num] = {};
+              if (!mode) modes[num][targetRaceId] = 'custom';
+            });
+          });
+          Object.keys(aim).forEach(num => {
+            if (!Object.keys(aim[num]).length) delete aim[num];
+          });
+          if (Object.keys(aim).length) d.targets[leg.raceId] = aim;
+          if (Object.keys(hand).length) d.hand[leg.raceId] = hand;
+          if (Object.keys(modes).length) d.aimModes[leg.raceId] = modes;
+
           if (window.RankOrders && (leg.rankOrder || []).length) {
             window.RankOrders.set(leg.raceId, leg.rankOrder);
           }
+        });
+        // Slope saved through a server that did not know the mode kept the
+        // staircase and lost the name. Recognize that shape once every
+        // race's rank is back.
+        const closeShares = (savedShares, next) => {
+          const keys = new Set([
+            ...Object.keys(savedShares || {}),
+            ...Object.keys(next || {}),
+          ]);
+          if (keys.size < 2) return false;
+          for (const key of keys) {
+            const got = Number(savedShares[key] ?? savedShares[Number(key)]) || 0;
+            const want = Number(next[key] ?? next[Number(key)]) || 0;
+            if (Math.abs(got - want) > 0.05) return false;
+          }
+          return true;
+        };
+        Object.entries(d.targets).forEach(([raceId, horses]) => {
+          Object.entries(horses || {}).forEach(([horse, targets]) => {
+            const num = Number(horse);
+            Object.entries(targets || {}).forEach(([targetRaceId, shares]) => {
+              const current = d.aimModes[raceId]
+                && d.aimModes[raceId][num]
+                && d.aimModes[raceId][num][targetRaceId];
+              if (current && current !== 'custom') return;
+              const picks = Object.keys(shares).map(Number);
+              const slope = Reduced.slopeShares(targetRaceId, picks, {});
+              if (!closeShares(shares, slope)) return;
+              const modes = d.aimModes[raceId] || (d.aimModes[raceId] = {});
+              const per = modes[num] || (modes[num] = {});
+              per[targetRaceId] = 'slope';
+              const handHorse = d.hand[raceId] && d.hand[raceId][num];
+              if (!handHorse) return;
+              delete handHorse[targetRaceId];
+              if (!Object.keys(handHorse).length) delete d.hand[raceId][num];
+              if (!Object.keys(d.hand[raceId]).length) delete d.hand[raceId];
+            });
+          });
         });
         d.on = !!(saved && (saved.weighted || saved.reduced || saved.levered));
         d.reduce = !!(saved && (saved.reduced || saved.levered));
@@ -7666,7 +9196,7 @@ window.trackNameHtml = trackNameHtml;
         (picks || []).forEach(n => {
           const r = Number((caps || {})[n]);
           if (!Number.isFinite(r) || r <= 0) return;
-          if (Math.abs(r - 1) < 0.0005) return;
+          if (Math.abs(r - 1) < 1e-6) return;
           out[n] = Math.min(r, REDUCED_MAX);
         });
         return out;
@@ -7684,7 +9214,7 @@ window.trackNameHtml = trackNameHtml;
           const w = Number(weights[n]);
           if (!Number.isFinite(w) || w <= 0) return;
           const cov = Math.max(REDUCED_MIN, Math.min(w * clean[n], REDUCED_MAX));
-          if (Math.abs(cov - w) < 0.05) return;
+          if (Math.abs(cov - w) < REDUCED_EPS) return;
           out[n] = cov;
         });
         return out;
@@ -7731,6 +9261,7 @@ window.trackNameHtml = trackNameHtml;
          in if a picked horse is scratched — without them ATG picks by
          betting percentage, which is nobody's opinion. */
       reservesFor(raceId, picks) {
+        if (ReservesSource.get() === 'auto') return [];
         const order = window.RankOrders ? window.RankOrders.get(raceId) : null;
         if (!order) return [];
         const out = [];
@@ -7762,9 +9293,10 @@ window.trackNameHtml = trackNameHtml;
             on ? Reduced.locksFor(l.raceId) : []);
           // The stored ratios are what every helper below reads; `caps` is
           // the same thing as percentages, for the wire.
-          const stored = Reduced.activeCapsFor(l.raceId);
+          const stored = on ? Reduced.activeCapsFor(l.raceId) : {};
           const coverage = Reduced.coverage(picks, weights, stored);
           const retention = Reduced.legRetention(picks, weights, stored);
+
           return {
             leg: l.leg,
             raceId: l.raceId,
@@ -7775,14 +9307,83 @@ window.trackNameHtml = trackNameHtml;
             retention,
             reduced: Reduced.isLegReduced(picks, weights, stored),
             levered: Reduced.isLegLevered(picks, weights, stored),
+            targets: {},
+            aimModes: {},
             groups: reducedRankGroups(picks, coverage),
             reserves: Reduced.reservesFor(l.raceId, picks),
             rankOrder: (window.RankOrders && window.RankOrders.get(l.raceId)) || [],
           };
         });
+
+        /* Where every lever's sub-coupon lands, in the solver's leg
+           numbers. This is a second pass because a lever in one leg is
+           described by the picks of all the others, which only exist once
+           the whole map above has run.
+
+           A leg is only worth naming when the lever actually reshapes it:
+           an unaimed lever spreads exactly like the base coupon, and
+           saying so on the wire would only cost the solver time. */
+        const learned = [];
+        const poolable = !!Coupon.topPool(d);
+        if (on) {
+          legs.forEach(src => {
+            src.picks.forEach(n => {
+              const weight = Number(src.weights[n]) || 0;
+              const amount = (Number(src.coverage[n]) || 0) - weight;
+              if (!(amount > 0.05)) return;
+              const per = {};
+              const perModes = {};
+              legs.forEach(dst => {
+                if (dst.leg === src.leg) return;
+                let mode = Reduced.aimModeFor(
+                  src.raceId, n, dst.raceId);
+                if (mode === 'multiplied' && !poolable) mode = 'auto';
+                // Ordinary aims only reshape existing picks, so a banker
+                // has nothing to redistribute. Cascade widens the
+                // sub-coupon to every starter; multiplied is about the
+                // lever, so a banker can carry it.
+                if (dst.picks.length < 2 && mode !== 'cascade' && mode !== 'multiplied') return;
+                const base = {};
+                let total = 0;
+                dst.picks.forEach(h => {
+                  const v = Math.max(0, Math.min(
+                    Number(dst.coverage[h]) || 0, Number(dst.weights[h]) || 0));
+                  base[h] = v;
+                  total += v;
+                });
+                if (!(total > 0)) return;
+                dst.picks.forEach(h => { base[h] = base[h] / total * 100; });
+                const shares = Reduced.aimShares(
+                  src.raceId, n, dst.raceId, dst.picks, base,
+                  { amount, weights: dst.weights, coverage: dst.coverage });
+                if ((mode === 'market' || mode === 'cascade')
+                    && Reduced.fieldFor(dst.raceId).horses.length) {
+                  learned.push([src.raceId, n, dst.raceId, shares]);
+                }
+                const moved = dst.picks.some(
+                  h => Math.abs((shares[h] || 0) - (base[h] || 0)) > 0.4)
+                  || Object.keys(shares).some(h => !dst.picks.includes(Number(h)));
+                if (moved) per[dst.leg] = shares;
+                if (mode !== 'auto') perModes[dst.leg] = mode;
+              });
+              if (Object.keys(per).length) src.targets[n] = per;
+              if (Object.keys(perModes).length) src.aimModes[n] = perModes;
+            });
+          });
+        }
+        reducedLearnShares(learned);
         const fullRows = legs.reduce((p, l) => p * Math.max(1, l.picks.length), 1);
-        const retention = legs.reduce((p, l) => p * l.retention, 1);
-        const rows = Math.max(1, Math.round(fullRows * retention));
+        // The system as the weights price it, which the scale bar's centre
+        // cell stands for.
+        const legRetention = legs.reduce((p, l) => p * l.retention, 1);
+        const baseRows = fullRows * legRetention;
+        const minRows = legs.reduce((m, l) => Math.max(m, l.picks.length), 1);
+        const scale = couponScaleFit(d && d.scale, baseRows, minRows);
+        const retention = legRetention * scale;
+        // Aiming redistributes fixed leverage; it never buys extra stake.
+        // Cascade can be refused if that fixed sub-coupon is too small to
+        // seat every starter, but it must not increase the coupon's cost.
+        const rows = Math.max(1, reducedRoundRows(fullRows * retention));
         return {
           gameId: (d && d.gameId) || '',
           gameType,
@@ -7793,10 +9394,15 @@ window.trackNameHtml = trackNameHtml;
           weighted: Reduced.isOn(),
           legs,
           fullRows,
+          baseRows,
+          minRows,
+          scale,
           retention,
           rows,
           removedRows: Math.max(0, fullRows - rows),
           addedRows: Math.max(0, rows - fullRows),
+          aimSchema: AIM_SCHEMA,
+          topOnly: Coupon.isTopOnly(d),
         };
       },
     };
@@ -7821,8 +9427,48 @@ window.trackNameHtml = trackNameHtml;
       }));
     }
 
+    /* Market and cascade shares are read off the target race's live field,
+       which only the builder has loaded. Keeping the last ones it worked out
+       on the draft lets pages without start lists (the summary and its
+       download) build the same system, where they would otherwise fall back
+       to an even split. A restored coupon starts from its saved shares, so
+       it stays as saved until the builder sees the races again. */
+    function reducedLearnShares(list) {
+      if (!list.length) return;
+      const d = Reduced.load();
+      let changed = false;
+      list.forEach(([raceId, horse, targetRaceId, shares]) => {
+        const per = d.targets[raceId] || (d.targets[raceId] = {});
+        const one = per[horse] || (per[horse] = {});
+        const prev = one[targetRaceId] || {};
+        const keys = Object.keys(shares);
+        const same = keys.length === Object.keys(prev).length
+          && keys.every(h => Math.abs((Number(prev[h]) || 0) - shares[h]) < 1e-9);
+        if (same) return;
+        one[targetRaceId] = { ...shares };
+        changed = true;
+      });
+      // Derived from what is already on screen: storing it quietly keeps
+      // plan() from re-rendering every listener that called it.
+      if (changed) localStorage.setItem(REDUCED_KEY, JSON.stringify(d));
+    }
+
     // Floors and locks can push the total off 100 — rescale so the shares
     // always read as percentages of the same whole.
+    function reducedRoundRows(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return 1;
+      const floor = Math.floor(n);
+      const fraction = n - floor;
+      // Coverage is saved to four decimals. Reconstructing an exact half can
+      // therefore produce 22.50001; snap that noise away and match Python's
+      // even-half rounding used by the file solver.
+      if (Math.abs(fraction - 0.5) < 0.0001) {
+        return floor % 2 === 0 ? floor : floor + 1;
+      }
+      return Math.round(n);
+    }
+
     function reducedScaleTo100(map, picks) {
       const total = picks.reduce((s, n) => s + (map[n] || 0), 0);
       if (total > 0 && Math.abs(total - 100) > 0.001) {
@@ -7833,6 +9479,94 @@ window.trackNameHtml = trackNameHtml;
     }
 
     window.Reduced = Reduced;
+
+    /* Which levered pick the coupon is aiming right now.
+
+       Aiming is modal: only one lever is ever being pointed at a time, so a
+       coupon with several of them never has to say which set of stripes
+       belongs to which anchor. It is deliberately not stored — a reload
+       comes back with every leg drawn plainly. */
+    let leverFocus = null;
+    let leverAimOn = false;
+    // Set when the user deselects: a lone lever then stays unaimed instead
+    // of being picked for them.
+    let leverNone = false;
+    const LeverFocus = {
+      get() { return leverFocus; },
+      isOn() { return leverAimOn; },
+      setOn(on) {
+        leverAimOn = !!on;
+        leverNone = false;
+        if (!leverAimOn) {
+          leverFocus = null;
+        } else if (!leverFocus) {
+          const first = LeverFocus.candidates()[0];
+          if (first) leverFocus = { raceId: first.raceId, horse: first.horse };
+        }
+        window.dispatchEvent(new CustomEvent('lever:focus'));
+      },
+      toggleMode() { LeverFocus.setOn(!leverAimOn); },
+      /* The lever the stripes belong to. Aim mode is deliberately separate
+         from reduce/lever mode: while it is off every coverage thumb keeps
+         making primary levers, including a second or third one. */
+      active() {
+        if (!leverAimOn) return null;
+        const all = LeverFocus.candidates();
+        if (leverFocus) {
+          return all.find(x => x.raceId === leverFocus.raceId
+            && x.horse === leverFocus.horse) || null;
+        }
+        return all.length === 1 && !leverNone ? all[0] : null;
+      },
+      candidates() {
+        if (!window.Coupon || !window.Reduced || !Reduced.isOn() || !Reduced.isReducing()) return [];
+        const d = Coupon.load();
+        const out = [];
+        ((d && d.legs) || []).forEach(l => {
+          const picks = ((d.selections || {})[l.raceId] || []);
+          const weights = Reduced.normalize(
+            picks, Reduced.weightsFor(l.raceId), Reduced.locksFor(l.raceId));
+          const cov = Reduced.coverage(
+            picks, weights, Reduced.activeCapsFor(l.raceId));
+          picks.forEach(n => {
+            const weight = Number(weights[n]) || 0;
+            if ((cov[n] || 0) > weight + 0.05) {
+              out.push({
+                raceId: l.raceId,
+                horse: n,
+                weight,
+                coverage: cov[n],
+                amount: cov[n] - weight,
+              });
+            }
+          });
+        });
+        return out;
+      },
+      is(raceId, horse) {
+        const a = LeverFocus.active();
+        return !!a && a.raceId === raceId && a.horse === Number(horse);
+      },
+      set(raceId, horse) {
+        leverFocus = (raceId && horse != null)
+          ? { raceId, horse: Number(horse) }
+          : null;
+        leverNone = false;
+        if (leverFocus) leverAimOn = true;
+        window.dispatchEvent(new CustomEvent('lever:focus'));
+      },
+      clear() { if (leverFocus) LeverFocus.set(null, null); },
+      // Aim mode stays on with no lever aimed.
+      deselect() {
+        leverFocus = null;
+        leverNone = true;
+        window.dispatchEvent(new CustomEvent('lever:focus'));
+      },
+      toggle(raceId, horse) {
+        LeverFocus.set(raceId, horse);
+      },
+    };
+    window.LeverFocus = LeverFocus;
 
     /* ---- floating cost sphere ---- */
 
@@ -7881,9 +9615,12 @@ window.trackNameHtml = trackNameHtml;
       // An unfinished coupon opens too. It cannot be saved or handed on, but
       // the receipt is where clear lives, and being stuck with a half-built
       // sphere until you go and empty it by hand is worse than the shake.
+      // A page can hang its own view of the draft on the sphere.
       el.addEventListener('click', () => {
         triggerSphereClickFlash(el);
-        if (Coupon.load()) Coupon.showOverlay();
+        if (!Coupon.load()) return;
+        if (typeof window.openCouponView === 'function') window.openCouponView();
+        else Coupon.showOverlay();
       });
       document.body.appendChild(el);
       return el;
@@ -7893,6 +9630,7 @@ window.trackNameHtml = trackNameHtml;
        equals the gap to the viewport edge. Falls back to a fixed margin when
        the gutter is narrower than the sphere. */
     function positionCouponSphere(el) {
+      if (el.classList.contains('is-dock-centered')) return;
       const MIN_RIGHT = 26;
       const col = document.querySelector('.game-page')
         || document.querySelector('.race-page--upcoming .race-shell')
@@ -7906,17 +9644,40 @@ window.trackNameHtml = trackNameHtml;
       el.style.right = Math.max(MIN_RIGHT, (gutter - size) / 2) + 'px';
     }
 
+    function couponSphereKeptOnDock() {
+      return typeof window.dockKeepsCouponSphere === 'function'
+        ? !!window.dockKeepsCouponSphere()
+        : !!window.dockKeepsCouponSphere;
+    }
+
     function refreshCouponSphere() {
       const d = Coupon.load();
       const el = couponSphereEl();
       if (!d || Coupon.totalPicks(d) === 0) {
-        el.classList.add('is-hidden');
+        if (!couponSphereKeptOnDock()) {
+          el.classList.add('is-hidden');
+          return;
+        }
+        const gameType = (d && d.gameType)
+          || (document.getElementById('gameLegs') || {}).dataset.gameTypeId
+          || '';
+        el.classList.remove('is-hidden');
+        el.classList.add('is-incomplete');
+        el.classList.remove('is-reduced', 'is-levered', 'is-mixed', 'is-started');
+        el.setAttribute('style', COUPON_SPHERE_PLASMA_STYLE);
+        setCouponSphereCost(el, 0);
+        el.querySelector('.coupon-sphere__meta').textContent = d
+          ? `${Coupon.filledLegs(d)}/${d.legs.length}`
+          : String(gameType).toLowerCase();
+        el.title = 'coupon';
+        requestAnimationFrame(() => positionCouponSphere(el));
         return;
       }
       const complete = Coupon.isComplete(d);
       const red = Coupon.reduction(d);
       el.classList.remove('is-hidden');
       el.classList.toggle('is-incomplete', !complete);
+      el.classList.add('is-started');
       // A reduced system swings the sphere from lime to yellow and a levered
       // one to cyan, and either trades the game-type label for how far the
       // system has moved off its full size.
@@ -7928,26 +9689,28 @@ window.trackNameHtml = trackNameHtml;
         : red.reduced ? COUPON_SPHERE_REDUCED_PLASMA_STYLE
         : red.levered ? COUPON_SPHERE_LEVERED_PLASMA_STYLE
         : COUPON_SPHERE_PLASMA_STYLE);
-      el.querySelector('.coupon-sphere__cost').textContent = couponAmount(Coupon.cost(d));
+      setCouponSphereCost(el, Coupon.cost(d));
       const swing = Math.round((red.retention - 1) * 100);
       const swingText = `${swing < 0 ? '−' : '+'}${Math.abs(swing)}%`;
       const moved = red.reduced || red.levered;
+      const playedAs = Coupon.isTopOnly(d) ? Coupon.topPool(d).label : d.gameType;
       el.querySelector('.coupon-sphere__meta').textContent = !complete
         ? `${Coupon.filledLegs(d)}/${d.legs.length}`
-        : moved ? swingText : d.gameType.toLowerCase();
+        : moved ? swingText : playedAs.toLowerCase();
       const movedWord = mixed ? 'reduced and levered'
         : red.reduced ? 'reduced' : 'levered';
       el.title = !complete
         ? `pick at least one horse in every leg (${Coupon.filledLegs(d)}/${d.legs.length} legs filled)`
         : moved
-          ? `${d.gameType} ${movedWord} — ${couponKr(Coupon.cost(d))}`
+          ? `${playedAs} ${movedWord} — ${couponKr(Coupon.cost(d))}`
             + (swing < 0
                 ? ` · ${red.rows} of ${red.fullRows} rows (${swingText})`
                 : ` · ${red.rows} rows against a full ${red.fullRows} (${swingText})`)
             + ` · full system ${couponKr(Coupon.fullCost(d))}`
-          : `${d.gameType} coupon — ${couponKr(Coupon.cost(d))}`;
+          : `${playedAs} coupon — ${couponKr(Coupon.cost(d))}`;
       requestAnimationFrame(() => positionCouponSphere(el));
     }
+    window.positionCouponSphere = positionCouponSphere;
 
     window.addEventListener('resize', () => {
       const el = document.getElementById('couponSphere');
@@ -7965,6 +9728,10 @@ window.trackNameHtml = trackNameHtml;
         gameType: coupon.gameType,
         gameDate: coupon.gameDate || '',
         trackName: coupon.trackName || '',
+        // Coupons saved before schema 1 carry none and stay legacy.
+        aimSchema: ((coupon && coupon.reduction) || {}).aimSchema || 0,
+        topOnly: !!(coupon && coupon.topOnly),
+        scale: ((coupon && coupon.reduction) || {}).scale || 1,
         legs: legs.map(l => {
           const info = byRace[l.raceId] || {};
           const picks = (l.numbers || []).slice();
@@ -7978,25 +9745,33 @@ window.trackNameHtml = trackNameHtml;
             leg: l.leg,
             raceId: l.raceId,
             picks,
+            weights: info.weights || {},
             coverage,
+            targets: info.targets || {},
+            aimModes: info.aimModes || {},
+            rankOrder: info.rankOrder || [],
             reserves: info.reserves || [],
           };
         }),
       };
     }
 
-    function couponFlatBoxes(legs) {
+    function couponFlatBoxes(legs, topOnly) {
       return [{
         legs: legs.map(l => ({ leg: l.leg, numbers: (l.numbers || []).slice() })),
         multiplier: 1,
+        topOnly: !!topOnly,
       }];
     }
 
-    function couponStakeHits(boxes, winners) {
+    /* Stake units with exactly N right. `top` keeps only the boxes played
+       for the top pool (true) or only the rest (false); omitted, all. */
+    function couponStakeHits(boxes, winners, top) {
       if (!boxes || !boxes.length) return [];
       const nLegs = boxes[0].legs.length;
       const total = Array(nLegs + 1).fill(0);
       boxes.forEach(box => {
+        if (top !== undefined && !!box.topOnly !== top) return;
         let poly = [1];
         box.legs.forEach(leg => {
           const w = winners[leg.leg];
@@ -8096,16 +9871,43 @@ window.trackNameHtml = trackNameHtml;
     function couponPayoutHtml(state) {
       const marked = state.legs.filter(l => state.winners[l.leg] != null).length;
       if (!marked) return '';
+      if (state.solveError) {
+        return '<div class="coupon-receipt__payout-title">Vinstberäkning</div>'
+          + `<div class="coupon-receipt__payout-note">kunde inte bygga systemet: ${esc(state.solveError)}</div>`;
+      }
       if (!state.boxes.length) {
         return '<div class="coupon-receipt__payout-title">Vinstberäkning</div>'
           + '<div class="coupon-receipt__payout-est">räknar…</div>';
       }
-      const hits = couponStakeHits(state.boxes, state.winners);
+      const hits = couponStakeHits(state.boxes, state.winners, false);
+      const pool = state.topPool;
+      const pooled = !!pool && state.boxes.some(b => b.topOnly);
+      const topHits = pooled ? couponStakeHits(state.boxes, state.winners, true) : [];
+      const anyNormal = state.boxes.some(b => !b.topOnly);
       const { div, estimated, tiers } = couponDividends(state);
       const nLegs = state.legs.length;
       const top = tiers.length ? tiers[tiers.length - 1] : nLegs;
       let sum = 0;
-      const rows = tiers.slice().reverse().map(t => {
+      // A top-pool unit shares the top tier's pot with fewer units: the
+      // dividend times the game's factor, and nothing below the top tier.
+      const poolRow = (() => {
+        if (!pooled) return '';
+        const units = topHits[pool.tier] || 0;
+        const base = div[pool.tier];
+        const hasDiv = Number.isFinite(base);
+        const payout = hasDiv ? base * pool.factor : NaN;
+        if (hasDiv) sum += units * payout;
+        const divLabel = hasDiv
+          ? `${Math.round(payout).toLocaleString('sv-SE')}\u00a0kr`
+          : '–';
+        const tag = units > 0 ? 'Vinst!' : 'Jackpot';
+        return `<tr class="coupon-receipt__payout-pool">
+          <td>${esc(pool.label)} · ${pool.tier} rätt: ${Math.round(units)} ×</td>
+          <td class="coupon-receipt__payout-div">${divLabel}</td>
+          <td class="coupon-receipt__payout-tag${units > 0 ? ' is-win' : ''}">${tag}</td>
+        </tr>`;
+      })();
+      const rows = poolRow + (anyNormal ? tiers : []).slice().reverse().map(t => {
         const units = hits[t] || 0;
         const payout = div[t];
         const hasDiv = Number.isFinite(payout);
@@ -8128,7 +9930,8 @@ window.trackNameHtml = trackNameHtml;
       const allMarked = marked === nLegs;
       const allOnCoupon = allMarked && state.legs.every(
         l => l.numbers.map(Number).includes(Number(state.winners[l.leg])));
-      const dropped = allOnCoupon && (hits[nLegs] || 0) < 0.5;
+      const dropped = allOnCoupon
+        && (hits[nLegs] || 0) + (topHits[nLegs] || 0) < 0.5;
       // Every horse is on the coupon and the row still is not: the weights
       // did not stretch to this particular combination of them. Say which
       // part is missing, or it reads as a bug in the system builder.
@@ -8210,12 +10013,23 @@ window.trackNameHtml = trackNameHtml;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(couponSolveBody(coupon, state.legs)),
-        }).then(r => r.ok ? r.json() : null).catch(() => null),
+        }).then(async r => {
+          const body = await r.json().catch(() => ({}));
+          return r.ok ? body : { error: body.error || `solve failed (${r.status})` };
+        }).catch(() => ({ error: 'no connection to the solver' })),
         fetch(`/api/atg/game/${encodeURIComponent(coupon.gameId)}/pool`)
           .then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       if (!ov.isConnected) return;
-      state.boxes = (solved && solved.coupons) ? solved.coupons : couponFlatBoxes(state.legs);
+      // The flat grid only stands in for a coupon nothing was moved on; for
+      // a weighted one it would simulate a system that is not being played.
+      const red = coupon && coupon.reduction;
+      const flat = !red || !(red.weighted || red.reduced || red.levered
+        || (red.scale && red.scale !== 1)
+        || (red.legs || []).some(l => l.reduced || l.levered));
+      if (solved && solved.coupons) state.boxes = solved.coupons;
+      else if (flat) state.boxes = couponFlatBoxes(state.legs, coupon && coupon.topOnly);
+      else state.solveError = (solved && solved.error) || 'unknown error';
       state.market = market;
       if (market && !Object.values(state.winners).some(v => v != null)) {
         (market.legs || []).forEach(l => {
@@ -8224,6 +10038,52 @@ window.trackNameHtml = trackNameHtml;
       }
       paintCouponSim(ov, state);
     }
+
+    /* The draft's legs as a receipt lists them: picks with the horse names
+       stored on the draft, and a looked-up name for any lone pick. */
+    Coupon.receiptLegs = function (d) {
+      return enrichCouponLegNames(d.legs.map(l => ({
+        leg: l.leg,
+        raceId: l.raceId,
+        numbers: Coupon.picksFor(d, l.raceId),
+        horseNames: (d.horseNames && d.horseNames[l.raceId]) || {},
+      })));
+    };
+    Coupon.horseLabel = couponHorseNameText;
+
+    /* Saves the draft as a coupon. Resolves to an error message, or null
+       once it is stored. */
+    Coupon.post = async function (d, legs, { name, status, topOnly }) {
+      try {
+        const res = await fetch('/api/coupons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            gameId: d.gameId,
+            gameType: d.gameType,
+            trackName: d.trackName,
+            gameDate: d.gameDate,
+            status,
+            selections: legs.map(l => ({
+              leg: l.leg,
+              raceId: l.raceId,
+              numbers: l.numbers,
+              horseNames: l.horseNames || {},
+            })),
+            // Weights, caps and the ranked order, so the coupon reopens as
+            // the system it was built as instead of a flat one.
+            reduction: window.Reduced ? Reduced.plan(d) : null,
+            topOnly,
+          }),
+        });
+        if (res.ok) return null;
+        const err = await res.json().catch(() => ({}));
+        return err.error || 'failed to save coupon';
+      } catch (_) {
+        return 'failed to save coupon';
+      }
+    };
 
     /* ---- receipt overlay (draft: save/clear · view: read-only + simulate) ---- */
 
@@ -8280,6 +10140,11 @@ window.trackNameHtml = trackNameHtml;
       const complete = view ? true : Coupon.isComplete(d);
       const sim = !!view;
       const reducible = window.Reduced && Reduced.isReducible(gameType);
+      const topPool = rule.topPool || null;
+      const topOnly = !!topPool && (view ? !!view.topOnly : Coupon.isTopOnly(d));
+      const poolLevers = !topOnly && !!topPool && !view && window.Reduced
+        && Reduced.plan(d).legs.some(l => Object.values(l.aimModes || {}).some(
+          per => Object.values(per || {}).includes('multiplied')));
 
       const symbol = typeof gameTypeSymbolById === 'function'
         ? gameTypeSymbolById(gameType.toLowerCase(), { size: 'panel' })
@@ -8330,6 +10195,10 @@ window.trackNameHtml = trackNameHtml;
             (${red.retention < 1 ? '−' : '+'}${
               Math.abs(Math.round((red.retention - 1) * 100))}%)</div>` : ''}
           <div>${rows.toLocaleString('sv-SE')} × ${couponKr(linePrice)} = ${couponKr(rows * linePrice)}</div>
+          ${topOnly ? `<div class="coupon-receipt__pool">played as ${esc(topPool.label)} —
+            only ${topPool.tier} rätt pays, ×${String(topPool.factor).replace('.', ',')}</div>` : ''}
+          ${poolLevers ? `<div class="coupon-receipt__pool">multiplied levers play their rows as
+            ${esc(topPool.label)} (×${String(topPool.factor).replace('.', ',')})</div>` : ''}
           <div class="total">total: ${couponKr(cost)}</div>
           ${view && view.status ? `<div>status: ${esc(view.status)}${view.payout != null ? ` · payout: ${couponKr(view.payout)}` : ''}</div>` : ''}
         </div>`;
@@ -8355,6 +10224,8 @@ window.trackNameHtml = trackNameHtml;
              <button type="button" class="coupon-btn coupon-btn--danger" data-coupon-clear>clear</button>
              <button type="button" class="coupon-btn" data-coupon-close>close</button>
              ${window.BUILDER_ONLY ? '' : `
+             <button type="button" class="coupon-btn" data-coupon-save-draft
+                     ${legs.some(l => l.numbers.length) ? '' : 'disabled title="pick a horse first"'}>save as draft</button>
              <button type="button" class="coupon-btn coupon-btn--save" data-coupon-save
                      ${complete ? '' : 'disabled title="every leg needs a horse first"'}>save</button>`}
              ${continueHtml}
@@ -8396,7 +10267,7 @@ window.trackNameHtml = trackNameHtml;
 
       if (sim) {
         const simCoupon = view || {
-          gameId, gameType, gameDate, trackName,
+          gameId, gameType, gameDate, trackName, topOnly,
           selections: legs,
           reduction: window.Reduced ? Reduced.plan(d) : null,
         };
@@ -8406,6 +10277,7 @@ window.trackNameHtml = trackNameHtml;
           winners: {},
           market: null,
           payTiers: rule.payTiers || [],
+          topPool,
           linePrice,
         };
         bindCouponSim(ov, state);
@@ -8413,8 +10285,11 @@ window.trackNameHtml = trackNameHtml;
       }
 
       const clearBtn = ov.querySelector('[data-coupon-clear]');
-      if (clearBtn) clearBtn.addEventListener('click', () => {
-        if (!confirm('clear this coupon draft?')) return;
+      if (clearBtn) clearBtn.addEventListener('click', async () => {
+        const ok = window.gameDockConfirm
+          ? await window.gameDockConfirm('clear coupon draft?')
+          : confirm('clear this coupon draft?');
+        if (!ok) return;
         Coupon.clear();
         closeCouponOverlay();
       });
@@ -8435,57 +10310,55 @@ window.trackNameHtml = trackNameHtml;
         window.location.href = `/game/${encodeURIComponent(gameId)}`;
       });
 
-      const saveBtn = ov.querySelector('[data-coupon-save]');
-      if (saveBtn) saveBtn.addEventListener('click', async () => {
-        saveBtn.disabled = true;
-        try {
-          const name = (ov.querySelector('#couponName').value || '').trim() || defaultName;
-          const res = await fetch('/api/coupons', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name,
-              gameId,
-              gameType,
-              trackName,
-              gameDate,
-              selections: legs.map(l => ({
-                leg: l.leg,
-                raceId: l.raceId,
-                numbers: l.numbers,
-                horseNames: l.horseNames || {},
-              })),
-              // Weights, caps and the ranked order, so the coupon reopens as
-              // the system it was built as instead of a flat one.
-              reduction: window.Reduced ? Reduced.plan(d) : null,
-            }),
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            alert(err.error || 'failed to save coupon');
-            saveBtn.disabled = false;
-            return;
-          }
-          Coupon.clear();
-          closeCouponOverlay();
-          window.location.href = '/play/coupons';
-        } catch (_) {
-          alert('failed to save coupon');
-          saveBtn.disabled = false;
+      async function saveCoupon(status) {
+        const buttons = ov.querySelectorAll('[data-coupon-save], [data-coupon-save-draft]');
+        buttons.forEach(b => { b.disabled = true; });
+        const name = (ov.querySelector('#couponName').value || '').trim() || defaultName;
+        const error = await Coupon.post(d, legs, { name, status, topOnly });
+        if (error) {
+          alert(error);
+          buttons.forEach(b => { b.disabled = false; });
+          return;
         }
-      });
+        Coupon.clear();
+        closeCouponOverlay();
+        window.location.href = '/play/coupons';
+      }
+      const saveBtn = ov.querySelector('[data-coupon-save]');
+      if (saveBtn) saveBtn.addEventListener('click', () => saveCoupon('saved'));
+      const draftBtn = ov.querySelector('[data-coupon-save-draft]');
+      if (draftBtn) draftBtn.addEventListener('click', () => saveCoupon('draft'));
     };
 
     window.addEventListener('coupon:changed', refreshCouponSphere);
     window.addEventListener('reduced:changed', refreshCouponSphere);
+    window.addEventListener('coupon:quote', refreshCouponSphere);
     window.addEventListener('storage', e => {
       if (e.key === COUPON_DRAFT_KEY) {
         refreshCouponSphere();
         window.dispatchEvent(new CustomEvent('coupon:changed'));
       }
     });
+
+    /* The weight and rank gutters are coupon-wide switches kept in storage,
+       so they would reopen on every race list long after the coupon that
+       wanted them is gone. A page opens with rank closed unless its own
+       game is being built, and with weighting closed when nothing is; the
+       start lists keep weighting shut on other games' pages themselves,
+       since the switch belongs to the build in progress. The ranks are
+       kept either way. */
+    (function closeIdleGutters() {
+      const d = Coupon.load();
+      const building = !!(d && Coupon.totalPicks(d) > 0);
+      const pageGame = decodeURIComponent(
+        (location.pathname.match(/^\/game\/([^/]+)/) || [])[1] || '');
+      const buildingHere = building && (!pageGame || d.gameId === pageGame);
+      if (!buildingHere && window.RankMode && RankMode.isOn()) RankMode.setOn(false);
+      if (!building && Reduced.isOn()) Reduced.setOn(false);
+    })();
     refreshCouponSphere();
 
+    window.refreshCouponSphere = refreshCouponSphere;
     window.Coupon = Coupon;
     window.COUPON_GAME_RULES = COUPON_GAME_RULES;
     window.couponKr = couponKr;

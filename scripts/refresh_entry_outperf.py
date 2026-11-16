@@ -37,7 +37,7 @@ from core.db import get_connection  # noqa: E402
 
 _QUALIFIER_RE = (
     r"^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|"
-    r"ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$"
+    r"ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$"
 )
 _MIN_FIELD = 4
 

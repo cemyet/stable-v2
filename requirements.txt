@@ -5,6 +5,8 @@ psycopg2-binary>=2.9
 # `playwright install` browser download is needed.
 playwright>=1.40
 flask>=3.0
+# The coupon agent on the game page (core/coupon_agent.py, core/coupon_sim.py).
+numpy>=1.26
 beautifulsoup4>=4.12
 lxml>=5.0
 gunicorn>=21.2

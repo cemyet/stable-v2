@@ -51,6 +51,9 @@ plays the system exactly as it was built, so it is the only one offered.
     color: var(--accent-reduce, #d29b00);
   }
   .sum-head__swing.is-lev { color: var(--accent-lever, #2f96d8); }
+  .sum-head__pool-play {
+    font-size: 11px; font-weight: 600; margin-top: 4px; color: #e0362c;
+  }
 
   .sum-section { margin-top: 30px; }
   .sum-section__title {
@@ -203,11 +206,21 @@ plays the system exactly as it was built, so it is the only one offered.
       gameDate: GAME_DATE,
       trackName: TRACK_NAME,
       trackCode: TRACK_CODE,
+      // Without it the server reads every 'uniform' aim as a legacy cascade.
+      aimSchema: plan.aimSchema,
+      topOnly: !!plan.topOnly,
+      scale: plan.scale,
       legs: plan.legs.map(l => ({
         leg: l.leg,
         raceId: l.raceId,
         picks: l.picks,
+        weights: l.weights,
         coverage: l.coverage,
+        targets: l.targets,
+        // A cascade tapers its outsiders down the race's rank. Without the
+        // order and the mode, the solver cannot tell a cascade from an aim.
+        aimModes: l.aimModes || {},
+        rankOrder: l.rankOrder || [],
         reserves: l.reserves,
         starters: (details[l.raceId] || {}).starters || 0,
       })),
@@ -245,8 +258,23 @@ plays the system exactly as it was built, so it is the only one offered.
             carries ${nf(solved.deepestRow)}.">over ${nf(solved.distinctRows)}
             different combinations</div>` : ''}
           ${swing}
+          ${poolHtml(solved)}
         </div>
       </div>`;
+  }
+
+  /* Top-pool coupons pay only every leg right, at the game's factor. Say
+     how much of the system plays that way, since the file marks it per
+     coupon and nothing else on the page would show it. */
+  function poolHtml(solved) {
+    const pool = solved.topPool;
+    if (!pool || !solved.topRows) return '';
+    const factor = String(pool.factor).replace('.', ',');
+    const all = solved.topRows >= solved.rows;
+    return `<div class="sum-head__pool-play">${all
+      ? `played as ${esc(pool.label)} — only ${pool.tier} rätt pays, ×${factor}`
+      : `${nf(solved.topRows)} of ${nf(solved.rows)} rows as ${esc(pool.label)}
+         (multiplied levers) — those pay only ${pool.tier} rätt, ×${factor}`}</div>`;
   }
 
   function legsHtml(solved, details, movedByRace) {
@@ -274,7 +302,7 @@ plays the system exactly as it was built, so it is the only one offered.
             <td class="sum-name">${esc(names[n] || '')}</td>
             <td class="num">${pct(wanted)}</td>
             <td class="num${moved[n] ? ' ' + moved[n] : ' muted'}">${
-              pct(leg.coverage[String(n)] ?? 0)}</td>
+              pct((leg.effective || leg.coverage)[String(n)] ?? 0)}</td>
             <td class="num${Math.abs(built - wanted) > grain ? ' sum-drift' : ' muted'}">${pct(built)}</td>
             <td class="num muted">${nf(horse.actual ?? 0)}</td>
           </tr>`);

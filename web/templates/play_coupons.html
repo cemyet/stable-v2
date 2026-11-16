@@ -3,17 +3,372 @@
 {% block title %}coupons - play - stable{% endblock %}
 
 {% block extra_style %}
-  .coupons-wrap {
+  .coupons-page {
     width: 100%;
-    max-width: 880px;
+    max-width: 1520px;
+    display: grid;
+    gap: 28px;
   }
-  .coupons-title {
+  .coupons-title,
+  .coupon-lab__title {
     color: var(--fg-muted);
     font-size: 11px;
-    letter-spacing: 0;
+    letter-spacing: 0.35px;
     font-weight: 600;
     text-transform: lowercase;
-    margin-bottom: 12px;
+  }
+  .coupon-lab {
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
+    overflow: hidden;
+  }
+  .coupon-lab__head {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border);
+  }
+  .coupon-lab__head select {
+    min-width: 270px;
+    max-width: 520px;
+    flex: 1;
+    height: 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    padding: 0 30px 0 10px;
+  }
+  .coupon-lab__clear,
+  .coupon-bulk-delete {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-muted);
+    font: inherit;
+    font-size: 11px;
+    height: 30px;
+    padding: 0 10px;
+    cursor: pointer;
+  }
+  .coupon-lab__clear:hover { color: var(--fg); background: var(--hover); }
+  .coupon-lab__empty,
+  .coupon-lab__loading {
+    color: var(--fg-muted);
+    font-size: 12px;
+    padding: 30px 16px;
+    text-align: center;
+  }
+  .coupon-lab__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .coupon-stat {
+    min-width: 132px;
+    flex: 1;
+    padding: 11px 15px;
+    background: var(--bg);
+  }
+  .coupon-stat__label {
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.55px;
+    font-size: 8.5px;
+    margin-bottom: 3px;
+  }
+  .coupon-stat__value {
+    color: var(--fg-heading);
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-stat__sub {
+    color: var(--fg-muted);
+    font-size: 9.5px;
+    margin-top: 2px;
+  }
+  .coupon-lab__warnings {
+    display: grid;
+    gap: 5px;
+    padding: 9px 14px;
+    color: #9a6810;
+    background: rgba(210, 155, 0, 0.075);
+    border-bottom: 1px solid rgba(210, 155, 0, 0.22);
+    font-size: 10.5px;
+  }
+  .coupon-lab__payout {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .coupon-lab__payout-title {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-width: 132px;
+    padding: 10px 15px;
+    color: var(--fg-muted);
+    font-size: 8.5px;
+    letter-spacing: 0.55px;
+    text-transform: uppercase;
+  }
+  .coupon-lab__payout-title strong {
+    color: var(--fg-heading);
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-lab__payout-est { font-size: 9px; letter-spacing: 0; text-transform: none; }
+  .coupon-lab__tiers {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+  .coupon-tier {
+    min-width: 108px;
+    flex: 1;
+    padding: 8px 12px;
+    border-left: 1px solid var(--border);
+  }
+  .coupon-tier__label {
+    color: var(--fg-muted);
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-tier__count {
+    color: var(--fg-heading);
+    font-size: 15px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-tier__div {
+    color: var(--fg-muted);
+    font-size: 9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-tier.is-win .coupon-tier__count { color: #3c8420; }
+  .coupon-tier--pool .coupon-tier__label { color: #e0362c; }
+  .coupon-tier.is-empty { opacity: 0.55; }
+  .coupon-lab__grid-wrap {
+    overflow-x: auto;
+    padding: 12px;
+  }
+  .coupon-lab__grid {
+    display: grid;
+    gap: 7px;
+    min-width: max-content;
+    --coupon-entry-size: 92px;
+  }
+  .coupon-race {
+    display: grid;
+    grid-template-columns: 62px max-content;
+    align-items: start;
+    gap: 7px;
+    width: max-content;
+    min-width: 100%;
+    padding-bottom: 7px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  }
+  .coupon-race:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .coupon-race__head {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    width: 62px;
+    min-height: var(--coupon-entry-size);
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    padding: 7px 6px;
+    color: var(--fg-heading);
+    font-size: 10px;
+    font-weight: 650;
+    background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
+    border-radius: 7px;
+  }
+  .coupon-race__head span {
+    color: var(--fg-muted);
+    font-size: 8px;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-race__entries {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: var(--coupon-entry-size);
+    gap: 5px;
+  }
+  .coupon-entry {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    width: var(--coupon-entry-size);
+    height: var(--coupon-entry-size);
+    min-height: 0;
+    padding: 5px 6px;
+    text-align: left;
+    font: inherit;
+    color: var(--fg);
+    border: 1px solid color-mix(in srgb, var(--border) 88%, var(--fg) 12%);
+    border-radius: 9px;
+    background: #fff;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .coupon-entry:hover {
+    border-color: color-mix(in srgb, var(--fg-muted) 46%, var(--border));
+    transform: translateY(-1px);
+  }
+  .coupon-entry.is-picked {
+    background: #fff;
+    border-color: rgba(25, 25, 23, 0.28);
+    box-shadow: 0 1px 0 rgba(25, 25, 23, 0.04);
+  }
+  .coupon-entry.is-unpicked {
+    color: color-mix(in srgb, var(--fg) 78%, var(--fg-muted));
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg) 8%);
+    background:
+      repeating-linear-gradient(135deg,
+        rgba(92, 92, 87, 0.05) 0 5px,
+        rgba(92, 92, 87, 0.1) 5px 9px),
+      color-mix(in srgb, var(--bg) 88%, #d8d8d2 12%);
+  }
+  .coupon-entry.is-unpicked:not(.has-rows) { opacity: 0.62; }
+  .coupon-entry.has-rows.is-unpicked {
+    opacity: 0.92;
+    border-color: rgba(78, 82, 78, 0.38);
+    background:
+      repeating-linear-gradient(135deg,
+        rgba(72, 76, 73, 0.07) 0 5px,
+        rgba(72, 76, 73, 0.14) 5px 9px),
+      color-mix(in srgb, var(--bg) 82%, #cfcfc8 18%);
+  }
+  .coupon-entry.is-selected {
+    border-color: #4c8b62;
+    box-shadow: 0 0 0 1px rgba(76, 139, 98, 0.42),
+                inset 0 0 24px rgba(76, 139, 98, 0.08);
+  }
+  .coupon-entry.is-scratched { opacity: 0.42; }
+  .coupon-entry__top {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+  }
+  .coupon-entry__num {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f3f3ef;
+    border: 1px solid rgba(25, 25, 23, 0.18);
+    color: #22231f;
+    font-size: 8px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-entry.is-picked .coupon-entry__num {
+    background: #fff;
+    border-color: rgba(25, 25, 23, 0.32);
+  }
+  .coupon-entry.is-unpicked .coupon-entry__num {
+    background: color-mix(in srgb, var(--bg) 70%, #c8c8c2);
+    border-color: rgba(25, 25, 23, 0.12);
+    color: #4a4a46;
+  }
+  .coupon-entry__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 8px;
+    font-weight: 600;
+  }
+  .coupon-entry__metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    color: var(--fg-muted);
+    font-size: 6.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-entry__metrics b {
+    display: block;
+    color: var(--fg);
+    font-size: 8.5px;
+    font-weight: 550;
+  }
+  .coupon-entry__rows {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    color: var(--fg-muted);
+    font-size: 6.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .coupon-entry__rows strong { color: var(--fg-heading); font-size: 8.5px; }
+  .coupon-entry__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: start;
+    gap: 2px;
+    max-height: 22px;
+    overflow: hidden;
+  }
+  .coupon-entry__tag {
+    padding: 0 3px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    font-size: 5.75px;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+  .coupon-entry__tag.is-up { color: #35739c; border-color: rgba(53, 115, 156, 0.35); }
+  .coupon-entry__tag.is-down { color: #a37520; border-color: rgba(163, 117, 32, 0.35); }
+  .coupon-entry__tag.is-aim { color: #4c6e61; border-color: rgba(76, 110, 97, 0.35); }
+  .coupon-list-block { max-width: 1000px; width: 100%; }
+  .coupons-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 34px;
+    margin-bottom: 5px;
+  }
+  .coupon-bulk {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg-muted);
+    font-size: 10px;
+  }
+  .coupon-bulk-delete:not(:disabled) { color: #a80012; border-color: rgba(168, 0, 18, 0.3); }
+  .coupon-bulk-delete:disabled { cursor: default; opacity: 0.45; }
+  .coupon-check {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--fg-heading);
+    cursor: pointer;
   }
   table.coupons {
     width: 100%;
@@ -33,6 +388,8 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
+  table.coupons td:first-child,
+  table.coupons th:first-child { width: 26px; padding-right: 1px; }
   table.coupons tbody tr { cursor: pointer; }
   table.coupons tbody tr:hover { background: var(--hover); }
   table.coupons td.num,
@@ -52,6 +409,21 @@
   }
   .coupon-status--won  { color: #3c8420; border-color: #3c8420; }
   .coupon-status--lost { color: #b00010; border-color: #b00010; }
+  .coupon-status--draft { color: #9a6810; border-color: #c4922a; }
+  .coupon-list { margin-bottom: 22px; }
+  .coupon-list .coupons-title { margin: 0 0 6px; }
+  .coupon-move {
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--fg-muted);
+    font: inherit;
+    font-size: 10px;
+    letter-spacing: 0.4px;
+    padding: 0 8px;
+    cursor: pointer;
+  }
   .coupon-delete {
     background: none; border: none; cursor: pointer;
     color: var(--fg-muted); font-family: inherit; font-size: 13px;
@@ -73,6 +445,10 @@
     color: var(--accent-lever, #2f96d8);
     border-color: var(--accent-lever, #2f96d8);
   }
+  .coupon-system--pool {
+    color: #e0362c;
+    border-color: #e0362c;
+  }
   /* Reduced and levered in equal measure — neither colour would be true. */
   .coupon-system--even {
     color: var(--fg-heading);
@@ -91,14 +467,45 @@
     margin-top: 14px;
     text-align: center;
   }
+  @media (max-width: 720px) {
+    .coupon-lab__head { align-items: stretch; flex-wrap: wrap; }
+    .coupon-lab__head select { order: 3; min-width: 100%; max-width: none; }
+    .coupon-stat { min-width: calc(50% - 1px); }
+    .coupon-lab__grid { --coupon-entry-size: 86px; }
+    .coupon-race { grid-template-columns: 54px max-content; }
+    .coupon-race__head { width: 54px; }
+    .coupon-list-block { overflow-x: auto; }
+    table.coupons { min-width: 760px; }
+  }
 {% endblock %}
 
 {% block content %}
-  <div class="coupons-wrap">
-    <div class="coupons-title">saved coupons</div>
-    <div id="couponsMount"></div>
-    <div class="coupons-count" id="couponsCount"></div>
-    <div class="coupons-empty" id="couponsEmpty"></div>
+  <div class="coupons-page">
+    <section class="coupon-lab" aria-label="coupon simulator">
+      <div class="coupon-lab__head">
+        <div class="coupon-lab__title">coupon simulator</div>
+        <select id="couponSimSelect" aria-label="coupon to simulate">
+          <option value="">select coupon…</option>
+        </select>
+        <button class="coupon-lab__clear" id="couponSimClear" type="button">clear outcomes</button>
+      </div>
+      <div id="couponSimMount">
+        <div class="coupon-lab__empty">select a coupon to inspect every race and simulate outcomes</div>
+      </div>
+    </section>
+
+    <section class="coupon-list-block">
+      <div class="coupons-list-head">
+        <div class="coupons-title">coupons</div>
+        <div class="coupon-bulk">
+          <span id="couponSelectedCount">0 selected</span>
+          <button class="coupon-bulk-delete" id="couponBulkDelete" type="button" disabled>remove selected</button>
+        </div>
+      </div>
+      <div id="couponsMount"></div>
+      <div class="coupons-count" id="couponsCount"></div>
+      <div class="coupons-empty" id="couponsEmpty"></div>
+    </section>
   </div>
 {% endblock %}
 
@@ -108,13 +515,37 @@
   const mountEl = document.getElementById('couponsMount');
   const countEl = document.getElementById('couponsCount');
   const emptyEl = document.getElementById('couponsEmpty');
+  const selectedCountEl = document.getElementById('couponSelectedCount');
+  const bulkDeleteEl = document.getElementById('couponBulkDelete');
+  const simSelectEl = document.getElementById('couponSimSelect');
+  const simClearEl = document.getElementById('couponSimClear');
+  const simMountEl = document.getElementById('couponSimMount');
 
   let coupons = [];
+  const selected = new Set();
+  let simData = null;
+  let simWinners = {};
+  let simRequest = 0;
 
-  function statusHtml(s) {
-    const cls = s === 'won' ? ' coupon-status--won'
-              : s === 'lost' ? ' coupon-status--lost' : '';
-    return `<span class="coupon-status${cls}">${esc(s || 'saved')}</span>`;
+  function bucketOf(c) {
+    if (c.status === 'draft') return 'draft';
+    if (c.status === 'played' || c.status === 'won' || c.status === 'lost') return 'played';
+    return 'saved';
+  }
+
+  function statusHtml(c) {
+    const played = bucketOf(c) === 'played';
+    let label = bucketOf(c);
+    let cls = label === 'draft' ? ' coupon-status--draft' : '';
+    if (played && c.payout != null) {
+      label = Number(c.payout) > 0 ? 'won' : 'lost';
+      cls = label === 'won' ? ' coupon-status--won' : ' coupon-status--lost';
+    }
+    const bucket = bucketOf(c);
+    const options = ['saved', 'draft', 'played'].map(value =>
+      `<option value="${value}"${value === bucket ? ' selected' : ''}>${value}</option>`).join('');
+    return `<span class="coupon-status${cls}">${label}</span>
+      <select class="coupon-move" data-status="${c.id}" aria-label="move coupon ${c.id}">${options}</select>`;
   }
 
   // Weighted and reduced coupons are a different thing to reopen than a flat
@@ -135,46 +566,459 @@
     return ' <span class="coupon-system">ω</span>';
   }
 
+  // Played for the top tier alone: only every leg right pays, at a factor.
+  function poolHtml(c) {
+    if (!c.topOnly || !c.topPool) return '';
+    const factor = String(c.topPool.factor).replace('.', ',');
+    return ` <span class="coupon-system coupon-system--pool"
+      title="played as ${esc(c.topPool.label)} — only ${c.topPool.tier} rätt pays, ×${factor}">${
+      esc(c.topPool.label)}</span>`;
+  }
+
   function renderRow(c) {
     return `
       <tr data-coupon-id="${c.id}">
+        <td><input class="coupon-check" type="checkbox" data-select="${c.id}"
+          aria-label="select coupon ${c.id}" ${selected.has(c.id) ? 'checked' : ''}></td>
         <td class="muted num">${c.id}</td>
         <td>${esc(c.name || '')}${systemHtml(c)}</td>
-        <td class="muted">${esc(c.gameType)}${c.trackName ? ' · ' + esc(c.trackName) : ''}${c.gameDate ? ' · ' + esc(c.gameDate) : ''}</td>
+        <td class="muted">${esc(c.gameType)}${poolHtml(c)}${c.trackName ? ' · ' + esc(c.trackName) : ''}${c.gameDate ? ' · ' + esc(c.gameDate) : ''}</td>
         <td class="num">${couponKr(c.cost)}</td>
         <td class="num muted">${c.payout != null ? couponKr(c.payout) : '–'}</td>
-        <td>${statusHtml(c.status)}</td>
+        <td>${statusHtml(c)}</td>
         <td><button class="coupon-delete" data-delete="${c.id}" aria-label="delete coupon" title="delete">×</button></td>
       </tr>`;
   }
 
   function render() {
+    const groups = [
+      ['saved', 'saved', coupons.filter(c => bucketOf(c) === 'saved')],
+      ['draft', 'drafts', coupons.filter(c => bucketOf(c) === 'draft')],
+      ['played', 'played', coupons.filter(c => bucketOf(c) === 'played')],
+    ];
     if (!coupons.length) {
       mountEl.innerHTML = '';
       countEl.textContent = '';
-      emptyEl.innerHTML = 'no saved coupons yet — pick horses on an upcoming race in <a href="/play">play</a>';
+      emptyEl.innerHTML = 'no coupons yet — pick horses on an upcoming race in <a href="/play">play</a>';
+      renderBulk();
       return;
     }
     emptyEl.textContent = '';
     countEl.textContent = `${coupons.length} coupon${coupons.length !== 1 ? 's' : ''}`;
-    const head = `
-      <thead>
-        <tr>
-          <th class="num">id</th>
-          <th>name</th>
-          <th>game</th>
-          <th class="num">cost</th>
-          <th class="num">payout</th>
-          <th>status</th>
-          <th></th>
-        </tr>
-      </thead>`;
-    const body = coupons.map(renderRow).join('');
-    mountEl.innerHTML = `<table class="coupons">${head}<tbody>${body}</tbody></table>`;
+    mountEl.innerHTML = groups.map(([key, title, rows]) => {
+      const body = rows.length
+        ? rows.map(renderRow).join('')
+        : '<tr><td></td><td class="muted" colspan="7">none</td></tr>';
+      const allChecked = rows.length > 0 && rows.every(c => selected.has(c.id));
+      return `<section class="coupon-list">
+        <div class="coupons-title">${title}</div>
+        <table class="coupons">
+          <thead><tr>
+            <th><input class="coupon-check" data-select-bucket="${key}" type="checkbox"
+              aria-label="select all ${title}" ${allChecked ? 'checked' : ''}></th>
+            <th class="num">id</th><th>name</th><th>game</th>
+            <th class="num">cost</th><th class="num">payout</th><th>status</th><th></th>
+          </tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </section>`;
+    }).join('');
+    groups.forEach(([key, , rows]) => {
+      const all = mountEl.querySelector(`[data-select-bucket="${key}"]`);
+      if (all) all.indeterminate = rows.some(c => selected.has(c.id)) && !all.checked;
+    });
+    renderBulk();
     if (typeof initFluidHighlights === 'function') initFluidHighlights(mountEl);
   }
 
+  function renderBulk() {
+    selectedCountEl.textContent = `${selected.size} selected`;
+    bulkDeleteEl.disabled = selected.size === 0;
+  }
+
+  function renderSimOptions() {
+    const current = simSelectEl.value;
+    const today = new Date().toISOString().slice(0, 10);
+    simSelectEl.innerHTML = '<option value="">select coupon…</option>' + coupons.map(c => {
+      const phase = c.gameDate && c.gameDate < today ? 'past' : 'pre-game';
+      const label = `#${c.id} · ${c.name || c.gameType} · ${c.gameDate || ''} · ${phase}`;
+      return `<option value="${c.id}">${esc(label)}</option>`;
+    }).join('');
+    if (coupons.some(c => String(c.id) === current)) simSelectEl.value = current;
+  }
+
+  function formatPct(value) {
+    if (value == null || !Number.isFinite(Number(value))) return '–';
+    const n = Number(value);
+    return `${n.toLocaleString('sv-SE', { minimumFractionDigits: n < 1 ? 1 : 0, maximumFractionDigits: 1 })}%`;
+  }
+
+  function boxSets(box) {
+    return (box.legs || []).map(leg => (leg.numbers || []).map(Number));
+  }
+
+  function remainingRows(ignoreLeg = null) {
+    if (!simData) return 0;
+    return (simData.boxes || []).reduce((total, box) => {
+      let ways = Number(box.multiplier || 1);
+      const sets = boxSets(box);
+      for (let i = 0; i < sets.length; i += 1) {
+        const leg = i + 1;
+        if (leg === ignoreLeg) {
+          ways *= sets[i].length;
+          continue;
+        }
+        const winner = simWinners[leg];
+        if (winner == null) ways *= sets[i].length;
+        else if (!sets[i].includes(Number(winner))) return total;
+      }
+      return total + ways;
+    }, 0);
+  }
+
+  function candidateRows(leg, number) {
+    if (!simData) return 0;
+    return (simData.boxes || []).reduce((total, box) => {
+      let ways = Number(box.multiplier || 1);
+      const sets = boxSets(box);
+      if (!sets[leg - 1] || !sets[leg - 1].includes(Number(number))) return total;
+      for (let i = 0; i < sets.length; i += 1) {
+        const thisLeg = i + 1;
+        if (thisLeg === leg) continue;
+        const winner = simWinners[thisLeg];
+        if (winner == null) ways *= sets[i].length;
+        else if (!sets[i].includes(Number(winner))) return total;
+      }
+      return total + ways;
+    }, 0);
+  }
+
+  /* Stake units by how many right. `top` keeps only the boxes played for
+     the top pool (true) or only the rest (false). */
+  function stakeHits(top) {
+    const n = (simData.legs || []).length;
+    const total = Array(n + 1).fill(0);
+    (simData.boxes || []).forEach(box => {
+      if (top !== undefined && !!box.topOnly !== top) return;
+      let poly = [1];
+      let open = 0;
+      boxSets(box).forEach((numbers, i) => {
+        const winner = simWinners[i + 1];
+        if (winner == null) {
+          open += 1;
+          poly = poly.map(count => count * numbers.length);
+          return;
+        }
+        const hit = numbers.includes(Number(winner)) ? 1 : 0;
+        const miss = numbers.length - hit;
+        const next = Array(poly.length + 1).fill(0);
+        poly.forEach((count, right) => {
+          next[right] += count * miss;
+          next[right + 1] += count * hit;
+        });
+        poly = next;
+      });
+      const m = Number(box.multiplier || 1);
+      poly.forEach((count, right) => {
+        total[right + open] += count * m;
+      });
+    });
+    return total;
+  }
+
+  function crowdProfile(probs) {
+    let poly = [1];
+    probs.forEach(pi => {
+      const p = Math.min(0.999, Math.max(0.001, pi));
+      const next = Array(poly.length + 1).fill(0);
+      poly.forEach((count, right) => {
+        next[right] += count * (1 - p);
+        next[right + 1] += count * p;
+      });
+      poly = next;
+    });
+    return poly;
+  }
+
+  function winnerProb(leg) {
+    const entries = leg.entries || [];
+    let winner = simWinners[leg.leg];
+    if (winner == null) {
+      const live = entries.filter(entry => !entry.scratched);
+      const rest = live.filter(entry => !entry.picked);
+      const pool = rest.length ? rest : live;
+      let best = null;
+      pool.forEach(entry => {
+        if (!best || (entry.marketPct || 0) > (best.marketPct || 0)) best = entry;
+      });
+      winner = best ? best.number : null;
+    }
+    const start = entries.find(entry => Number(entry.number) === Number(winner));
+    return Math.max((start && start.marketPct) || 0.1, 0.1) / 100;
+  }
+
+  function simDividends() {
+    const tiers = (simData.payTiers || []).map(Number);
+    const legs = simData.legs || [];
+    const official = legs.length > 0 && legs.every(leg => leg.winner != null)
+      && legs.every(leg => Number(simWinners[leg.leg]) === Number(leg.winner));
+    if (official && simData.resultPayouts) {
+      const div = {};
+      tiers.forEach(tier => {
+        div[tier] = Number(simData.resultPayouts[tier] || simData.resultPayouts[String(tier)] || 0);
+      });
+      return { div, estimated: false, tiers };
+    }
+    if (!simData.turnover || !simData.tierPools) return { div: {}, estimated: true, tiers };
+    const profile = crowdProfile(legs.map(winnerProb));
+    const units = Number(simData.turnover) / Number(simData.coupon.linePrice || 1);
+    const div = {};
+    tiers.forEach(tier => {
+      const pot = Number(simData.tierPools[tier] || simData.tierPools[String(tier)] || 0);
+      div[tier] = pot / Math.max((profile[tier] || 0) * units, 1);
+    });
+    return { div, estimated: true, tiers };
+  }
+
+  function payoutProjection(hits, div, estimated, tiers, priced, played = {}) {
+    const marked = Object.values(simWinners).filter(v => v != null).length;
+    if (!marked) return '';
+    const shown = played.anyNormal === false ? []
+      : (tiers.length ? tiers : hits.map((_, i) => i).filter(i => i > 0)).slice().reverse();
+    const pool = played.pool;
+    const poolRow = (() => {
+      if (!pool) return '';
+      const units = Math.round((played.topHits || [])[pool.tier] || 0);
+      const base = div[pool.tier];
+      const hasDiv = priced && Number.isFinite(base);
+      const dividend = hasDiv ? base * pool.factor : NaN;
+      const each = hasDiv ? `${Math.round(dividend).toLocaleString('sv-SE')} kr` : '';
+      const money = hasDiv ? `${Math.round(units * dividend).toLocaleString('sv-SE')} kr` : '';
+      const factor = String(pool.factor).replace('.', ',');
+      return `<div class="coupon-tier coupon-tier--pool${units > 0 ? ' is-win' : ' is-empty'}">
+        <div class="coupon-tier__label">${esc(pool.label)} · ${pool.tier} rätt</div>
+        <div class="coupon-tier__count">${units.toLocaleString('sv-SE')}</div>
+        <div class="coupon-tier__div">${each ? `${each} each (×${factor})` : (priced ? '–' : 'still possible')}${money ? ` · ${money}` : ''}</div>
+      </div>`;
+    })();
+    const rows = poolRow + shown.map(tier => {
+      const units = Math.round(hits[tier] || 0);
+      const dividend = div[tier];
+      const hasDiv = priced && Number.isFinite(dividend);
+      const money = hasDiv
+        ? `${Math.round(units * dividend).toLocaleString('sv-SE')} kr`
+        : '';
+      const each = hasDiv
+        ? `${Math.round(dividend).toLocaleString('sv-SE')} kr`
+        : '';
+      return `<div class="coupon-tier${units > 0 ? ' is-win' : ' is-empty'}">
+        <div class="coupon-tier__label">${tier} rätt</div>
+        <div class="coupon-tier__count">${units.toLocaleString('sv-SE')}</div>
+        <div class="coupon-tier__div">${each ? `${each} each` : (priced ? '–' : 'still possible')}${money ? ` · ${money}` : ''}</div>
+      </div>`;
+    }).join('');
+    const note = priced
+      ? (estimated ? 'estimated from the pool' : 'official dividends')
+      : 'open races still count toward the line';
+    return `<div class="coupon-lab__payout">
+      <div class="coupon-lab__payout-title">payout projection<span class="coupon-lab__payout-est">${note}</span></div>
+      <div class="coupon-lab__tiers">${rows}</div>
+    </div>`;
+  }
+
+  function adjustmentTags(entry) {
+    const tags = [];
+    if (entry.weightPct != null) tags.push(`<span class="coupon-entry__tag">w ${formatPct(entry.weightPct)}</span>`);
+    if (entry.adjustmentPct > 0.045) {
+      tags.push(`<span class="coupon-entry__tag is-up">lev +${formatPct(entry.adjustmentPct)}</span>`);
+    } else if (entry.adjustmentPct < -0.045) {
+      tags.push(`<span class="coupon-entry__tag is-down">red ${formatPct(entry.adjustmentPct)}</span>`);
+    }
+    if (entry.reserve) tags.push(`<span class="coupon-entry__tag">reserve ${entry.reserve}</span>`);
+    (entry.aims || []).forEach(aim => {
+      tags.push(`<span class="coupon-entry__tag is-aim">${esc(aim.mode)} → A${aim.targetLeg}</span>`);
+    });
+    const incoming = {};
+    (entry.aimedBy || []).forEach(aim => {
+      const mode = aim.mode || 'auto';
+      incoming[mode] = (incoming[mode] || 0) + 1;
+    });
+    Object.entries(incoming).forEach(([mode, count]) => {
+      tags.push(`<span class="coupon-entry__tag is-aim">${esc(mode)} in${count > 1 ? ` ×${count}` : ''}</span>`);
+    });
+    return tags.join('');
+  }
+
+  function renderSim() {
+    if (!simData) return;
+    const total = Number(simData.rows || 0);
+    const remaining = remainingRows();
+    const marked = Object.values(simWinners).filter(v => v != null).length;
+    const legs = simData.legs || [];
+    const allMarked = marked === legs.length;
+    const share = total ? (100 * remaining / total) : 0;
+    const boxes = simData.boxes || [];
+    const pool = simData.topPool && boxes.some(b => b.topOnly) ? simData.topPool : null;
+    const anyNormal = boxes.some(b => !b.topOnly);
+    const hits = marked ? stakeHits(false) : [];
+    const topHits = marked && pool ? stakeHits(true) : [];
+    const { div, estimated, tiers } = marked ? simDividends() : { div: {}, estimated: true, tiers: [] };
+    const priced = allMarked && Object.keys(div).length > 0;
+    // A top-pool unit pays the top tier's dividend times the game's factor.
+    const payout = priced
+      ? tiers.reduce((sum, tier) => sum + (hits[tier] || 0) * Number(div[tier] || 0), 0)
+        + (pool ? (topHits[pool.tier] || 0) * Number(div[pool.tier] || 0) * pool.factor : 0)
+      : null;
+    const top = tiers.length ? Math.max(...tiers) : legs.length;
+    const resultSub = marked
+      ? `${Math.round((hits[top] || 0) + (topHits[top] || 0)).toLocaleString('sv-SE')} × ${top} rätt`
+      : `${marked}/${legs.length} outcomes`;
+
+    const warnings = (simData.warnings || []).length
+      ? `<div class="coupon-lab__warnings">${simData.warnings.map(w => `<div>⚠ ${esc(w)}</div>`).join('')}</div>`
+      : '';
+    const summary = `
+      <div class="coupon-lab__summary">
+        <div class="coupon-stat">
+          <div class="coupon-stat__label">rows remaining</div>
+          <div class="coupon-stat__value">${Math.round(remaining).toLocaleString('sv-SE')}</div>
+          <div class="coupon-stat__sub">of ${total.toLocaleString('sv-SE')} · ${formatPct(share)}</div>
+        </div>
+        <div class="coupon-stat">
+          <div class="coupon-stat__label">result state</div>
+          <div class="coupon-stat__value">${marked}/${legs.length}</div>
+          <div class="coupon-stat__sub">${resultSub}</div>
+        </div>
+        <div class="coupon-stat">
+          <div class="coupon-stat__label">stake</div>
+          <div class="coupon-stat__value">${couponKr(Number(simData.coupon.cost || 0))}</div>
+          <div class="coupon-stat__sub">${Number(simData.distinctRows || 0).toLocaleString('sv-SE')} distinct combinations</div>
+        </div>
+        <div class="coupon-stat">
+          <div class="coupon-stat__label">payout</div>
+          <div class="coupon-stat__value">${payout != null ? couponKr(payout) : '–'}</div>
+          <div class="coupon-stat__sub">${payout != null ? (estimated ? 'estimated' : 'official result') : (marked ? 'finish the result for kr' : 'select outcomes')}</div>
+        </div>
+      </div>
+      ${payoutProjection(hits, div, estimated, tiers, priced, { pool, topHits, anyNormal })}`;
+
+    const columns = legs.map(leg => {
+      const ordered = (leg.entries || []).slice().sort((a, b) => {
+        const ar = a.rank != null ? a.rank : 999;
+        const br = b.rank != null ? b.rank : 999;
+        if (ar !== br) return ar - br;
+        if (Boolean(a.picked) !== Boolean(b.picked)) return a.picked ? -1 : 1;
+        const aw = a.weightPct != null ? a.weightPct : -1;
+        const bw = b.weightPct != null ? b.weightPct : -1;
+        if (aw !== bw) return bw - aw;
+        return Number(a.number) - Number(b.number);
+      });
+      const branchTotal = ordered.reduce(
+        (sum, entry) => sum + candidateRows(leg.leg, entry.number), 0);
+      const entries = ordered.map(entry => {
+        const rows = candidateRows(leg.leg, entry.number);
+        const pct = branchTotal ? 100 * rows / branchTotal : 0;
+        const classes = [
+          'coupon-entry',
+          entry.picked ? 'is-picked' : 'is-unpicked',
+          rows > 0 ? 'has-rows' : '',
+          Number(simWinners[leg.leg]) === Number(entry.number) ? 'is-selected' : '',
+          entry.scratched ? 'is-scratched' : '',
+        ].filter(Boolean).join(' ');
+        return `<button class="${classes}" type="button"
+          data-sim-leg="${leg.leg}" data-sim-number="${entry.number}"
+          aria-pressed="${Number(simWinners[leg.leg]) === Number(entry.number)}">
+          <span class="coupon-entry__top">
+            <span class="coupon-entry__num">${entry.number}</span>
+            <span class="coupon-entry__name" title="${esc(entry.name)}">${esc(entry.name || `horse ${entry.number}`)}</span>
+          </span>
+          <span class="coupon-entry__metrics">
+            <span>market<b>${formatPct(entry.marketPct)}</b></span>
+            <span>coupon<b>${formatPct(pct)}</b></span>
+          </span>
+          <span class="coupon-entry__rows"><span>conditional rows</span><strong>${Math.round(rows).toLocaleString('sv-SE')}</strong></span>
+          <span class="coupon-entry__tags">${adjustmentTags(entry)}</span>
+        </button>`;
+      }).join('');
+      const chosen = simWinners[leg.leg] != null ? `#${simWinners[leg.leg]}` : 'open';
+      return `<section class="coupon-race">
+        <div class="coupon-race__head">race ${leg.leg}<span>${chosen}</span></div>
+        <div class="coupon-race__entries">${entries}</div>
+      </section>`;
+    }).join('');
+
+    simMountEl.innerHTML = `${summary}${warnings}
+      <div class="coupon-lab__grid-wrap"><div class="coupon-lab__grid">${columns}</div></div>`;
+  }
+
+  async function loadSimulation(id, keepOutcomes = false) {
+    if (!id) {
+      simData = null;
+      simWinners = {};
+      simMountEl.innerHTML = '<div class="coupon-lab__empty">select a coupon to inspect every race and simulate outcomes</div>';
+      return;
+    }
+    const requestId = ++simRequest;
+    simMountEl.innerHTML = '<div class="coupon-lab__loading">building coupon rows…</div>';
+    try {
+      const res = await fetch(`/api/coupons/${Number(id)}/simulation`);
+      const data = await res.json();
+      if (requestId !== simRequest) return;
+      if (!res.ok) throw new Error(data.error || 'failed to build simulator');
+      simData = data;
+      if (!keepOutcomes) {
+        simWinners = {};
+        const complete = (data.legs || []).every(leg => leg.winner != null);
+        if (complete) (data.legs || []).forEach(leg => { simWinners[leg.leg] = Number(leg.winner); });
+      }
+      renderSim();
+    } catch (error) {
+      if (requestId !== simRequest) return;
+      simData = null;
+      simMountEl.innerHTML = `<div class="coupon-lab__empty">${esc(error.message)}</div>`;
+    }
+  }
+
+  mountEl.addEventListener('change', async (ev) => {
+    const move = ev.target.closest('[data-status]');
+    if (!move) return;
+    const id = Number(move.dataset.status);
+    const coupon = coupons.find(c => c.id === id);
+    const status = move.value;
+    if (!coupon || bucketOf(coupon) === status) return;
+    const res = await fetch(`/api/coupons/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      coupon.status = status;
+      render();
+    } else {
+      move.value = bucketOf(coupon);
+    }
+  });
+
   mountEl.addEventListener('click', async (ev) => {
+    if (ev.target.closest('[data-status]')) { ev.stopPropagation(); return; }
+    const check = ev.target.closest('[data-select]');
+    if (check) {
+      ev.stopPropagation();
+      const id = Number(check.dataset.select);
+      if (check.checked) selected.add(id);
+      else selected.delete(id);
+      render();
+      return;
+    }
+    const all = ev.target.closest('[data-select-bucket]');
+    if (all) {
+      ev.stopPropagation();
+      const rows = coupons.filter(c => bucketOf(c) === all.dataset.selectBucket);
+      if (all.checked) rows.forEach(c => selected.add(c.id));
+      else rows.forEach(c => selected.delete(c.id));
+      render();
+      return;
+    }
     const del = ev.target.closest('[data-delete]');
     if (del) {
       ev.stopPropagation();
@@ -183,7 +1027,13 @@
       const res = await fetch(`/api/coupons/${id}`, { method: 'DELETE' });
       if (res.ok) {
         coupons = coupons.filter(c => c.id !== id);
+        selected.delete(id);
         render();
+        renderSimOptions();
+        if (Number(simSelectEl.value) === id) {
+          simSelectEl.value = '';
+          loadSimulation(null);
+        }
       }
       return;
     }
@@ -193,11 +1043,76 @@
     if (c && window.Coupon) Coupon.showOverlay({ coupon: c });
   });
 
+  simMountEl.addEventListener('click', ev => {
+    const entry = ev.target.closest('[data-sim-leg]');
+    if (!entry) return;
+    const leg = Number(entry.dataset.simLeg);
+    const number = Number(entry.dataset.simNumber);
+    simWinners[leg] = Number(simWinners[leg]) === number ? null : number;
+    renderSim();
+  });
+
+  simSelectEl.addEventListener('change', () => loadSimulation(simSelectEl.value));
+  simClearEl.addEventListener('click', () => {
+    simWinners = {};
+    renderSim();
+  });
+
+  bulkDeleteEl.addEventListener('click', async () => {
+    const ids = Array.from(selected);
+    if (!ids.length || !confirm(`remove ${ids.length} selected coupon${ids.length === 1 ? '' : 's'}?`)) return;
+    bulkDeleteEl.disabled = true;
+    const res = await fetch('/api/coupons', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) {
+      renderBulk();
+      return;
+    }
+    const result = await res.json();
+    const removed = new Set(result.ids || ids);
+    coupons = coupons.filter(c => !removed.has(c.id));
+    removed.forEach(id => selected.delete(id));
+    if (removed.has(Number(simSelectEl.value))) {
+      simData = null;
+      simWinners = {};
+    }
+    render();
+    renderSimOptions();
+    if (!simData) {
+      simSelectEl.value = '';
+      loadSimulation(null);
+    }
+  });
+
+  async function refreshPayouts() {
+    try {
+      const res = await fetch('/api/coupons/refresh-results', { method: 'POST' });
+      if (!res.ok) return;
+      const payload = await res.json();
+      const updates = new Map((payload.updated || []).map(item => [Number(item.id), item]));
+      if (!updates.size) return;
+      coupons.forEach(c => {
+        const update = updates.get(Number(c.id));
+        if (update && bucketOf(c) === 'played') c.payout = Number(update.payout);
+      });
+      render();
+    } catch (_) {}
+  }
+
   async function load() {
     try {
       const res = await fetch('/api/coupons');
       coupons = await res.json();
       render();
+      renderSimOptions();
+      if (coupons.length) {
+        simSelectEl.value = String(coupons[0].id);
+        loadSimulation(coupons[0].id);
+      }
+      refreshPayouts();
     } catch (e) {
       emptyEl.textContent = 'failed to load coupons';
     }

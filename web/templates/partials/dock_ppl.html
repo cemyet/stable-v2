@@ -1,0 +1,582 @@
+{# ppl: picks per leg on the dock's right side, plus the market maths the
+   right side shares. The rings sit on the jackpot bar's line; the
+   top half shows how much of the market each leg's picks cover, as a wave
+   or one column per leg. The game dock and the design lab both draw it;
+   the lab picks the design and the game follows. #}
+<style>
+  .dpl-hit {
+    fill: transparent;
+    pointer-events: all;
+    cursor: pointer;
+    outline: none;
+  }
+  .dpl-hit:focus-visible {
+    stroke: color-mix(in srgb, var(--accent-glow, #2f96d8) 70%, transparent);
+    stroke-width: 1px;
+    stroke-dasharray: 2 2;
+  }
+  .dpl-label {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    fill: #4f5359;
+    pointer-events: none;
+  }
+</style>
+<script>
+(function () {
+  /* ── market maths ──
+     market: { horse number: row% } for one leg, scratched horses left out. */
+  const DECADES = 2;
+  const SEGMENT_MIN = Math.log10(1.05);
+
+  function shares(market) {
+    const out = {};
+    let total = 0;
+    Object.keys(market || {}).forEach(k => {
+      const v = Math.max(0, Number(market[k]) || 0);
+      out[k] = v;
+      total += v;
+    });
+    if (!(total > 0)) return {};
+    Object.keys(out).forEach(k => { out[k] /= total; });
+    return out;
+  }
+
+  function covered(picks, mu) {
+    return (picks || []).reduce((s, n) => s + (Number((mu || {})[n]) || 0), 0);
+  }
+
+  function factorText(x) {
+    if (!(x < Infinity)) return '∞';
+    if (x < 10) return (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, '');
+    if (x < 1000) return String(Math.round(x));
+    if (x < 1e6) return `${Math.round(x / 100) / 10}k`.replace('.0k', 'k');
+    return `${Math.round(x / 1e5) / 10}M`.replace('.0M', 'M');
+  }
+
+  /* Every row of a coupon, bucketed by the log of its weight product so a
+     million rows cost a few thousand steps. legs: per leg [{ w: log weight,
+     mass }]. A bucket keeps the market mass (product of mu) of its rows;
+     at(b) is the bucket's log weight. */
+  const BINS = 1200;
+  function rowBuckets(legs) {
+    const mins = legs.map(l => Math.min(...l.map(x => x.w)));
+    const span = legs.reduce((s, l, i) => s + Math.max(...l.map(x => x.w)) - mins[i], 0);
+    const step = span > 1e-9 ? span / BINS : 1;
+    const size = BINS + legs.length + 1;
+    let mass = new Float64Array(size);
+    mass[0] = 1;
+    let top = 0;
+    legs.forEach((l, i) => {
+      const offs = l.map(x => Math.round((x.w - mins[i]) / step));
+      const next = new Float64Array(size);
+      let nt = 0;
+      for (let b = 0; b <= top; b += 1) {
+        if (!mass[b]) continue;
+        l.forEach((x, j) => {
+          if (!x.mass) return;
+          const t = Math.min(size - 1, b + offs[j]);
+          next[t] += mass[b] * x.mass;
+          if (t > nt) nt = t;
+        });
+      }
+      mass = next;
+      top = nt;
+    });
+    const lo = mins.reduce((s, v) => s + v, 0);
+    return { mass, top, at: b => lo + b * step };
+  }
+
+  /* The market's own plain coupon of at most R rows: its top k horses in
+     every leg, growing whichever leg buys the most hit chance per extra
+     row while prod(k) still fits. Returns its hit chance, prod of the top-k
+     market sums. */
+  function chalkMass(L, R) {
+    const cum = L.map(l => {
+      const out = [0];
+      Object.values(l.mu).map(Number).sort((x, y) => y - x)
+        .forEach(v => out.push(out[out.length - 1] + v));
+      return out;
+    });
+    const k = L.map(() => 1);
+    let K = 1;
+    for (;;) {
+      let best = -1;
+      let gain = 0;
+      k.forEach((ki, i) => {
+        if (ki + 1 >= cum[i].length) return;
+        if (K / ki * (ki + 1) > R + 1e-9) return;
+        const lo = cum[i][ki];
+        const hi = cum[i][ki + 1];
+        if (!(lo > 0) || !(hi > lo)) return;
+        const g = Math.log(hi / lo) / Math.log((ki + 1) / ki);
+        if (g > gain) { gain = g; best = i; }
+      });
+      if (best < 0) break;
+      K = K / k[best] * (k[best] + 1);
+      k[best] += 1;
+    }
+    return k.reduce((p, ki, i) => p * cum[i][ki], 1);
+  }
+
+  /* How far the coupon stands from the market, with its size taken out.
+     A row's stake is R * prod(q), q being a horse's share of its leg's
+     rows, and it comes in with the market's chance prod(mu). The coupon
+     hits with sum(mu * min(1, stake)): a row bought twice does not hit
+     twice, a row on a fraction of a unit is that likely to be played. The
+     market's plain coupon of the same R rows is the yardstick. Their ratio
+     is how many times less likely this coupon is to come in: 1 is chalk,
+     and the bar fills over DECADES powers of ten past that. A banker on a
+     10% horse, a 40% horse left off and weights leaning away from the
+     favourites all push it up; more rows alone do not, because the
+     market's coupon grows with them. Weights leaning toward the favourites
+     can beat any plain coupon and read as chalk.
+
+     legs: [{ leg, picks, q?: { n: share }, mu: { n: share } }]. Legs with
+     no picks or no market are left out. Segments split the bar by leg:
+     each leg's picks against the market's top as many, the rest being how
+     the rows are spread across legs and weights. */
+  function risk(legs, rows) {
+    const L = (legs || []).filter(l => l.picks && l.picks.length
+      && l.mu && Object.keys(l.mu).length);
+    if (!L.length) return { enabled: false, value: 0, ratio: 1, segments: [], text: '' };
+    const R = Math.max(1, Number(rows) || 1);
+    const own = L.map(l => {
+      const q = {};
+      let t = 0;
+      l.picks.forEach(n => {
+        const v = l.q && l.q[n] != null ? Math.max(0, Number(l.q[n]) || 0) : 1;
+        q[n] = v;
+        t += v;
+      });
+      return l.picks.filter(n => q[n] > 0 && t > 0)
+        .map(n => ({ w: Math.log(q[n] / t), mass: Number(l.mu[n]) || 0 }));
+    });
+    if (own.some(l => !l.length)) return { enabled: false, value: 0, ratio: 1, segments: [], text: '' };
+    const B = rowBuckets(own);
+    let mine = 0;
+    for (let b = 0; b <= B.top; b += 1) {
+      if (B.mass[b]) mine += B.mass[b] * Math.min(1, R * Math.exp(B.at(b)));
+    }
+    const best = chalkMass(L, R);
+    const ratio = best > 0 ? Math.min(1, mine / best) : 1;
+    const decades = ratio > 0 ? -Math.log10(ratio) : DECADES;
+    const gaps = L.map((l, i) => {
+      const top = Object.values(l.mu).map(Number).sort((x, y) => y - x)
+        .slice(0, own[i].length).reduce((s, v) => s + v, 0);
+      const got = own[i].reduce((s, x) => s + x.mass, 0);
+      return got > 0 ? Math.max(0, Math.log10(top / got)) : DECADES;
+    });
+    const segments = [];
+    L.forEach((l, i) => {
+      if (gaps[i] > SEGMENT_MIN) {
+        segments.push({ share: gaps[i], label: `L${l.leg} ×${factorText(10 ** gaps[i])}` });
+      }
+    });
+    const rest = decades - gaps.reduce((s, g) => s + g, 0);
+    if (rest > SEGMENT_MIN) segments.push({ share: rest, label: `spread ×${factorText(10 ** rest)}` });
+    return {
+      enabled: true,
+      value: Math.min(1, decades / DECADES),
+      ratio,
+      segments,
+      text: ratio >= 0.995 ? 'chalk' : `×${factorText(1 / ratio)}`,
+    };
+  }
+
+  /* Deterministic noise per (seed, key) so a tilt redraws the same way. */
+  function hash32(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i += 1) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    h ^= h >>> 15;
+    h = Math.imul(h, 2246822507);
+    h ^= h >>> 13;
+    return h >>> 0;
+  }
+  function unit(seed, key) { return (hash32(`${seed}:${key}`) + 0.5) / 4294967296; }
+  function gauss(seed, key) {
+    const u = unit(seed, `${key}:u`);
+    const v = unit(seed, `${key}:v`);
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+
+  /* Randomness for the builder. Each unlocked pick's weight is multiplied
+     by exp(level * (LEAN * ln(rating / market) + NOISE * z)): horses the
+     player rates above the market get more rows, those below get fewer,
+     and z adds a seeded wobble. rating and mu are any positive scale over
+     the picks; weights come back unnormalised. */
+  const TILT = { strength: 1, lean: 1, noise: 0.4 };
+  function tilt({ picks, weights, rating, mu, level, seed, key, locks }) {
+    const list = (picks || []).map(Number);
+    const out = {};
+    list.forEach(n => { out[n] = Math.max(0, Number((weights || {})[n]) || 0); });
+    if (list.length < 2 || !(level > 0)) return out;
+    const norm = (src) => {
+      const t = list.reduce((s, n) => s + Math.max(0, Number((src || {})[n]) || 0), 0);
+      const o = {};
+      list.forEach(n => { o[n] = t > 0 ? Math.max(0, Number(src[n]) || 0) / t : 1 / list.length; });
+      return o;
+    };
+    const m = norm(mu);
+    const r = norm(rating || weights);
+    const held = new Set((locks || []).map(Number));
+    const lam = Math.max(0, Math.min(1, level)) * TILT.strength;
+    list.forEach(n => {
+      if (held.has(n)) return;
+      const lean = Math.log(Math.max(1e-4, r[n]) / Math.max(1e-4, m[n]));
+      const z = gauss(seed, `${key}:${n}`);
+      out[n] *= Math.exp(lam * (TILT.lean * lean + TILT.noise * z));
+    });
+    return out;
+  }
+
+  window.DockMarket = { DECADES, TILT, shares, covered, risk, tilt, factorText };
+
+  /* ── drawing ── */
+  const CAP = '#f7f8fb';
+  const OFF = '#c9ced4';
+  const PICK = '#2fd36f';
+  const REDUCE = '#f0c020';
+  const LEV = '#2f96d8';
+  const ICE = '#8ee8ff';
+  const ICE_HOT = '#c9f6ff';
+  /* The selected leg: a black disc and ring with a white count. */
+  const SEL = '#1a1c20';
+  const SEL_HOT = '#1a1c20';
+  const SEL_FACE = '#1a1c20';
+  const SEL_LABEL = '#ffffff';
+  const HEAT = [[0, '#8ee8ff'], [0.3, '#8fb4ff'], [0.6, '#d890ff'], [0.82, '#ff72b6'], [1, '#ff4f6c']];
+  const DESIGN_KEY = 'dockPplMarketDesign';
+  let uid = 0;
+
+  const DESIGNS = [
+    {
+      id: 'wave', label: 'wave',
+      note: 'One mirrored waveform through every leg, smooth between them, on a hairline axis. Wide where a leg covers a lot of the market, pinched where it bets against it. This is the default.',
+    },
+    {
+      id: 'slot', label: 'slot',
+      note: 'A small VFD slot per leg, smoked black like the bars, with an ice fill growing out of a centre tick. The selected leg gets a black rim.',
+    },
+    {
+      id: 'ladder', label: 'ladder',
+      note: 'The same slot cut into LED cells, each a sliver of the market, lit from the middle out. The colour runs hot when a leg covers little of the market and cools to ice as it covers more.',
+    },
+    {
+      id: 'stack', label: 'stack',
+      note: 'No screen: a hairline on the pearl with one block per picked horse, the biggest in the middle. Blocks take the ring colours, so a reduced favourite shows yellow and a levered outsider blue.',
+    },
+  ];
+  const WAVE_RIM = '#e3e6ea';
+  function design(id) { return DESIGNS.find(d => d.id === id) || DESIGNS[0]; }
+  function designId() {
+    try {
+      const saved = localStorage.getItem(DESIGN_KEY);
+      if (DESIGNS.some(d => d.id === saved)) return saved;
+    } catch (_) {}
+    return DESIGNS[0].id;
+  }
+  function setDesign(id) {
+    try { localStorage.setItem(DESIGN_KEY, design(id).id); } catch (_) {}
+  }
+
+  const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const hexOf = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  function ramp(stops, t) {
+    const v = Math.min(1, Math.max(0, t));
+    for (let k = 1; k < stops.length; k += 1) {
+      const [t1, c1] = stops[k];
+      if (v <= t1) {
+        const [t0, c0] = stops[k - 1];
+        const x = rgbOf(c0);
+        const y = rgbOf(c1);
+        const u = t1 > t0 ? (v - t0) / (t1 - t0) : 1;
+        return hexOf(x.map((c, i) => c + (y[i] - c) * u));
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+
+  function litFill(k, picks, reduced, levered) {
+    const lev = Math.max(0, Math.min(levered | 0, picks));
+    const red = Math.max(0, Math.min(reduced | 0, picks - lev));
+    if (k < lev) return LEV;
+    if (k >= picks - red) return REDUCE;
+    return PICK;
+  }
+
+  /* Monotone cubic through the points, so the wave never overshoots the
+     axis between a full leg and an empty one. */
+  function smoothPath(pts, f) {
+    const n = pts.length;
+    if (n < 2) return '';
+    const d = [];
+    const m = [];
+    for (let i = 0; i < n - 1; i += 1) {
+      d.push((pts[i + 1][1] - pts[i][1]) / ((pts[i + 1][0] - pts[i][0]) || 1));
+    }
+    m[0] = d[0];
+    m[n - 1] = d[n - 2];
+    for (let i = 1; i < n - 1; i += 1) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+    for (let i = 0; i < n - 1; i += 1) {
+      if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+      const a = m[i] / d[i];
+      const b = m[i + 1] / d[i];
+      const s = a * a + b * b;
+      if (s > 9) {
+        const t = 3 / Math.sqrt(s);
+        m[i] = t * a * d[i];
+        m[i + 1] = t * b * d[i];
+      }
+    }
+    let out = '';
+    for (let i = 0; i < n - 1; i += 1) {
+      const [x0, y0] = pts[i];
+      const [x1, y1] = pts[i + 1];
+      const h = (x1 - x0) / 3;
+      out += `C${f(x0 + h)} ${f(y0 + m[i] * h)} ${f(x1 - h)} ${f(y1 - m[i + 1] * h)} ${f(x1)} ${f(y1)}`;
+    }
+    return out;
+  }
+
+  /* model: { zoneW, pad, gapRatio, cellMax } in 1x px; ring, the ring's
+     width as a share of the disc; design; legs: [{ starters, picks,
+     reduced, levered, focus, label, raceId, market: null | { covered,
+     parts: [{ share, state: 'pick' | 'red' | 'lev' }] } }]. */
+  function paint(svg, model, id) {
+    const w = svg.clientWidth;
+    const h = svg.clientHeight;
+    if (!w || !h) return null;
+    const legs = model.legs || [];
+    const n = Math.max(legs.length, 1);
+    const zoneW = model.zoneW || 300;
+    const pad = model.pad != null ? model.pad : 12;
+    const ratio = model.gapRatio != null ? model.gapRatio : 0.6;
+    const px = w / zoneW;
+    const dpr = window.devicePixelRatio || 1;
+    const hair = 1 / dpr;
+    const f = v => (+v).toFixed(2);
+    const snap = v => Math.round(v * dpr) / dpr;
+    const ringShare = model.ring || 0.038 / 0.85;
+
+    // The pitch is the width fit, so the legs keep their places. The disc
+    // is centred on the jackpot bar (0.68 of the band). Its size still
+    // comes from the old three-quarter line, so a game with few legs keeps
+    // the margin eight legs have instead of growing discs to the edge.
+    const s0 = Math.min((model.cellMax || 30) * px, (zoneW - 2 * pad) / (n * (1 + ratio) - ratio) * px);
+    const reach = h / 4 - 8 * px;
+    const sH = Math.min(
+      (reach - 1.5 * px) / (0.5 + ringShare),
+      reach / (0.5 + 0.055 + ringShare));
+    const s = Math.max(4 * px, Math.min(s0, sH));
+    const pitch = s0 * (1 + ratio);
+    const x0 = (w - (n * s0 + (n - 1) * ratio * s0)) / 2 + s0 / 2;
+    const cy = snap(h * 0.68);
+    const R0 = snap(s / 2);
+    const ringW = Math.max(hair, snap(ringShare * s));
+    const margin = snap(Math.max(1.5 * px, 0.055 * s));
+    const ri = snap(R0 + margin);
+    const ro = snap(ri + ringW);
+    // The wave at full coverage stops 9px under the top edge.
+    const my = snap(h / 4);
+    const mh = Math.max(4 * px, snap(Math.min(h / 4 - 9 * px, cy - ro - 4 * px - my)));
+    const cw = snap(Math.max(3 * px, Math.min(12 * px, 0.4 * s0)));
+
+    const region = `filterUnits="userSpaceOnUse" x="-20" y="-20" width="${f(w + 40)}" height="${f(h + 40)}" color-interpolation-filters="sRGB"`;
+    const defs = [
+      `<filter id="${id}-glow" ${region}>
+        <feGaussianBlur in="SourceGraphic" stdDeviation="${f(0.035 * s)}" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`,
+      `<filter id="${id}-halo" ${region}><feGaussianBlur stdDeviation="${f(0.06 * s)}"/></filter>`,
+      `<filter id="${id}-vfd" ${region}>
+        <feGaussianBlur in="SourceGraphic" stdDeviation="${f(0.9 * px)}" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`,
+      `<linearGradient id="${id}-face" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#05070d"/><stop offset="1" stop-color="#0a0e18"/></linearGradient>`,
+      `<linearGradient id="${id}-glass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.12"/><stop offset="0.4" stop-color="#fff" stop-opacity="0"/></linearGradient>`,
+    ];
+    const layer = { market: [], marketGlow: [], faces: [], ringGhost: [], ringLit: [], halo: [], ice: [], labels: [] };
+    const centers = legs.map((_, i) => x0 + i * pitch);
+    const D = design(model.design);
+    const rect = (x, y, wd, ht, fill, extra = '') =>
+      `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, wd))}" height="${f(Math.max(0, ht))}" fill="${fill}"${extra}/>`;
+
+    if (D.id === 'wave') {
+      const pts = [[snap(pad * px), 0]];
+      legs.forEach((leg, i) => {
+        const c = leg.market ? Math.min(1, Math.max(0, leg.market.covered)) : 0;
+        pts.push([centers[i], c * mh]);
+      });
+      pts.push([snap(w - pad * px), 0]);
+      const top = pts.map(([x, v]) => [x, my - v]);
+      const bottom = pts.map(([x, v]) => [x, my + v]).reverse();
+      const any = legs.some(l => l.market && l.market.covered > 0);
+      defs.push(`<linearGradient id="${id}-wave" gradientUnits="userSpaceOnUse" x1="0" y1="${f(my - mh)}" x2="0" y2="${f(my + mh)}">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.55"/>
+        <stop offset="0.5" stop-color="#fff" stop-opacity="1"/>
+        <stop offset="1" stop-color="#fff" stop-opacity="0.55"/></linearGradient>`);
+      layer.market.push(`<path d="M${f(pts[0][0])} ${f(my)}H${f(pts[pts.length - 1][0])}" stroke="${OFF}" stroke-width="${f(Math.max(hair, px))}" fill="none"/>`);
+      legs.forEach((leg, i) => {
+        const tick = Math.max(hair, px);
+        layer.market.push(rect(centers[i] - tick / 2, my - 2 * px, tick, 4 * px, leg.focus ? SEL_HOT : OFF));
+      });
+      if (any) {
+        const d = `M${f(top[0][0])} ${f(top[0][1])}${smoothPath(top, f)}L${f(bottom[0][0])} ${f(bottom[0][1])}${smoothPath(bottom, f)}Z`;
+        layer.market.push(`<path d="${d}" fill="url(#${id}-wave)" stroke="${WAVE_RIM}" stroke-width="${f(hair)}"/>`);
+      }
+      // Drawn as the selected ring: a soft shadow under a dark core.
+      const lw = Math.min(margin * 0.45, Math.max(hair, 0.035 * s));
+      legs.forEach((leg, i) => {
+        if (!leg.focus) return;
+        layer.halo.push(rect(centers[i] - lw, my - mh, 2 * lw, 2 * mh, SEL, ' fill-opacity="0.35"'));
+        layer.ice.push(rect(centers[i] - lw / 2, my - mh, lw, 2 * mh, SEL_HOT));
+      });
+    } else {
+      legs.forEach((leg, i) => {
+        const cx = centers[i];
+        const c = leg.market ? Math.min(1, Math.max(0, leg.market.covered)) : 0;
+        if (D.id === 'stack') {
+          const line = Math.max(hair, snap(px));
+          const ink = leg.focus ? SEL_HOT : OFF;
+          layer.market.push(rect(cx - line / 2, my - mh, line, 2 * mh, ink));
+          layer.market.push(rect(cx - 2 * px, my - mh, 4 * px, line, ink));
+          layer.market.push(rect(cx - 2 * px, my + mh - line, 4 * px, line, ink));
+          if (leg.focus) layer.halo.push(rect(cx - line, my - mh, 2 * line, 2 * mh, SEL, ' fill-opacity="0.35"'));
+          const parts = ((leg.market && leg.market.parts) || []).filter(p => p.share > 0)
+            .slice().sort((x, y) => y.share - x.share);
+          // Biggest block on the middle line, the rest alternating out.
+          const order = [];
+          parts.forEach((p, k) => { if (k % 2) order.push(p); else order.unshift(p); });
+          const gapY = Math.max(hair, 0.75 * px);
+          const bw = snap(Math.max(2 * px, cw * 0.62));
+          let y = my - c * mh;
+          order.forEach(p => {
+            const hh = p.share * 2 * mh;
+            const fill = p.state === 'red' ? REDUCE : p.state === 'lev' ? LEV : PICK;
+            if (hh - gapY > hair) {
+              layer.marketGlow.push(`<rect x="${f(cx - bw / 2)}" y="${f(y + gapY / 2)}" width="${f(bw)}" height="${f(hh - gapY)}" rx="${f(Math.min(bw / 2, 1.5 * px))}" fill="${fill}"/>`);
+            }
+            y += hh;
+          });
+          return;
+        }
+        const x = snap(cx - cw / 2);
+        const ins = Math.max(hair, snap(px));
+        const rx = Math.min(2 * px, cw / 2);
+        layer.market.push(`<rect x="${f(x)}" y="${f(my - mh)}" width="${f(cw)}" height="${f(2 * mh)}" rx="${f(rx)}" fill="url(#${id}-face)"${
+          leg.focus ? ` stroke="${SEL_HOT}" stroke-width="${f(Math.max(hair, 0.75 * px))}"` : ''}/>`);
+        if (leg.focus) layer.halo.push(`<rect x="${f(x)}" y="${f(my - mh)}" width="${f(cw)}" height="${f(2 * mh)}" rx="${f(rx)}" fill="none" stroke="${SEL}" stroke-width="${f(1.5 * px)}" stroke-opacity="0.35"/>`);
+        const inner = mh - ins;
+        if (D.id === 'ladder') {
+          const p = 3 * px;
+          const N = Math.max(3, Math.floor((inner + 0.5 * px) / p));
+          const lit = Math.round(c * N);
+          const ink = ramp(HEAT, 1 - c);
+          for (let k = 0; k < N; k += 1) {
+            const on = k < lit;
+            const yTop = snap(my - (k + 1) * p + 0.5 * px);
+            const yBot = snap(my + k * p + 0.5 * px);
+            const cell = (yy) => rect(x + ins, yy, cw - 2 * ins, 2 * px, on ? ink : ICE, on ? '' : ' fill-opacity="0.12"');
+            (on ? layer.marketGlow : layer.market).push(cell(yTop), cell(yBot));
+          }
+        } else {
+          layer.market.push(rect(x + ins, my - inner, cw - 2 * ins, 2 * inner, ICE, ' fill-opacity="0.1"'));
+          const hh = snap(c * inner);
+          if (hh > 0) layer.marketGlow.push(rect(x + ins, my - hh, cw - 2 * ins, 2 * hh, leg.focus ? ICE_HOT : ICE));
+          layer.marketGlow.push(rect(x + ins, my - hair / 2, cw - 2 * ins, Math.max(hair, 0.75 * px), '#e4fbff', ' fill-opacity="0.85"'));
+        }
+        layer.market.push(`<rect x="${f(x)}" y="${f(my - mh)}" width="${f(cw)}" height="${f(2 * mh)}" rx="${f(rx)}" fill="url(#${id}-glass)"/>`);
+      });
+    }
+
+    const hits = [];
+    legs.forEach((leg, i) => {
+      const cx = centers[i];
+      const picks = Math.max(0, leg.picks | 0);
+      const starters = Math.max(1, leg.starters | 0, picks);
+      const turn = 2 * Math.PI / starters;
+      const mid = (ri + ro) / 2;
+      const gapA = Math.min(turn * 0.35, Math.max(hair, 0.045 * s) / mid);
+      const pt = (r, a) => `${f(cx + r * Math.sin(a))} ${f(cy - r * Math.cos(a))}`;
+      layer.faces.push(`<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(R0)}" fill="${leg.focus ? SEL_FACE : CAP}"
+        stroke="${leg.focus ? SEL_HOT : OFF}" stroke-width="${f(hair)}"/>`);
+      for (let k = 0; k < starters; k += 1) {
+        const a0 = k * turn + gapA / 2;
+        const a1 = (k + 1) * turn - gapA / 2;
+        const d = `M${pt(ro, a0)}A${f(ro)} ${f(ro)} 0 0 1 ${pt(ro, a1)}`
+          + `L${pt(ri, a1)}A${f(ri)} ${f(ri)} 0 0 0 ${pt(ri, a0)}Z`;
+        if (k < picks) layer.ringLit.push(`<path d="${d}" fill="${litFill(k, picks, leg.reduced, leg.levered)}"/>`);
+        else layer.ringGhost.push(`<path d="${d}" fill="${OFF}"/>`);
+      }
+      if (leg.focus) {
+        const lw = Math.min(margin * 0.45, Math.max(hair, 0.035 * s));
+        const iceR = R0 + margin / 2;
+        layer.halo.push(`<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(iceR)}" fill="none" stroke="${SEL}" stroke-width="${f(2 * lw)}" stroke-opacity="0.35"/>`);
+        layer.ice.push(`<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(iceR)}" fill="none" stroke="${SEL_HOT}" stroke-width="${f(lw)}"/>`);
+      }
+      if (picks) {
+        const size = 0.44 * s;
+        layer.labels.push(`<text class="dpl-label" x="${f(cx)}" y="${f(cy + size * 0.36)}"
+          font-size="${f(size)}" text-anchor="middle"${leg.focus ? ` style="fill:${SEL_LABEL}"` : ''}>${picks}</text>`);
+      }
+      const top = D.id === 'wave' ? my - mh : my - mh - 2 * px;
+      hits.push({ x: cx - pitch / 2 + 1, y: top, width: pitch - 2, height: cy + ro + 3 * px - top, rx: 3 * px });
+    });
+
+    const paintMarkup = `<defs>${defs.join('')}</defs>
+      <g class="dpl-market">${layer.market.join('')}</g>
+      ${layer.halo.length ? `<g filter="url(#${id}-halo)">${layer.halo.join('')}</g>` : ''}
+      <g filter="url(#${id}-vfd)">${layer.marketGlow.join('')}</g>
+      ${layer.faces.join('')}
+      <g>${layer.ringGhost.join('')}</g>
+      <g>${layer.ringLit.join('')}</g>
+      ${layer.ice.length ? `<g filter="url(#${id}-glow)">${layer.ice.join('')}</g>` : ''}
+      ${layer.labels.join('')}`;
+    return { paint: paintMarkup, hits, size: s / px, ringW: ringW / px };
+  }
+
+  /* Draws into svg and keeps one hit rect per leg (column and ring) that
+     survives repaints. Hits carry data-ppl-leg (index) and data-race-id;
+     not data-leg, which the game page means as a race panel. */
+  function render(svg, model) {
+    if (!svg._dpl || svg._dpl.paint.parentNode !== svg) {
+      svg.innerHTML = '<g class="dpl-paint"></g><g class="dpl-hits"></g>';
+      svg._dpl = { paint: svg.firstChild, hits: svg.lastChild, id: `dpl${uid += 1}` };
+    }
+    const out = paint(svg, model, svg._dpl.id);
+    svg._dpl.paint.innerHTML = out ? out.paint : '';
+    const list = out ? out.hits : [];
+    const hits = svg._dpl.hits;
+    if (hits.childElementCount !== list.length) {
+      hits.innerHTML = list.map((_, i) =>
+        `<rect class="dpl-hit" data-ppl-leg="${i}" tabindex="0" role="button"/>`).join('');
+    }
+    const f = v => (+v).toFixed(2);
+    [...hits.children].forEach((el, i) => {
+      const hit = list[i];
+      const leg = model.legs[i] || {};
+      ['x', 'y', 'width', 'height', 'rx'].forEach(k => el.setAttribute(k, f(hit[k])));
+      el.setAttribute('aria-label', leg.label || `leg ${i + 1}`);
+      el.setAttribute('aria-pressed', leg.focus ? 'true' : 'false');
+      if (leg.raceId) el.setAttribute('data-race-id', leg.raceId);
+      else el.removeAttribute('data-race-id');
+    });
+    return out;
+  }
+
+  window.DockPpl = {
+    DESIGNS,
+    DESIGN_KEY,
+    design,
+    designId,
+    setDesign,
+    render,
+    litFill,
+  };
+})();
+</script>

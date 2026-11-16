@@ -42,11 +42,29 @@ log = logging.getLogger(__name__)
 # The list endpoint paginates; a window of racedays never approaches this.
 _MEET_PAGE_LIMIT = 200
 
+# A dropped or stalled connection rather than an answer from the server.
+_TRANSIENT = (httpx.TimeoutException, httpx.NetworkError, httpx.RemoteProtocolError)
+_RETRIES = 2
+
+# Races failing back to back means the site is down, not one bad connection.
+_MAX_CONSECUTIVE_FAILURES = 5
+
 
 def _get(client: httpx.Client, url: str, params: dict | None = None) -> dict | None:
     """GET one JSON document. 404 means "no such raceday/race", which is an
-    ordinary answer here (tracks race on different days), so it is not logged."""
-    r = client.get(url, params=params, headers=TR_HEADERS, timeout=TR_TIMEOUT)
+    ordinary answer here (tracks race on different days), so it is not logged.
+    Transport errors are retried, then re-raised."""
+    for attempt in range(_RETRIES + 1):
+        try:
+            r = client.get(url, params=params, headers=TR_HEADERS, timeout=TR_TIMEOUT)
+            break
+        except _TRANSIENT as exc:
+            if attempt == _RETRIES:
+                raise
+            wait = 2 ** attempt
+            log.warning("tr %s -> %r  (retry %d/%d in %ds)",
+                        url, exc, attempt + 1, _RETRIES, wait)
+            time.sleep(wait)
     if r.status_code == 404:
         return None
     if r.status_code != 200:
@@ -162,17 +180,31 @@ def comments_from_race(race: dict) -> list[dict]:
 
 def scrape_races(targets: list[tuple[str, str, int]],
                  client: httpx.Client | None = None,
-                 log_fn=None) -> Iterator[dict]:
+                 log_fn=None,
+                 failed: list | None = None) -> Iterator[dict]:
     """Yield comment rows for each (track_slug, race_date, race_number).
 
     Serial by design — see TR_REQUEST_DELAY. Races that 404 or carry no
-    comments simply contribute nothing."""
+    comments simply contribute nothing. A race whose fetch still fails after
+    retries is skipped and appended to `failed`; callers re-walk a trailing
+    window, so it is picked up next time. Only a streak of failures raises."""
     own = client is None
     if own:
         client = httpx.Client()
+    streak = 0
     try:
         for i, (slug, d, n) in enumerate(targets):
-            race = fetch_race(slug, d, n, client=client)
+            try:
+                race = fetch_race(slug, d, n, client=client)
+                streak = 0
+            except _TRANSIENT as exc:
+                streak += 1
+                if streak >= _MAX_CONSECUTIVE_FAILURES:
+                    raise
+                log.warning("tr %s-%s-%s skipped: %r", slug, d, n, exc)
+                if failed is not None:
+                    failed.append((slug, d, n))
+                race = None
             if race:
                 rows = comments_from_race(race)
                 for row in rows:

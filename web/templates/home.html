@@ -631,26 +631,26 @@
 
         const entries = tracks.map(t => {
           const headlineId = t.headline;
-          // Map each game-type id → its ATG game id so every bubble can deep-link.
-          const gameIdById = {};
-          if (headlineId && t.headlineGameId) gameIdById[headlineId] = t.headlineGameId;
-          for (const s of t.satellites) {
-            if (s.gameId) gameIdById[s.id] = s.gameId;
-          }
+          // Ids and deep links are built side by side so a second headline of
+          // the same type still links to its own game. Unposted games have no
+          // game id yet → null (not navigable).
           const satelliteIds = [];
-          if (headlineId) satelliteIds.push(headlineId);
+          const satelliteHrefs = [];
+          const add = (id, gameId) => {
+            satelliteIds.push(id);
+            satelliteHrefs.push(gameId ? `/game/${gameId}` : null);
+          };
+          if (headlineId) add(headlineId, t.headlineGameId);
+          for (const h of t.extraHeadlines || []) add(h.id, h.gameId);
           for (const id of cyanOrder) {
-            if (t.satellites.some(s => s.id === id)) {
-              satelliteIds.push(id);
-            }
+            const s = t.satellites.find(sat => sat.id === id);
+            if (s) add(id, s.gameId);
           }
           return {
             trackName: t.trackName,
             gameTypeId: headlineId || (satelliteIds[0] || 'v4'),
             satelliteIds,
-            // Per-satellite deep links, aligned to satelliteIds. Unposted
-            // games have no game id yet → null (not navigable).
-            satelliteHrefs: satelliteIds.map(id => gameIdById[id] ? `/game/${gameIdById[id]}` : null),
+            satelliteHrefs,
             sphereSize: window.HOME_SPHERE_SIZE || 87,
             // Unposted days have no game id yet → not navigable.
             headlineHref: t.headlineGameId ? `/game/${t.headlineGameId}` : null,

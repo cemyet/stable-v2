@@ -134,11 +134,17 @@ def import_window(conn, *, start: date, end: date, min_score: int = 3,
             say(f"[tr]   no meet in feed for: {sorted(unslugged)[:8]}"
                 f"{' ...' if len(unslugged) > 8 else ''}")
 
-        rows = list(tr.scrape_races(fetch, client=client, log_fn=None))
+        failed: list[tuple[str, str, int]] = []
+        rows = list(tr.scrape_races(fetch, client=client, log_fn=None,
+                                    failed=failed))
 
     say(f"[tr]   fetched {len(rows):,} comment rows")
+    if failed:
+        say(f"[tr]   ! {len(failed)} races skipped after network errors, "
+            f"retried next run: {failed[:5]}{' ...' if len(failed) > 5 else ''}")
     if not rows:
-        return {"races_targeted": len(fetch), "rows": 0, "written": 0}
+        return {"races_targeted": len(fetch), "rows": 0, "written": 0,
+                "fetch_failed": len(failed)}
 
     _stage(conn, rows)
     stats = comment_match.build_matches(conn, _STAGING)
@@ -151,6 +157,7 @@ def import_window(conn, *, start: date, end: date, min_score: int = 3,
     eligible = comment_match.eligible_count(conn, min_score)
     stats["races_targeted"] = len(fetch)
     stats["rows"] = len(rows)
+    stats["fetch_failed"] = len(failed)
     stats["eligible"] = eligible
 
     if not execute:

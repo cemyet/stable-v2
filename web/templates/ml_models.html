@@ -75,6 +75,8 @@
 
   .mc-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 22px; }
   @media (max-width: 720px) { .mc-grid { grid-template-columns: 1fr; } }
+  .mc-grid--stack { grid-template-columns: 1fr; }
+  .mc-grid--stack .cmp-table td { white-space: nowrap; }
   .mc-block h4 {
     font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
     color: var(--fg-muted); margin: 0 0 8px; font-weight: 400;
@@ -101,24 +103,289 @@
   }
   .mc-detail-link:hover { text-decoration: underline; }
 
+  .mc-tag-live { color: #5fd38d; border-color: rgba(95, 211, 141, 0.6); }
+  .mc-tag-retired { color: #e0806b; border-color: rgba(224, 128, 107, 0.6); }
+  /* Superseded race models: the scorer only reads the newest per target. */
+  .mc-card--old { opacity: 0.6; }
+
+  /* ---- race-model write-ups ---- */
+  .ml-doc { padding: 16px 20px; font-size: 12px; line-height: 1.7; color: var(--fg-muted); }
+  .ml-doc p { margin: 0 0 8px; }
+  .ml-doc p:last-child { margin-bottom: 0; }
+  .ml-doc ul { margin: 0 0 8px; padding-left: 18px; }
+  .ml-doc b { color: var(--fg); font-weight: 500; }
+  .ml-doc code { color: var(--fg); background: rgba(255,255,255,0.04); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  .ml-chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0 10px; font-size: 11px; }
+  .ml-chain span { border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; color: var(--fg-muted); }
+  .ml-chain span.on { color: var(--fg); border-color: var(--accent-glow, #6ea8fe); }
+  .ml-chain i { font-style: normal; color: var(--fg-muted); opacity: 0.6; }
+
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 14px; }
+  .cmp-table th, .cmp-table td { text-align: right; padding: 3px 6px; font-variant-numeric: tabular-nums; }
+  .cmp-table th { color: var(--fg-muted); font-weight: 400; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .cmp-table td:first-child, .cmp-table th:first-child { text-align: left; }
+  .cmp-table td { color: var(--fg-muted); }
+  .cmp-table tr.me td { color: var(--fg); }
+  .cmp-table tr.sep td { border-top: 1px solid var(--border); }
+  .cmp-table tr.muted td { opacity: 0.6; }
+
+  .coef-row { display: grid; grid-template-columns: 130px 1fr 48px; align-items: center; gap: 8px; font-size: 11px; padding: 2px 0; }
+  .coef-row .nm { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .coef-row .val { text-align: right; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+  .coef-bar { position: relative; height: 7px; }
+  .coef-bar::before { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--border); }
+  .coef-bar > span { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--accent-glow, #6ea8fe); opacity: 0.75; }
+  .coef-bar > span.neg { background: #e0806b; }
+
+  /* ---- layered sidebar ---- */
+  .ml-side-group {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fg-muted);
+    opacity: 0.7; padding: 14px 14px 4px;
+  }
+  .ml-side-group:first-child { padding-top: 0; }
+
+  /* ---- overview: the chain, layer by layer ---- */
+  .ov-layer { margin-bottom: 6px; }
+  .ov-layer-tag {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--fg-muted);
+    margin: 0 4px 6px;
+  }
+  .ov-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .ov-row.two { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 680px) { .ov-row.two { grid-template-columns: 1fr; } }
+  .ov-node { padding: 14px 16px; cursor: pointer; transition: background 0.15s; margin-bottom: 0; }
+  .ov-node:hover { background: var(--hover); }
+  .ov-node .nm { font-size: 14px; color: var(--fg); display: flex; align-items: baseline; gap: 8px; }
+  .ov-node .nm small { font-size: 10px; color: var(--fg-muted); }
+  .ov-node .q { font-size: 11px; color: var(--fg-muted); line-height: 1.55; margin: 6px 0 8px; }
+  .ov-node .st { font-size: 11px; color: var(--fg); font-variant-numeric: tabular-nums; line-height: 1.6; }
+  .ov-node .st span { color: var(--fg-muted); }
+  .ov-node.planned { opacity: 0.55; cursor: default; }
+  .ov-arrow { text-align: center; color: var(--fg-muted); opacity: 0.5; font-size: 12px; margin: 4px 0 8px; }
+  .ov-weights { padding: 14px 18px; }
+  .ov-weights .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 680px) { .ov-weights .cols { grid-template-columns: 1fr; } }
+
+  /* ---- pools ---- */
+  .roi-pos { color: #5fd38d; }
+  .roi-neg { color: var(--fg-muted); }
+  .ae-hi { color: #5fd38d; }
+  .ae-lo { color: #e0806b; }
+  .pool-switch { display: flex; gap: 6px; margin: 0 4px 6px; flex-wrap: wrap; }
+  .pool-switch button {
+    background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--fg-muted);
+    font-family: inherit; font-size: 11px; padding: 4px 10px; cursor: pointer; letter-spacing: 0.5px;
+  }
+  .pool-switch button.active { color: var(--fg); border-color: var(--accent-glow, #6ea8fe); }
+  .pool-block { padding: 14px 18px; }
+  .pool-block h4 {
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--fg-muted);
+    margin: 0 0 8px; font-weight: 400;
+  }
+  .pool-block .cmp-table { margin-bottom: 4px; }
+  .diag-note { font-size: 11px; color: var(--fg-muted); line-height: 1.6; margin: 0 0 10px; }
+
+  /* Headers that explain themselves on hover (custom tip, not the slow native one). */
+  th[data-tip], .mc-metric[data-tip] { cursor: help; }
+  th[data-tip] { text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--border); }
+  .ml-tip {
+    position: fixed; z-index: 1000; max-width: 320px; padding: 8px 11px;
+    background: #1a1d24; color: #e8eaed; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px; font-size: 11px; line-height: 1.55; letter-spacing: 0.2px;
+    pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  }
+  .ml-tip::before {
+    content: ''; position: absolute; left: 14px; top: -5px; width: 8px; height: 8px;
+    background: #1a1d24; border-left: 1px solid rgba(255,255,255,0.12);
+    border-top: 1px solid rgba(255,255,255,0.12); transform: rotate(45deg);
+  }
+  .ml-tip.above::before { top: auto; bottom: -5px; border: none;
+    border-right: 1px solid rgba(255,255,255,0.12); border-bottom: 1px solid rgba(255,255,255,0.12); }
+
+  /* ---- coupon viewer ---- */
+  .cp-controls { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; font-size: 11px; color: var(--fg-muted); }
+  .cp-controls select {
+    background: var(--hover); color: var(--fg); border: 1px solid var(--border); border-radius: 5px;
+    font-family: inherit; font-size: 11px; padding: 3px 6px; margin-left: 4px;
+  }
+  .cp-list tbody tr { cursor: pointer; }
+  .cp-list tbody tr:hover td { color: var(--fg); background: var(--hover); }
+  .cp-list tbody tr.sel td { color: var(--fg); background: var(--hover); }
+  .cp-list td, .cp-head td, .cp-head th, .cp-leg td, .cp-leg th { white-space: nowrap; }
+  .cp-head .mc-block + .mc-block { margin-top: 14px; }
+  .cp-legs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 820px) { .cp-legs { grid-template-columns: 1fr; } }
+  .cp-leg { padding: 12px 14px; margin-bottom: 0; }
+  .cp-leg h4 { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--fg); margin: 0 0 3px; font-weight: 400; }
+  .cp-leg .sub { font-size: 10px; color: var(--fg-muted); margin-bottom: 8px; line-height: 1.5; }
+  .cp-leg .cmp-table td { padding: 2px 5px; }
+  .cp-leg tr.pick td { color: var(--fg); }
+  .cp-leg tr.won td { color: #5fd38d; }
+  .cp-leg tr.scr td { opacity: 0.35; text-decoration: line-through; }
+  .cp-leg td.who { text-align: left; letter-spacing: 1px; font-size: 9px; color: var(--fg-muted); white-space: nowrap; }
+  .cp-leg td.who b { color: var(--accent-glow, #6ea8fe); font-weight: 500; }
+  .cp-leg td.nm { text-align: left; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cp-leg th:nth-child(3) { text-align: left; }
+  .cp-tag { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #5fd38d; border: 1px solid rgba(95, 211, 141, 0.5); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+
 {% endblock %}
 
 {% block content %}
   <div class="ml-page">
     <h1>models</h1>
-    <div class="ml-sub">trained models, their slice and forward-test performance</div>
+    <div class="ml-sub">every layer of the race models: what it answers, what it reads, what it's worth</div>
   </div>
 
   <div class="ml-page">
     <div class="ml-layout">
       <div class="ml-side">
-        <button data-view="xgal" class="active">xgal<span class="ml-side-count" id="cnt-xgal"></span></button>
+        <button data-view="overview" class="active">overview</button>
+        <div class="ml-side-group">foundation</div>
+        <button data-view="rating">rating<span class="ml-side-count" id="cnt-rating"></span></button>
+        <div class="ml-side-group">components</div>
+        <button data-view="xlead">xlead<span class="ml-side-count" id="cnt-xlead"></span></button>
+        <button data-view="xfront">xfront<span class="ml-side-count" id="cnt-xfront"></span></button>
+        <button data-view="xgal">xgal<span class="ml-side-count" id="cnt-xgal"></span></button>
+        <button data-view="xodds">xodds<span class="ml-side-count" id="cnt-xodds"></span></button>
+        <div class="ml-side-group">final</div>
+        <button data-view="xwin">xwin<span class="ml-side-count" id="cnt-xwin"></span></button>
+        <button data-view="xedge">xedge<span class="ml-side-count" id="cnt-xedge"></span></button>
+        <div class="ml-side-group">evaluation</div>
+        <button data-view="pools">pools</button>
+        <button data-view="agent">coupon agent<span class="ml-side-count" id="cnt-agent"></span></button>
+        <div class="ml-side-group">other</div>
         <button data-view="trainerform">trainer form<span class="ml-side-count" id="cnt-trainerform"></span></button>
         <button data-view="upcoming">upcoming<span class="ml-side-count" id="cnt-upcoming"></span></button>
         <button data-view="breeding">breeding</button>
       </div>
 
-      <div class="ml-view" id="view-xgal">
+      <div class="ml-view" id="view-overview">
+        <div class="ov-layer">
+          <div class="ov-layer-tag">1 · foundation — how strong is everyone?</div>
+          <div class="ov-row">
+            <div class="glass-panel ml-panel ov-node" data-go="rating">
+              <div class="nm">rating pass</div>
+              <div class="q">Two strengths per horse, both transitive through the opponents it has met: one from how the win pool priced every Nordic race since 2012, one from whom it beat, in every country.</div>
+              <div class="st" id="ov-rating"></div>
+            </div>
+          </div>
+        </div>
+        <div class="ov-arrow">↓</div>
+        <div class="ov-layer">
+          <div class="ov-layer-tag">2 · components — one question each</div>
+          <div class="ov-row two">
+            <div class="glass-panel ml-panel ov-node" data-go="xlead">
+              <div class="nm">xlead <small>who is in front after 150 m?</small></div>
+              <div class="q">Post, gate speed and the field around it. Reads the rating's strength against the field.</div>
+              <div class="st" id="ov-xlead"></div>
+            </div>
+            <div class="glass-panel ml-panel ov-node" data-go="xfront">
+              <div class="nm">xfront <small>who is in front at 700 m?</small></div>
+              <div class="q">The same inputs as xlead, a later moment: by 700 m the lead has changed hands in ~39% of auto races and ~31% of volt races, and that leader wins ~40%.</div>
+              <div class="st" id="ov-xfront"></div>
+            </div>
+            <div class="glass-panel ml-panel ov-node" data-go="xgal">
+              <div class="nm">xgal <small>will it break?</small></div>
+              <div class="q">Galopp risk per starter. Its out-of-fold chances are an input to xwin and xedge.</div>
+              <div class="st" id="ov-xgal"></div>
+            </div>
+            <div class="glass-panel ml-panel ov-node" data-go="xodds">
+              <div class="nm">xodds <small>what will the market think?</small></div>
+              <div class="q">The rating plus form, times, the last comment and xlead, fitted to the win pool's own shares.</div>
+              <div class="st" id="ov-xodds"></div>
+            </div>
+          </div>
+        </div>
+        <div class="ov-arrow">↓</div>
+        <div class="ov-layer">
+          <div class="ov-layer-tag">3 · final — who wins?</div>
+          <div class="ov-row two">
+            <div class="glass-panel ml-panel ov-node" data-go="xwin">
+              <div class="nm">xwin <small>before any odds exist</small></div>
+              <div class="q">Grows from the xodds share and learns where results part ways with it, from every component above.</div>
+              <div class="st" id="ov-xwin"></div>
+            </div>
+            <div class="glass-panel ml-panel ov-node" data-go="xedge">
+              <div class="nm">xedge <small>where the odds are wrong</small></div>
+              <div class="q">The same inputs, grown from the market's own prices: a tilt on the odds on the board. The probability the pools are played on.</div>
+              <div class="st" id="ov-xedge"></div>
+            </div>
+          </div>
+        </div>
+        <div class="ov-arrow">↓</div>
+        <div class="ov-layer">
+          <div class="ov-layer-tag">4 · evaluation — what is it worth?</div>
+          <div class="ov-row two">
+            <div class="glass-panel ml-panel ov-node" data-go="pools">
+              <div class="nm">pools</div>
+              <div class="q">Every win-probability layer settled against what ATG actually paid: win, place, V4 … V86, next to the market and the public.</div>
+              <div class="st" id="ov-pools"></div>
+            </div>
+            <div class="glass-panel ml-panel ov-node" data-go="agent">
+              <div class="nm">coupon agent <small>how to play it</small></div>
+              <div class="q">Picks the coupon for each game (bankers, coverage, weighted rows, copies) or passes, learned on earlier games and tested forward.</div>
+              <div class="st" id="ov-agent"></div>
+            </div>
+          </div>
+        </div>
+        <div class="ml-section-head">what xwin and xedge actually listen to</div>
+        <div class="glass-panel ml-panel ov-weights" id="ov-weights"></div>
+      </div>
+
+      <div class="ml-view" id="view-rating" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span class="on">rating pass</span><i>→</i><span>xlead</span><span>xfront</span><span>xgal</span><i>→</i><span>xodds</span><i>→</i><span>xwin</span><span>xedge</span></div>
+          <p><b>Purpose.</b> How strong every horse, driver and stable is, comparable across every horse they have met, directly or through others. Every layer above reads it: xlead uses it to weigh a horse against its field, and xodds and xwin start from it. There are two strengths, because the market's opinion and the race results are different evidence.</p>
+          <p><b>The price rating: only win-pool prices.</b> Each priced Nordic race since 2012 (SE, NO, DK, FI; five or more starters, all with odds) nudges the horse, driver and stable ratings so that together with post, tillägg and track effects they explain the closing shares. A race's surprise is split by uncertainty, so a seasoned driver (prior variance 0.03) or stable (0.02) moves far less than a horse (0.3). A horse's uncertainty grows with every day it isn't priced (×2 at age 3 or younger, ×1.5 at 4) and stops growing at 0.8. A horse never priced enters at the average newcomer's first rating.</p>
+          <p><b>The results rating: whom it beat.</b> Every race with a result since 2012, in every country stored, read as a ranking: the winner beat the whole field, second beat the rest, third the rest after that (second and third count 0.7 and 0.49 of the winner; lower places are mostly noise once a driver eases up). Galloped, disqualified and unplaced runners lose to every placed one. France is stored with full fields, so a horse raced there is placed against the Nordic horses that cross over. The scale is the same log win odds as the price rating, with its own driver and post effects and an uncertainty that grows with days off. A loss counts in full even when the comment gives an excuse (start trouble, death seat, wide, no room): discounting it was tested and fit worse.</p>
+          <p><b>What it hands on beside the two strengths:</b> form against its odds (pairwise against every rival, 120-day half-life) and the last race against its odds, margins behind the winner, km-time records against this field, galopp rate, shoes and sulky, earnings, days off, the stable's and driver's recent form, and the <b>last</b> comment's trip (death seat, wide, disturbed, start trouble, finish, strength). These don't move the rating; xodds and xwin weigh them.</p>
+          <p><b>What it doesn't read:</b></p>
+          <ul>
+            <li><b>Prices abroad.</b> The price rating only sees Nordic win pools; a horse from France reaches it through the results rating alone.</li>
+            <li><b>xLabs sectional times</b> (first 200, last 200, best 100). The horse-card ratings (Elo and sub-ratings) use them; no layer of this chain does yet.</li>
+            <li><b>Older comments</b> (only the last one is kept) and <b>pedigree</b>.</li>
+          </ul>
+          <p>The card's score is the price rating's own shares (horse + driver + stable + post, softmaxed per race) on the forward test, as a model in its own right. The results rating is scored the same way beside it, and by what it adds to the market and to the price rating.</p>
+        </div>
+        <div class="ml-section-head">diagnostics · forward test</div>
+        <div id="rating-diag"></div>
+        <div class="ml-section-head">models</div>
+        <div id="rating-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-pools" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <p><b>A rough estimate, on purpose.</b> Each layer's out-of-sample predictions (the forward test from July 2025, then every live prediction since the build) are played with fixed rules and settled against what ATG actually paid. Our own stake is added to the pool, so a hit dilutes itself. Place uses the top-2/3 chance from the win probabilities (Harville) and the board's minimum place odds. Marking games use the real stake shares and per-tier payouts; V6/V7 rows count 2–2.5 units in the top tier.</p>
+          <p><b>Read the interval, not the number.</b> One big V64 or V86 hit can carry a year. Hover any column header (halves, market, 90%, …) for what it means. The halves and the ROI without the biggest return show whether a result holds up; market and public play the same rule on the same games, so every model row has a like-for-like reference.</p>
+        </div>
+        <div class="pool-switch" id="pool-switch"></div>
+        <div id="pools-body"></div>
+        <div class="ml-section-head">coupons</div>
+        <div class="glass-panel ml-panel pool-block">
+          <p class="diag-note">Every simulated coupon of the selected model, one row per game. Pick a game and rule, then click a coupon to see every leg: what the model, the market and the public would have picked, and who won.</p>
+          <div class="cp-controls">
+            <label>game <select id="cp-game"></select></label>
+            <label>rule <select id="cp-rule"></select></label>
+            <label>show <select id="cp-show">
+              <option value="all">all coupons</option>
+              <option value="paid">paid something</option>
+              <option value="all_right">every leg right</option>
+              <option value="one_short">one leg short</option>
+            </select></label>
+            <label>sort <select id="cp-sort">
+              <option value="profit">biggest profit</option>
+              <option value="return">biggest return</option>
+              <option value="multiple">return ÷ cost</option>
+              <option value="public">most ahead of the public</option>
+              <option value="newest">newest</option>
+            </select></label>
+          </div>
+          <div id="coupon-list"></div>
+        </div>
+        <div id="coupon-detail"></div>
+      </div>
+
+      <div class="ml-view" id="view-xgal" hidden>
         <div class="ml-sub" style="text-align:left;margin:0 4px 4px">expected galopp — probability a starter breaks (gallops/DQ).</div>
         <div class="ml-section-head">general</div>
         <div id="xgal-general"></div>
@@ -126,13 +393,94 @@
         <div id="xgal-track"></div>
       </div>
 
+      <div class="ml-view" id="view-xodds" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span>rating pass</span><i>→</i><span>xlead</span><span>xfront</span><span>xgal</span><i>→</i><span class="on">xodds</span><i>→</i><span>xwin</span><span>xedge</span></div>
+          <p><b>Purpose: what the market will think.</b> The win odds a starter should carry, given everything public before the race, shown in the race list as <code>payout ÷ share</code>. It is fitted to the win pool's shares, not to results, so by design it copies the market, habits and over-reactions included. It isn't built to beat the market; its job is to give xwin a market baseline before any odds exist, so xwin can spend its effort on where results disagree.</p>
+          <p><b>How.</b> It starts from the rating pass (see the rating tab) and adds everything the pass hands on: form against the odds, the last race against its odds, km-time records against this field, margins, galopp rate, the last comment's trip, shoes and sulky, days off, the stable's and driver's form, and the starter's <b>xlead</b> share. A multinomial logit plus residual trees is fitted to the market's shares in Swedish races.</p>
+          <p><b>Opponent comparisons</b> live in the rating pass, and they are made of prices: A priced over C and C over B puts A over B without the two ever meeting. Results against opponents only come in as form against the odds, pairwise against every rival in the race relative to their prices. The card's input groups show how much each part moves the fit.</p>
+          <p><b>Gap closed</b> is how far xodds gets from equal chances toward the market's own prices, tested forward on races the models never saw.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="xodds-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-xlead" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span>rating pass</span><i>→</i><span class="on">xlead</span><span>xfront</span><span>xgal</span><i>→</i><span>xodds</span><i>→</i><span>xwin</span><span>xedge</span></div>
+          <p><b>Purpose: who wins the start.</b> The chance a starter is <b>in front after the first 100–150 m</b>. There is one model per start method (auto, volt), on Swedish tracks only, with the track as an input. A horse leading early wins ~27% of races. The lead changes hands by 700 m in ~39% of auto races (~31% of volt races), and an early leader that gives it up wins only ~6%. Its partner <b>xfront</b> asks who is in front once that has settled, at 700 m.</p>
+          <p><b>Label.</b> It comes from the race comment's opening (<code>Ledn</code>, <code>Tog ledn</code>, <code>Släppte ledn e 400</code>). A race only teaches when exactly one starter reads as the early leader and at least 80% of the field has a comment, so a missing comment can't hide the real leader.</p>
+          <p><b>Inputs, all as of race morning:</b></p>
+          <ul>
+            <li>how often each post leads, overall and on this track</li>
+            <li>the horse's and the driver's lead rate against what their posts promised</li>
+            <li>early position, fast starts and start trouble from past comments</li>
+            <li>a driver change, and the early speed of everyone inside and outside it</li>
+            <li>how strongly the rating pass prices the horse and its driver against this field (the best horse and the top driver often get to choose)</li>
+          </ul>
+          <p>Shares are normalised so the field sums to 100%. The comparison is against the post baseline: how often that post leads on that track. Faded cards are earlier versions tested from January 2025; for a like-for-like comparison, use the live card's <b>first version</b> row, which ran on the same races.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="xlead-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-xwin" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span>rating pass</span><i>→</i><span>xlead</span><span>xfront</span><span>xgal</span><i>→</i><span>xodds</span><i>→</i><span class="on">xwin</span><span>xedge</span></div>
+          <p><b>Purpose: who wins, before any odds exist.</b> xodds learns what the market will think; xwin starts from the xodds share and learns where results part ways with it. Its inputs are where xodds and the results rating put the horse in its field, xlead, xfront, xgal, the race shape (post, tillägg, distance), and every feature of the rating pass again.</p>
+          <p><b>Trained race by race.</b> The trees (LightGBM) are grown on the winner's likelihood within its race, so the field's chances sum to one while it learns, instead of a yes/no per runner normalised afterwards. They start from the log xodds share, so every tree is a correction to it.</p>
+          <p><b>The inputs aren't weighted equally, or by design.</b> The card's input groups show how much winner log-loss each part adds when it's shuffled. The xodds starting point itself is never shuffled, so the groups split what the trees add on top of it; the earlier classifier had to relearn xodds and gave everything to it.</p>
+          <p><b>Stacking is only honest out of fold.</b> Every xodds, xlead, xfront or xgal value xwin trained on came from a model that never saw that race: four time blocks from 2021 to mid-2025, each predicted by models fitted on the others. The forward test runs the whole chain on models fitted before it. Scoring an upcoming race is out of sample by nature.</p>
+          <p>The yardstick is <b>winner log-loss</b>: uniform, xodds and the market's own prices against what happened. Gap closed is how far from uniform toward the market xwin gets, without ever seeing a price for the race itself.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="xwin-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-xfront" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span>rating pass</span><i>→</i><span>xlead</span><span class="on">xfront</span><span>xgal</span><i>→</i><span>xodds</span><i>→</i><span>xwin</span><span>xedge</span></div>
+          <p><b>Purpose: who is in front once the start has settled.</b> The chance a starter is <b>in front at 700 m</b>. By then the lead has changed hands in ~39% of auto races and ~31% of volt races, and the 700 m leader wins ~41% / ~39% of the time. Like xlead there is one model per start method, on Swedish tracks, with the same inputs; only the label differs.</p>
+          <p><b>Label.</b> The race comment read as a timeline: each clause with a distance (<code>ledn e 400</code>, <code>1450 kv</code>, <code>varvet kv</code>) is placed in the race, an undated first clause opens it. The starter in front at 700 m is the one whose last takeover before 700 m still holds. Two claims resolve to the later takeover; a race teaches only when that leaves exactly one leader and at least 80% of the field has a comment.</p>
+          <p><b>What it adds.</b> Its out-of-fold shares feed xwin and xedge. In front of the market it carried about twice what xlead does.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="xfront-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-xedge" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <div class="ml-chain"><span>rating pass</span><i>→</i><span>xlead</span><span>xfront</span><span>xgal</span><i>→</i><span>xodds</span><i>→</i><span>xwin</span><span class="on">xedge</span></div>
+          <p><b>Purpose: where the odds are wrong.</b> The same inputs and the same race-by-race trees as xwin, but they start from the <b>market's own shares</b> (the closing win odds). All they can learn is a correction: the market's favourite–longshot bias, and where form, trip, gallop risk and the lead signals say the public has a horse wrong. It is the probability the pools tab's xedge rows and the coupon agent play.</p>
+          <p><b>A tilt, not a price.</b> The trees never see the race's own odds, so a starter's correction is fixed before any money is in: it's computed nightly with the other models and multiplied into whatever odds are on the board, then renormalised over the field. It learned on closing odds; earlier odds are thinner, so it's best read close to the start.</p>
+          <p><b>Evidence.</b> The card's per-block table: every out-of-fold block from 2021 to mid-2025 and the forward test from July 2025, against the market on the same races. The <b>recalibrated market</b> row is the market alone with its bias removed (its log shares times one fitted power); the gap between it and xedge is what the inputs add beyond the bias.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="xedge-general"></div>
+      </div>
+
+      <div class="ml-view" id="view-agent" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <p><b>Purpose: how to play a marking game.</b> For every V4 … V86 game the agent sees a menu of coupons built from xedge's chances: 0–3 bankers by four rules, five coverages, flat rows or weighted rows (weight ∝ chance, or ∝ chance² ÷ the public's share, whole or half units), the top pool where there is one, each played ×1 to ×10. It plays the coupon it scores highest, or passes.</p>
+          <p><b>What it looks at.</b> Before the race, each coupon's expected return under xedge's chances and under the market's alone (the public's winning rows estimated from its stake shares), its cost against the bankroll, its chance of paying anything, its shape and the game type. The score is linear in those; its weights are the policy.</p>
+          <p><b>Two policies.</b> Days before a game the win pools are empty, so there are no odds for xedge to correct. Until every leg's win pool holds money the agent plays a <b>preliminary</b> policy on xwin's chances against xodds (the forecast of the odds); after that the <b>live</b> one on xedge against the odds. Each is fitted on its own inputs: without the market the forecasts expect several times what their coupons return, and the live policy fed them overbets.</p>
+          <p><b>How it learned.</b> The cross-entropy method on the games before the test period: the weights that grow a 10,000 kr bankroll fastest (log growth), with each policy's three luckiest games left out so it can't be chosen for jackpots it happened to catch. Then frozen and played forward over every later game on out-of-sample chances, settled against what ATG paid with our stake diluting the pool. Read the interval and the result without the biggest win, not the headline. The backtest knows each leg's closing odds and the pool's final stake shares; on the day, later legs' odds are still forming when the game closes, so expect less.</p>
+          <p>The game page's red <b>agent</b> sphere loads the coupon it would play on that game into the builder, as a starting point. It is never handed in; picks still where the agent put them show red.</p>
+        </div>
+        <div class="ml-section-head">models</div>
+        <div id="agent-general"></div>
+      </div>
+
       <div class="ml-view" id="view-trainerform" hidden>
+        <div class="glass-panel ml-panel ml-doc">
+          <p><b>Retired: the trainer-form models leak.</b> Their table (<code>trainer_form_exp</code>) gives away the result twice. Its last-N windows count the trainer's other starts of the same day, including later races and stablemates in the very race. And starters without a result (disqualified, unplaced) have no row at all, so a missing value tells the model the horse failed. That's why they looked strong. With both leaks removed the trainer's form adds nothing to xwin, so none of the chain reads it. The cards stay for the record.</p>
+        </div>
         <div class="ml-sub" style="text-align:left;margin:0 4px 4px">two complementary trainer/driver signals: <b>form</b> (finishing-percentile family — actual recent performance, predicts winning, powers the <code>form</code> column) and <b>mkt±</b> (odds-rank outperformance — a market-edge/value signal that anti-correlates with winning, powers the <code>mkt±</code> column).</div>
         <div id="trainerform-general"></div>
       </div>
 
       <div class="ml-view" id="view-upcoming" hidden>
-        <div class="ml-sub" style="text-align:left;margin:0 4px 4px">race-outcome models (winner / placement) built on the x-features above.</div>
+        <div class="ml-sub" style="text-align:left;margin:0 4px 4px">other race-outcome models (winner / placement) on entry features.</div>
         <div id="upcoming-general"></div>
       </div>
 
@@ -172,33 +520,145 @@
       }).join('');
     }
 
+    // Hover text for column headers and tiles, by their label.
+    const TIP = {
+      // pools
+      'rule': 'How the horses are picked. Cover X%: in each leg, horses in order of chance until their chances add up to X%. Banker + cover 80%: a single horse in one leg, 80% elsewhere. The banker leg is the one where the favourite is most underbet by the public (its chance ÷ its share of the pool\'s rows), among favourites with at least 35%; it is not simply the biggest chance or the biggest margin to the second. "· V6" / "· V7": the same coupon played top tier only (a V6 row counts 2.5 units in V64, 2 in V65). Win / place rows starting "market ·" use the closing odds instead of the model.',
+      'bets': 'Single bets placed over the period.',
+      'rows': 'Rows per coupon. Cost = rows × row price (V4 2 kr; V5, V64, V65, GS75 1 kr; V75, V85 0.50 kr, V75 0.60 kr from 28 Nov 2026; V86 0.25 kr).',
+      'hit': 'Win / place: share of bets that paid. Marking games: share of games with every leg right.',
+      'roi': 'Return on investment: (return − cost) ÷ cost. +20% means 120 kr back for every 100 kr staked.',
+      '90%': '90% bootstrap interval of the ROI, resampling whole races or games. If it spans zero, the result may be luck.',
+      'halves': 'ROI in the first half of the period / in the second half. A real edge should show up in both.',
+      'w/o top': 'ROI with the single biggest return taken out: how much one lucky hit carries the result.',
+      'market': 'Same rule, same games, with the horses picked by the closing win odds instead of the model.',
+      'public': 'Same rule, same games, with the horses picked by the public\'s stake shares (streck).',
+      // forward-test tables and tiles
+      'winner ll': 'Winner log-loss: the average of −log(chance given to the horse that won). Lower is better; the market\'s own prices are the bar to reach.',
+      'winner log loss': 'Winner log-loss: the average of −log(chance given to the horse that won). Lower is better.',
+      'log loss': 'Leader log-loss: the average of −log(chance given to the horse that actually led). Lower is better.',
+      'leader log loss': 'Leader log-loss: the average of −log(chance given to the horse that actually led). Lower is better.',
+      'top-1': 'How often the horse this layer rates highest actually won (led, for xlead).',
+      'p(winner)': 'Average chance given to the horse that won.',
+      'p(leader)': 'Average chance given to the horse that led.',
+      'corr mkt': 'Correlation of this layer\'s log-chances with the market\'s, runner by runner.',
+      'corr log-odds': 'Correlation of xodds\' log-chances with the market\'s, runner by runner.',
+      'same fav': 'Share of races where this layer\'s favourite is also the market\'s.',
+      'same favourite': 'Share of races where this layer\'s favourite is also the market\'s.',
+      'x-ent': 'Cross-entropy against the market\'s shares: how far this layer\'s prices are from the market\'s. Lower is closer.',
+      'gap': 'How far this layer gets from equal chances (0%) to the market\'s prices (100%).',
+      'gap closed': 'How far this layer gets from equal chances (0%) toward the market (100%) on the forward test. xodds measures it against the market\'s prices; rating and xwin against winner log-loss.',
+      'to market': 'Like gap closed, but measured against the market\'s prices (cross-entropy) instead of the winners.',
+      'xodds': 'xodds\' winner log-loss on the same races.',
+      'posts only': 'Leader log-loss when only the post\'s lead rate on this track is known.',
+      'first version': 'Leader log-loss of the first xlead version\'s inputs, on the same races.',
+      // calibration and diagnostics
+      'decile': 'Runners grouped into ten equal-sized bins by predicted chance, lowest first.',
+      'pred': 'Average predicted chance in the bin.',
+      'actual': 'How often runners in the bin actually won (or led).',
+      'runners': 'Runners in this group on the forward test.',
+      'wins': 'Winners among them.',
+      'a/e market': 'Actual wins ÷ the wins the closing odds expected for this group. Above 1: the market underrates the group.',
+      'a/e rating': 'Actual wins ÷ the wins the price rating\'s own shares expected. Above 1: the rating underrates the group.',
+      'a/e results': 'Actual wins ÷ the wins the results rating\'s own shares expected. Above 1: it underrates the group.',
+      'base': 'What the results rating is added to: the closing odds, the price rating\'s shares, or xodds.',
+      'alone': 'Winner log-loss of the base alone, rescaled by one fitted weight (fitted on 2021 – mid-2025, tested from July 2025).',
+      'with results': 'Winner log-loss with the results rating added as a second input, fitted and tested the same way. Lower is better.',
+      'gain': 'How much lower the winner log-loss gets with the results rating. Positive: it knows something the base doesn\'t.',
+      'a/e xodds': 'Actual wins ÷ the wins xodds expected. Above 1: xodds underrates the group.',
+      'a/e xwin': 'Actual wins ÷ the wins xwin expected. Above 1: xwin underrates the group.',
+      'a/e xedge': 'Actual wins ÷ the wins xedge expected. Above 1: xedge underrates the group.',
+      'vs market': 'Winner log-loss of the closing odds minus xedge\'s, on the forward test. Positive: xedge finds where the market is wrong.',
+      'recalibrated': 'The closing odds alone with their favourite–longshot bias removed (log shares times one fitted power). What a pure bias fix gets.',
+      'front log loss': 'The average of −log(chance given to the horse in front at 700 m). Lower is better.',
+      'p(in front)': 'Average chance given to the horse that was in front at 700 m.',
+      // coupon agent
+      'test roi': 'Return on the coupons the frozen policy played on games after it was trained: (return − cost) ÷ cost.',
+      'played': 'Games it played out of all games it saw. It passes when no coupon scores above zero.',
+      'profit': 'Return − cost over the test, from a 10,000 kr bankroll.',
+      'max drawdown': 'The deepest fall of the bankroll from a high point during the test.',
+      'log growth': 'Sum of log(bankroll after ÷ before) over the games: what the policy maximised (with its three luckiest games left out when it learned).',
+      'games': 'Marking games in the period.',
+      'cost': 'What its coupons cost in total.',
+      'return': 'What its coupons paid in total, with its own rows added to the pool.',
+      'rating sd': 'Average uncertainty (standard deviation) of the horse\'s rating on race day.',
+      'starts': 'Median number of earlier starts, in every country.',
+      'priced': 'Median number of priced Nordic races the rating pass has seen for the horse.',
+      'prices seen': 'How many priced races the rating pass had seen for the horse before this one.',
+      'earlier starts': 'Where the horse\'s earlier starts were run. Abroad = outside SE / NO / DK / FI.',
+      'strength · last race': 'The rating\'s rank in this field, then how the last race went against the horse\'s own odds (pairwise against every rival), in fifths.',
+    };
+    const attr = s => esc(s).replace(/"/g, '&quot;');
+    const tipAttr = (label, tip) => ((tip || TIP[label]) ? ` data-tip="${attr(tip || TIP[label])}"` : '');
+    const th = (label, tip) => `<th${tipAttr(label, tip)}>${label}</th>`;
+
+    // Instant, readable tooltips for any [data-tip] (headers, tiles).
+    (function () {
+      const tip = document.createElement('div');
+      tip.className = 'ml-tip'; tip.hidden = true; tip.setAttribute('role', 'tooltip');
+      document.body.appendChild(tip);
+      let on = null;
+      const hide = () => { tip.hidden = true; tip.classList.remove('above'); on = null; };
+      const place = (el) => {
+        const r = el.getBoundingClientRect(), pad = 10;
+        tip.hidden = false;
+        let top = r.bottom + 8, left = Math.min(Math.max(8, r.left), window.innerWidth - tip.offsetWidth - 8);
+        if (top + tip.offsetHeight > window.innerHeight - pad) {
+          top = r.top - tip.offsetHeight - 8; tip.classList.add('above');
+        } else tip.classList.remove('above');
+        tip.style.top = Math.max(pad, top) + 'px'; tip.style.left = left + 'px';
+      };
+      document.addEventListener('pointerover', e => {
+        const el = e.target.closest('[data-tip]');
+        if (!el || el === on) return;
+        on = el; tip.textContent = el.getAttribute('data-tip'); place(el);
+      });
+      document.addEventListener('pointerout', e => {
+        if (on && !on.contains(e.relatedTarget)) hide();
+      });
+      document.addEventListener('scroll', () => { if (on) place(on); }, true);
+    })();
+
     function calTable(cal) {
       if (!cal || !cal.length) return '';
       const rows = cal.map(c =>
         `<tr><td>${c.decile}</td><td>${fmtPct(c.pred)}</td><td>${fmtPct(c.actual)}</td><td>${c.n.toLocaleString()}</td></tr>`
       ).join('');
-      return `<table class="cal-table"><thead><tr><th>decile</th><th>pred</th><th>actual</th><th>n</th></tr></thead><tbody>${rows}</tbody></table>`;
+      return `<table class="cal-table"><thead><tr>${['decile', 'pred', 'actual', 'n'].map(l => th(l)).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function metric(k, v) {
-      return `<div class="mc-metric"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+      return `<div class="mc-metric"${tipAttr(k)}><div class="v">${v}</div><div class="k">${k}</div></div>`;
     }
 
-    const VIEWS = ['xgal', 'trainerform', 'upcoming', 'breeding'];
+    const VIEWS = ['overview', 'rating', 'xgal', 'xodds', 'xlead', 'xfront', 'xwin', 'xedge', 'pools', 'agent',
+                   'trainerform', 'upcoming', 'breeding'];
+    const RACE_TARGETS = { rating: 'rating', y_lead: 'xlead', y_front: 'xfront', xodds: 'xodds', xwin: 'xwin', xedge: 'xedge' };
+    const LEAD_TARGETS = ['y_lead', 'y_front'];
 
     // Which tab a model belongs to, inferred from its target / slice.
     function categoryOf(m) {
       const t = (m.target || '');
       const src = m.slice_def?.source_table || '';
-      if (t.startsWith('y_gal')) return 'xgal';
+      if (t === 'xgal' || t.startsWith('y_gal')) return 'xgal';
+      if (t === 'coupon_agent') return 'agent';
+      if (RACE_TARGETS[t]) return RACE_TARGETS[t];
       if (src === 'trainer_form_exp' || t === 'y_beat_exp' || t === 'y_outperf'
           || t.includes('outperf') || t.includes('beat')) return 'trainerform';
       return 'upcoming';
     }
 
-    // A model's headline score: AUC for classifiers, R²/ρ for regressors.
+    // A model's headline score: top-1 for xlead / xfront, share of the
+    // uniform → market gap for xodds / xwin, log-loss on the market for
+    // xedge, test ROI for the agent, AUC for classifiers, R²/ρ for regressors.
     function headline(m) {
       const test = m.metrics?.test || {};
+      if (LEAD_TARGETS.includes(m.target) && test.race?.model) return { val: (test.race.model.top1 * 100).toFixed(1), label: '% top-1' };
+      if (['rating', 'xodds', 'xwin'].includes(m.target) && test.gap_closed != null) {
+        return { val: (test.gap_closed * 100).toFixed(1), label: '% of mkt' };
+      }
+      if (m.target === 'xedge' && test.gain != null) return { val: (test.gain > 0 ? '+' : '') + test.gain.toFixed(4), label: 'vs mkt' };
+      if (m.target === 'coupon_agent' && test.roi != null) return { val: (test.roi > 0 ? '+' : '') + (test.roi * 100).toFixed(1), label: '% roi' };
       if (test.roc_auc != null) return { val: (+test.roc_auc).toFixed(3), label: 'auc' };
       if (m.metrics?.score != null) {
         const reg = m.slice_def?.kind === 'reg'
@@ -208,12 +668,202 @@
       return { val: '—', label: '' };
     }
 
+    const n3 = v => (v == null ? '—' : (+v).toFixed(3));
+
+    // rows: [{ name, r, me, sep }], cols: [{ k, label, fmt }]
+    function cmpTable(cols, rows) {
+      const head = `<tr><th></th>${cols.map(c => th(c.label)).join('')}</tr>`;
+      const body = rows.filter(x => x.r).map(x =>
+        `<tr class="${x.me ? 'me' : ''}${x.sep ? ' sep' : ''}"><td>${esc(x.name)}</td>`
+        + cols.map(c => `<td>${c.fmt(x.r[c.k])}</td>`).join('') + '</tr>').join('');
+      return `<table class="cmp-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    }
+
+    function coefList(coefs) {
+      if (!coefs || !coefs.length) return '';
+      const top = coefs.slice(0, 12);
+      const max = Math.max(...top.map(d => Math.abs(d.coef)), 1e-9);
+      return top.map(d => {
+        const w = Math.abs(d.coef) / max * 50;
+        const side = d.coef >= 0 ? 'left:50%' : 'right:50%';
+        return `<div class="coef-row"><span class="nm">${esc(d.feature)}</span>`
+             + `<span class="coef-bar"><span class="${d.coef < 0 ? 'neg' : ''}" style="${side};width:${w.toFixed(1)}%"></span></span>`
+             + `<span class="val">${d.coef >= 0 ? '+' : ''}${d.coef.toFixed(3)}</span></div>`;
+      }).join('');
+    }
+
+    const sgn = v => (v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`);
+    const roi = v => (v == null ? '—' : `<span class="${v > 0 ? 'roi-pos' : 'roi-neg'}">${sgn(v)}</span>`);
+    const ae = v => (v == null ? '—'
+      : `<span class="${v > 1.1 ? 'ae-hi' : v < 0.9 ? 'ae-lo' : ''}">${(+v).toFixed(2)}</span>`);
+
+    // Each input group's share of what shuffling it costs the model.
+    function groupList(groups) {
+      if (!groups || !groups.length) return '';
+      const g = [...groups].sort((a, b) => b.importance - a.importance);
+      const max = Math.max(...g.map(d => d.share), 1e-9);
+      return g.map(d => `<div class="imp-row" title="${esc((d.inputs || []).join(', '))}">`
+        + `<span class="nm">${esc(d.group)}</span>`
+        + `<span class="imp-bar bar-track"><span class="bar-fill" style="width:${(d.share / max * 100).toFixed(0)}%"></span></span>`
+        + `<span class="val">${(d.share * 100).toFixed(1)}%</span></div>`).join('');
+    }
+
+    // A handful of pool rules for a card; the pools tab has all of them.
+    const POOL_KEYS = [['win', 'favourite ≠ market favourite'], ['win', 'p × odds > 1.2'],
+                       ['place', 'top-k chance × place odds > 1'], ['V4', 'cover 70%'],
+                       ['V5', 'cover 70%'], ['V64', 'cover 70%'], ['V64', 'cover 70% · V6']];
+    function poolsSummary(m) {
+      const p = m.metrics?.pools;
+      if (!p) return '';
+      const rows = POOL_KEYS.map(([k, rule]) => {
+        const r = (p[k]?.model || []).find(x => x.rule === rule);
+        if (!r) return '';
+        const ref = (p[k]?.market || []).find(x => x.rule === rule);
+        return `<tr><td>${esc(k)} · ${esc(rule)}</td><td>${roi(r.roi)}</td>`
+          + `<td>${sgn(r.lo)} … ${sgn(r.hi)}</td><td>${ref ? roi(ref.roi) : '—'}</td></tr>`;
+      }).join('');
+      return `<h4>pools · ${esc(p.from)} … ${esc(p.to)}</h4><table class="cmp-table"><thead><tr>`
+        + ['rule', 'roi', '90%', 'market'].map(l => th(l)).join('') + `</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    // Tiles, left / right blocks and slice line for rating / xlead / xfront / xodds / xwin / xedge.
+    function raceParts(m) {
+      const t = m.metrics?.test || {};
+      const sl = m.slice_def || {};
+      const imps = `<h4>${m.metrics?.importance_kind === 'gain' ? 'inputs by share of the trees\' split gain' : 'feature importance (permutation)'}</h4>`
+        + importanceList(m.metrics?.importances);
+      let tiles, left, right;
+      if (m.target === 'rating') {
+        const r = t.rating || {}, mk = t.market || {};
+        tiles = [
+          metric('gap closed', fmtPct(t.gap_closed)),
+          metric('to market', fmtPct(t.market_gap_closed)),
+          metric('winner log loss', n3(r.winner_logloss)),
+          metric('market', n3(mk.winner_logloss)),
+          metric('top-1', fmtPct(r.top1)),
+          metric('same favourite', fmtPct(r.same_favourite)),
+        ];
+        const adds = t.results_adds || [];
+        left = `<h4>calibration (test, by chance decile)</h4>${calTable(t.calibration)}`
+          + (adds.length ? `<h4>what the results rating adds (winner log loss, forward test)</h4>`
+            + `<table class="cmp-table"><thead><tr>${['base', 'alone', 'with results', 'gain'].map(l => th(l)).join('')}</tr></thead><tbody>`
+            + adds.map(a => `<tr><td>${esc(a.base)}</td><td>${n3(a.alone)}</td><td>${n3(a.with_results)}</td>`
+              + `<td><span class="${a.gain > 0 ? 'roi-pos' : 'roi-neg'}">${a.gain > 0 ? '+' : ''}${a.gain.toFixed(4)}</span></td></tr>`).join('')
+            + '</tbody></table>' : '');
+        right = `<h4>forward test · ${(r.races ?? 0).toLocaleString()} races</h4>` + cmpTable(
+          [{ k: 'winner_logloss', label: 'winner ll', fmt: n3 }, { k: 'top1', label: 'top-1', fmt: fmtPct },
+           { k: 'corr_log_odds', label: 'corr mkt', fmt: n3 }, { k: 'same_favourite', label: 'same fav', fmt: fmtPct }],
+          [{ name: 'market', r: mk }, { name: 'xedge', r: t.xedge }, { name: 'xwin', r: t.xwin }, { name: 'xodds', r: t.xodds },
+           { name: 'price rating', r, me: true }, { name: 'results rating', r: t.results },
+           { name: 'uniform', r: t.uniform }]);
+      } else if (LEAD_TARGETS.includes(m.target)) {
+        const r = t.race || {}, front = m.target === 'y_front';
+        tiles = [
+          metric(front ? 'front log loss' : 'leader log loss', n3(r.model?.logloss)),
+          metric('top-1', fmtPct(r.model?.top1)),
+          metric(front ? 'p(in front)' : 'p(leader)', fmtPct(r.model?.p_leader)),
+          metric('posts only', n3(r.post_baseline?.logloss)),
+          ...(r.first_version ? [metric('first version', n3(r.first_version.logloss))] : []),
+          metric('roc auc', t.roc_auc ?? '—'),
+        ];
+        left = imps;
+        right = `<h4>forward test · ${(r.model?.races ?? 0).toLocaleString()} races</h4>` + cmpTable(
+          [{ k: 'logloss', label: 'log loss', fmt: n3 }, { k: 'top1', label: 'top-1', fmt: fmtPct },
+           { k: 'p_leader', label: front ? 'p(in front)' : 'p(leader)', fmt: fmtPct }],
+          [{ name: 'this model', r: r.model, me: true }, { name: 'first version', r: r.first_version },
+           { name: 'posts on this track', r: r.post_baseline }, { name: 'uniform', r: r.uniform }]);
+      } else if (m.target === 'xedge') {
+        const e = t.xedge || {}, mk = t.market || {}, mr = t.market_recal || {};
+        const signed = v => (v == null ? '—' : `<span class="${v > 0 ? 'roi-pos' : 'roi-neg'}">${v > 0 ? '+' : ''}${(+v).toFixed(4)}</span>`);
+        tiles = [
+          metric('vs market', signed(t.gain)),
+          metric('winner log loss', n3(e.winner_logloss)),
+          metric('market', n3(mk.winner_logloss)),
+          metric('recalibrated', n3(mr.winner_logloss)),
+          metric('top-1', fmtPct(e.top1)),
+          metric('p(winner)', fmtPct(e.p_winner)),
+        ];
+        left = (m.metrics?.groups ? `<h4>input groups (log-loss added when shuffled)</h4>${groupList(m.metrics.groups)}`
+                + '<div style="height:14px"></div>' : '') + imps;
+        const blocks = t.blocks || [];
+        right = `<h4>forward test · ${(e.races ?? 0).toLocaleString()} races</h4>` + cmpTable(
+          [{ k: 'winner_logloss', label: 'winner ll', fmt: n3 }, { k: 'top1', label: 'top-1', fmt: fmtPct },
+           { k: 'p_winner', label: 'p(winner)', fmt: fmtPct }, { k: 'corr_log_odds', label: 'corr mkt', fmt: n3 }],
+          [{ name: 'market', r: mk }, { name: `market, recalibrated (power ${mr.power ?? '—'})`, r: t.market_recal },
+           { name: 'xedge', r: e, me: true }, { name: 'xwin', r: t.xwin }, { name: 'uniform', r: t.uniform }])
+          + (blocks.length ? `<h4>every block against the market (winner log loss)</h4><table class="cmp-table"><thead><tr>`
+            + th('period', 'Out-of-fold blocks are predicted by trees fitted on the other blocks; the forward test by trees fitted on everything before it.')
+            + th('races') + th('market', 'The closing win odds\' winner log-loss on these races.')
+            + th('xedge', 'xedge\'s winner log-loss on the same races.')
+            + th('gain', 'Market minus xedge. Positive in every row: the correction holds in every period, not just one.')
+            + '</tr></thead><tbody>'
+            + blocks.map(b => `<tr class="${b.forward ? 'me' : ''}"><td>${esc(b.from.slice(0, 7))} … ${esc(b.to.slice(0, 7))}${b.forward ? ' · forward' : ''}</td>`
+              + `<td>${b.races.toLocaleString()}</td><td>${n3(b.market)}</td><td>${n3(b.xedge)}</td><td>${signed(b.gain)}</td></tr>`).join('')
+            + '</tbody></table>' : '')
+          + `<h4>calibration (test, by chance decile)</h4>${calTable(t.calibration)}`;
+      } else if (m.target === 'xodds') {
+        const x = t.xodds || {}, mk = t.market || {}, ab = t.ablation || {};
+        tiles = [
+          metric('gap closed', fmtPct(t.gap_closed)),
+          metric('corr log-odds', n3(x.corr_log_odds)),
+          metric('same favourite', fmtPct(x.same_favourite)),
+          metric('winner log loss', n3(x.winner_logloss)),
+          metric('market', n3(mk.winner_logloss)),
+          metric('top-1', fmtPct(x.top1)),
+        ];
+        left = (m.metrics?.groups ? `<h4>input groups (fit to the market lost when shuffled)</h4>${groupList(m.metrics.groups)}`
+                + '<div style="height:14px"></div>' : '')
+          + `<h4>logit coefficients (standardised)</h4>${coefList(m.metrics?.coefficients)}`;
+        right = `<h4>forward test · ${(x.races ?? 0).toLocaleString()} races</h4>` + cmpTable(
+          [{ k: 'cross_entropy_vs_market', label: 'x-ent', fmt: n3 }, { k: 'gap_closed', label: 'gap', fmt: fmtPct },
+           { k: 'winner_logloss', label: 'winner ll', fmt: n3 }, { k: 'same_favourite', label: 'same fav', fmt: fmtPct }],
+          [{ name: 'market', r: { ...mk, gap_closed: 1 } },
+           { name: 'xodds', r: { ...x, gap_closed: t.gap_closed }, me: true },
+           { name: 'logit, no trees', r: t.logit_only }, { name: 'ratings only', r: t.stage1 },
+           { name: 'uniform', r: t.uniform && { ...t.uniform, gap_closed: 0 } },
+           { name: 'first version inputs', r: ab.first_version, sep: true },
+           { name: 'without xlead', r: ab.no_xlead }]);
+      } else {
+        const w = t.xwin || {}, x = t.xodds || {}, mk = t.market || {};
+        tiles = [
+          metric('gap closed', fmtPct(t.gap_closed)),
+          metric('winner log loss', n3(w.winner_logloss)),
+          metric('xodds', n3(x.winner_logloss)),
+          metric('market', n3(mk.winner_logloss)),
+          metric('top-1', fmtPct(w.top1)),
+          metric('p(winner)', fmtPct(w.p_winner)),
+        ];
+        left = (m.metrics?.groups ? `<h4>input groups (log-loss added when shuffled)</h4>${groupList(m.metrics.groups)}`
+                + '<div style="height:14px"></div>' : '') + imps;
+        right = `<h4>forward test · ${(w.races ?? 0).toLocaleString()} races</h4>` + cmpTable(
+          [{ k: 'winner_logloss', label: 'winner ll', fmt: n3 }, { k: 'top1', label: 'top-1', fmt: fmtPct },
+           { k: 'p_winner', label: 'p(winner)', fmt: fmtPct }, { k: 'corr_log_odds', label: 'corr mkt', fmt: n3 }],
+          [{ name: 'market', r: mk }, { name: 'xwin', r: w, me: true }, { name: 'xodds', r: x },
+           { name: 'uniform', r: t.uniform }, { name: 'per-runner classifier', r: t.classifier, sep: true }])
+          + `<h4>calibration (test, by chance decile)</h4>${calTable(t.calibration)}`;
+      }
+      if (m.metrics?.pools) right += poolsSummary(m);
+      const st = sl.stack;
+      const slice = `${sl.n_features ?? '?'} features · train <code>${(sl.n_train ?? 0).toLocaleString()}</code>`
+        + ` · test <code>${(sl.n_test ?? 0).toLocaleString()}</code> (≥ ${esc(String(sl.test_since ?? '?'))})`
+        + (st && m.target !== 'rating' ? ` · out-of-fold stack: ${st.folds} time blocks from ${esc(st.rows_from)}`
+              + (st.inputs?.length ? `, inputs ${st.inputs.map(esc).join(' + ')}` : '') : '')
+        + (sl.note ? `<br><span style="opacity:.8">${esc(sl.note)}</span>` : '');
+      return { tiles: tiles.join(''), left, right, slice };
+    }
+
     function card(m) {
+      if (m.target === 'coupon_agent') return agentCard(m);
       const t = m.metrics?.test || {};
       const sl = m.slice_def || {};
       const when = m.created_at ? m.created_at.slice(0, 10) : '';
       const hl = headline(m);
-      const trackTag = `<span class="mc-tag">${esc(trackLabel(m))}</span>`;
+      const race = RACE_TARGETS[m.target] ? raceParts(m) : null;
+      const trackTag = (race
+        ? (LEAD_TARGETS.includes(m.target) ? `<span class="mc-tag">${esc(methodLabel(sl))}</span>` : '')
+        : `<span class="mc-tag">${esc(trackLabel(m))}</span>`)
+        + (m._live ? '<span class="mc-tag mc-tag-live">live</span>' : '')
+        + (sl.retired ? `<span class="mc-tag mc-tag-retired" title="${attr(sl.retired.reason || '')}">retired</span>` : '');
 
       // Classifier (gal) cards keep the rich test-metric tiles; trainer-form
       // (and other slice-style) models show their train/test footprint.
@@ -245,7 +895,16 @@
           + (sl.note ? `<br><span style="opacity:.8">${esc(sl.note)}</span>` : '');
       }
 
-      return `<div class="glass-panel ml-panel mc-card">
+      if (race) {
+        metricsHtml = race.tiles;
+        sliceHtml = race.slice;
+      }
+      const grid = race
+        ? `<div class="mc-block">${race.left}</div><div class="mc-block">${race.right}</div>`
+        : `<div class="mc-block"><h4>feature importance (permutation)</h4>${importanceList(m.metrics?.importances)}</div>
+            <div class="mc-block"><h4>calibration (test, by risk decile)</h4>${calTable(t.calibration) || '<div class="ml-empty" style="text-align:left;padding:0">n/a for this model</div>'}</div>`;
+
+      return `<div class="glass-panel ml-panel mc-card${(race && !m._live) || sl.retired ? ' mc-card--old' : ''}">
         <div class="mc-header" onclick="this.parentElement.classList.toggle('open')">
           ${chevronSvg}
           <span class="mc-name">${esc(m.name)}</span>
@@ -256,47 +915,424 @@
         </div>
         <div class="mc-body">
           <div class="mc-metrics">${metricsHtml}</div>
-          <div class="mc-grid">
-            <div class="mc-block"><h4>feature importance (permutation)</h4>${importanceList(m.metrics?.importances)}</div>
-            <div class="mc-block"><h4>calibration (test, by risk decile)</h4>${calTable(t.calibration) || '<div class="ml-empty" style="text-align:left;padding:0">n/a for this model</div>'}</div>
-          </div>
+          <div class="mc-grid">${grid}</div>
           <div class="mc-slice">${sliceHtml}</div>
           <a class="mc-detail-link" href="/ml/models/${m.model_id}">view full details →</a>
         </div>
       </div>`;
     }
 
-    function render(elId, list, emptyLabel) {
+    // The coupon agent: what its frozen live policy made on later games, by
+    // game type, what it plays, and the preliminary policy beside it.
+    function agentCard(m) {
+      const mt = m.metrics || {}, t = mt.test || {}, sl = m.slice_def || {};
+      const when = m.created_at ? m.created_at.slice(0, 10) : '';
+      const hl = headline(m);
+      const kr0 = v => (v == null ? '—' : Math.round(v).toLocaleString('sv-SE') + ' kr');
+      const krK = v => (v == null || Math.abs(v) < 1e5 ? kr0(v) : Math.round(v / 1000).toLocaleString('sv-SE') + 'k kr');
+      const tiles = [
+        metric('test roi', roi(t.roi)),
+        metric('90%', `${sgn(t.lo)} … ${sgn(t.hi)}`),
+        metric('w/o top', sgn(t.roi_wo_top)),
+        metric('played', `${(t.played ?? 0).toLocaleString()} / ${(t.games ?? 0).toLocaleString()}`),
+        metric('profit', krK(t.profit)),
+        metric('max drawdown', krK(t.max_drawdown)),
+      ].join('');
+      const types = (t.by_type || []).map(r => `<tr><td>${esc(r.type)}</td><td>${r.games.toLocaleString()}</td>`
+        + `<td>${r.played.toLocaleString()}</td><td>${krK(r.cost)}</td><td>${krK(r.ret)}</td><td>${roi(r.roi)}</td>`
+        + `<td>${sgn(r.roi_wo_top)}</td></tr>`).join('');
+      const hist = (h, fmt) => Object.entries(h || {}).map(([k, n]) => `${fmt(k)} <b>${(+n).toLocaleString()}</b>`).join(' · ');
+      const pl = t.plays || {};
+      const left = `<h4>by game type · forward test</h4><table class="cmp-table"><thead><tr>`
+        + ['game', 'games', 'played', 'cost', 'return', 'roi', 'w/o top'].map(l => th(l)).join('')
+        + `</tr></thead><tbody>${types}</tbody></table>`
+        + `<h4>what it plays</h4><p class="diag-note">`
+        + (pl.bankers ? `bankers: ${hist(pl.bankers, k => k)}<br>` : '')
+        + (pl.mult ? `copies: ${hist(pl.mult, k => '×' + k)}<br>` : '')
+        + (pl.cover ? `cover: ${hist(pl.cover, k => k)}<br>` : '')
+        + (pl.weighted != null ? `weighted rows ${fmtPct(pl.weighted)} of coupons` : '')
+        + (pl.top != null ? ` · top pool only ${fmtPct(pl.top)}` : '') + '</p>';
+      const runs = [['live · learned on', mt.train, ''], ['live · forward test', t, 'me'],
+                    ['preliminary · learned on', mt.preliminary_train, 'sep'], ['preliminary · forward test', mt.preliminary, ''],
+                    ['live policy on the forecasts', mt.live_on_forecasts, 'sep muted']];
+      const right = `<h4>two policies</h4><table class="cmp-table"><thead><tr><th></th>`
+        + ['games', 'played', 'roi', '90%', 'w/o top', 'log growth'].map(l => th(l)).join('') + '</tr></thead><tbody>'
+        + runs.filter(([, r]) => r).map(([name, r, cls]) => `<tr class="${cls}">`
+          + `<td>${esc(name)}${r.from ? ` <small>${esc(r.from.slice(0, 7))} … ${esc(r.to.slice(0, 7))}</small>` : ''}</td>`
+          + `<td>${(r.games ?? 0).toLocaleString()}</td><td>${(r.played ?? 0).toLocaleString()}</td><td>${roi(r.roi)}</td>`
+          + `<td>${sgn(r.lo)} … ${sgn(r.hi)}</td><td>${sgn(r.roi_wo_top)}</td><td>${n3(r.log_growth)}</td></tr>`).join('')
+        + '</tbody></table>'
+        + `<p class="diag-note">The live policy plays xedge against the win odds once every leg's win pool holds `
+        + `${kr0(sl.win_pool_live)}; before that the preliminary one plays xwin against xodds. Without the market `
+        + `the forecasts expect several times what their coupons return, so the live policy on them overbets.</p>`
+        + (mt.theta ? `<h4>live policy weights</h4>${coefList(mt.theta)}` : '')
+        + (mt.theta_forecast ? `<h4>preliminary policy weights</h4>${coefList(mt.theta_forecast)}` : '');
+      const src = sl.source || {}, fc = (sl.forecast || {}).own || {};
+      const slice = `live: <code>${esc(src.target || 'xedge')}</code>${src.name ? ` (${esc(src.name)})` : ''} against the odds`
+        + ` · preliminary: <code>${esc(fc.target || 'xwin')}</code>${fc.name ? ` (${esc(fc.name)})` : ''} against xodds`
+        + ` · learned before ${esc(String(sl.test_since ?? '?'))}`
+        + ` · bankroll ${kr0(sl.bankroll)}, at most ${fmtPct(sl.stake_cap)} on one game · ${sl.items ?? '?'} coupons per game`
+        + (sl.note ? `<br><span style="opacity:.8">${esc(sl.note)}</span>` : '');
+      return `<div class="glass-panel ml-panel mc-card${m._live ? '' : ' mc-card--old'}">
+        <div class="mc-header" onclick="this.parentElement.classList.toggle('open')">
+          ${chevronSvg}
+          <span class="mc-name">${esc(m.name)}</span>
+          <span class="mc-tag mc-tag-target">${esc(m.target)}</span>
+          ${m._live ? '<span class="mc-tag mc-tag-live">live</span>' : ''}
+          <span class="mc-auc">${hl.val}<small>${hl.label}</small></span>
+          <span class="mc-when">${when}</span>
+        </div>
+        <div class="mc-body">
+          <div class="mc-metrics">${tiles}</div>
+          <div class="mc-grid mc-grid--stack"><div class="mc-block">${right}</div><div class="mc-block">${left}</div></div>
+          <div class="mc-slice">${slice}</div>
+          <a class="mc-detail-link" href="/ml/models/${m.model_id}">view full details →</a>
+        </div>
+      </div>`;
+    }
+
+    function render(elId, list, emptyLabel, byHeadline = true) {
       const el = document.getElementById(elId);
       if (!el) return;
       if (!list || !list.length) {
         el.innerHTML = `<div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty"><em>no ${emptyLabel} models yet</em><br>train one (CLI) and it will appear here.</div></div>`;
         return;
       }
-      list.sort((a, b) => parseFloat(headline(b).val || 0) - parseFloat(headline(a).val || 0));
+      if (byHeadline) list.sort((a, b) => parseFloat(headline(b).val || 0) - parseFloat(headline(a).val || 0));
       el.innerHTML = list.map(card).join('');
     }
 
-    document.querySelectorAll('.ml-side button').forEach(b => b.addEventListener('click', () => {
-      document.querySelectorAll('.ml-side button').forEach(x => x.classList.toggle('active', x === b));
+    function showView(view) {
+      document.querySelectorAll('.ml-side button').forEach(x => x.classList.toggle('active', x.dataset.view === view));
       VIEWS.forEach(v => {
         const el = document.getElementById('view-' + v);
-        if (el) el.hidden = b.dataset.view !== v;
+        if (el) el.hidden = view !== v;
       });
-    }));
+    }
+    document.querySelectorAll('.ml-side button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+    document.querySelectorAll('.ov-node[data-go]').forEach(n => n.addEventListener('click', () => showView(n.dataset.go)));
+
+    // ---- rating diagnostics ----
+    function aeTable(rows, head, extra = []) {
+      if (!rows || !rows.length) return '';
+      const cols = ['market', 'rating', 'results', 'xodds', 'xwin', 'xedge'].filter(c => rows.some(r => r['ae_' + c] != null));
+      const hr = `<tr>${th(head)}${th('runners')}${th('wins')}${extra.map(e => th(e.label)).join('')}`
+        + cols.map(c => th('a/e ' + c)).join('') + '</tr>';
+      const body = rows.map(r => `<tr><td>${esc(r.bucket)}</td><td>${r.n.toLocaleString()}</td><td>${r.wins.toLocaleString()}</td>`
+        + extra.map(e => `<td>${e.fmt(r[e.k])}</td>`).join('')
+        + cols.map(c => `<td>${ae(r['ae_' + c])}</td>`).join('') + '</tr>').join('');
+      return `<table class="cmp-table"><thead>${hr}</thead><tbody>${body}</tbody></table>`;
+    }
+
+    function renderRatingDiag(m) {
+      const el = document.getElementById('rating-diag');
+      const d = m?.metrics?.diagnostics;
+      if (!d) {
+        el.innerHTML = '<div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty">no diagnostics yet: rebuild the race models.</div></div>';
+        return;
+      }
+      const lr = d.last_race || {}, lc = d.last_comment || {}, cov = d.comment_coverage || [];
+      const years = [...new Set(cov.map(c => c.year))].sort();
+      const ctrs = [...new Set(cov.map(c => c.country))];
+      const covTable = `<table class="cmp-table"><thead><tr><th>year</th>${ctrs.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`
+        + years.map(y => `<tr><td>${y}</td>` + ctrs.map(c => {
+            const x = cov.find(v => v.year === y && v.country === c);
+            return `<td>${x ? fmtPct(x.share) : '—'}</td>`;
+          }).join('') + '</tr>').join('') + '</tbody></table>';
+      const int = v => (v == null ? '—' : v.toLocaleString());
+      el.innerHTML = `
+        <div class="glass-panel ml-panel pool-block">
+          <p class="diag-note"><b>a/e</b> is actual wins ÷ expected wins over ${int(d.runners)} runners in ${int(d.races)} forward-test races. 1.00 is fair. Above 1 means the layer underrates the group (green, > 1.1); below 1 it overrates it (red, &lt; 0.9). The rating is a strength, not a calibrated chance, so its column shows where the strength alone is off.</p>
+          <h4>how much price evidence the horse has</h4>
+          ${aeTable(d.evidence, 'prices seen', [{ k: 'sd', label: 'rating sd', fmt: n3 }])}
+        </div>
+        <div class="glass-panel ml-panel pool-block">
+          <h4>where the horse raced before</h4>
+          <p class="diag-note">Starts outside SE / NO / DK / FI never reach the price rating, so a horse with only foreign starts comes in there at a newcomer's rating; the results rating reads them. Medians of its earlier starts (all countries) and of the prices the price rating has seen.</p>
+          ${aeTable(d.abroad, 'earlier starts', [{ k: 'starts_median', label: 'starts', fmt: int }, { k: 'priced_median', label: 'priced', fmt: int }])}
+        </div>
+        <div class="glass-panel ml-panel pool-block">
+          <h4>the market's reaction to the last race</h4>
+          <p class="diag-note">Strength is the rating's rank in this field, set by the prices before the last race. The last race is its result pairwise against every rival, relative to their odds, in fifths (edges ${(lr.edges || []).map(n3).join(' / ')}). If the market over-reacts to a letdown, its column sits above 1 for strong horses that ran far below their odds.</p>
+          ${aeTable((lr.cells || []).map(c => ({ ...c, bucket: c.strength + ' · ' + c.bucket })), 'strength · last race')}
+        </div>
+        <div class="glass-panel ml-panel pool-block">
+          <h4>comments</h4>
+          <p class="diag-note">The pass keeps only the last comment. Of runners with a last start, ${fmtPct(lc.any_signal)} get a trip signal from it: ${Object.entries(lc.flags || {}).map(([k, v]) => `${esc(k)} ${fmtPct(v)}`).join(' · ')}. Share of Nordic starts with a comment:</p>
+          ${covTable}
+        </div>`;
+    }
+
+    // ---- pools ----
+    const POOL_ORDER = ['win', 'place', 'V4', 'V5', 'V64', 'V65', 'V75', 'GS75', 'V85', 'V86'];
+    const POOL_NAMES = { win: 'win · vinnare', place: 'place · plats' };
+
+    function poolTable(key, b) {
+      const tr = (r, cls, extra) => `<tr class="${cls}"><td>${esc(r.rule)}</td><td>${(r.bets ?? r.rows ?? 0).toLocaleString()}</td>`
+        + `<td>${fmtPct(r.hit)}</td><td>${roi(r.roi)}</td><td>${sgn(r.lo)} … ${sgn(r.hi)}</td>`
+        + `<td>${sgn(r.roi_h1)} / ${sgn(r.roi_h2)}</td><td>${sgn(r.roi_wo_top)}</td>${extra || ''}</tr>`;
+      const head = (n, extra) => `<tr>${['rule', n, 'hit', 'roi', '90%', 'halves', 'w/o top'].map(l => th(l)).join('')}${extra || ''}</tr>`;
+      if (key === 'win' || key === 'place') {
+        const body = (b.model || []).map(r => tr(r, 'me'))
+          .concat((b.market || []).map((r, i) => tr({ ...r, rule: 'market · ' + r.rule }, i ? '' : 'sep')));
+        return `<table class="cmp-table"><thead>${head('bets')}</thead><tbody>${body.join('')}</tbody></table>`;
+      }
+      const ref = (src, rule) => (b[src] || []).find(x => x.rule === rule);
+      const body = (b.model || []).map(r => tr(r, 'me',
+        `<td>${roi(ref('market', r.rule)?.roi)}</td><td>${roi(ref('public', r.rule)?.roi)}</td>`));
+      return `<table class="cmp-table"><thead>${head('rows', th('market') + th('public'))}</thead><tbody>${body.join('')}</tbody></table>`;
+    }
+
+    function poolBlocks(p) {
+      return POOL_ORDER.filter(k => p[k]).map(k => `<div class="glass-panel ml-panel pool-block">
+          <h4>${esc(POOL_NAMES[k] || k)}${p[k].games ? ` · ${p[k].games.toLocaleString()} games` : ''}</h4>
+          ${poolTable(k, p[k])}</div>`).join('');
+    }
+
+    let POOL_MODELS = {}, POOL_SEL = 'xedge';
+    function renderPools() {
+      const sw = document.getElementById('pool-switch');
+      const names = Object.keys(POOL_MODELS);
+      if (!names.includes(POOL_SEL)) POOL_SEL = names[names.length - 1];
+      sw.innerHTML = names.map(n => `<button data-m="${n}" class="${n === POOL_SEL ? 'active' : ''}">${esc(n)} · ${esc(POOL_MODELS[n].name)}</button>`).join('');
+      sw.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { POOL_SEL = b.dataset.m; renderPools(); }));
+      const body = document.getElementById('pools-body');
+      const m = POOL_MODELS[POOL_SEL];
+      loadCouponOptions(m);
+      const p = m?.metrics?.pools;
+      if (!p) {
+        body.innerHTML = '<div class="glass-panel ml-panel" style="padding:18px 20px"><div class="ml-empty"><em>not settled yet</em><br>rebuild the race models, or run <code>scripts.eval_pools</code>.</div></div>';
+        return;
+      }
+      body.innerHTML = `<div class="ml-section-head">${(p.races ?? 0).toLocaleString()} races · ${esc(p.from)} … ${esc(p.to)}`
+        + ` · ${(p.n_backtest ?? 0).toLocaleString()} backtest + ${(p.n_live ?? 0).toLocaleString()} live predictions</div>`
+        + poolBlocks(p)
+        + (p.live ? `<div class="ml-section-head">live only · ${(p.live.races ?? 0).toLocaleString()} races since the build</div>` + poolBlocks(p.live) : '');
+    }
+
+    // ---- coupon viewer ----
+    const kr = v => (v == null ? '—' : Math.round(v).toLocaleString('sv-SE') + ' kr');
+    const krSigned = v => (v == null ? '—'
+      : `<span class="${v > 0 ? 'roi-pos' : 'roi-neg'}">${v > 0 ? '+' : ''}${Math.round(v).toLocaleString('sv-SE')}</span>`);
+    let CP = { model: null, opts: [], game: 'V64', rule: 'cover 70%', sel: null };
+    const cpEl = id => document.getElementById(id);
+
+    function loadCouponOptions(m) {
+      CP.model = m || null;
+      cpEl('coupon-detail').innerHTML = '';
+      if (!m) { cpEl('coupon-list').innerHTML = ''; cpEl('cp-game').innerHTML = ''; cpEl('cp-rule').innerHTML = ''; return; }
+      fetch(`/api/ml/pools/coupon-options?model_id=${m.model_id}`).then(r => r.json()).then(d => {
+        CP.opts = d.options || [];
+        const games = POOL_ORDER.filter(g => CP.opts.some(o => o.game_type === g));
+        if (!games.includes(CP.game)) CP.game = games[0];
+        cpEl('cp-game').innerHTML = games.map(g => {
+          const n = Math.max(...CP.opts.filter(o => o.game_type === g).map(o => o.games));
+          return `<option value="${g}"${g === CP.game ? ' selected' : ''}>${g} · ${n} games</option>`;
+        }).join('');
+        fillCouponRules();
+        loadCoupons();
+      });
+    }
+
+    function fillCouponRules() {
+      const rules = CP.opts.filter(o => o.game_type === CP.game);
+      if (!rules.some(o => o.rule === CP.rule)) CP.rule = (rules.find(o => o.rule === 'cover 70%') || rules[0] || {}).rule;
+      cpEl('cp-rule').innerHTML = rules.map(o => {
+        const r = o.cost ? o.ret / o.cost - 1 : null;
+        return `<option value="${attr(o.rule)}"${o.rule === CP.rule ? ' selected' : ''}>${esc(o.rule)} · ${sgn(r)}</option>`;
+      }).join('');
+    }
+
+    function loadCoupons() {
+      if (!CP.model || !CP.rule) return;
+      const q = new URLSearchParams({ model_id: CP.model.model_id, game_type: CP.game, rule: CP.rule,
+                                      sort: cpEl('cp-sort').value, show: cpEl('cp-show').value, limit: 80 });
+      cpEl('coupon-list').innerHTML = '<div class="ml-empty">loading…</div>';
+      fetch('/api/ml/pools/coupons?' + q).then(r => r.json()).then(d => {
+        const list = d.coupons || [];
+        if (!list.length) { cpEl('coupon-list').innerHTML = '<div class="ml-empty">no coupons match.</div>'; return; }
+        const T = {
+          date: 'Race day. "live" marks games after the model was built, played on its live predictions.',
+          right: 'Legs where the coupon had the winner, out of all legs.',
+          cost: 'What the coupon cost: rows × row price.',
+          return: 'What the coupon would have been paid, with our own winning rows added to the pool.',
+          profit: 'Return − cost.',
+          market: 'Profit of the same rule with the horses picked by the closing win odds, and its legs right.',
+          public: 'Profit of the same rule with the horses picked by the public\'s stake shares, and its legs right.',
+        };
+        cpEl('coupon-list').innerHTML = `<table class="cmp-table cp-list"><thead><tr>`
+          + th('date', T.date) + th('track') + th('rows') + th('cost', T.cost) + th('return', T.return)
+          + th('profit', T.profit) + th('right', T.right) + th('market', T.market) + th('public', T.public)
+          + '</tr></thead><tbody>'
+          + list.map(c => `<tr data-g="${attr(c.atg_game_id)}" class="${c.atg_game_id === CP.sel ? 'sel' : ''}">`
+            + `<td>${esc(c.game_date)}${c.live ? '<span class="cp-tag">live</span>' : ''}</td><td>${esc(c.track || '')}</td>`
+            + `<td>${c.rows.toLocaleString('sv-SE')}</td><td>${kr(c.cost)}</td><td>${kr(c.ret)}</td>`
+            + `<td>${krSigned(c.ret - c.cost)}</td><td>${c.legs_right}/${c.legs}</td>`
+            + `<td>${c.market_cost != null ? krSigned(c.market_ret - c.market_cost) + ` <small>${c.market_right}/${c.legs}</small>` : '—'}</td>`
+            + `<td>${c.public_cost != null ? krSigned(c.public_ret - c.public_cost) + ` <small>${c.public_right}/${c.legs}</small>` : '—'}</td></tr>`).join('')
+          + '</tbody></table>';
+        cpEl('coupon-list').querySelectorAll('tbody tr').forEach(tr => tr.addEventListener('click', () => {
+          CP.sel = tr.dataset.g;
+          cpEl('coupon-list').querySelectorAll('tbody tr').forEach(x => x.classList.toggle('sel', x === tr));
+          loadCoupon(CP.sel);
+        }));
+      });
+    }
+
+    function loadCoupon(gid) {
+      const q = new URLSearchParams({ model_id: CP.model.model_id, game_id: gid, rule: CP.rule });
+      cpEl('coupon-detail').innerHTML = '<div class="ml-empty">loading…</div>';
+      fetch('/api/ml/pools/coupon?' + q).then(r => r.json()).then(d => {
+        cpEl('coupon-detail').innerHTML = couponDetail(d);
+        cpEl('coupon-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+
+    function couponDetail(d) {
+      const g = d.game, me = g.target;
+      const srcName = { model: me, market: 'market', public: 'public' };
+      const sysRows = ['model', 'market', 'public'].filter(s => d.systems[s]).map(s => {
+        const x = d.systems[s];
+        const by = Object.entries(x.by_right || {}).sort((a, b) => b[0] - a[0])
+          .map(([k, n]) => `${k}: ${(+n).toLocaleString('sv-SE')}`).join(' · ');
+        return `<tr class="${s === 'model' ? 'me' : ''}"><td>${esc(srcName[s])}</td><td>${x.rows.toLocaleString('sv-SE')}</td>`
+          + `<td>${kr(x.cost)}</td><td>${kr(x.ret)}</td><td>${krSigned(x.ret - x.cost)}</td><td>${x.legs_right}/${d.legs.length}</td>`
+          + `<td style="text-align:left">${by}</td></tr>`;
+      }).join('');
+      const tierRows = g.tiers.map(t => `<tr><td>${t.tier} right</td><td>${t.jackpot ? 'jackpot' : kr(t.payout)}</td>`
+        + `<td>${(t.systems ?? 0).toLocaleString('sv-SE')}</td><td>${kr(t.pot)}</td></tr>`).join('');
+      const legs = d.legs.map((lg, i) => {
+        const w = lg.starters.find(s => s.won);
+        const pickN = lg.starters.filter(s => s.picked.model).length;
+        let cut = false;
+        const rows = lg.starters.map(s => {
+          const sep = !cut && !s.picked.model && pickN > 0 ? (cut = true) : false;
+          const who = ['model', 'market', 'public'].map(k => s.picked[k]
+            ? (k === 'model' ? `<b>${me[0].toUpperCase()}</b>` : k[0].toUpperCase()) : '·').join('');
+          return `<tr class="${s.won ? 'won' : s.picked.model ? 'pick' : ''}${s.scratched ? ' scr' : ''}${sep ? ' sep' : ''}">`
+            + `<td class="who">${who}</td><td>${s.number}</td><td class="nm" title="${attr(s.horse || '')}">${s.won ? '★ ' : ''}${esc(s.horse || '')}</td>`
+            + `<td>${fmtPct(s.p)}</td><td${s.odds ? ` title="odds ${s.odds.toFixed(2)}"` : ''}>${fmtPct(s.q)}</td>`
+            + `<td>${fmtPct(s.share)}</td><td>${s.finish ?? ''}</td></tr>`;
+        }).join('');
+        const sub = w ? `winner ${w.number} ${esc(w.horse || '')} · ${me} rank ${w.rank_p ?? '—'} · market rank ${w.rank_q ?? '—'}`
+          + ` · ${fmtPct(w.share)} streck (rank ${w.rank_share ?? '—'}) · ${me} picked ${pickN}` : 'no winner recorded';
+        return `<div class="glass-panel ml-panel cp-leg">
+            <h4>leg ${i + 1} · ${esc(lg.track || '')} race ${lg.race_number ?? '?'} · ${lg.distance ?? ''} m ${lg.start_method === 'A' ? 'auto' : lg.start_method === 'V' ? 'volt' : ''}</h4>
+            <div class="sub">${sub}</div>
+            <table class="cmp-table"><thead><tr>`
+          + th('picked', `Who picked the horse: ${me} (${me[0].toUpperCase()}), market (M), public (P). Sorted by ${me}'s chance; the line marks where ${me}'s cover stops.`)
+          + th('nr') + th('horse') + th(me, `${me}'s win chance, normalised over the field.`)
+          + th('mkt', 'The closing win odds as a chance, normalised over the field. Hover a value for the odds.')
+          + th('streck', 'The public\'s share of this game\'s stakes on the horse in this leg.')
+          + th('fin', 'Finishing position.')
+          + `</tr></thead><tbody>${rows}</tbody></table></div>`;
+      }).join('');
+      return `<div class="glass-panel ml-panel pool-block">
+          <h4>${esc(g.game_type)} · ${esc(d.legs[0]?.track || '')} · ${esc(g.game_date)} · ${esc(d.rule)} · ${esc(me)} (${esc(g.model_name)})</h4>
+          <p class="diag-note">Turnover ${kr(g.turnover)} · ${g.rtp ?? 65}% back to the players · ${(g.system_count ?? 0).toLocaleString('sv-SE')} systems played.</p>
+          <div class="cp-head">
+            <div class="mc-block"><h4>the three coupons</h4><table class="cmp-table"><thead><tr>`
+          + th('picked by', 'Whose chances chose the horses, by the same rule.') + th('rows') + th('cost') + th('return')
+          + th('profit') + th('right', 'Legs where the coupon had the winner.')
+          + th('rows by legs right', 'How many of the coupon\'s rows had 8, 7, 6 … legs right (top tiers only).')
+          + `</tr></thead><tbody>${sysRows}</tbody></table></div>
+            <div class="mc-block"><h4>what the pool paid</h4><table class="cmp-table"><thead><tr>`
+          + th('tier') + th('per row', 'Payout per winning row (1 unit), before our own rows join the pool. "jackpot": under the minimum, rolled over.')
+          + th('systems', 'Winning rows in the pool at this tier.') + th('pot', 'The tier\'s share of the pool.')
+          + `</tr></thead><tbody>${tierRows}</tbody></table></div>
+          </div>
+        </div>
+        <div class="cp-legs">${legs}</div>`;
+    }
+
+    ['cp-show', 'cp-sort'].forEach(id => cpEl(id).addEventListener('change', loadCoupons));
+    cpEl('cp-game').addEventListener('change', e => { CP.game = e.target.value; fillCouponRules(); loadCoupons(); });
+    cpEl('cp-rule').addEventListener('change', e => { CP.rule = e.target.value; loadCoupons(); });
+
+    // ---- overview ----
+    function renderOverview(live, xgal) {
+      const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+      const none = '<span>not registered yet</span>';
+      const t = m => m?.metrics?.test || {};
+      set('ov-rating', live.rating
+        ? `<span>closes</span> ${fmtPct(t(live.rating).gap_closed)} <span>of the uniform → market winner gap</span>` : none);
+      const lead = (prefix) => ['auto', 'volt'].map(k => live[prefix + k]).filter(Boolean).map(m =>
+        `${esc(m.slice_def.method)} <span>top-1</span> ${fmtPct(t(m).race?.model?.top1)} <span>· posts alone</span> ${fmtPct(t(m).race?.post_baseline?.top1)}`
+      ).join('<br>') || none;
+      set('ov-xlead', lead('lead_'));
+      set('ov-xfront', lead('front_'));
+      const g = live.xgal || xgal.filter(m => m.scope !== 'track').sort((a, b) => (t(b).roc_auc || 0) - (t(a).roc_auc || 0))[0];
+      set('ov-xgal', g ? `<span>auc</span> ${t(g).roc_auc}` : none);
+      set('ov-xodds', live.xodds
+        ? `<span>closes</span> ${fmtPct(t(live.xodds).gap_closed)} <span>of the gap to the market's prices</span>` : none);
+      const w = t(live.xwin);
+      set('ov-xwin', live.xwin
+        ? `<span>winner log loss</span> ${n3(w.xwin?.winner_logloss)} <span>· market</span> ${n3(w.market?.winner_logloss)}`
+          + `<br><span>closes</span> ${fmtPct(w.gap_closed)} <span>of the uniform → market gap</span>` : none);
+      const e = t(live.xedge), eb = e.blocks || [];
+      set('ov-xedge', live.xedge
+        ? `<span>winner log loss</span> ${n3(e.xedge?.winner_logloss)} <span>· market</span> ${n3(e.market?.winner_logloss)}`
+          + `<br><span>beats the closing odds in</span> ${eb.filter(b => b.gain > 0).length} <span>of</span> ${eb.length} <span>periods since 2021</span>` : none);
+      const pm = live.xedge?.metrics?.pools ? 'xedge' : 'xwin';
+      const p = live[pm]?.metrics?.pools;
+      const pick = (k, rule) => (p?.[k]?.model || []).find(r => r.rule === rule);
+      set('ov-pools', p ? [['win', 'p × odds > 1.2'], ['V4', 'cover 70%'], ['V64', 'cover 70% · V6']]
+        .map(([k, rule]) => { const r = pick(k, rule); return r ? `${pm} ${esc(k)} ${esc(rule)} ${roi(r.roi)} <span>(${sgn(r.lo)} … ${sgn(r.hi)})</span>` : ''; })
+        .filter(Boolean).join('<br>') : '<span>not settled yet</span>');
+      const a = t(live.coupon_agent);
+      set('ov-agent', live.coupon_agent
+        ? `<span>forward test roi</span> ${roi(a.roi)} <span>(${sgn(a.lo)} … ${sgn(a.hi)})</span>`
+          + `<br><span>played</span> ${(a.played ?? 0).toLocaleString()} <span>of</span> ${(a.games ?? 0).toLocaleString()} <span>games · without its biggest win</span> ${sgn(a.roi_wo_top)}`
+        : '<span>not trained yet</span>');
+      const gl = (m, name) => (m?.metrics?.groups ? `<h4>${name}</h4>${groupList(m.metrics.groups)}` : '');
+      const both = gl(live.xwin, 'xwin · on top of xodds') + gl(live.xedge, 'xedge · on top of the market');
+      set('ov-weights', both
+        ? `<p class="diag-note">Each group's share of the winner log-loss the model adds when that group is shuffled on the forward test. The starting point (xodds for xwin, the market for xedge) is never shuffled, so this splits what the trees add on top of it.</p><div class="cols">`
+          + `<div>${gl(live.xwin, 'xwin · on top of xodds')}</div><div>${gl(live.xedge, 'xedge · on top of the market')}</div></div>`
+        : '<div class="ml-empty">rebuild the race models for the input groups.</div>');
+    }
 
     function loadModels() {
       fetch('/api/ml/models').then(r => r.json()).then(d => {
         const all = [...(d.general || []), ...(d.track || [])];
-        const byCat = { xgal: [], trainerform: [], upcoming: [] };
+        const byCat = { rating: [], xgal: [], xodds: [], xlead: [], xfront: [], xwin: [], xedge: [], agent: [],
+                        trainerform: [], upcoming: [] };
         all.forEach(m => byCat[categoryOf(m)].push(m));
 
+        // Newest first (API order); the newest per target / method is live.
+        // On the xgal tab only the chain's own xgal is scored live.
+        const seen = new Set(), live = {};
+        const prefix = { y_lead: 'lead_', y_front: 'front_' };
+        for (const c of ['rating', 'xodds', 'xlead', 'xfront', 'xwin', 'xedge', 'agent', 'xgal']) {
+          byCat[c].forEach(m => {
+            if (c === 'xgal' && m.target !== 'xgal') return;
+            const key = m.target + '/' + (m.slice_def?.method || '');
+            m._live = !seen.has(key);
+            seen.add(key);
+            if (m._live) live[prefix[m.target] ? prefix[m.target] + m.slice_def?.method : m.target] = m;
+          });
+          if (c === 'xgal') continue;
+          byCat[c].sort((a, b) => (b._live - a._live)
+            || String(a.slice_def?.method || '').localeCompare(String(b.slice_def?.method || '')));
+        }
+
+        render('rating-general', byCat.rating, 'rating', false);
+        renderRatingDiag(live.rating);
+        POOL_MODELS = Object.fromEntries(['rating', 'xodds', 'xwin', 'xedge'].filter(k => live[k]).map(k => [k, live[k]]));
+        renderPools();
+        renderOverview(live, byCat.xgal);
         render('xgal-general', byCat.xgal.filter(m => m.scope !== 'track'), 'xgal');
         render('xgal-track',   byCat.xgal.filter(m => m.scope === 'track'), 'track xgal');
+        render('xodds-general', byCat.xodds, 'xodds', false);
+        render('xlead-general', byCat.xlead, 'xlead', false);
+        render('xfront-general', byCat.xfront, 'xfront', false);
+        render('xwin-general',  byCat.xwin,  'xwin', false);
+        render('xedge-general', byCat.xedge, 'xedge', false);
+        render('agent-general', byCat.agent, 'coupon-agent', false);
         render('trainerform-general', byCat.trainerform, 'trainer-form');
         render('upcoming-general',    byCat.upcoming,    'race-outcome');
 
-        for (const c of ['xgal', 'trainerform', 'upcoming']) {
+        for (const c of ['rating', 'xgal', 'xodds', 'xlead', 'xfront', 'xwin', 'xedge', 'agent', 'trainerform', 'upcoming']) {
           const el = document.getElementById('cnt-' + c);
           if (el) el.textContent = byCat[c].length || '';
         }

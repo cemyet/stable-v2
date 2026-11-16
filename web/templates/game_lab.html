@@ -1,0 +1,157 @@
+{% extends "game.html" %}
+{#
+  Race lab: the real game page, fed one made-up race (see
+  admin_design_game_lab). Framed by /admin/design#game. Storage is kept in
+  memory so picks, coupon drafts and the night switch never touch the real
+  page, and the game/race endpoints are answered from the payload below.
+#}
+
+{% block extra_head %}
+<script>
+  (() => {
+    const LAB = {{ race_lab | tojson }};
+    window.RACE_LAB = LAB;
+    document.documentElement.classList.add('race-lab');
+
+    const memoryStorage = () => {
+      const m = new Map();
+      return {
+        get length() { return m.size; },
+        key: i => [...m.keys()][i] ?? null,
+        getItem: k => (m.has(String(k)) ? m.get(String(k)) : null),
+        setItem: (k, v) => { m.set(String(k), String(v)); },
+        removeItem: k => { m.delete(String(k)); },
+        clear: () => m.clear(),
+      };
+    };
+    ['localStorage', 'sessionStorage'].forEach(name => {
+      Object.defineProperty(window, name, { value: memoryStorage(), configurable: true });
+    });
+    localStorage.setItem('game.night', new URLSearchParams(location.search).get('dark') === '1' ? '1' : '0');
+
+    const answers = {
+      [`/api/atg/game/${LAB.gameId}`]: () => LAB.game,
+      [`/api/race/atg/${LAB.raceId}`]: () => LAB.race,
+      [`/api/race/atg/${LAB.raceId}/live`]: () => LAB.live,
+      [`/api/race/atg/${LAB.raceId}/tips`]: () => LAB.tips,
+    };
+    const reply = (body, status = 200) => Promise.resolve(new Response(JSON.stringify(body), {
+      status, headers: { 'Content-Type': 'application/json' },
+    }));
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+      const path = decodeURIComponent(url.pathname);
+      if (answers[path]) return reply(structuredClone(answers[path]()));
+      if (path.startsWith(`/api/atg/game/${LAB.gameId}/`)
+          || path.startsWith(`/api/race/atg/${LAB.raceId}/`)) return reply({ error: 'race lab' }, 404);
+      if (path.startsWith('/api/coupons')) {
+        const method = String(init?.method || 'GET').toUpperCase();
+        return reply(method === 'GET' ? [] : { ok: true });
+      }
+      return realFetch(input, init);
+    };
+  })();
+</script>
+{{ super() }}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<style>
+  html.race-lab { overflow: hidden; }
+  html.race-lab body {
+    padding: 28px 0 36px;
+    min-height: 0;
+  }
+  html.race-lab [data-nav-inline-row],
+  html.race-lab .page-back,
+  html.race-lab .game-hero,
+  html.race-lab #gameDock,
+  html.race-lab #gameDockMetal,
+  html.race-lab #couponSphere {
+    display: none !important;
+  }
+  html.race-lab .game-page {
+    min-height: 0;
+    padding-bottom: 0;
+  }
+</style>
+<script>
+  (() => {
+    const legs = document.getElementById('gameLegs');
+    const page = document.querySelector('.game-page');
+
+    const heightListeners = new Set();
+    let height = 0;
+    const measure = () => {
+      const pad = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      const h = Math.ceil(page.getBoundingClientRect().bottom + scrollY + pad);
+      if (h === height) return;
+      height = h;
+      heightListeners.forEach(fn => fn(h));
+    };
+    new ResizeObserver(measure).observe(page);
+
+    const ready = new Promise(resolve => {
+      const done = () => legs.querySelector('.game-leg .sl-row[data-num]');
+      if (done()) { resolve(); return; }
+      const mo = new MutationObserver(() => { if (done()) { mo.disconnect(); resolve(); } });
+      mo.observe(legs, { childList: true, subtree: true });
+      setTimeout(resolve, 5000);
+    });
+
+    const leg = () => legs.querySelector('.game-leg');
+    const settle = (test, ms = 1500) => new Promise(resolve => {
+      const t0 = performance.now();
+      const tick = () => (test() || performance.now() - t0 > ms ? resolve() : requestAnimationFrame(tick));
+      tick();
+    });
+
+    async function openHorse(number) {
+      await ready;
+      // The list drops clicks for 300 ms after a thumb release, and its
+      // release clock starts at page load.
+      const early = 340 - performance.now();
+      if (early > 0) await new Promise(r => setTimeout(r, early));
+      const l = leg();
+      if (!l) return;
+      if (!l.classList.contains('is-open')) {
+        l.querySelector('.game-leg__head')?.click();
+        await settle(() => l.querySelector('.sl-row[data-num]') && l.querySelector('.game-leg__body')?.offsetHeight > 60);
+      }
+      if (l._horse) {
+        if (String(l._horse.number) === String(number) && !l._horse.closing) return;
+        l.querySelector('.game-leg__horse-x')?.click();
+        await settle(() => !l._horse);
+      }
+      l.querySelector(`.sl-row[data-num="${CSS.escape(String(number))}"] .sl-c-horse__name`)?.click();
+    }
+
+    function closeHorse() {
+      leg()?.querySelector('.game-leg__horse-x')?.click();
+    }
+
+    window.RaceLab = {
+      ready,
+      setDark: (on, { animate = true } = {}) => GameNight.set(on, { animate, from: leg() }),
+      isDark: () => GameNight.isOn(),
+      onDark: fn => GameNight.onChange(fn),
+      openHorse,
+      closeHorse,
+      onHeight(fn) {
+        heightListeners.add(fn);
+        if (height) fn(height);
+        return () => heightListeners.delete(fn);
+      },
+      field: () => {
+        const share = new Map((window.RACE_LAB.live.starts || []).map(s => [s.number, s.betDist]));
+        return (window.RACE_LAB.race.results || []).map(e => ({
+          number: e.number, name: e.horse_name, horseId: e.horse_id, share: share.get(e.number),
+        }));
+      },
+    };
+    measure();
+  })();
+</script>
+{% endblock %}

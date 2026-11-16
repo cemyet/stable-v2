@@ -1,0 +1,710 @@
+{# Coupon-wide scale bar. Forty 5% cells, the twentieth being the system as
+   its weights price it, then x3, x5 and x10. The game dock and the design
+   lab both draw it; each passes its own geometry, state and setter.
+
+   The same frame also draws two plain bars stacked under it: a read-only
+   meter and a draggable 0-100% level. They take the scale's cell pitch and
+   frame width, so the three line up cell for cell, but have no multipliers
+   and no centre mark. #}
+<style>
+  .csb-host { overflow: visible; }
+  .csb-host:focus { outline: none; }
+  .csb__hit {
+    fill: transparent;
+    pointer-events: all;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .csb-host.is-disabled .csb__hit,
+  .csb-host.is-meter .csb__hit { cursor: default; }
+  .csb__readout,
+  .csb__label {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    pointer-events: none;
+  }
+  .csb__readout { font-weight: 600; fill: #2a2a2c; }
+  .csb__label { font-weight: 800; }
+  .csb__title {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    font-weight: 700;
+    fill: #9aa0a8;
+    pointer-events: none;
+  }
+</style>
+<script>
+(function () {
+  const STEPS = (window.Coupon && Coupon.SCALE_STEPS)
+    || [...Array.from({ length: 40 }, (_, i) => (i + 1) / 20), 3, 5, 10];
+  const N = 40;
+  const CENTER = 19;
+  // x3, x5, x10 as shares of what is left once the 5% cells are placed.
+  const MULT = [2, 3, 4];
+  const SEP = 2;
+  const MGAP = 1;
+  const DESIGN_KEY = 'couponScaleDesign';
+  let uid = 0;
+
+  /* Light inks for a dark screen, deeper ones that still read on the pearl.
+     `cut` runs from just below the centre to the bottom cell, `lev` from
+     the centre to 200%. `heat` is the meter, cold chalk to hot; `chaos` is
+     the level, the jackpot bar, warming from cream to ATG's jackpot yellow
+     (#ffdd00, the game page's jackpot pill). */
+  const PALETTES = {
+    vfd: {
+      base: '#a8ffc0',
+      cut: [[0, '#fff27a'], [0.35, '#ffd93d'], [0.65, '#ffa232'], [0.88, '#ff6a26'], [1, '#ff3d22']],
+      lev: [[0, '#a8ffc0'], [0.4, '#8dffe2'], [0.75, '#8ee8ff'], [1, '#b4efff']],
+      mult: ['#bfefff', '#e2f9ff', '#ffffff'],
+      ghost: '#8fdcec',
+      ink: '#06080e',
+      label: '#8fdcec',
+      heat: [[0, '#8ee8ff'], [0.3, '#8fb4ff'], [0.6, '#d890ff'], [0.82, '#ff72b6'], [1, '#ff4f6c']],
+      heatGhost: '#a3b6ff',
+      chaos: [[0, '#fff6c4'], [0.5, '#ffe866'], [1, '#ffdd00']],
+      chaosGhost: '#ffe680',
+    },
+    deep: {
+      base: '#2fd36f',
+      cut: [[0, '#f2d500'], [0.35, '#ffb800'], [0.65, '#ff8a00'], [0.88, '#ff5a14'], [1, '#f2301c']],
+      lev: [[0, '#2fd36f'], [0.4, '#16cfae'], [0.75, '#18b6f0'], [1, '#43c8ff']],
+      mult: ['#5fd2ff', '#8fe1ff', '#c4f0ff'],
+      ghost: '#1a1f27',
+      ink: '#06080e',
+      label: '#9aa3ad',
+      heat: [[0, '#18b6f0'], [0.3, '#3f7cff'], [0.6, '#a03dff'], [0.82, '#ff2a9a'], [1, '#f2304a']],
+      heatGhost: '#1a1f27',
+      chaos: [[0, '#ffe24d'], [0.5, '#ffd000'], [1, '#f0b400']],
+      chaosGhost: '#1a1f27',
+    },
+  };
+  const INK = '#1a1c20';
+  /* Resting bars, and bars that cannot be moved, share the monitor's glass.
+     The level stays readable as a muted run; the phosphor colours and the
+     black frame come up only while the bar is being dragged. */
+  const REST = {
+    base: INK,
+    cut: [[0, INK], [1, INK]],
+    lev: [[0, INK], [1, INK]],
+    mult: [INK, INK, INK],
+    ghost: INK,
+    ink: INK,
+    label: INK,
+    heat: [[0, INK], [1, INK]],
+    heatGhost: INK,
+    chaos: [[0, INK], [1, INK]],
+    chaosGhost: INK,
+    idleGhost: 0.1,
+    restLit: 0.45,
+  };
+
+  /* height and inset are 1x px. color: 'level' paints every lit cell the
+     level's colour, 'ramp' grades the run along its length. center: how
+     100% stays marked. ghost is the unlit cells' opacity. */
+  const DESIGNS = [
+    {
+      id: 'tint', label: 'tint',
+      note: 'Every lit cell takes the colour of the level: green on the centre, yellow just below it, through orange to almost red on the last cell, and green to ice above. The centre cell keeps a green glow, and green ticks on the frame border mark 100% whatever the level. This is the default.',
+      frame: 'dark', height: 22, inset: 3, color: 'level', center: 'glow', ticks: true, ghost: 0.16, glow: 1.1,
+    },
+    {
+      id: 'ramp', label: 'ramp',
+      note: 'The lit run is a gradient. Cutting, it warms from yellow at the left end to the level colour at the head. Levering, every cell past the centre is a step further from green toward ice. Unlit cells keep a faint tint of their side of the scale.',
+      frame: 'dark', height: 22, inset: 3, color: 'ramp', center: 'glow', ghost: 0.13, ghostTint: true, glow: 1.1,
+    },
+    {
+      id: 'peak', label: 'peak',
+      note: 'VFD peak hold over phosphor lines. The run burns at half strength and the head cell at full, with its own halo. Green ticks above and below the centre cell stay on whatever the level.',
+      frame: 'dark', height: 22, inset: 3, color: 'level', center: 'ticks', peak: 0.42, scan: true, glass: 0.1, ghost: 0.14, glow: 1.3,
+    },
+    {
+      id: 'wedge', label: 'wedge',
+      note: 'Cells rise from a third of the height at 5% to full at 200%, so the bar reads as a volume wedge. White frame, dark well. The centre cell stands full height as the marker; the multipliers are full height too.',
+      frame: 'white', height: 22, inset: 2, color: 'ramp', center: 'spike', wedge: [0.32, 1], ghost: 0.16, glow: 1,
+    },
+    {
+      id: 'cells', label: 'cells',
+      note: 'No frame and no well: dark cells straight on the dock, lit ones in deeper colours that hold up on the pearl. The centre cell and the multipliers stand taller than the rest.',
+      frame: 'none', height: 16, inset: 0, color: 'level', center: 'tall', tall: 3, palette: 'deep', ghost: 0.88, glow: 0.9,
+    },
+  ];
+
+  function design(id) {
+    return DESIGNS.find(d => d.id === id) || DESIGNS[0];
+  }
+  function designId() {
+    try {
+      const saved = localStorage.getItem(DESIGN_KEY);
+      if (DESIGNS.some(d => d.id === saved)) return saved;
+    } catch (_) {}
+    return DESIGNS[0].id;
+  }
+  function setDesign(id) {
+    try { localStorage.setItem(DESIGN_KEY, design(id).id); } catch (_) {}
+  }
+
+  const rgbOf = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const hexOf = c => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  function mix(a, b, t) {
+    const x = rgbOf(a);
+    const y = rgbOf(b);
+    return hexOf(x.map((v, i) => v + (y[i] - v) * t));
+  }
+  function ramp(stops, t) {
+    const v = Math.min(1, Math.max(0, t));
+    for (let k = 1; k < stops.length; k += 1) {
+      const [t1, c1] = stops[k];
+      if (v <= t1) {
+        const [t0, c0] = stops[k - 1];
+        return mix(c0, c1, t1 > t0 ? (v - t0) / (t1 - t0) : 1);
+      }
+    }
+    return stops[stops.length - 1][1];
+  }
+  const clamp01 = v => Math.min(1, Math.max(0, Number(v) || 0));
+
+  function stepIndex(value) {
+    const v = Number(value);
+    let best = CENTER;
+    STEPS.forEach((s, i) => {
+      if (Math.abs(s - v) < Math.abs(STEPS[best] - v)) best = i;
+    });
+    return best;
+  }
+  function levelText(step) {
+    return step > 2 ? `×${step}` : `${Math.round(step * 100)}%`;
+  }
+
+  function litColor(i, s, D, P) {
+    if (i >= N) return P.mult[i - N];
+    if (i <= CENTER) {
+      if (s >= CENTER) return P.base;
+      const t = (CENTER - s) / CENTER;
+      return ramp(P.cut, D.color === 'ramp' ? t * (0.2 + 0.8 * (s ? i / s : 1)) : t);
+    }
+    const u = D.color === 'ramp' ? i - CENTER : Math.min(s, N - 1) - CENTER;
+    return ramp(P.lev, u / (N - 1 - CENTER));
+  }
+  function ghostColor(i, D, P) {
+    if (i === CENTER) return D.frame === 'none' ? mix(P.ghost, P.base, 0.45) : P.base;
+    if (!D.ghostTint) return P.ghost;
+    if (i < CENTER) return P.cut[1][1];
+    return i < N ? P.lev[2][1] : P.mult[0];
+  }
+
+  /* Cells in svg pixels. The 5% cells take the widest period that still
+     leaves the multipliers room, snapped to device pixels; the multipliers
+     share the rest 2:3:4 and the frame shrinks to fit, centred in the zone.
+     The plain kinds keep that frame and pitch and fill it with as many
+     even cells as fit. */
+  function geometry(zone, D, dpr, kind) {
+    const { px, x0, x1, mid } = zone;
+    const snap = v => Math.round(v * dpr) / dpr;
+    const ins = D.inset;
+    const avail = (x1 - x0) / px - 2 * ins;
+    const options = dpr * px >= 2
+      ? [[3, 1], [2.5, 0.5], [2, 0.5], [1.5, 0.5]]
+      : [[3, 1], [2, 1]];
+    let fit = null;
+    for (const [p, gap] of options) {
+      const rest = avail - (N * p - gap) - SEP - 2 * MGAP;
+      if (rest >= 18) {
+        fit = { p, gap, unit: Math.min(4.5, rest / 9) };
+        break;
+      }
+    }
+    if (!fit) {
+      const [p, gap] = options[options.length - 1];
+      fit = { p, gap, unit: 2 };
+    }
+    const { p, gap, unit } = fit;
+    const content = N * p - gap + SEP + 2 * MGAP + 9 * unit;
+    const fw = snap((content + 2 * ins) * px);
+    const fx = snap(x0 + Math.max(0, x1 - x0 - fw) / 2);
+    const height = Math.min(D.height, zone.maxHeight || D.height);
+    const fh = snap(height * px);
+    const fy = snap(mid - fh / 2);
+    const inset = snap(ins * px);
+    const cx = fx + inset;
+    const cy = fy + inset;
+    const ch = fh - 2 * inset;
+    const cells = [];
+    const plain = kind && kind !== 'scale';
+    if (plain) {
+      const count = Math.max(8, Math.floor((content + gap) / p));
+      const off = (content - (count * p - gap)) / 2;
+      for (let i = 0; i < count; i += 1) {
+        cells.push({ L: snap(cx + (off + i * p) * px), R: snap(cx + (off + i * p + p - gap) * px) });
+      }
+    } else {
+      for (let i = 0; i < N; i += 1) {
+        cells.push({ L: snap(cx + i * p * px), R: snap(cx + (i * p + p - gap) * px) });
+      }
+      let at = N * p - gap + SEP;
+      MULT.forEach(m => {
+        cells.push({ L: snap(cx + at * px), R: snap(cx + (at + unit * m) * px) });
+        at += unit * m + MGAP;
+      });
+    }
+    const last = cells.length - 1;
+    cells.forEach((c, i) => {
+      let T = cy;
+      let B = cy + ch;
+      if (D.wedge && (plain || (i < N && i !== CENTER))) {
+        const [a, b] = D.wedge;
+        const t = plain ? i / Math.max(1, last) : i / (N - 1);
+        T = snap(cy + ch * (1 - (a + (b - a) * t)));
+      }
+      if (D.tall && !plain) {
+        const grow = i === CENTER ? D.tall : i >= N ? (i - N + 1) * D.tall / MULT.length : 0;
+        T = snap(T - grow * px);
+        B = snap(B + grow * px);
+      }
+      c.T = T;
+      c.B = B;
+    });
+    return { fx, fy, fw, fh, cx, cy, ch, cells, contentR: snap(cx + content * px) };
+  }
+
+  /* Meter segments: [{ share, label }], shares of the lit run. Returns the
+     segment index of every lit cell. */
+  function segmentOf(segments, lit) {
+    if (!segments || !segments.length || !lit) return null;
+    const total = segments.reduce((s, g) => s + Math.max(0, g.share || 0), 0);
+    if (!(total > 0)) return null;
+    const out = [];
+    let acc = 0;
+    segments.forEach((g, k) => {
+      acc += Math.max(0, g.share || 0);
+      const end = Math.round(lit * acc / total);
+      while (out.length < end) out.push(k);
+    });
+    while (out.length < lit) out.push(segments.length - 1);
+    return out;
+  }
+
+  function markup(ctrl) {
+    const { svg, opts, ui } = ctrl;
+    const w = svg.clientWidth;
+    if (!w || !svg.clientHeight) return null;
+    const zone = opts.layout();
+    if (!zone || !(zone.x1 > zone.x0)) return null;
+    const kind = opts.kind || 'scale';
+    const D = design(opts.design ? opts.design() : designId());
+    const st = ctrl.state;
+    // Glass unless the pointer or the keyboard is actually moving the bar.
+    const live = st.enabled && D.frame === 'dark' && (ui.drag || (ui.focus && ui.keys));
+    const rest = D.frame === 'dark' && !live;
+    const P = rest ? { ...PALETTES[D.palette || 'vfd'], ...REST } : PALETTES[D.palette || 'vfd'];
+    const dpr = window.devicePixelRatio || 1;
+    const px = zone.px;
+    const G = geometry(zone, D, dpr, kind);
+    ctrl.cells = G.cells;
+    const id = `csb${uid += 1}`;
+    const f = n => (+n).toFixed(2);
+    const rect = (c, fill, extra = '') =>
+      `<rect x="${f(c.L)}" y="${f(c.T)}" width="${f(c.R - c.L)}" height="${f(c.B - c.T)}" fill="${fill}"${extra}/>`;
+    const region = `filterUnits="userSpaceOnUse" x="${f(G.fx - 24 * px)}" y="${f(G.fy - 24 * px)}" width="${f(G.fw + 48 * px)}" height="${f(G.fh + 48 * px)}" color-interpolation-filters="sRGB"`;
+
+    const defs = [
+      `<filter id="${id}-glow" ${region}>
+        <feGaussianBlur in="SourceGraphic" stdDeviation="${f(D.glow * px)}" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>`,
+      `<filter id="${id}-halo" ${region}><feGaussianBlur stdDeviation="${f(2.2 * px)}"/></filter>`,
+    ];
+    if (rest) {
+      defs.push(`<linearGradient id="${id}-face" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="0.5"/>
+        <stop offset="0.55" stop-color="#f0f2f5" stop-opacity="0.28"/>
+        <stop offset="1" stop-color="#e2e5e9" stop-opacity="0.38"/></linearGradient>`);
+    } else if (D.frame === 'dark') {
+      defs.push(`<linearGradient id="${id}-face" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#06080e"/><stop offset="1" stop-color="#0b0f19"/></linearGradient>`);
+    }
+    if (D.frame === 'white') {
+      defs.push(`<linearGradient id="${id}-well" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#05070d"/><stop offset="1" stop-color="#0a0e18"/></linearGradient>`);
+    }
+    if (D.scan) {
+      defs.push(`<pattern id="${id}-scan" x="0" y="${f(G.fy)}" width="8" height="${f(2 * px)}" patternUnits="userSpaceOnUse">
+        <rect x="0" y="0" width="8" height="${f(px)}" fill="#000" fill-opacity="0.34"/></pattern>`);
+    }
+    if (D.glass) {
+      defs.push(`<linearGradient id="${id}-glass" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity="${D.glass}"/><stop offset="0.45" stop-color="#fff" stop-opacity="0"/></linearGradient>`);
+    }
+
+    const frame = [];
+    if (rest) {
+      const hair = 1 / dpr;
+      frame.push(`<rect x="${f(G.fx + hair / 2)}" y="${f(G.fy + hair / 2)}" width="${f(G.fw - hair)}" height="${f(G.fh - hair)}"
+        fill="url(#${id}-face)" stroke="#3d3f48" stroke-opacity="0.2" stroke-width="${f(hair)}"/>`);
+    } else if (D.frame === 'dark') {
+      frame.push(`<rect x="${f(G.fx)}" y="${f(G.fy)}" width="${f(G.fw)}" height="${f(G.fh)}" fill="url(#${id}-face)"/>`);
+    } else if (D.frame === 'white') {
+      // The well reaches a pixel past the cells so a lit white cell keeps
+      // an edge against the white frame.
+      const lip = Math.max(1 / dpr, Math.round(0.5 * px * dpr) / dpr);
+      frame.push(`<rect x="${f(G.fx)}" y="${f(G.fy)}" width="${f(G.fw)}" height="${f(G.fh)}" fill="#fff"/>`);
+      frame.push(`<rect x="${f(G.cx - lip)}" y="${f(G.cy - lip)}" width="${f(G.contentR - G.cx + 2 * lip)}" height="${f(G.ch + 2 * lip)}" fill="url(#${id}-well)"/>`);
+    }
+
+    const layers = kind === 'scale'
+      ? scaleLayers({ G, D, P, st, ui, px, dpr, id, rect, f })
+      : plainLayers({ G, D, P, st, ui, kind, rect });
+
+    let readout = '';
+    if (layers.read) {
+      const size = 9 * px;
+      const c = G.cells[Math.max(0, Math.min(G.cells.length - 1, layers.read.at))];
+      const x = (c.L + c.R) / 2;
+      // Baseline just clear of the frame, centred on the cell it reads.
+      const y = zone.readout === 'below'
+        ? G.fy + G.fh + 3 * px + size * 0.72
+        : G.fy - 3 * px;
+      readout = `<text class="csb__readout" x="${f(x)}" y="${f(y)}" font-size="${f(size)}" text-anchor="middle">${layers.read.text}</text>`;
+    }
+    // Small caps over the frame's left end.
+    const title = opts.title
+      ? `<text class="csb__title" x="${f(G.fx)}" y="${f(G.fy - 3 * px)}" font-size="${f(7 * px)}"
+          letter-spacing="${f(0.8 * px)}">${String(opts.title).toUpperCase()}</text>`
+      : '';
+
+    const paint = `<defs>${defs.join('')}</defs>
+      ${frame.join('')}
+      <g class="csb__ghost">${layers.ghosts.join('')}</g>
+      ${layers.halo.length ? `<g class="csb__halo" filter="url(#${id}-halo)">${layers.halo.join('')}</g>` : ''}
+      <g class="csb__lit"${rest ? '' : ` filter="url(#${id}-glow)"`}>${layers.lit.join('')}</g>
+      ${layers.marks || ''}
+      ${layers.hover || ''}
+      ${(layers.labels || []).join('')}
+      ${D.scan ? `<rect x="${f(G.fx)}" y="${f(G.fy)}" width="${f(G.fw)}" height="${f(G.fh)}" fill="url(#${id}-scan)" pointer-events="none"/>` : ''}
+      ${D.glass ? `<rect x="${f(G.fx)}" y="${f(G.fy)}" width="${f(G.fw)}" height="${f(G.fh)}" fill="url(#${id}-glass)" pointer-events="none"/>` : ''}
+      ${title}
+      ${readout}`;
+    return {
+      paint,
+      hit: { x: f(G.fx - 4 * px), y: f(G.fy - 6 * px), width: f(G.fw + 8 * px), height: f(G.fh + 12 * px) },
+    };
+  }
+
+  function scaleLayers({ G, D, P, st, ui, px, dpr, id, rect, f }) {
+    const s = st.enabled ? stepIndex(st.value) : CENTER;
+    const ghosts = [];
+    const lit = [];
+    const halo = [];
+    const labels = [];
+    G.cells.forEach((c, i) => {
+      const off = i < st.lo || i > st.hi;
+      if (i <= s && st.enabled) {
+        const color = litColor(i, s, D, P);
+        const alpha = P.restLit || (D.peak && i < s ? D.peak : 1);
+        lit.push(rect(c, color, alpha < 1 ? ` fill-opacity="${alpha}"` : ''));
+        if (D.peak && i === s && !P.restLit) halo.push(rect(c, color, ' fill-opacity="0.9"'));
+      } else {
+        let alpha = D.ghost;
+        if (i === CENTER && D.frame !== 'none') alpha = Math.max(alpha, 0.42);
+        if (P.idleGhost) alpha = i === CENTER ? 2 * P.idleGhost : P.idleGhost;
+        else if (off || !st.enabled) alpha *= 0.3;
+        ghosts.push(rect(c, ghostColor(i, D, P), ` fill-opacity="${alpha.toFixed(3)}"`));
+      }
+      if (i >= N) {
+        const text = String(STEPS[i]);
+        const size = 7 * px;
+        if (c.R - c.L >= text.length * size * 0.62 + px) {
+          const on = i <= s && st.enabled;
+          labels.push(`<text class="csb__label" x="${f((c.L + c.R) / 2)}" y="${f((c.T + c.B) / 2 + size * 0.36)}"
+            font-size="${f(size)}" text-anchor="middle" fill="${on ? P.ink : P.label}"
+            fill-opacity="${on ? 0.85 : off || !st.enabled ? 0.25 : 0.6}">${text}</text>`);
+        }
+      }
+    });
+    const center = G.cells[CENTER];
+    if (D.center === 'glow' && st.enabled && !P.restLit) {
+      halo.push(rect(center, P.base, ` fill-opacity="${s >= CENTER ? 0.95 : 0.5}"`));
+    }
+    let marks = '';
+    if (D.center === 'ticks' || D.ticks) {
+      const tick = Math.max(1 / dpr, Math.round(px * dpr) / dpr);
+      const tc = { L: center.L - 0.5 * px, R: center.R + 0.5 * px };
+      const tickAlpha = P.restLit ? 0.55 : (st.enabled ? 0.95 : 0.4);
+      marks = `<g${P.restLit ? '' : ` filter="url(#${id}-glow)"`}>
+        ${rect({ ...tc, T: G.cy - tick - px, B: G.cy - px }, P.base, ` fill-opacity="${tickAlpha}"`)}
+        ${rect({ ...tc, T: G.cy + G.ch + px, B: G.cy + G.ch + px + tick }, P.base, ` fill-opacity="${tickAlpha}"`)}
+      </g>`;
+    }
+    let hover = '';
+    if (ui.hover != null && !ui.drag && st.enabled) {
+      const c = G.cells[ui.hover];
+      const onGlass = P.restLit || D.frame === 'none';
+      hover = rect(c, onGlass ? '#1a1c20' : '#fff', ` fill-opacity="${onGlass ? 0.18 : 0.35}"`);
+    }
+    const showAt = ui.drag || (ui.focus && ui.keys) ? s : ui.hover;
+    const read = showAt != null && st.enabled
+      ? { at: showAt, text: levelText(STEPS[showAt]) } : null;
+    return { ghosts, lit, halo, labels, marks, hover, read };
+  }
+
+  /* meter: value 0..1 lit from the left, optional segments in alternating
+     shades. level: the same run, set by dragging, 0 being no cells. */
+  function plainLayers({ G, D, P, st, ui, kind, rect }) {
+    const n = G.cells.length;
+    const meter = kind === 'meter';
+    const stops = meter ? P.heat : P.chaos;
+    const ghostInk = meter ? P.heatGhost : P.chaosGhost;
+    const count = st.enabled ? Math.round(clamp01(st.value) * n) : 0;
+    const seg = meter ? segmentOf(st.segments, count) : null;
+    const head = count - 1;
+    const ghosts = [];
+    const lit = [];
+    const halo = [];
+    G.cells.forEach((c, i) => {
+      if (i < count) {
+        const t = D.color === 'ramp' ? i / Math.max(1, n - 1) : head / Math.max(1, n - 1);
+        let color = ramp(stops, t);
+        if (seg && seg[i] % 2 === 1) color = mix(color, P.ink, D.frame === 'none' ? 0.3 : 0.42);
+        const alpha = P.restLit || (D.peak && i < head ? D.peak : 1);
+        lit.push(rect(c, color, alpha < 1 ? ` fill-opacity="${alpha}"` : ''));
+        if (D.peak && i === head && !P.restLit) halo.push(rect(c, color, ' fill-opacity="0.9"'));
+      } else {
+        const alpha = P.idleGhost || D.ghost * (st.enabled ? 1 : 0.3);
+        ghosts.push(rect(c, ghostInk, ` fill-opacity="${alpha.toFixed(3)}"`));
+      }
+    });
+
+    let hover = '';
+    let read = null;
+    const onGlass = P.restLit || D.frame === 'none';
+    const hl = onGlass ? '#1a1c20' : '#fff';
+    const ha = onGlass ? 0.18 : 0.35;
+    if (meter) {
+      if (ui.hover != null && st.enabled) {
+        const k = seg && ui.hover < count ? seg[ui.hover] : null;
+        if (k != null) {
+          hover = G.cells.map((c, i) => (seg[i] === k ? rect(c, hl, ` fill-opacity="${ha * 0.6}"`) : '')).join('');
+          const label = st.segments[k] && st.segments[k].label;
+          read = { at: ui.hover, text: label || st.text || '' };
+        } else {
+          read = { at: ui.hover, text: st.text || '' };
+        }
+        if (!read.text) read = null;
+      }
+    } else if (st.enabled) {
+      if (ui.drag || (ui.focus && ui.keys)) {
+        read = { at: Math.max(0, head), text: `${Math.round(clamp01(st.value) * 100)}%` };
+      } else if (ui.hover != null) {
+        const k = ui.hover;
+        if (k >= 0) hover = rect(G.cells[k], hl, ` fill-opacity="${ha}"`);
+        read = { at: Math.max(0, k), text: `${Math.round(((k + 1) / n) * 100)}%` };
+      }
+    }
+    return { ghosts, lit, halo, hover, read };
+  }
+
+  /* opts: layout() -> { px, x0, x1, mid, maxHeight?, readout? } in svg
+     pixels, px being svg pixels per 1x px; kind 'scale' | 'meter' | 'level';
+     label for assistive tech; title, small caps over the frame; design()
+     -> id; active() -> false hands the svg back.
+     scale: state() -> { value, lo, hi, enabled, costAt }; onInput(step).
+     meter: state() -> { value 0..1, enabled, text, segments }.
+     level: state() -> { value 0..1, enabled }; onInput(value). */
+  function mount(svg, opts) {
+    if (svg._csb) {
+      svg._csb.opts = opts;
+      return svg._csb;
+    }
+    const ctrl = { svg, opts, ui: { hover: null, drag: null, focus: false, keys: false }, state: null, cells: null };
+    svg._csb = ctrl;
+    const kindOf = () => ctrl.opts.kind || 'scale';
+    const active = () => !ctrl.opts.active || ctrl.opts.active();
+    const live = () => active() && ctrl.state && ctrl.state.enabled;
+    const ARIA = ['role', 'tabindex', 'aria-label', 'aria-valuemin', 'aria-valuemax', 'aria-valuenow',
+      'aria-valuetext', 'aria-disabled'];
+
+    ctrl.render = (fresh = true) => {
+      if (!active()) {
+        svg.classList.remove('csb-host', 'is-disabled', 'is-meter');
+        ARIA.forEach(a => svg.removeAttribute(a));
+        ctrl.cells = null;
+        ctrl.hit = null;
+        return false;
+      }
+      if (fresh || !ctrl.state) ctrl.state = ctrl.opts.state();
+      const st = ctrl.state;
+      const kind = kindOf();
+      svg.classList.add('csb-host');
+      svg.classList.toggle('is-disabled', !st.enabled);
+      svg.classList.toggle('is-meter', kind === 'meter');
+      svg.setAttribute('aria-label', ctrl.opts.label || 'coupon scale');
+      svg.setAttribute('aria-disabled', st.enabled ? 'false' : 'true');
+      if (kind === 'scale') {
+        svg.setAttribute('role', 'slider');
+        svg.setAttribute('tabindex', st.enabled ? '0' : '-1');
+        svg.setAttribute('aria-valuemin', String(Math.round(STEPS[st.lo] * 100)));
+        svg.setAttribute('aria-valuemax', String(Math.round(STEPS[st.hi] * 100)));
+        svg.setAttribute('aria-valuenow', String(Math.round(st.value * 100)));
+        svg.setAttribute('aria-valuetext', levelText(st.value));
+      } else {
+        svg.setAttribute('role', kind === 'meter' ? 'meter' : 'slider');
+        svg.setAttribute('tabindex', kind === 'level' && st.enabled ? '0' : '-1');
+        svg.setAttribute('aria-valuemin', '0');
+        svg.setAttribute('aria-valuemax', '100');
+        svg.setAttribute('aria-valuenow', String(Math.round(clamp01(st.value) * 100)));
+        svg.setAttribute('aria-valuetext', kind === 'meter' && st.text
+          ? st.text : `${Math.round(clamp01(st.value) * 100)}%`);
+      }
+      // The hit rect outlives every repaint: a press, release or double
+      // click has to land on the node it started on.
+      if (!ctrl.hit || ctrl.hit.parentNode !== svg) {
+        svg.innerHTML = '<g class="csb__paint"></g><rect class="csb__hit"/>';
+        ctrl.paint = svg.firstChild;
+        ctrl.hit = svg.lastChild;
+      }
+      const out = markup(ctrl);
+      if (!out) ctrl.cells = null;
+      ctrl.paint.innerHTML = out ? out.paint : '';
+      const box = out ? out.hit : { x: 0, y: 0, width: 0, height: 0 };
+      Object.entries(box).forEach(([k, v]) => ctrl.hit.setAttribute(k, v));
+      return true;
+    };
+
+    /* The cell under the pointer. The scale clamps to its reachable range;
+       the level returns -1 left of its first cell, which is zero. */
+    const indexAt = (clientX) => {
+      const cells = ctrl.cells;
+      if (!cells) return null;
+      const x = clientX - svg.getBoundingClientRect().left;
+      const kind = kindOf();
+      if (kind === 'level' && x < cells[0].L) return -1;
+      let k = cells.length - 1;
+      for (let i = 0; i < cells.length - 1; i += 1) {
+        if (x < (cells[i].R + cells[i + 1].L) / 2) { k = i; break; }
+      }
+      if (kind === 'scale') return Math.min(ctrl.state.hi, Math.max(ctrl.state.lo, k));
+      return k;
+    };
+    const levelOf = k => (k == null ? null : Math.max(0, Math.min(1, (k + 1) / ctrl.cells.length)));
+    const apply = (k) => {
+      if (k == null) return;
+      if (kindOf() === 'level') {
+        const v = levelOf(k);
+        if (Math.abs(v - clamp01(ctrl.state.value)) > 1e-6) ctrl.opts.onInput(v);
+      } else {
+        const step = STEPS[Math.min(ctrl.state.hi, Math.max(ctrl.state.lo, k))];
+        if (step !== ctrl.state.value) ctrl.opts.onInput(step);
+      }
+      ctrl.render(true);
+    };
+    const draggable = () => kindOf() !== 'meter';
+
+    let raf = 0;
+    let pendingX = null;
+    svg.addEventListener('pointerdown', (e) => {
+      if (!live() || !draggable() || e.button !== 0 || !e.target.closest('.csb__hit')) return;
+      e.preventDefault();
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+      ctrl.ui.drag = { start: ctrl.state.value };
+      ctrl.ui.keys = false;
+      ctrl.ui.hover = null;
+      svg.focus({ preventScroll: true });
+      apply(indexAt(e.clientX));
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!live()) return;
+      if (ctrl.ui.drag) {
+        pendingX = e.clientX;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          if (ctrl.ui.drag && pendingX != null) apply(indexAt(pendingX));
+        });
+        return;
+      }
+      let over = e.target.closest('.csb__hit') ? indexAt(e.clientX) : null;
+      if (over != null && kindOf() === 'meter') over = Math.max(0, over);
+      if (over !== ctrl.ui.hover) {
+        ctrl.ui.hover = over;
+        ctrl.render(false);
+      }
+    });
+    svg.addEventListener('pointerleave', () => {
+      if (ctrl.ui.hover == null || ctrl.ui.drag) return;
+      ctrl.ui.hover = null;
+      ctrl.render(false);
+    });
+    const end = () => {
+      if (!ctrl.ui.drag) return;
+      ctrl.ui.drag = null;
+      if (ctrl.opts.onCommit) ctrl.opts.onCommit(ctrl.state.value);
+      ctrl.render(false);
+    };
+    svg.addEventListener('pointerup', end);
+    svg.addEventListener('pointercancel', end);
+    svg.addEventListener('lostpointercapture', end);
+    svg.addEventListener('dblclick', (e) => {
+      if (!live() || !draggable() || !e.target.closest('.csb__hit')) return;
+      apply(kindOf() === 'level' ? -1 : CENTER);
+      if (ctrl.opts.onCommit) ctrl.opts.onCommit(ctrl.state.value);
+    });
+    svg.addEventListener('keydown', (e) => {
+      if (!live() || !draggable()) return;
+      const level = kindOf() === 'level';
+      if (e.key === 'Escape' && ctrl.ui.drag) {
+        const back = ctrl.ui.drag.start;
+        ctrl.ui.drag = null;
+        e.preventDefault();
+        e.stopPropagation();
+        if (level) {
+          ctrl.opts.onInput(clamp01(back));
+          ctrl.render(true);
+        } else {
+          apply(stepIndex(back));
+        }
+        return;
+      }
+      let to;
+      if (level) {
+        const n = ctrl.cells ? ctrl.cells.length : 40;
+        const k = Math.round(clamp01(ctrl.state.value) * n) - 1;
+        to = {
+          ArrowLeft: k - 1, ArrowDown: k - 1, ArrowRight: k + 1, ArrowUp: k + 1,
+          PageDown: k - 4, PageUp: k + 4, Home: -1, End: n - 1, Delete: -1, Backspace: -1,
+        }[e.key];
+        if (to != null) to = Math.max(-1, Math.min(n - 1, to));
+      } else {
+        const s = stepIndex(ctrl.state.value);
+        to = {
+          ArrowLeft: s - 1, ArrowDown: s - 1, ArrowRight: s + 1, ArrowUp: s + 1,
+          PageDown: s - 4, PageUp: s + 4, Home: ctrl.state.lo, End: ctrl.state.hi,
+          Delete: CENTER, Backspace: CENTER,
+        }[e.key];
+      }
+      if (to == null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      ctrl.ui.keys = true;
+      apply(to);
+      if (ctrl.opts.onCommit) ctrl.opts.onCommit(ctrl.state.value);
+    });
+    svg.addEventListener('focus', () => { ctrl.ui.focus = true; });
+    svg.addEventListener('blur', () => {
+      ctrl.ui.focus = false;
+      ctrl.ui.keys = false;
+      if (active()) ctrl.render(false);
+    });
+    return ctrl;
+  }
+
+  window.CouponScaleBar = {
+    STEPS,
+    CENTER,
+    DESIGNS,
+    DESIGN_KEY,
+    design,
+    designId,
+    setDesign,
+    levelText,
+    mount,
+  };
+})();
+</script>

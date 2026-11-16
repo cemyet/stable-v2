@@ -1191,6 +1191,9 @@ def upsert_raceday_from_st(cur, race_day_id: int, raw: dict,
             time_text = rr.get("time")
             ptext = _st_placement_text(placement, disqualified, galopp, False,
                                        rr.get("placementDisplay"))
+            # Match ATG: unclassified galopp (no official place) is also a DQ.
+            if galopp and placement is None:
+                disqualified = True
 
             # entry.sex: canonical uppercase H/V/S from the resolved horse.
             cur.execute("SELECT gender_code FROM horse WHERE horse_id = %s", (horse_id,))

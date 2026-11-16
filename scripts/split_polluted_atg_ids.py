@@ -76,32 +76,71 @@ def _fetch_polluted(cur, limit: int | None) -> list[dict]:
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
-def _find_target(cur, name: str, country: str | None, polluted_first_year: int) -> int | None:
+def _implied_birth_year(cur, polluted: dict) -> int | None:
+    """Most common (race year - entry age) across the polluted entries.
+
+    ATG stamps every start with the horse's age, so this is the namesake's
+    birth year as the source itself reported it.
+    """
+    cur.execute(
+        """
+        SELECT EXTRACT(year FROM r.race_date)::int - e.age AS by, COUNT(*)
+          FROM entry e
+          JOIN race  r ON r.race_id = e.race_id
+         WHERE e.horse_id = %s
+           AND e.age > 0
+           AND (r.race_date - %s::date) > 6570
+         GROUP BY 1 ORDER BY 2 DESC LIMIT 1
+        """,
+        (polluted["horse_id"], polluted["date_of_birth"]),
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _synth_country(polluted: dict) -> str | None:
+    parts = (polluted.get("atg_id") or "").split(":", 2)
+    return parts[1] if len(parts) == 3 and parts[1] else None
+
+
+def _find_target(cur, polluted: dict) -> int | None:
     """Look for a likely correct foreign horse for the polluted entries.
 
     Candidate horse must:
       - share the normalised name (regardless of suffix marks)
-      - share country OR have unknown country (relaxed)
-      - have a DOB that could plausibly produce the first polluted race
-        year (DOB year between polluted_first_year - 12 and
-        polluted_first_year - 1)
+      - share the synth key's country, the polluted row's country, or have
+        unknown country. The polluted row is usually an old Swedish horse,
+        so its own country alone would steer `x:FR:KAISER` onto a Swedish
+        Kaiser.
+      - have a DOB year matching the age ATG reported on the polluted
+        entries (ST counts age from the birthday, ATG by year, so one year
+        older is also accepted). Without ages, fall back to a DOB that
+        makes the horse at least 2 at the first polluted race.
       - NOT be the polluted horse itself
 
     Returns horse_id if exactly one candidate matches, else None
     (ambiguous → leave for manual review).
     """
+    first_year = polluted["first_polluted_race"].year
+    birth_year = _implied_birth_year(cur, polluted)
+    if birth_year is not None:
+        lo, hi = birth_year - 1, birth_year
+    else:
+        lo, hi = first_year - 12, first_year - 2
+    countries = [c for c in (_synth_country(polluted), polluted["birth_country"]) if c]
     cur.execute(
         """
-        SELECT h.horse_id, h.date_of_birth, h.st_id, h.atg_id, h.birth_country
+        SELECT h.horse_id
           FROM horse h
          WHERE v2_normalize_name(h.name) = v2_normalize_name(%s)
            AND v2_normalize_name(h.name) <> ''
-           AND (h.birth_country = %s OR h.birth_country IS NULL OR %s IS NULL)
+           AND h.horse_id <> %s
+           AND (h.birth_country = ANY(%s) OR h.birth_country IS NULL
+                OR cardinality(%s::text[]) = 0)
            AND h.date_of_birth IS NOT NULL
            AND EXTRACT(year FROM h.date_of_birth)::int BETWEEN %s AND %s
         """,
-        (name, country, country,
-         polluted_first_year - 12, polluted_first_year - 1),
+        (polluted["name"], polluted["horse_id"], countries, countries, lo, hi),
     )
     rows = cur.fetchall()
     if len(rows) == 1:
@@ -148,8 +187,7 @@ def _create_split_row(cur, polluted: dict) -> int:
     # The polluted row is often an old Swedish/ST horse, so do not copy its
     # country onto the new synthetic ATG row. Prefer the synth key country:
     # x:FR:NEVER ON TIME -> FR.
-    parts = (polluted.get("atg_id") or "").split(":", 2)
-    split_country = parts[1] if len(parts) == 3 and parts[1] else polluted["birth_country"]
+    split_country = _synth_country(polluted) or polluted["birth_country"]
     cur.execute(
         """
         INSERT INTO horse (name, birth_country, atg_id, primary_source,
@@ -192,13 +230,8 @@ def main() -> int:
         log(f"Found {len(polluted)} polluted horses.")
 
         for p in polluted:
-            first_year = p["first_polluted_race"].year
-            target_id = None
             with conn.cursor() as cur:
-                target_id = _find_target(cur, p["name"], p["birth_country"], first_year)
-                # Never split into the polluted row itself.
-                if target_id == p["horse_id"]:
-                    target_id = None
+                target_id = _find_target(cur, p)
 
             method = "category_a_existing" if target_id is not None else "category_a_split"
             tgt_name = f"horse {target_id}" if target_id else "NEW ROW"

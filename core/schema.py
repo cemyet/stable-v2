@@ -588,7 +588,7 @@ WITH computed AS (
         e.horse_id,
         COUNT(*) FILTER (
             WHERE NOT e.withdrawn
-              AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+              AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
         )                                                   AS starts,
         COUNT(*) FILTER (
             WHERE e.placement_text = '1'
@@ -603,7 +603,7 @@ WITH computed AS (
               AND NOT COALESCE(e.disqualified, false)
         )                                                   AS placed,
         COUNT(*) FILTER (
-            WHERE COALESCE(e.placement_text, '') ~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+            WHERE COALESCE(e.placement_text, '') ~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
         )                                                   AS qualifiers,
         COALESCE(SUM(e.prize_kr), 0)                        AS prize_money_kr,
         MIN(r.race_date)                                    AS first_start,
@@ -638,7 +638,7 @@ SELECT
     EXTRACT(YEAR FROM r.race_date)::integer AS race_year,
     COUNT(*) FILTER (
         WHERE NOT e.withdrawn
-          AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+          AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
     ) AS starts,
     COUNT(*) FILTER (
         WHERE e.placement_text = '1'
@@ -665,12 +665,12 @@ SELECT 'driver'::text AS role,
        e.driver_id     AS person_id,
        COUNT(*) FILTER (
            WHERE NOT e.withdrawn
-             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
        ) AS starts,
        COUNT(*) FILTER (
            WHERE e.placement_text = '1'
              AND NOT COALESCE(e.disqualified, false)
-             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
        ) AS wins
 FROM entry e
 WHERE e.driver_id IS NOT NULL
@@ -680,12 +680,12 @@ SELECT 'trainer'::text AS role,
        e.trainer_id     AS person_id,
        COUNT(*) FILTER (
            WHERE NOT e.withdrawn
-             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
        ) AS starts,
        COUNT(*) FILTER (
            WHERE e.placement_text = '1'
              AND NOT COALESCE(e.disqualified, false)
-             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+             AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
        ) AS wins
 FROM entry e
 WHERE e.trainer_id IS NOT NULL
@@ -709,7 +709,7 @@ WITH started AS (
            e.galopp, e.auto, e.odds, e.placement_text, e.disqualified,
            (
                NOT e.withdrawn
-               AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+               AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
            ) AS started
     FROM race r
     JOIN entry e ON e.race_id = r.race_id
@@ -990,6 +990,41 @@ CREATE TABLE IF NOT EXISTS ml_prediction (
 );
 
 -- =====================================================================
+-- ML_BACKTEST — every finished starter a race model scored without having
+-- trained on it (scripts/build_race_models.py), kept so later evaluations
+-- (pool ROI in scripts/eval_pools.py, data diagnostics) can replay the
+-- model without refitting it. fold = the out-of-fold time block the race
+-- sat in; the highest fold of a model is its forward test. Local only.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS ml_backtest (
+    model_id    INTEGER NOT NULL,
+    entry_id    BIGINT NOT NULL,
+    fold        SMALLINT NOT NULL,
+    prob        REAL NOT NULL,
+    PRIMARY KEY (model_id, entry_id)
+);
+
+-- =====================================================================
+-- ML_POOL_COUPON — every marking-game system scripts/eval_pools.py settled
+-- for a model: the picks per leg and what the pool paid, for the coupon
+-- viewer on the ml page. src = 'model' | 'market' | 'public' (whose
+-- probabilities picked the horses). Kept for the live model per target.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS ml_pool_coupon (
+    model_id     INTEGER NOT NULL,
+    atg_game_id  TEXT NOT NULL,
+    rule         TEXT NOT NULL,
+    src          TEXT NOT NULL,
+    rows         INTEGER NOT NULL,
+    cost         REAL NOT NULL,
+    ret          REAL NOT NULL,
+    legs_right   SMALLINT NOT NULL,
+    picks        JSONB NOT NULL,
+    PRIMARY KEY (model_id, atg_game_id, rule, src)
+);
+CREATE INDEX IF NOT EXISTS ml_pool_coupon_rule_idx ON ml_pool_coupon (model_id, rule, src);
+
+-- =====================================================================
 -- ENTRY_OUTPERF — per-entry market outperformance ("s_form" building block).
 -- Within each race we rank runners by odds (market's expected order) and by
 -- finish_order (actual order); market_outperf = (odds_rank - fin_rank)/(n-1),
@@ -1073,18 +1108,87 @@ CREATE TABLE IF NOT EXISTS coupon (
     num_lines   INTEGER       NOT NULL,
     cost        NUMERIC(12,2) NOT NULL,
     payout      NUMERIC(12,2),
-    status      VARCHAR(12)   NOT NULL DEFAULT 'saved',  -- saved|played|won|lost
+    status      VARCHAR(12)   NOT NULL DEFAULT 'saved',  -- saved|draft|played
     created_at  TIMESTAMP     NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_coupon_created ON coupon (created_at DESC);
 
 -- The weighted / reduced system behind the selections, as the game page's
 -- Reduced.plan() emits it: per leg the picks' weights, the caps that reduce
--- them, the resulting coverage, and the user's full ranked order (unpicked
--- horses included, since the best of those become ATG's r1/r2 reserves).
+-- them, the resulting coverage, lever targets plus each source→target aim
+-- mode, and the user's full ranked order (unpicked horses included, since
+-- the best of those become ATG's r1/r2 reserves).
 -- Without it a saved coupon reopens as a flat, unweighted system and
 -- num_lines/cost would be priced against the full system.
 ALTER TABLE coupon ADD COLUMN IF NOT EXISTS reduction JSONB;
+-- Played for the top tier alone (V64/V65 "V6", GS75 "V7"): pays only on
+-- every leg right, at that tier's dividend times the game's factor.
+ALTER TABLE coupon ADD COLUMN IF NOT EXISTS top_only BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- =====================================================================
+-- RATING_ENTRY — the horse's sub-ratings right after one start, from the
+-- chronological pass in scripts/build_ratings.py (core/ratings). The as-of
+-- rating for day D is the horse's latest row with race_date < D.
+--   hv: display values (1–99, 0 = no evidence) in core.ratings.keys.HORSE_KEYS
+--       order; hc: confidence 0–100; hr: the raw values behind them
+--       (s/km, rates, Elo points — see keys.py), NULL where hv is 0.
+--   resid: how the horse ran against its pre-race Elo expectation (-1..1);
+--   p_win: the Elo win probability it went in with.
+-- Rows exist from the snapshot window start (2023), plus one seed row per
+-- horse that last raced in the three years before it.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS rating_entry (
+    entry_id    BIGINT NOT NULL PRIMARY KEY,
+    horse_id    INTEGER NOT NULL,
+    race_date   DATE NOT NULL,
+    elo         REAL NOT NULL,
+    starts      INTEGER NOT NULL,
+    hv          SMALLINT[] NOT NULL,
+    hc          SMALLINT[] NOT NULL,
+    hr          REAL[],
+    resid       REAL,
+    p_win       REAL
+);
+CREATE INDEX IF NOT EXISTS idx_rating_entry_horse ON rating_entry (horse_id, race_date DESC);
+-- The breed the horse was scaled against: its code, or for the many foreign
+-- horses without one, the breed of the coded horses it races against.
+ALTER TABLE rating_entry ADD COLUMN IF NOT EXISTS breed CHAR(1);
+
+-- Trainer ('T') and driver ('D') ratings at the start of each month, over
+-- people active in the prior year. Trainer v: A/E of wins against Elo
+-- expectation in complete fields (18-month half-life); v2: stable form
+-- (45-day half-life). Driver v: the driver's share of the joint Elo.
+-- raw/raw2: A/E ratios or Elo points; n: expected wins (trainer) or drives.
+CREATE TABLE IF NOT EXISTS rating_person (
+    person_id   INTEGER NOT NULL,
+    role        CHAR(1) NOT NULL,
+    month       DATE NOT NULL,
+    v           SMALLINT,
+    c           SMALLINT,
+    raw         REAL,
+    v2          SMALLINT,
+    c2          SMALLINT,
+    raw2        REAL,
+    n           REAL,
+    PRIMARY KEY (person_id, role, month)
+);
+
+-- Pedigree sub-ratings per horse (own index, sire, dam, damsire), on the
+-- same 1–99 / 0–100 scales; info keeps the BLUP and foal counts behind them.
+CREATE TABLE IF NOT EXISTS rating_pedigree (
+    horse_id    INTEGER NOT NULL PRIMARY KEY,
+    v           SMALLINT[] NOT NULL,
+    c           SMALLINT[] NOT NULL,
+    info        JSONB
+);
+
+-- Model-level values the API needs: fitted overall weights, per-breed
+-- overall normalisation, freshness table, backtest report.
+CREATE TABLE IF NOT EXISTS rating_model (
+    key         TEXT NOT NULL PRIMARY KEY,
+    value       JSONB NOT NULL,
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
 """
 
 # Per-source rolling buffer DDL is generated from KNOWN_SOURCES so we don't
@@ -1179,6 +1283,78 @@ CREATE TABLE IF NOT EXISTS atg_race_scrape_log (
 """
 
 
+# ATG pool results (scrapers/atg_games.py): what each game paid and how the
+# public spread its stakes, for backtesting models against real pools.
+# Money in öre, shares as fractions. Local only, like the raw store.
+ATG_POOL_DDL = r"""
+-- One row per game: V4_2025-09-10_34_1, V64_..., plats_2025-09-10_5_1.
+CREATE TABLE IF NOT EXISTS atg_game (
+    atg_game_id   VARCHAR(64) PRIMARY KEY,
+    game_type     VARCHAR(12) NOT NULL,
+    game_date     DATE        NOT NULL,
+    status        VARCHAR(20),
+    rtp           SMALLINT,               -- returnToPlayer, % of turnover
+    turnover      BIGINT,
+    system_count  INTEGER,
+    tier_pots     JSONB,                  -- {"5": öre, "6": öre}: each tier's pot
+    payouts       JSONB,                  -- {"6": {"systems": n, "payout": öre per row, "jackpot": bool}}
+    jackpot       BIGINT,
+    race_ids      TEXT[]      NOT NULL,   -- the legs, in order
+    legs          JSONB,                  -- per leg {"winners": [8], "systems": n, "reserve": [...]}
+    scraped_at    TIMESTAMP   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS atg_game_type_date_idx ON atg_game (game_type, game_date);
+
+-- The public's stake share per starter in each leg (the "streck").
+CREATE TABLE IF NOT EXISTS atg_game_start (
+    atg_game_id   VARCHAR(64) NOT NULL REFERENCES atg_game ON DELETE CASCADE,
+    leg           SMALLINT    NOT NULL,
+    number        SMALLINT    NOT NULL,
+    bet_share     REAL,
+    scratched     BOOLEAN     NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (atg_game_id, leg, number)
+);
+
+-- Win and place pool per starter: final odds, the place odds range on the
+-- board, what place actually paid (NULL when it didn't place).
+CREATE TABLE IF NOT EXISTS atg_race_pool (
+    atg_race_id   VARCHAR(64) NOT NULL,
+    number        SMALLINT    NOT NULL,
+    race_date     DATE        NOT NULL,
+    win_odds      REAL,
+    place_min     REAL,
+    place_max     REAL,
+    place_paid    REAL,
+    places_paid   SMALLINT,               -- 3, or 2 in small fields
+    finish        SMALLINT,
+    scratched     BOOLEAN     NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (atg_race_id, number)
+);
+CREATE INDEX IF NOT EXISTS atg_race_pool_date_idx ON atg_race_pool (race_date);
+
+-- How a marking game's legs formed before their start (scrapers.atg_snap):
+-- one row per game, leg and capture, the starters as parallel arrays.
+-- Times are ATG's local clock; odds and stake shares in human units.
+CREATE TABLE IF NOT EXISTS atg_pool_snap (
+    atg_game_id   VARCHAR(64) NOT NULL,
+    leg           SMALLINT    NOT NULL,
+    captured_at   TIMESTAMP   NOT NULL,
+    atg_race_id   VARCHAR(64) NOT NULL,
+    start_time    TIMESTAMP,              -- the leg's start as ATG had it then
+    game_status   VARCHAR(20),
+    game_turnover BIGINT,                 -- öre, the whole game so far
+    systems       INTEGER,
+    win_turnover  BIGINT,                 -- öre, the leg's win pool so far
+    numbers       SMALLINT[]  NOT NULL,
+    win_odds      REAL[],                 -- 3.52; NULL where none yet
+    streck        REAL[],                 -- the game's stake share, 35.45 (%)
+    scratched     BOOLEAN[],
+    PRIMARY KEY (atg_game_id, leg, captured_at)
+);
+CREATE INDEX IF NOT EXISTS atg_pool_snap_race_idx ON atg_pool_snap (atg_race_id, captured_at);
+"""
+
+
 NORMALIZE_NAME_FUNC_DDL = r"""
 -- Mirror of core.identity.normalize_name(). Strip diacritics, * / ·,
 -- trailing (XX), trailing ?, collapse whitespace, uppercase.
@@ -1235,7 +1411,7 @@ WITH ent AS (
     FROM entry e
     CROSS JOIN LATERAL (SELECT (
             NOT e.withdrawn
-            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
         ) AS started) q
     GROUP BY e.horse_id
 ),
@@ -1319,7 +1495,7 @@ WITH agg AS (
     FROM entry e
     CROSS JOIN LATERAL (SELECT (
             NOT e.withdrawn
-            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
         ) AS started) q
     WHERE e.driver_id IS NOT NULL
     GROUP BY e.driver_id
@@ -1334,7 +1510,7 @@ WITH agg AS (
     FROM entry e
     CROSS JOIN LATERAL (SELECT (
             NOT e.withdrawn
-            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+            AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
         ) AS started) q
     WHERE e.trainer_id IS NOT NULL
     GROUP BY e.trainer_id
@@ -1379,7 +1555,7 @@ JOIN entry e ON e.race_id = r.race_id
 LEFT JOIN horse h ON h.horse_id = e.horse_id
 CROSS JOIN LATERAL (SELECT (
         NOT e.withdrawn
-        AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'
+        AND COALESCE(e.placement_text, '') !~ '^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'
     ) AS started) q
 WHERE r.track_id IS NOT NULL
   AND e.auto IS NOT NULL
@@ -1406,6 +1582,7 @@ def create_schema(conn) -> None:
         cur.execute(BUFFER_DDL)
         cur.execute(ST_RAW_DDL)
         cur.execute(ATG_RAW_DDL)
+        cur.execute(ATG_POOL_DDL)
         cur.execute(NORMALIZE_NAME_FUNC_DDL)
         # Stats browse matviews. MUST run after SCHEMA_DDL: horse_stats reads
         # horse_career_stats, which SCHEMA_DDL drops+recreates with CASCADE on
@@ -1429,6 +1606,9 @@ def drop_schema(conn) -> None:
             DROP TABLE IF EXISTS st_raceday_scrape_log  CASCADE;
             DROP TABLE IF EXISTS atg_race_raw           CASCADE;
             DROP TABLE IF EXISTS atg_race_scrape_log    CASCADE;
+            DROP TABLE IF EXISTS atg_game_start         CASCADE;
+            DROP TABLE IF EXISTS atg_game               CASCADE;
+            DROP TABLE IF EXISTS atg_race_pool          CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS horse_stats CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS person_stats CASCADE;
             DROP MATERIALIZED VIEW IF EXISTS track_post_stats CASCADE;
@@ -1440,6 +1620,8 @@ def drop_schema(conn) -> None:
             DROP TABLE IF EXISTS ml_model               CASCADE;
             DROP TABLE IF EXISTS ml_slice               CASCADE;
             DROP TABLE IF EXISTS ml_prediction          CASCADE;
+            DROP TABLE IF EXISTS ml_backtest            CASCADE;
+            DROP TABLE IF EXISTS ml_pool_coupon         CASCADE;
             DROP TABLE IF EXISTS person_merge_log       CASCADE;
             DROP TABLE IF EXISTS horse_merge_log        CASCADE;
             DROP TABLE IF EXISTS job_run                CASCADE;

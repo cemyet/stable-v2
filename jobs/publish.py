@@ -12,6 +12,8 @@ Sync strategy per table:
     publish and upsert them (idempotent). Watermarks are stored in `publish_state`.
   * history tables (no per-row timestamp): pull rows for horses whose
     `last_updated_at` advanced.
+  * snapshot tables (the ratings, rebuilt wholesale): pushed whole when the
+    rebuild's stamp in `rating_model` moved.
   * materialized views: REFRESH on the cloud after base tables are synced.
 
 Usage:
@@ -43,7 +45,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import psycopg2
-from psycopg2.extras import execute_values, Json
+from psycopg2.extras import execute_batch, execute_values, Json
 
 from core import config
 
@@ -78,6 +80,15 @@ SERVING_TABLES: list[tuple[str, str | None]] = [
     ("ml_model",              "created_at"),
     ("ml_prediction",         "updated_at"),
 ]
+
+# Pushed whole every run: registry rows are updated in place (pool results
+# settled after the build, retired flags) without their created_at moving,
+# and the registry is a few hundred kB.
+ALWAYS_FULL = {"ml_slice", "ml_model"}
+
+# Rebuilt wholesale by scripts/build_ratings.py, which stamps rating_model
+# last. Pushed whole, the stamp last too, whenever that stamp has moved.
+SNAPSHOT_TABLES = ["rating_entry", "rating_person", "rating_pedigree", "rating_model"]
 
 # Materialized views refreshed on the cloud after base tables land (order: the
 # horse_*/person_* career views feed the browse-stat views).
@@ -225,19 +236,40 @@ def _pk_columns(conn, table: str) -> list[str]:
         return [r[0] for r in cur.fetchall()]
 
 
-def _upsert_sql(table: str, cols: list[str], pk: list[str]) -> str:
+def _upsert_sql(table: str, cols: list[str], pk: list[str],
+                keep: list[str] = ()) -> str:
+    """`keep` columns are inserted but left untouched on conflict."""
     col_list = ", ".join(cols)
-    updates = [c for c in cols if c not in pk]
+    updates = [c for c in cols if c not in pk and c not in keep]
     set_clause = ", ".join(f"{c}=EXCLUDED.{c}" for c in updates)
     conflict = (f"ON CONFLICT ({', '.join(pk)}) DO UPDATE SET {set_clause}"
                 if updates else f"ON CONFLICT ({', '.join(pk)}) DO NOTHING")
     return f"INSERT INTO {table} ({col_list}) VALUES %s {conflict}"
 
 
+def _self_ref_columns(conn, table: str, pk: list[str]) -> list[str]:
+    """Columns with a foreign key back onto the table's own primary key
+    (horse.sire_id / horse.dam_id)."""
+    if len(pk) != 1:
+        return []
+    return [col for child, col in _fk_referrers(conn, table, pk[0])
+            if child == table]
+
+
 def _stream_upsert(local, cloud, table: str, where_sql: str, params: list,
                    cols: list[str], pk: list[str], *, log=print) -> int:
-    """Stream rows matching where_sql from local and upsert into cloud."""
-    sql = _upsert_sql(table, cols, pk)
+    """Stream rows matching where_sql from local and upsert into cloud.
+
+    Self-referencing columns are written in a second pass. The stream has no
+    parent-first order (a dam can be created after her foal was linked to
+    her, so she has the higher id), and the cloud checks the self-FK per
+    statement — a foal arriving before its dam would abort the whole table.
+    """
+    self_refs = _self_ref_columns(local, table, pk)
+    self_idx = [cols.index(c) for c in self_refs]
+    pk_idx = cols.index(pk[0]) if self_refs else None
+    links: list[tuple] = []
+    sql = _upsert_sql(table, cols, pk, keep=self_refs)
     col_list = ", ".join(cols)
     json_cols = _json_columns(local, table)
     json_idx = [i for i, c in enumerate(cols) if c in json_cols]
@@ -246,12 +278,16 @@ def _stream_upsert(local, cloud, table: str, where_sql: str, params: list,
         select += f" WHERE {where_sql}"
 
     def _prep(row):
-        if not json_idx:
+        if not json_idx and not self_idx:
             return row
         r = list(row)
         for i in json_idx:
             if r[i] is not None:
                 r[i] = Json(r[i])
+        if self_idx:
+            links.append(tuple(r[i] for i in self_idx) + (r[pk_idx],))
+            for i in self_idx:
+                r[i] = None
         return r
 
     pushed = 0
@@ -271,6 +307,13 @@ def _stream_upsert(local, cloud, table: str, where_sql: str, params: list,
                 execute_values(dst, sql, batch, page_size=1000)
                 cloud.commit()
                 pushed += len(batch)
+    if links:
+        set_clause = ", ".join(f"{c} = %s" for c in self_refs)
+        link_sql = f"UPDATE {table} SET {set_clause} WHERE {pk[0]} = %s"
+        with cloud.cursor() as dst:
+            for i in range(0, len(links), _BATCH):
+                execute_batch(dst, link_sql, links[i:i + _BATCH], page_size=1000)
+                cloud.commit()
     if pushed:
         log(f"  {table}: +{pushed:,} rows")
     return pushed
@@ -308,6 +351,21 @@ def sync_table(local_read, state, cloud, table: str, wm_col: str, *,
     new_max = _new_max(local_read, table, wm_col, where_sql, params)
     if new_max is not None:
         _set_watermark(state, table, new_max)
+    return pushed
+
+
+def sync_snapshot(local_read, state, cloud, *, full: bool, log=print) -> int:
+    """SNAPSHOT_TABLES whole, when rating_model's stamp moved since the last push."""
+    with local_read.cursor() as cur:
+        cur.execute("SELECT MAX(updated_at) FROM rating_model")
+        stamp = cur.fetchone()[0]
+    if stamp is None or (not full and _get_watermark(state, "rating_model") == str(stamp)):
+        return 0
+    pushed = 0
+    for table in SNAPSHOT_TABLES:
+        pushed += _stream_upsert(local_read, cloud, table, "", [], _columns(local_read, table),
+                                 _pk_columns(local_read, table), log=log)
+    _set_watermark(state, "rating_model", stamp)
     return pushed
 
 
@@ -909,7 +967,7 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
                                      horse_wm=horse_wm, log=log)
                 else:
                     n = sync_table(local_read, state, cloud, table, wm_col,
-                                   full=full, log=log)
+                                   full=full or table in ALWAYS_FULL, log=log)
                 totals["tables"][table] = n
                 totals["pushed"] += n
             except Exception as exc:
@@ -918,6 +976,17 @@ def _run_publish_once(*, full: bool = False, do_matviews: bool = True, log=print
                     raise _ConnectionLost(f"{table}: {exc!r}") from exc
                 log(f"  {table}: ERROR {exc!r}")
                 totals["tables"][table] = f"error: {exc!r}"
+
+        try:
+            n = sync_snapshot(local_read, state, cloud, full=full, log=log)
+            totals["tables"]["ratings"] = n
+            totals["pushed"] += n
+        except Exception as exc:
+            _safe_rollback(cloud)
+            if _conn_dead(cloud):
+                raise _ConnectionLost(f"ratings: {exc!r}") from exc
+            log(f"  ratings: ERROR {exc!r}")
+            totals["tables"]["ratings"] = f"error: {exc!r}"
 
         # Merge reconciliation (post-pass): re-home references and delete the
         # merged-away loser rows now that all keepers/entries are on the cloud.

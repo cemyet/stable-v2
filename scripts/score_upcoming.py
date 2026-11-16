@@ -1,9 +1,16 @@
-"""Score upcoming-race entries with galopp-risk models.
+"""Score upcoming-race entries with the race-view models.
 
-Writes two targets per entry into ml_prediction so the race view can toggle
-between track-specific and general model scores without loading the ML stack:
-  - y_gal_general — best general-scope model (kvikk, etc.)
-  - y_gal_track   — best track model for that track, or general when none
+Writes these targets per entry into ml_prediction so the race view can read
+them without loading the ML stack:
+  - y_gal_general — best general-scope galopp model (kvikk, etc.)
+  - y_gal_track   — best track galopp model for that track, or general when none
+  - y_lead        — xlead: share of being in front after 100–150 m (SE, per method)
+  - y_front       — xfront: share of being in front at 700 m (SE, per method)
+  - xgal          — xgal: chance of a gallop, the chain's own (an input to xwin / xedge)
+  - xodds         — xodds: share of the win pool the starter "should" draw
+  - xwin          — xwin: chance of winning, grown from xodds
+  - xedge         — xedge's tilt on the market: multiply by the win odds' shares
+                    and renormalise per race for its chances (core/xstack.tilted)
 
 Run under the ML venv:
     .venv-ml/bin/python -m scripts.score_upcoming
@@ -16,6 +23,9 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+import datetime as dt
+import traceback
 
 import pandas as pd
 import joblib
@@ -79,70 +89,131 @@ def _score_subset(conn, entry_ids, artifact_path, model_id, target):
             for eid, p in zip(df["entry_id"].tolist(), probs)]
 
 
+def _latest(cur, target, method=None):
+    cur.execute("""
+        SELECT model_id, name, artifact_path FROM ml_model
+        WHERE target = %s AND (%s::text IS NULL OR slice_def->>'method' = %s)
+        ORDER BY created_at DESC LIMIT 1
+    """, (target, method, method))
+    return cur.fetchone()
+
+
+def score_race_models(conn):
+    """Both passes up to today, then xlead / xfront / xgal -> xodds -> xwin,
+    xedge (core/xstack.py)."""
+    from core import xstack as XS
+    with conn.cursor() as cur:
+        lead = {m: _latest(cur, "y_lead", m) for m in ("auto", "volt")}
+        front = {m: _latest(cur, "y_front", m) for m in ("auto", "volt")}
+        single = {t: _latest(cur, t) for t in ("xgal", "xodds", "xwin", "xedge", "rating")}
+    if not any(lead.values()) and not single["xodds"]:
+        print("race models: nothing registered")
+        return []
+
+    def art(m):
+        return joblib.load(_ROOT / m[2]) if m else None
+
+    out = XS.score(
+        conn, today=dt.date.today(),
+        lead_bundles={m: art(v) for m, v in lead.items()},
+        front_bundles={m: art(v) for m, v in front.items()},
+        gal_art=art(single["xgal"]), xodds_art=art(single["xodds"]),
+        xwin_art=art(single["xwin"]), xedge_art=art(single["xedge"]),
+        log=lambda msg: print(f"race models: {msg}"))
+    method = out["lead_method"]
+    records = []
+    for target, mids in (("y_lead", lead), ("y_front", front)):
+        mid = {m: v[0] for m, v in mids.items() if v}
+        records += [(e, target, mid[method[e]], p) for e, p in out[target].items() if method.get(e) in mid]
+    for target, m in single.items():
+        if m:
+            records += [(e, target, m[0], p) for e, p in out[target].items()]
+    for target in ("y_lead", "y_front", *single):
+        print(f"race models: {sum(1 for r in records if r[1] == target):,} {target}")
+    return records
+
+
+def score_gal(conn):
+    with conn.cursor() as cur:
+        gen = best_general_model(cur)
+        if not gen:
+            print("no general y_gal model registered", file=sys.stderr)
+            return []
+        gen_id, gen_name, gen_path, gen_auc = gen
+        track_models = best_track_models(cur)
+        print(f"general: #{gen_id} '{gen_name}' (auc={gen_auc})")
+        print(f"track models: " + (", ".join(
+            f"{tid}->{m[1]}({m[3]:.4f})" for tid, m in track_models.items()) or "none"))
+
+        cur.execute("""
+            SELECT ef.entry_id, ef.track_id
+            FROM entry_features ef
+            JOIN race r ON r.race_id = ef.race_id
+            WHERE r.race_date >= CURRENT_DATE
+        """)
+        upcoming = cur.fetchall()
+    if not upcoming:
+        print("no upcoming entries to score")
+        return []
+
+    all_ids = [eid for eid, _ in upcoming]
+    records = _score_subset(conn, all_ids, gen_path, gen_id, "y_gal_general")
+
+    track_assignment = {}  # (model_id, path) -> [entry_ids]
+    for entry_id, track_id in upcoming:
+        if track_id in track_models:
+            mid, _name, path, _auc = track_models[track_id]
+            track_assignment.setdefault((mid, path), []).append(entry_id)
+
+    for (mid, path), eids in track_assignment.items():
+        records.extend(_score_subset(conn, eids, path, mid, "y_gal_track"))
+
+    # Tracks without a dedicated model: track score = general score.
+    track_only_ids = {eid for eids in track_assignment.values() for eid in eids}
+    for entry_id, _track_id in upcoming:
+        if entry_id not in track_only_ids:
+            # copy general prob for this entry into y_gal_track
+            gen_prob = next((p for eid, tgt, mid, p in records
+                               if eid == entry_id and tgt == "y_gal_general"), None)
+            if gen_prob is not None:
+                records.append((entry_id, "y_gal_track", gen_id, gen_prob))
+
+    print(f"scoring {len(upcoming):,} upcoming entries "
+          f"({len(track_assignment)} track model(s))")
+    return records
+
+
+def _write(conn, records):
+    from psycopg2.extras import execute_values
+    with conn.cursor() as cur:
+        execute_values(cur, """
+            INSERT INTO ml_prediction (entry_id, target, model_id, prob)
+            VALUES %s
+            ON CONFLICT (entry_id, target)
+            DO UPDATE SET model_id = EXCLUDED.model_id, prob = EXCLUDED.prob,
+                          updated_at = NOW()
+        """, records)
+    conn.commit()
+
+
 def main() -> int:
     conn = get_connection()
+    failed = 0
     try:
-        with conn.cursor() as cur:
-            gen = best_general_model(cur)
-            if not gen:
-                print("no general y_gal model registered", file=sys.stderr)
-                return 2
-            gen_id, gen_name, gen_path, gen_auc = gen
-            track_models = best_track_models(cur)
-            print(f"general: #{gen_id} '{gen_name}' (auc={gen_auc})")
-            print(f"track models: " + (", ".join(
-                f"{tid}->{m[1]}({m[3]:.4f})" for tid, m in track_models.items()) or "none"))
-
-            cur.execute("""
-                SELECT ef.entry_id, ef.track_id
-                FROM entry_features ef
-                JOIN race r ON r.race_id = ef.race_id
-                WHERE r.race_date >= CURRENT_DATE
-            """)
-            upcoming = cur.fetchall()
-        if not upcoming:
-            print("no upcoming entries to score")
-            return 0
-
-        all_ids = [eid for eid, _ in upcoming]
-        records = _score_subset(conn, all_ids, gen_path, gen_id, "y_gal_general")
-
-        track_assignment = {}  # (model_id, path) -> [entry_ids]
-        for entry_id, track_id in upcoming:
-            if track_id in track_models:
-                mid, _name, path, _auc = track_models[track_id]
-                track_assignment.setdefault((mid, path), []).append(entry_id)
-
-        for (mid, path), eids in track_assignment.items():
-            records.extend(_score_subset(conn, eids, path, mid, "y_gal_track"))
-
-        # Tracks without a dedicated model: track score = general score.
-        track_only_ids = {eid for eids in track_assignment.values() for eid in eids}
-        for entry_id, _track_id in upcoming:
-            if entry_id not in track_only_ids:
-                # copy general prob for this entry into y_gal_track
-                gen_prob = next((p for eid, tgt, mid, p in records
-                                   if eid == entry_id and tgt == "y_gal_general"), None)
-                if gen_prob is not None:
-                    records.append((entry_id, "y_gal_track", gen_id, gen_prob))
-
-        print(f"scoring {len(upcoming):,} upcoming entries "
-              f"({len(track_assignment)} track model(s))")
-
-        with conn.cursor() as cur:
-            from psycopg2.extras import execute_values
-            execute_values(cur, """
-                INSERT INTO ml_prediction (entry_id, target, model_id, prob)
-                VALUES %s
-                ON CONFLICT (entry_id, target)
-                DO UPDATE SET model_id = EXCLUDED.model_id, prob = EXCLUDED.prob,
-                              updated_at = NOW()
-            """, records)
-        conn.commit()
-        print("done")
+        for name, scorer in (("gal", score_gal), ("race models", score_race_models)):
+            try:
+                records = scorer(conn)
+                if records:
+                    _write(conn, records)
+            except Exception:
+                conn.rollback()
+                failed += 1
+                print(f"{name}: scoring failed", file=sys.stderr)
+                traceback.print_exc()
+        print("done" + (f" ({failed} scorer(s) failed)" if failed else ""))
     finally:
         conn.close()
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

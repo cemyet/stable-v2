@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: snapshot the open ATG marking games every 5 minutes
+  (scrapers.atg_snap: odds and stake shares as they form before the start).
+
+  A pass reads only the games with a leg due, so most passes make no request
+  at all. Runs only while the Mac is awake; a missed beat fires on wake.
+
+  Install:
+    cp deploy/com.stable-v2.atgsnap.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.stable-v2.atgsnap.plist
+  Stop:
+    launchctl unload ~/Library/LaunchAgents/com.stable-v2.atgsnap.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.stable-v2.atgsnap</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>-m</string>
+        <string>scrapers.atg_snap</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jakob/Dev/stable-v2</string>
+
+    <key>StartInterval</key>
+    <integer>300</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jakob/Dev/stable-v2/logs/atg_snap.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jakob/Dev/stable-v2/logs/atg_snap.err</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+</dict>
+</plist>

@@ -158,7 +158,7 @@ def walk_forward_racedays(conn, seed_ids, *, max_steps_per_chain: int = 80,
                           client: httpx.Client | None = None,
                           log=print) -> dict:
     """From each seed raceday, follow `nextRaceDayId` forward, scraping every
-    new raceday until the chain ends (None/404) or `max_steps_per_chain`.
+    new raceday until the chain ends (None/0/404) or `max_steps_per_chain`.
 
     This is the v2-native replacement for v1's prev/next discovery, scoped to
     *recent* data: each chain advances chronologically at a single track, so
@@ -187,7 +187,9 @@ def walk_forward_racedays(conn, seed_ids, *, max_steps_per_chain: int = 80,
                 # have the blob (free) and only fetch racedays we haven't
                 # scraped — so steady-state runs make almost no HTTP calls.
                 nxt, _blob = _next_raceday_id(conn, client, current)
-                if nxt is None or int(nxt) in visited:
+                # ST ends some chains with 0 rather than null; racedayid/0 is
+                # always a 404 and would read as a failed fetch.
+                if not nxt or int(nxt) in visited:
                     break
                 nxt = int(nxt)
                 if nxt not in done:

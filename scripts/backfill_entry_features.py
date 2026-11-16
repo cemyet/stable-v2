@@ -46,7 +46,7 @@ START_DATE = "2005-01-01"
 # app + career-stats matviews use, so "starts" here mean the same thing.
 _QUALIFIER_RE = (
     r"^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|"
-    r"ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$"
+    r"ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$"
 )
 
 # Phase-2 staging (built by run_phase2). Listed separately so run_phase2 can

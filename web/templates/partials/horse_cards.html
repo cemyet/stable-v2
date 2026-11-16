@@ -1,0 +1,1503 @@
+<style>
+  /* Horse cards: a layer laid into the game page's horse view. The head
+     (number, name, pedigree, description) stays where the view puts it;
+     each design fills the space around it and may move the X. The designs
+     are tabs in the strip the view takes over from the leg's foot. */
+  .hc {
+    position: absolute;
+    inset: 0 0 var(--leg-colhead-h, 34px) 0;
+    pointer-events: none;
+    container: hc / size;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    --hc-l: calc(var(--sl-side-l) + 22px);
+    --hc-r: calc(var(--sl-side-r) + 22px);
+    --hc-accent: color-mix(in srgb, var(--game-type-brand) 42%, white);
+    --hc-accent-deep: color-mix(in srgb, var(--game-type-brand) 78%, #050506);
+    --hc-ideal: #c792ff;
+    --hc-good: #6fe39a;
+    --hc-warn: #ffd166;
+    --hc-gold: #ffd36b;
+    --hc-dim: rgba(255, 255, 255, 0.62);
+    --hc-mute: rgba(255, 255, 255, 0.4);
+    --hc-faint: rgba(255, 255, 255, 0.13);
+    --hc-line: rgba(255, 255, 255, 0.09);
+    --hc-base: 0ms;
+  }
+  .hc.is-out { opacity: 0; transition: opacity 0.16s ease; }
+  .hc [hidden] { display: none !important; }
+  .hc [data-in] { opacity: 0; }
+  .hc.is-in [data-in] {
+    opacity: 1;
+    animation: hc-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--hc-base) + var(--d, 0) * 70ms);
+  }
+  @keyframes hc-in { from { opacity: 0; transform: translateY(8px); } }
+
+  /* Foot strip — where the leg's tool row was, the designs as tabs. */
+  .hc-tabs {
+    position: absolute;
+    left: var(--sl-side-r);
+    right: var(--sl-side-r);
+    bottom: 0;
+    z-index: 2;
+    height: var(--leg-colhead-h, 34px);
+    display: flex;
+    justify-content: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    animation: hc-tabs-in 0.5s 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .hc-tabs.is-out { opacity: 0; transition: opacity 0.16s ease; }
+  @keyframes hc-tabs-in { from { opacity: 0; } }
+  .hc-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    font: inherit;
+    letter-spacing: inherit;
+    color: rgba(255, 255, 255, 0.42);
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  .hc-tab b { font-size: 10px; font-weight: 600; color: rgba(255, 255, 255, 0.26); transition: color 0.15s ease; }
+  .hc-tab:hover { color: rgba(255, 255, 255, 0.82); }
+  .hc-tab.is-active { color: #fff; }
+  .hc-tab.is-active b { color: color-mix(in srgb, var(--game-type-brand) 42%, white); }
+  .hc-tab::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    border-radius: 0 0 2px 2px;
+    background: color-mix(in srgb, var(--game-type-brand) 42%, white);
+    transform: scaleX(0);
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hc-tab.is-active::before { transform: none; }
+  .hc-tab:focus-visible { outline: none; color: #fff; text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) {
+    .hc-tabs { animation: none; }
+  }
+
+  /* A bottom X sits in the strip, beside the tabs. */
+  .game-leg__horse[data-hc] .game-leg__horse-x {
+    bottom: calc((var(--leg-colhead-h, 34px) - 32px) / 2);
+  }
+  .game-leg__horse[data-hc] .game-leg__horse-x {
+    left: auto;
+    right: calc((var(--sl-side-r) + 22px - 32px) / 2);
+    top: 28px;
+    bottom: auto;
+  }
+
+  /* ── Shared pieces ── */
+  .hc a { color: inherit; text-decoration: none; pointer-events: auto; }
+  /* The site's a:hover recolours, re-weights and zeroes padding; a link here
+     keeps its look, so its box rules sit at .hc specificity. */
+  .hc a:hover { color: inherit !important; font-weight: inherit; text-shadow: none; }
+  .hc-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 7px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--hc-line);
+    font-size: 10.5px;
+    letter-spacing: 0.3px;
+    color: var(--hc-mute);
+    white-space: nowrap;
+  }
+  .hc-h > b { font-weight: 600; color: var(--hc-dim); }
+  .hc-empty { margin: 0; font-size: 11px; color: var(--hc-mute); }
+  .hc-note { color: var(--hc-mute); border-bottom: 1px dotted var(--hc-faint); pointer-events: auto; cursor: help; }
+
+  .hc-form { display: flex; gap: 5px; }
+  .hc-form i {
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid var(--hc-faint);
+    font-size: 10.5px;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--hc-dim);
+    pointer-events: auto;
+    cursor: default;
+  }
+  .hc-form i.p1 { background: var(--hc-gold); border-color: transparent; color: #1a1408; }
+  .hc-form i.p23 { border-color: color-mix(in srgb, var(--hc-accent) 65%, transparent); color: #fff; }
+  .hc-form i.pg, .hc-form i.pd { color: #ff8f8f; border-color: rgba(255, 143, 143, 0.35); }
+
+  .rel-full { --rel: var(--hc-good); }
+  .rel-maternal { --rel: #ff9ecb; }
+  .rel-paternal { --rel: #8fd0ff; }
+
+  .hc-key { display: inline-flex; align-items: center; gap: 6px; color: var(--hc-dim); }
+  .hc-key i { display: inline-block; width: 12px; height: 2px; border-radius: 1px; background: var(--hc-accent); }
+  .hc-key i.k-ideal { background: repeating-linear-gradient(90deg, var(--hc-ideal) 0 3px, transparent 3px 5px); }
+  .hc-key i + b, .hc-key b { font-weight: 600; color: #fff; margin-right: 6px; }
+
+  .hc-gps { position: relative; min-width: 0; min-height: 0; pointer-events: auto; }
+  .hc-gps > svg { position: absolute; inset: 0; overflow: visible; }
+  .hc-gps__grid { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; }
+  .hc-gps__lab { fill: var(--hc-mute); font-size: 9.5px; }
+  .hc-gps__lab--x { text-anchor: middle; }
+  .hc-gps__ghost { fill: none; stroke: rgba(255, 255, 255, 0.09); stroke-width: 1; }
+  .hc-gps__best {
+    fill: none;
+    stroke: var(--hc-accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--hc-accent) 55%, transparent));
+  }
+  .hc-gps__ideal { fill: none; stroke: var(--hc-ideal); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  .hc.is-in .hc-gps__draw {
+    animation: hc-wipe 1.25s cubic-bezier(0.45, 0, 0.2, 1) both;
+    animation-delay: calc(var(--hc-base) + 240ms);
+  }
+  .hc-gps > svg.is-static .hc-gps__draw { animation: none; }
+  @keyframes hc-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+  .hc-gps__hover { opacity: 0; transition: opacity 0.12s ease; pointer-events: none; }
+  .hc-gps__hover line { stroke: rgba(255, 255, 255, 0.3); stroke-width: 1; }
+  .hc-gps.is-hover .hc-gps__hover { opacity: 1; }
+  .hc-tip {
+    position: absolute;
+    top: 2px;
+    z-index: 2;
+    display: flex;
+    gap: 10px;
+    padding: 4px 9px;
+    border-radius: 7px;
+    background: rgba(5, 5, 6, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 10.5px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+  }
+  .hc-gps.is-hover .hc-tip { opacity: 1; }
+  .hc-tip b { font-weight: 600; color: var(--hc-dim); }
+  .hc-tip span { display: inline-flex; align-items: center; gap: 5px; }
+  .hc-tip span::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+  .hc-tip em { font-style: normal; color: var(--hc-mute); }
+
+  .tier-legend { --tier: var(--hc-gold); }
+  .tier-elite { --tier: #d6a8ff; }
+  .tier-pro { --tier: var(--hc-accent); }
+  .tier-contender { --tier: var(--hc-good); }
+  .tier-prospect { --tier: rgba(255, 255, 255, 0.6); }
+
+  .hc-ovr {
+    position: absolute;
+    top: 22px;
+    display: flex;
+    gap: 14px;
+  }
+  .hc-ovr__n {
+    font-size: 60px;
+    font-weight: 800;
+    line-height: 0.88;
+    letter-spacing: -2.5px;
+    background: linear-gradient(180deg, #fff 30%, var(--tier));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hc-ovr { pointer-events: auto; cursor: help; }
+  .hc-ovr__meta { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
+  .hc-ovr__meta > span { font-size: 9.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--hc-mute); }
+  .hc-ovr__meta > em { font-size: 10.5px; font-style: normal; font-weight: 600; color: var(--hc-dim); }
+  .hc-segs { display: grid; gap: var(--hc-seg-gap, 9px); }
+  .hc-seg {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    pointer-events: auto;
+    cursor: default;
+  }
+  .hc-seg > span { color: var(--hc-dim); white-space: nowrap; }
+  .hc-seg.is-est > span:first-child::after { content: '*'; color: var(--hc-mute); }
+  .hc-seg > b { text-align: right; }
+  .hc-seg__c { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 9px; }
+  .hc-seg__c i { border-radius: 1.5px; background: var(--hc-faint); }
+  .hc-seg__c i.on { background: var(--hc-accent); box-shadow: 0 0 6px color-mix(in srgb, var(--hc-accent) 45%, transparent); }
+  .hc-seg__c i.part { background: linear-gradient(90deg, var(--hc-accent) calc(var(--p) * 100%), var(--hc-faint) 0); }
+  .hc.is-in .hc-seg__c i.on, .hc.is-in .hc-seg__c i.part {
+    animation: hc-cell 0.28s ease both;
+    animation-delay: calc(var(--hc-base) + 220ms + var(--i) * 50ms + var(--c) * 34ms);
+  }
+  @keyframes hc-cell { from { opacity: 0; transform: scaleY(0.4); } }
+  .hc-radar svg { display: block; overflow: visible; }
+  .hc-radar__ring { fill: none; stroke: rgba(255, 255, 255, 0.09); }
+  .hc-radar__ring:last-of-type { stroke: rgba(255, 255, 255, 0.2); }
+  .hc-radar__spoke { stroke: rgba(255, 255, 255, 0.07); }
+  .hc.is-in .pf-radar__shape {
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+    animation: hc-pop 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.12) both;
+    animation-delay: calc(var(--hc-base) + 220ms);
+  }
+  .hc-radar svg.is-static .pf-radar__shape { animation: none; }
+  @keyframes hc-pop { from { transform: scale(0); opacity: 0; } }
+
+  /* Origin ring */
+  .org-french { --org: #4f8dff; }
+  .org-american { --org: #ff5462; }
+  .org-italian { --org: #3fd68a; }
+  .org-swedish { --org: #ffd23c; }
+  .org-norwegian { --org: #c22f4b; }
+  .org-other { --org: #9aa5b8; }
+  .org-unknown { --org: rgba(255, 255, 255, 0.3); }
+  .hc-origin { flex: 1; min-height: 0; max-height: 200px; display: flex; align-items: center; gap: 22px; pointer-events: auto; }
+  .hc-origin__ring { position: relative; flex: none; height: 100%; max-height: 176px; aspect-ratio: 1; container-type: size; }
+  .hc-origin__ring svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .hc-ring__track { fill: none; stroke: var(--hc-faint); stroke-width: 6; }
+  .hc-ring__hair { fill: none; stroke: var(--hc-line); stroke-width: 0.6; }
+  .hc-ring__s {
+    fill: none;
+    stroke: var(--org);
+    stroke-width: 6;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 2.5px color-mix(in srgb, var(--org) 55%, transparent));
+    transition: opacity 0.18s ease, stroke-width 0.18s ease;
+  }
+  .hc.is-in .hc-ring__s {
+    animation: hc-ring var(--t) cubic-bezier(0.4, 0, 0.25, 1) backwards;
+    animation-delay: calc(var(--hc-base) + 260ms + var(--w));
+  }
+  @keyframes hc-ring { from { stroke-dasharray: 0 100; visibility: hidden; } }
+  .hc-origin[data-hl] .hc-ring__s:not(.is-hl) { opacity: 0.22; }
+  .hc-origin[data-hl] .hc-ring__s.is-hl { stroke-width: 7.5; }
+  .hc-origin__c {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    pointer-events: none;
+  }
+  .hc-origin__c b {
+    font-size: clamp(13px, 20cqh, 32px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .hc-origin__c b small { margin-left: 1px; font-size: 0.55em; font-weight: 600; color: var(--hc-dim); letter-spacing: 0; }
+  .hc-origin__c span {
+    max-width: 70%;
+    font-size: clamp(8px, 6.5cqh, 10px);
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--org, var(--hc-mute)) 72%, white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hc-origin__c.is-unknown b { color: var(--hc-dim); }
+  .hc.is-in .hc-origin__c { animation: hc-in 0.5s ease backwards; animation-delay: calc(var(--hc-base) + 520ms); }
+
+  /* ── 1 · Profile ──
+     Left, attributes over the bloodline; middle, the pace chart over the
+     siblings; right, the radar with its compare switch, centred in the card.
+     The view is one height for every field size, so this is laid out for it. */
+  /* Above the view's head, which spans to the compare switch. */
+  .hc--profile { --pf-vs: #ff8f6b; z-index: 1; }
+  .hc--profile > * {
+    --pf-rd: 290px;
+    --pf-side-r: calc(var(--hc-r) - 40px);
+    --pf-zone-r: calc(var(--pf-side-r) + var(--pf-rd) + 48px);
+  }
+  .hc--profile .hc-ovr { left: 0; right: 0; width: max-content; margin: 0 auto; }
+  .hc--profile .hc-ovr__meta { justify-content: center; padding-top: 0; }
+  .hc--profile .hc-ovr__meta > span { line-height: 1.6; }
+  /* Newest first, down the gutter from the attributes' top row. */
+  .pf-form {
+    position: absolute;
+    left: 0;
+    width: var(--hc-l);
+    top: calc(var(--hc-head-b) + 20px);
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .pf-grid {
+    position: absolute;
+    left: var(--hc-l);
+    right: var(--pf-zone-r);
+    top: calc(var(--hc-head-b) + 20px);
+    bottom: 22px;
+    display: grid;
+    grid-template-columns: 330px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: "stats pace" "blood sibs";
+    gap: 14px 40px;
+  }
+  .hc--profile .hc-segs { --hc-seg-gap: 9px; }
+  /* Reaches up past the grid's top to just under the rating; the head ends left of it. */
+  .pf-pace {
+    grid-area: pace;
+    margin-top: calc(92px - var(--hc-head-b, 110px) - 20px);
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pf-pace .hc-h { margin-bottom: 6px; }
+  .pf-gps { flex: 1; }
+  .pf-gps__vs { fill: none; stroke: var(--pf-vs); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--pf-vs) 50%, transparent)); }
+  .pf-gps__vs-ideal { fill: none; stroke: var(--pf-vs); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: 0.85; }
+  .pf-gps__vsg.is-fresh { animation: pf-fade 0.45s ease both; }
+  .pf-gps .hc-gps__hover circle { fill: var(--c); stroke: #050506; stroke-width: 1.5; }
+  .pf-gps .hc-gps__hover circle.is-ideal { fill: #050506; stroke: var(--c); }
+  .pf-gps .hc-tip { gap: 8px; padding: 3px 8px; font-size: 10px; }
+  .pf-gps .hc-tip span.is-ideal::before { box-sizing: border-box; background: none; border: 1.5px solid var(--c); }
+  .pf-pace__key { display: flex; gap: 14px; margin-top: 4px; min-height: 13px; font-size: 10px; white-space: nowrap; overflow: hidden; }
+  .pf-pace__key .hc-key b { margin-right: 4px; }
+  .pf-pace__key .hc-key i.k-vs { background: var(--pf-vs); }
+  .pf-pace__key .hc-key i.k-vs-ideal { background: repeating-linear-gradient(90deg, var(--pf-vs) 0 3px, transparent 3px 5px); }
+  .pf-pace__key small { font-weight: 700; color: var(--hc-mute); }
+  .pf-stats { grid-area: stats; }
+  .pf-blood, .pf-sibs { align-self: end; height: min(100%, 232px); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .pf-blood { grid-area: blood; }
+  .pf-sibs { grid-area: sibs; }
+  .pf-blood .hc-h { margin-bottom: 10px; }
+  .hc--profile .hc-origin { max-height: none; gap: 20px; }
+  .hc--profile .hc-origin__ring { max-height: 168px; }
+  .hc-ring__track[data-k] { cursor: default; }
+
+  .pf-coi { flex: 1; min-width: 0; max-width: 176px; display: flex; flex-direction: column; gap: 4px; }
+  .pf-coi__k { font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--hc-mute); }
+  .pf-coi__v { align-self: flex-start; font-size: 24px; font-weight: 700; line-height: 1.05; letter-spacing: -0.4px; cursor: help; }
+  .pf-coi__v small { margin-left: 1px; font-size: 0.55em; font-weight: 600; letter-spacing: 0; color: var(--hc-dim); }
+  .pf-coi__v em { margin-right: 3px; font-size: 0.7em; font-style: normal; font-weight: 600; color: var(--hc-mute); }
+  .pf-coi__bar { position: relative; height: 4px; margin: 7px 0 3px; border-radius: 2px; background: var(--hc-faint); cursor: help; }
+  .pf-coi__bar i { position: absolute; }
+  .pf-coi__band { top: 0; bottom: 0; left: var(--a); right: calc(100% - var(--b)); border-radius: 2px; background: rgba(255, 255, 255, 0.2); }
+  .pf-coi__mid { top: -3px; bottom: -3px; left: var(--m); width: 1px; background: rgba(255, 255, 255, 0.55); }
+  .pf-coi__dot {
+    top: 50%;
+    left: var(--v);
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(5, 5, 6, 0.55), 0 0 10px rgba(255, 255, 255, 0.55);
+  }
+  .hc.is-in .pf-coi__dot { animation: pf-dot 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--hc-base) + 420ms); }
+  @keyframes pf-dot { from { left: 0; opacity: 0; } }
+  .pf-coi__note { font-size: 10px; color: var(--hc-mute); white-space: nowrap; }
+  .pf-sibs .hc-h { margin-bottom: 4px; }
+  /* The bloodline note's dotted underline adds a pixel; matched so both rules line up. */
+  .pf-sibs .hc-h > span { border-bottom: 1px solid transparent; }
+  /* Centred under its header like the ring beside it. */
+  .pf-sibs__list { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+  .hc--profile .pf-sib {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1px 11px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--hc-line);
+  }
+  .hc--profile .pf-sib:last-child { border-bottom: 0; }
+  .pf-sib__rel {
+    grid-row: span 2;
+    box-sizing: border-box;
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--rel) 50%, transparent);
+    background: color-mix(in srgb, var(--rel) 12%, transparent);
+    font-size: 11.5px;
+    font-style: normal;
+    font-weight: 700;
+    color: var(--rel);
+    cursor: help;
+  }
+  .pf-sib__rel.is-full { font-size: 7.5px; letter-spacing: 0.5px; }
+  .pf-sib > b { min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-sib > strong { grid-row: 1 / span 2; grid-column: 3; font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .pf-sib > em { min-width: 0; font-size: 10.5px; font-style: normal; color: var(--hc-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .pf-side {
+    position: absolute;
+    right: var(--pf-side-r);
+    top: 0;
+    bottom: 0;
+    width: var(--pf-rd);
+    display: flex;
+    align-items: center;
+  }
+  .pf-radar-box { position: relative; width: 100%; aspect-ratio: 1; }
+  .hc--profile .hc-radar { position: absolute; inset: 0; width: auto; height: auto; pointer-events: auto; }
+  .pf-radar__shape polygon {
+    stroke: var(--hc-accent);
+    stroke-width: 1.6;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--hc-accent) 45%, transparent));
+  }
+  .pf-radar__shape circle { fill: #fff; stroke: var(--hc-accent); stroke-width: 1.2; }
+  .pf-radar__shape circle.is-none { fill: #050506; stroke: var(--hc-mute); }
+  .pf-radar__k { text-anchor: middle; cursor: default; }
+  .pf-radar__k.is-est .pf-radar__kv { fill: var(--hc-dim); }
+  .pf-radar__kk { fill: var(--hc-mute); font-size: 9px; letter-spacing: 1.2px; }
+  .pf-radar__kv { fill: #fff; font-size: 11.5px; font-weight: 700; }
+  .pf-radar__kvs { fill: var(--pf-vs); }
+  .pf-radar__vs { transition: opacity 0.22s ease; }
+  .pf-radar__vs.is-out { opacity: 0; }
+  .pf-radar__vs.is-fresh { animation: pf-fade 0.45s ease both; }
+  @keyframes pf-fade { from { opacity: 0; } }
+  .pf-radar__vs-shape { fill: color-mix(in srgb, var(--pf-vs) 14%, transparent); stroke: var(--pf-vs); stroke-width: 1.4; stroke-linejoin: round; }
+  .pf-radar__vs circle { fill: var(--pf-vs); }
+  .pf-radar__vs-all { fill: none; stroke: color-mix(in srgb, var(--pf-vs) 42%, transparent); stroke-width: 0.9; stroke-linejoin: round; }
+
+  /* The switch is two overlapping dots, this horse and a rival; opened, they
+     part to the ends and the rival's name opens out from the middle. */
+  .pf-cmp {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: var(--cw, 30px);
+    max-width: 100%;
+    height: 30px;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: width 0.46s cubic-bezier(0.65, 0, 0.25, 1);
+  }
+  .pf-cmp::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+    transition: border-color 0.2s ease;
+  }
+  .pf-cmp:hover::before { border-color: rgba(255, 255, 255, 0.28); }
+  .pf-cmp button { position: absolute; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+  .pf-cmp button:focus-visible { outline: none; }
+  .pf-cmp:has(:focus-visible)::before { border-color: var(--hc-accent); }
+  .pf-cmp .pf-cmp__cap {
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    transition: left 0.46s cubic-bezier(0.65, 0, 0.25, 1), transform 0.18s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .pf-cmp__cap::after { content: ''; position: absolute; inset: -8px; }
+  .pf-cmp .pf-cmp__cap--a { left: calc(50% - 10px); z-index: 1; background: var(--hc-accent); box-shadow: 0 0 8px color-mix(in srgb, var(--hc-accent) 55%, transparent); }
+  .pf-cmp .pf-cmp__cap--b { left: calc(50% - 2px); border: 1.5px solid var(--pf-vs); }
+  .pf-cmp.is-open .pf-cmp__cap--a { left: 9px; }
+  .pf-cmp.is-open .pf-cmp__cap--b { left: calc(100% - 21px); background: var(--pf-vs); box-shadow: 0 0 8px color-mix(in srgb, var(--pf-vs) 55%, transparent); }
+  .pf-cmp.is-open.is-all .pf-cmp__cap--b { background: radial-gradient(circle, var(--pf-vs) 0 1.6px, transparent 2.2px); box-shadow: none; }
+  .pf-cmp.is-open .pf-cmp__cap:hover { transform: scale(1.3); }
+  .pf-cmp .pf-cmp__name {
+    inset: 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    clip-path: inset(0 50%);
+    transition: clip-path 0.46s cubic-bezier(0.65, 0, 0.25, 1), opacity 0.3s ease;
+  }
+  .pf-cmp.is-open .pf-cmp__name { opacity: 1; clip-path: inset(0 0); }
+  .pf-cmp__name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .pf-cmp__name small { margin-right: 6px; font-size: 10px; font-weight: 700; color: var(--hc-mute); }
+  .pf-cmp__name > span.is-swap { animation: pf-swap 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes pf-swap { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 10px)); } }
+  .pf-cmp.is-loading .pf-cmp__name > span { animation: pf-pulse 0.8s ease-in-out infinite alternate; }
+  @keyframes pf-pulse { to { opacity: 0.45; } }
+
+  /* ── 2 · Attributes ──
+     Every sub-rating under its main: the six abilities left, the four
+     standing mains right, each sub with its value, label and a hairline bar. */
+  .hc--attributes .hc-ovr { left: 0; right: 0; width: max-content; margin: 0 auto; }
+  .hc--attributes .hc-ovr__meta { justify-content: center; padding-top: 0; }
+  .hc--attributes .hc-ovr__meta > span { line-height: 1.6; }
+  .hc--attributes .hc-body {
+    position: absolute;
+    left: var(--hc-l);
+    right: var(--hc-r);
+    top: calc(var(--hc-head-b) + 22px);
+    bottom: 20px;
+  }
+  .at { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 44px; }
+  .at-group { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .at-group .hc-h { margin-bottom: 10px; }
+  .at-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px 26px; }
+  .at-group--standing .at-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .at-a { --bc: #4ee08a; }
+  .at-b { --bc: #a6e86f; }
+  .at-c { --bc: #ffd166; }
+  .at-d { --bc: #ffa45c; }
+  .at-e { --bc: #ff7a7a; }
+  .at-none { --bc: var(--hc-mute); }
+  .at-main { min-width: 0; }
+  .at-main header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid var(--hc-line);
+    pointer-events: auto;
+    cursor: help;
+  }
+  .at-main header b { font-size: 21px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; color: var(--bc); }
+  .at-main header span { font-size: 9.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--hc-dim); }
+  .at-main header.is-est b::after, .at-main li.is-est span::after { content: '*'; color: var(--hc-mute); font-weight: 400; }
+  .at-main ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .at-main li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    padding: 0 0 4px;
+    font-size: 10.5px;
+    pointer-events: auto;
+    cursor: help;
+  }
+  .at-main li b { font-weight: 700; text-align: right; color: var(--bc); }
+  .at-main li span { color: var(--hc-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .at-main li.is-est b, .at-main li.is-est span { opacity: 0.55; }
+  .at-main li i { position: absolute; left: 28px; right: 0; bottom: 1px; height: 2px; border-radius: 1px; background: var(--hc-faint); }
+  .at-main li i::after { content: ''; position: absolute; inset: 0 auto 0 0; width: calc(var(--v) * 100%); border-radius: 1px; background: var(--bc); opacity: 0.8; }
+  .at-main li.is-est i::after { opacity: 0.35; }
+  .at-main li:hover span { color: #fff; }
+  .hc.is-in .at-main li i::after {
+    animation: at-bar 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--hc-base) + 200ms + var(--i) * 45ms);
+  }
+  @keyframes at-bar { from { width: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hc.is-in [data-in], .hc.is-in .hc-gps__draw, .hc.is-in .hc-seg__c i,
+    .hc.is-in .hc-ring__s, .hc.is-in .hc-origin__c, .hc.is-in .at-main li i::after,
+    .hc.is-in .pf-radar__shape, .hc.is-in .pf-coi__dot, .pf-radar__vs, .pf-gps__vsg, .pf-cmp__name > span { animation: none !important; }
+    .pf-cmp, .pf-cmp .pf-cmp__cap, .pf-cmp .pf-cmp__name { transition: none; }
+  }
+</style>
+<script>
+  (() => {
+    const VARIANTS = ['profile', 'attributes'];
+    // The design lab's made-up horses may have no traces of their own, so
+    // it falls back to a labelled demo; the real page shows only real ones.
+    const gpsUrl = (id, start) => (window.RACE_LAB
+      ? `/admin/design/game-lab/gps/${id}?start=${start}`
+      : `/api/horse/${id}/gps?start=${start}`);
+    const fromUrl = new URLSearchParams(location.search).get('card');
+    let variant = VARIANTS.includes(fromUrl) ? fromUrl : 'profile';
+    const variantListeners = new Set();
+    const loads = new Map();
+    let waiters = [];
+    let uid = 0;
+    const motion = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ── Formatting ──
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const km = (sec, method) => {
+      if (!(sec > 0)) return '–';
+      const t = Math.round(sec * 10);
+      const m = Math.floor(t / 600);
+      const r = t - m * 600;
+      return `${m}.${String(Math.floor(r / 10)).padStart(2, '0')},${r % 10}${method === 'A' ? 'a' : ''}`;
+    };
+    const kr = n => {
+      n = Number(n) || 0;
+      if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace('.', ',')} Mkr`;
+      if (n >= 1e3) return `${Math.round(n / 1e3)} tkr`;
+      return `${n} kr`;
+    };
+    const pct = x => (x == null || Number.isNaN(x) ? '–' : `${Math.round(x * 100)}%`);
+    const plainName = s => {
+      const name = String(s || '').replace(/\*/g, '').replace(/\s*\([A-Z]{2,3}\)\s*$/, '').trim();
+      if (name !== name.toUpperCase()) return name;
+      return name.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, a, b) => a + b.toUpperCase());
+    };
+
+    // ── Ratings ──
+    // The mains as core/ratings/keys.py has them: six abilities on the radar,
+    // four standing bars. The values come from /api/horse/<id>/ratings.
+    const MAINS = [
+      ['start', 'STA', 'ability'], ['speed', 'SPD', 'ability'], ['finish', 'FIN', 'ability'],
+      ['strength', 'STR', 'ability'], ['discipline', 'DIS', 'ability'], ['heart', 'HRT', 'ability'],
+      ['class', 'CLS', 'standing'], ['form', 'FRM', 'standing'], ['connections', 'CON', 'standing'],
+      ['pedigree', 'PED', 'standing'],
+    ];
+    const ABILITY = MAINS.filter(m => m[2] === 'ability').map(m => m[0]);
+    // A value resting on less than half the evidence its rating wants is starred and dimmed.
+    const THIN = 0.5;
+
+    function mainsOf(raw) {
+      const got = new Map((raw?.mains || []).map(x => [x.key, x]));
+      return MAINS.map(([key, code, group]) => {
+        const x = got.get(key);
+        const subs = (x?.subs || []).map(s => ({ ...s, est: s.v != null && s.c < THIN }));
+        const known = subs.filter(s => s.v != null);
+        const basis = !x || x.v == null
+          ? 'no evidence yet'
+          : `${pct(x.c)} of the evidence it wants · ${known.map(s => `${s.label} ${s.v}${s.est ? '*' : ''}`).join(' · ')}${known.length < subs.length ? ` · ${subs.length - known.length} without evidence` : ''}`;
+        return { key, label: x?.label || key, short: code, group, value: x?.v ?? null, c: x?.c || 0, est: x?.v != null && x.c < THIN, basis, subs };
+      });
+    }
+
+    const tierOf = v => (v == null ? 'prospect' : v >= 88 ? 'legend' : v >= 80 ? 'elite' : v >= 72 ? 'pro' : v >= 62 ? 'contender' : 'prospect');
+
+    function gpsModel(raw) {
+      const races = (raw?.races || []).filter(r => r.intervals?.length).map(r => ({
+        date: r.race_date,
+        track: r.track,
+        place: r.placement_text,
+        km: r.km_ms / 1000,
+        iv: r.intervals.map(s => ({ a: s.start, b: s.end, pace: s.duration / 1000 })),
+      // No trotter covers 100 m quicker than about 1.00/km; a trace that does
+      // has lost GPS lock somewhere and its sectors can't be trusted.
+      })).filter(r => r.iv.every(s => s.pace >= 55));
+      if (!races.length) return null;
+      const n = Math.min(...races.map(r => r.iv.length));
+      races.forEach(r => { r.iv = r.iv.slice(0, n); });
+      const dist = races[0].iv[n - 1].b;
+      const best = races.reduce((a, r) => (r.km < a.km ? r : a));
+      const ideal = Array.from({ length: n }, (_, i) => {
+        const owner = races.reduce((a, r) => (r.iv[i].pace < a.iv[i].pace ? r : a));
+        return { ...owner.iv[i], from: owner };
+      });
+      const over = (iv, a, b) => {
+        let t = 0, m = 0;
+        iv.forEach(s => {
+          const lo = Math.max(a, s.a), hi = Math.min(b, s.b);
+          if (hi > lo) { t += ((hi - lo) / 1000) * s.pace; m += hi - lo; }
+        });
+        return m ? t / (m / 1000) : null;
+      };
+      const idealKm = over(ideal, 0, dist);
+      return {
+        source: raw.source === 'xlabs' ? 'xlabs' : 'demo',
+        races, best, ideal, dist, idealKm,
+        first200: over(best.iv, 0, 200),
+        last200: over(best.iv, dist - 200, dist),
+        best100: Math.min(...best.iv.map(s => s.pace)),
+      };
+    }
+
+    const ORIGINS = ['french', 'american', 'italian', 'swedish', 'norwegian', 'other', 'unknown'];
+
+    function bloodModel(raw) {
+      const s = raw?.shares;
+      if (!s) return null;
+      return {
+        horizon: raw.horizon,
+        known: 1 - (s.unknown || 0),
+        other: raw.other || {},
+        slices: ORIGINS.filter(k => s[k] > 0).map(k => ({ key: k, share: s[k] })),
+      };
+    }
+
+    function pickSibs(sibs) {
+      const byEarn = (a, b) => (b.earnings_raw || 0) - (a.earnings_raw || 0);
+      const full = sibs.filter(s => s.rel === 'full').sort(byEarn);
+      const mat = sibs.filter(s => s.rel === 'maternal').sort(byEarn);
+      const pat = sibs.filter(s => s.rel === 'paternal').sort(byEarn);
+      const close = [...full, ...mat];
+      const out = close.slice(0, 2);
+      if (pat.length) out.push(pat[0]);
+      [...close.slice(2), ...pat.slice(1)].sort(byEarn).forEach(s => { if (out.length < 3) out.push(s); });
+      return out;
+    }
+
+    function model(entry, rows, sibs, gpsRaw, ctx, bloodRaw, ratingsRaw) {
+      const place = r => (r.disqualified ? null : r.placement_num);
+      const started = rows
+        .filter(r => !r.withdrawn && (r.time_val > 0 || r.placement_num != null || r.galopp || r.disqualified))
+        .sort((a, b) => String(b.race_date).localeCompare(String(a.race_date)));
+      const gps = gpsModel(gpsRaw);
+
+      const mains = mainsOf(ratingsRaw);
+      const S = Object.fromEntries(mains.map(s => [s.key, s]));
+      const stats = mains.filter(s => s.group === 'standing');
+      const ov = ratingsRaw?.overall || {};
+      const ovr = ov.v ?? null;
+      const tier = tierOf(ovr);
+      const W = ratingsRaw?.weights || {};
+      const ovrTitle = ovr == null
+        ? 'no rating yet'
+        : `${pct(ov.c)} of the evidence the overall wants${ov.pm ? `, so give or take ${ov.pm}` : ''} · as known before this race day · weights ${Object.entries(W).sort((a, b) => b[1] - a[1]).map(([k, w]) => `${k} ${Math.round(w * 100)}%`).join(', ')}; pedigree fades as the horse races, and a main with no evidence is left out rather than counted low`;
+
+      const formOf = r => {
+        const p = place(r);
+        const title = `${r.race_date} ${r.track_label || ''} · ${km(r.time_val, r.start_method)}`;
+        if (r.disqualified) return { t: 'd', c: 'pd', title };
+        if (r.galopp && !(p >= 1 && p <= 3)) return { t: 'g', c: 'pg', title };
+        return { t: p >= 1 && p <= 9 ? String(p) : '0', c: p === 1 ? 'p1' : p === 2 || p === 3 ? 'p23' : '', title };
+      };
+      const recent = started.slice(0, 10).map(formOf);
+
+      const paternal = sibs.filter(s => s.rel === 'paternal').length;
+      const maternal = sibs.filter(s => s.rel === 'maternal').length;
+      const fullN = sibs.filter(s => s.rel === 'full').length;
+      return {
+        number: entry.number,
+        name: plainName(entry.horse_name),
+        mains, stats, stat: S, ovr, pm: ov.pm || 0, ovrTitle, tier,
+        recent,
+        sibs: pickSibs(sibs),
+        sibCount: sibs.length,
+        sibCapped: sibs.length >= 500,
+        family: { paternal, maternal, full: fullN },
+        gps,
+        blood: bloodModel(bloodRaw),
+        inb: bloodRaw?.inbreeding || null,
+        rivals: rivals(ctx).length,
+      };
+    }
+
+    // The rest of the field in program order, from the horse after this one.
+    function rivals(ctx) {
+      const self = ctx.entry?.horse_id;
+      const list = (ctx.raceData?.results || [])
+        .filter(e => e.horse_id && !e.withdrawn && e.horse_id !== self)
+        .sort((a, b) => a.number - b.number);
+      return [...list.filter(e => e.number > ctx.number), ...list.filter(e => !(e.number > ctx.number))];
+    }
+
+    function load(entry, ctx) {
+      const id = entry?.horse_id;
+      if (!id) return Promise.resolve([[], [], null, null, null]);
+      // Ratings are as of the race day, so they key on the race too.
+      const start = ctx.raceData?.start_method === 'V' ? 'V' : 'A';
+      const key = `${id}:${start}:${ctx.raceId || ''}`;
+      if (!loads.has(key)) {
+        const j = u => fetch(u).then(r => (r.ok ? r.json() : null)).catch(() => null);
+        const race = encodeURIComponent(ctx.raceId || '');
+        loads.set(key, Promise.all([
+          j(`/api/horse/${id}/races`),
+          j(`/api/horse/${id}/siblings`),
+          j(gpsUrl(id, start)),
+          j(`/api/horse/${id}/bloodline?race=${race}`),
+          j(`/api/horse/${id}/ratings?race=${race}`),
+        ]));
+      }
+      return loads.get(key);
+    }
+
+    // ── Pieces ──
+    const segs = m => `<div class="hc-segs">${m.stats.map((s, i) => {
+      const v = s.value ?? 0;
+      const full = Math.floor(v / 10);
+      const cells = Array.from({ length: 10 }, (_, c) => {
+        if (c < full) return `<i class="on" style="--c:${c}"></i>`;
+        if (c === full && v % 10) return `<i class="part" style="--c:${c};--p:${(v % 10) / 10}"></i>`;
+        return '<i></i>';
+      }).join('');
+      return `<div class="hc-seg${s.est ? ' is-est' : ''}" title="${esc(s.basis)}" style="--i:${i}"><span>${s.label}</span><span class="hc-seg__c">${cells}</span><b>${s.value ?? '–'}</b></div>`;
+    }).join('')}</div>`;
+
+    const sibMeta = s => [s.year, s.gender, s.starts ? `${s.wins}/${s.starts}` : 'unraced'].filter(Boolean).join(' · ');
+
+    const gpsNote = m => {
+      const g = m.gps;
+      if (!g) return '';
+      if (g.source !== 'xlabs') return '<span class="hc-note" title="xLabs profiles from real 2140 m races, rescaled to this horse\u2019s best times">demo</span>';
+      const n = g.races.length;
+      return `<span class="hc-note" title="${esc(`this horse\u2019s ${n} xLabs trace${n === 1 ? '' : 's'} over ${g.dist} m \u2014 km times over the distance actually trotted, so quicker than the official ones`)}">${g.dist} m</span>`;
+    };
+
+    const originNote = gen => `every line traced ${gen} generations back; the ${2 ** gen} ancestors there count 1/${2 ** gen} each, by the country they were bred in. Flags closer in don\u2019t count \u2014 an Italian-bred son of two American parents is American. Unknown: the pedigree ends sooner`;
+
+    const REGIONS = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['en'], { type: 'region' }) : null;
+    // Intl folds these retired codes into Russia and Serbia.
+    const OLD_REGIONS = { SU: 'Soviet Union', YU: 'Yugoslavia' };
+    function countryName(code) {
+      if (OLD_REGIONS[code]) return OLD_REGIONS[code];
+      try { return REGIONS?.of(code) || code; } catch { return code; }
+    }
+
+    // Slices keep a fixed order, so one horse reads against the next at a glance.
+    // Arcs carry their share for the centre readout; the bare track is the unknown.
+    function ring(m) {
+      const b = m.blood;
+      const gen = b?.horizon || 6;
+      const svg = (arcs, track = `<circle class="hc-ring__track" cx="50" cy="50" r="${RING_R}"/>`) => `<svg viewBox="0 0 100 100" aria-hidden="true">
+            ${track}
+            <circle class="hc-ring__hair" cx="50" cy="50" r="${RING_R - 7}"/>
+            <g transform="rotate(-90 50 50)">${arcs}</g>
+          </svg>`;
+      if (!b || b.known < 0.005) {
+        return { gen, html: `<div class="hc-origin__ring">${svg('')}<div class="hc-origin__c"><b>–</b></div></div>` };
+      }
+      const known = b.slices.filter(s => s.key !== 'unknown');
+      const top = known.reduce((a, s) => (s.share > a.share ? s : a), known[0]);
+      const full = known.length === 1 && b.known > 0.995;
+      const title = s => s.key === 'other'
+        ? Object.entries(b.other).map(([c, v]) => `${countryName(c)} ${originPct(v)}%`).join(' · ')
+        : s.key === 'unknown' ? `pedigree ends within ${gen} generations` : '';
+      let at = 0;
+      const arcs = b.slices.map(s => {
+        const len = s.share * 100, start = at;
+        at += len;
+        if (s.key === 'unknown') return '';
+        // Round caps reach past the dash, so trim each arc and centre it in its share.
+        const dash = full ? 100 : Math.max(0.001, len - RING_TRIM);
+        const from = full ? 0 : start + (len - dash) / 2;
+        return `<circle class="hc-ring__s org-${s.key}" data-k="${s.key}" data-v="${originPct(s.share)}" cx="50" cy="50" r="${RING_R}" pathLength="100"
+          stroke-dasharray="${dash.toFixed(3)} 100" stroke-dashoffset="${(-from).toFixed(3)}"
+          style="--w:${Math.round(start * 7)}ms;--t:${Math.round(140 + len * 7)}ms">${title(s) ? `<title>${esc(title(s))}</title>` : ''}</circle>`;
+      }).join('');
+      const unknown = b.slices.find(s => s.key === 'unknown');
+      const track = unknown
+        ? `<circle class="hc-ring__track" data-k="unknown" data-v="${originPct(unknown.share)}" cx="50" cy="50" r="${RING_R}"><title>${esc(title(unknown))}</title></circle>`
+        : undefined;
+      return {
+        gen, top,
+        html: `<div class="hc-origin__ring">${svg(arcs, track)}${originCentre(top.key, originPct(top.share))}</div>`,
+      };
+    }
+
+    // Ring radius in a 100-unit box, and how much of the circle (in %) each arc
+    // gives up so its round caps leave a hairline gap to the next.
+    const RING_R = 42;
+    const RING_TRIM = (2 * 3 + 1.4) / (2 * Math.PI * RING_R) * 100;
+    const originPct = v => Math.max(1, Math.round(v * 100));
+    const originCentreClass = k => `hc-origin__c org-${k}${k === 'unknown' ? ' is-unknown' : ''}`;
+    const originCentreInner = (k, v) => `<b>${v}<small>%</small></b><span>${k}</span>`;
+    const originCentre = (k, v) => `<div class="${originCentreClass(k)}">${originCentreInner(k, v)}</div>`;
+
+    function originFocus(box, k) {
+      if ((box.dataset.hl || null) === k) return;
+      if (k) box.dataset.hl = k;
+      else delete box.dataset.hl;
+      box.querySelectorAll('[data-k]').forEach(el => el.classList.toggle('is-hl', el.dataset.k === k));
+      const src = box.querySelector(`[data-k="${k || box.dataset.top}"][data-v]`);
+      const c = box.querySelector('.hc-origin__c');
+      if (!src || !c) return;
+      c.className = originCentreClass(src.dataset.k);
+      c.innerHTML = originCentreInner(src.dataset.k, src.dataset.v);
+    }
+    document.addEventListener('pointerover', ev => {
+      const box = ev.target.closest?.('.hc-origin[data-top]');
+      if (box) originFocus(box, ev.target.closest('[data-k]')?.dataset.k || null);
+    });
+    document.addEventListener('pointerout', ev => {
+      const box = ev.target.closest?.('.hc-origin[data-top]');
+      if (box && !box.contains(ev.relatedTarget)) originFocus(box, null);
+    });
+
+    // ── Profile pieces ──
+    const pc = (v, d = 2) => v.toFixed(d).replace('.', ',');
+    const BREED = { V: 'trotters', K: 'coldbloods' };
+
+    function inbreeding(m) {
+      const c = m.inb;
+      const k = '<span class="pf-coi__k">inbreeding</span>';
+      if (c?.coi == null) return `<div class="pf-coi">${k}<b class="pf-coi__v">–</b><span class="pf-coi__note">no pedigree on record</span></div>`;
+      const how = c.source === 'travsport'
+        ? 'TravSport\u2019s figure: Wright\u2019s coefficient over the whole known pedigree'
+        : c.exact
+          ? 'Wright\u2019s coefficient over the whole known pedigree'
+          : 'Wright\u2019s coefficient over the pedigree on record. It thins out within ten generations and missing ancestors only lower the figure, so the true one is higher';
+      const t = c.typical;
+      const max = Math.max(20, Math.ceil((c.coi * 1.15) / 5) * 5);
+      const at = v => `${clamp((v / max) * 100, 0, 100).toFixed(1)}%`;
+      const breed = BREED[c.breed] || BREED.V;
+      const scale = t ? `
+          <span class="pf-coi__bar" title="${esc(`middle 80% of Swedish-registered ${breed} born since 2012, ${pc(t[0], 1)}\u2013${pc(t[2], 1)} %; the tick is the median, ${pc(t[1], 1)} %`)}">
+            <i class="pf-coi__band" style="--a:${at(t[0])};--b:${at(t[2])}"></i><i class="pf-coi__mid" style="--m:${at(t[1])}"></i><i class="pf-coi__dot" style="--v:${at(c.coi)}"></i>
+          </span>` : '';
+      return `<div class="pf-coi">${k}
+          <b class="pf-coi__v" title="${esc(how)}">${c.exact ? '' : '<em>\u2265</em>'}${pc(c.coi)}<small>%</small></b>${scale}
+        </div>`;
+    }
+
+    function bloodPanel(m) {
+      const r = ring(m);
+      const head = `<header class="hc-h"><b>bloodline</b><span class="hc-note" title="${esc(originNote(r.gen))}">${r.gen} generations</span></header>`;
+      return `${head}<div class="hc-origin"${r.top ? ` data-top="${r.top.key}"` : ''}>${r.html}${inbreeding(m)}</div>`;
+    }
+
+    // M and P rather than dam and sire letters, so they carry over to Swedish.
+    const REL_MARK = { full: 'FULL', maternal: 'M', paternal: 'P' };
+    const REL_LONG = { full: 'full sibling, same sire and dam', maternal: 'half sibling on the dam\u2019s side', paternal: 'half sibling on the sire\u2019s side' };
+    const kin = m => (m.sibs.length
+      ? m.sibs.map(s => `
+          <a class="pf-sib rel-${s.rel}" href="/horse/${s.horse_id}" target="_blank" rel="noopener">
+            <i class="pf-sib__rel${s.rel === 'full' ? ' is-full' : ''}" title="${REL_LONG[s.rel]}">${REL_MARK[s.rel]}</i>
+            <b>${esc(plainName(s.name))}</b><strong>${s.earnings_raw ? kr(s.earnings_raw) : '–'}</strong><em>${esc(sibMeta(s))}</em>
+          </a>`).join('')
+      : '<p class="hc-empty">no siblings on record</p>');
+    const kinCount = m => (m.sibCount
+      ? `<span>${m.family.full} full · ${m.family.maternal} M · ${m.family.paternal}${m.sibCapped ? '+' : ''} P</span>`
+      : '');
+
+    const compareSwitch = m => (m.rivals
+      ? `<div class="pf-cmp" data-pf-cmp title="compare with the field">
+          <button type="button" class="pf-cmp__cap pf-cmp__cap--a" data-step="-1" aria-label="compare: step back"></button>
+          <button type="button" class="pf-cmp__name" data-step="1" aria-label="compare: next horse"><span></span></button>
+          <button type="button" class="pf-cmp__cap pf-cmp__cap--b" data-step="1" aria-label="compare: next horse"></button>
+        </div>`
+      : '');
+
+    // Rivals as they'd open on their own card, the live market aside.
+    const rivalModels = new Map();
+    function rivalModel(e, ctx) {
+      const key = `${e.horse_id}:${ctx.raceData?.start_method === 'V' ? 'V' : 'A'}:${ctx.raceId || ''}`;
+      if (!rivalModels.has(key)) {
+        rivalModels.set(key, load(e, ctx).then(([rows, sibs, gps, blood, ratings]) =>
+          model(e, rows || [], sibs || [], gps, { ...ctx, entry: e, number: e.number, live: {} }, blood, ratings)));
+      }
+      return rivalModels.get(key);
+    }
+
+    // Positions: 0 closed, 1 the whole field, 2… one rival each. Opening lands
+    // on the first rival, so the whole field is one step back and closing is
+    // a step back from there or a step past the last rival.
+    function compareStep(sw, dir) {
+      const hc = sw.closest('.hc');
+      const ctx = hc?.parentElement?.closest('[data-leg]')?._horse;
+      if (!hc?._m || !ctx) return;
+      const field = hc._field || (hc._field = rivals(ctx));
+      if (!field.length) return;
+      const n = field.length + 2;
+      const was = hc._vs?.i || 0;
+      const i = was === 0 ? (dir > 0 ? 2 : 1) : (was + dir + n) % n;
+      hc._vs = { i, sel: hc._vs?.sel || null };
+      paintSwitch(sw, i === 0 ? null : i === 1 ? { all: field.length } : { e: field[i - 2] }, dir);
+      const done = sel => {
+        if (hc._vs.i !== i) return;
+        hc._vs.sel = sel;
+        sw.classList.remove('is-loading');
+        hc.querySelectorAll('[data-hc-radar="pf"]').forEach(host => overlay(host, sel, true));
+        hc.querySelectorAll('[data-hc-pfgps]').forEach(host => drawPfGps(host, hc._m, true));
+      };
+      if (i === 0) { done(null); return; }
+      sw.classList.add('is-loading');
+      if (i === 1) Promise.all(field.map(e => rivalModel(e, ctx))).then(all => done({ all }));
+      else rivalModel(field[i - 2], ctx).then(one => done({ one }));
+    }
+
+    function paintSwitch(sw, what, dir) {
+      const label = sw.querySelector('.pf-cmp__name > span');
+      sw.classList.toggle('is-open', !!what);
+      sw.classList.toggle('is-all', !!what?.all);
+      sw.title = what ? '' : 'compare with the field';
+      if (!what) { sw.style.removeProperty('--cw'); sw.classList.remove('is-loading'); return; }
+      label.innerHTML = what.all
+        ? `<small>${what.all}</small>whole field`
+        : `<small>${what.e.number}</small>${esc(plainName(what.e.horse_name))}`;
+      label.style.setProperty('--dir', dir);
+      label.classList.remove('is-swap');
+      void label.offsetWidth;
+      label.classList.add('is-swap');
+      sw.style.setProperty('--cw', `${Math.min(sw.parentElement.clientWidth, label.scrollWidth + 66)}px`);
+    }
+
+    document.addEventListener('click', ev => {
+      const sw = ev.target.closest?.('[data-pf-cmp]');
+      if (!sw) return;
+      const step = sw.classList.contains('is-open') ? Number(ev.target.closest('[data-step]')?.dataset.step || 0) : 1;
+      if (step) compareStep(sw, step);
+    });
+    document.addEventListener('keydown', ev => {
+      const sw = ev.target.closest?.('[data-pf-cmp]');
+      if (!sw || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+      ev.preventDefault();
+      compareStep(sw, ev.key === 'ArrowLeft' ? -1 : 1);
+    });
+
+    // ── Variants ──
+    const overall = m => `
+        <div class="hc-ovr tier-${m.tier}" data-in style="--d:1" title="${esc(m.ovrTitle)}">
+          <b class="hc-ovr__n">${m.ovr ?? '–'}</b>
+          <div class="hc-ovr__meta"><span>overall<br>rating</span>${m.pm ? `<em>±${m.pm}</em>` : ''}</div>
+        </div>`;
+
+    // Green to red around the breed median of 65; 85+ is the top 2%.
+    const band = v => (v == null ? 'none' : v >= 85 ? 'a' : v >= 75 ? 'b' : v >= 65 ? 'c' : v >= 55 ? 'd' : 'e');
+    const subTitle = s => `${s.label}${s.v != null ? ` ${s.v}` : ''} — ${s.basis}${s.v != null ? ` · ${pct(s.c)} of the evidence it wants` : ''}`;
+    const atMain = (x, i) => `<section class="at-main" style="--i:${i}">
+        <header class="at-${band(x.value)}${x.est ? ' is-est' : ''}" title="${esc(`${x.label}: ${x.basis}`)}"><b>${x.value ?? '–'}</b><span>${x.label}</span></header>
+        <ul>${x.subs.map(s => `<li class="at-${band(s.v)}${s.est ? ' is-est' : ''}" title="${esc(subTitle(s))}" style="--v:${(s.v ?? 0) / 99}"><b>${s.v ?? '–'}</b><span>${esc(s.label)}</span><i></i></li>`).join('')}</ul>
+      </section>`;
+
+    const T = {
+      profile: m => `
+        ${overall(m)}
+        ${m.recent.length ? `<div class="hc-form pf-form" data-in style="--d:2">${m.recent.map(f => `<i class="${f.c}" title="${esc(f.title)}">${f.t}</i>`).join('')}</div>` : ''}
+        <div class="pf-grid">
+          <div class="pf-stats" data-in style="--d:2">${segs(m)}</div>
+          <section class="pf-pace" data-in style="--d:3">
+            <header class="hc-h"><b>pace · xLabs</b><span>${gpsNote(m)}</span></header>
+            <div class="hc-gps pf-gps" data-hc-pfgps></div>
+            <div class="pf-pace__key"></div>
+          </section>
+          <section class="pf-blood" data-in style="--d:3">${bloodPanel(m)}</section>
+          <section class="pf-sibs" data-in style="--d:4"><header class="hc-h"><b>siblings</b>${kinCount(m)}</header><div class="pf-sibs__list">${kin(m)}</div></section>
+        </div>
+        <div class="pf-side" data-in style="--d:2">
+          <div class="pf-radar-box">${compareSwitch(m)}<div class="hc-radar" data-hc-radar="pf"></div></div>
+        </div>`,
+
+      attributes: m => `
+        ${overall(m)}
+        <div class="hc-body at" data-in style="--d:2">
+          <div class="at-group">
+            <header class="hc-h"><b>ability</b><span>the radar on the profile</span></header>
+            <div class="at-cols">${m.mains.filter(x => x.group === 'ability').map(atMain).join('')}</div>
+          </div>
+          <div class="at-group at-group--standing">
+            <header class="hc-h"><b>standing</b><span>the bars</span></header>
+            <div class="at-cols">${m.mains.filter(x => x.group === 'standing').map((x, i) => atMain(x, i + 6)).join('')}</div>
+          </div>
+        </div>`,
+    };
+
+    // ── Drawing ──
+    // Monotone cubic, so a section never bulges past its neighbours.
+    function smooth(p) {
+      const n = p.length;
+      if (n < 2) return '';
+      const xy = (x, y) => `${x.toFixed(1)},${y.toFixed(1)}`;
+      const dx = [], m = [];
+      for (let i = 0; i < n - 1; i++) {
+        dx[i] = p[i + 1][0] - p[i][0];
+        m[i] = (p[i + 1][1] - p[i][1]) / dx[i];
+      }
+      const t = [m[0]];
+      for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+      t[n - 1] = m[n - 2];
+      for (let i = 0; i < n - 1; i++) {
+        if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+        const a = t[i] / m[i], b = t[i + 1] / m[i], s = a * a + b * b;
+        if (s > 9) { const k = 3 / Math.sqrt(s); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+      }
+      let d = `M${xy(p[0][0], p[0][1])}`;
+      for (let i = 0; i < n - 1; i++) {
+        const h = dx[i] / 3;
+        d += `C${xy(p[i][0] + h, p[i][1] + h * t[i])} ${xy(p[i + 1][0] - h, p[i + 1][1] - h * t[i + 1])} ${xy(p[i + 1][0], p[i + 1][1])}`;
+      }
+      return d;
+    }
+
+    const kmOf = iv => {
+      let t = 0, d = 0;
+      iv.forEach(s => { t += ((s.b - s.a) / 1000) * s.pace; d += s.b - s.a; });
+      return d ? t / (d / 1000) : null;
+    };
+
+    // What the compare switch sets beside this horse's two lines: a rival's
+    // best race and best sectors, or the field's fastest race and, over its
+    // length, the best 100 m any rival has trotted.
+    function paceRival(sel) {
+      if (sel?.one) {
+        const x = sel.one, g = x.gps;
+        return { tag: x.number, name: x.name, best: g?.best.iv, bestKm: g && kmOf(g.best.iv), ideal: g?.ideal, idealKm: g?.idealKm };
+      }
+      if (!sel?.all) return null;
+      const gs = sel.all.filter(x => x.gps);
+      if (!gs.length) return { all: true };
+      const top = gs.reduce((a, x) => (x.gps.best.km < a.gps.best.km ? x : a));
+      const by = new Map();
+      gs.forEach(x => x.gps.races.forEach(r => r.iv.forEach(s => {
+        if (!(by.get(s.a)?.pace <= s.pace)) by.set(s.a, s);
+      })));
+      const ideal = top.gps.best.iv.map(s => by.get(s.a) || s);
+      return { all: true, tag: top.number, name: top.name, best: top.gps.best.iv, bestKm: kmOf(top.gps.best.iv), ideal, idealKm: kmOf(ideal) };
+    }
+
+    function pfPaceKey(hc, m, vs) {
+      const key = hc?.querySelector('.pf-pace__key');
+      if (!key) return;
+      const g = m.gps;
+      const own = g
+        ? `<span class="hc-key" title="best race · best 100 m of ${g.races.length} runs, km times over the distance traced"><i></i><b>${km(kmOf(g.best.iv))}</b><i class="k-ideal"></i><b>${km(g.idealKm)}</b></span>`
+        : '';
+      const who = vs?.all ? 'field' : vs?.tag;
+      const them = !vs || (!g && !vs.best) ? '' : vs.best
+        ? `<span class="hc-key" title="${esc(vs.all ? `fastest in the field, ${vs.tag} ${vs.name} · best 100 m by any rival` : `${vs.name}: best race · best 100 m`)}"><small>${who}</small><i class="k-vs"></i><b>${km(vs.bestKm)}</b><i class="k-vs-ideal"></i><b>${km(vs.idealKm)}</b></span>`
+        : `<span class="hc-key"><small>${who}</small>no xLabs traces</span>`;
+      key.innerHTML = own + them;
+    }
+
+    // Pace along the race. Ghost runs only show without a rival.
+    function drawPfGps(host, m, fresh = false) {
+      const w = host.clientWidth, h = host.clientHeight;
+      if (w < 60 || h < 40) return;
+      const hc = host.closest('.hc');
+      const g = m.gps;
+      const vs = paceRival(hc?._vs?.sel);
+      pfPaceKey(hc, m, vs);
+      const lines = [];
+      if (g) lines.push({ iv: g.best.iv, cls: 'hc-gps__best', c: 'var(--hc-accent)' }, { iv: g.ideal, cls: 'hc-gps__ideal', c: 'var(--hc-ideal)', ideal: true });
+      if (vs?.best) lines.push({ iv: vs.best, cls: 'pf-gps__vs', c: 'var(--pf-vs)', vs: true }, { iv: vs.ideal, cls: 'pf-gps__vs-ideal', c: 'var(--pf-vs)', vs: true, ideal: true });
+      if (!lines.length) { host.innerHTML = '<p class="hc-empty">no xLabs traces</p>'; host._geom = null; return; }
+      const ghosts = !vs && g ? g.races.filter(r => r !== g.best).slice(0, 4).map(r => r.iv) : [];
+      const id = `hcg${++uid}`;
+      let out = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="${host.dataset.drawn ? 'is-static' : ''}">
+        <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" style="stop-color:var(--hc-accent);stop-opacity:.32"/><stop offset="1" style="stop-color:var(--hc-accent);stop-opacity:0"/>
+        </linearGradient></defs>`;
+      const rule = (x1, y1, x2, y2) => `<line class="hc-gps__grid" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+      const geom = pfPaceGeom(lines, ghosts, w, h);
+      const { pad, pts } = geom;
+      out += geom.grid(rule);
+      out += '<g class="hc-gps__draw">';
+      ghosts.forEach(iv => { out += `<path class="hc-gps__ghost" d="${smooth(pts(iv))}"/>`; });
+      if (g) {
+        const bp = pts(g.best.iv);
+        out += `<path fill="url(#${id})" d="${smooth(bp)}L${bp[bp.length - 1][0].toFixed(1)},${h - pad.b}L${bp[0][0].toFixed(1)},${h - pad.b}Z"/>`;
+      }
+      const paths = list => list.slice().reverse().map(l => `<path class="${l.cls}" d="${smooth(pts(l.iv))}"/>`).join('');
+      out += `${paths(lines.filter(l => !l.vs))}</g>`;
+      const rv = lines.filter(l => l.vs);
+      if (rv.length) out += `<g class="pf-gps__vsg${fresh ? ' is-fresh' : ''}">${paths(rv)}</g>`;
+      out += `<g class="hc-gps__hover"><line/>${lines.map(l => `<circle r="3.2" style="--c:${l.c}"${l.ideal ? ' class="is-ideal"' : ''}/>`).join('')}</g></svg>`;
+      host.innerHTML = `${out}<div class="hc-tip"></div>`;
+      host.dataset.drawn = '1';
+      host._geom = { ...geom, lines, h };
+      if (!host._hover) {
+        host._hover = true;
+        host.addEventListener('pointermove', ev => pfPaceHover(host, ev));
+        host.addEventListener('pointerleave', () => host.classList.remove('is-hover'));
+      }
+    }
+
+    function pfPaceGeom(lines, ghosts, w, h) {
+      const dist = Math.max(...lines.map(l => l.iv[l.iv.length - 1].b));
+      const all = [...lines.map(l => l.iv), ...ghosts].flatMap(iv => iv.map(s => s.pace)).sort((a, b) => a - b);
+      const lo = Math.floor((Math.min(...lines.filter(l => l.ideal).flatMap(l => l.iv.map(s => s.pace))) - 0.35) * 2) / 2;
+      const hi = Math.max(all[Math.floor(all.length * 0.96)] + 0.4, lo + 3);
+      const pad = { l: 0, r: 34, t: 4, b: 15 };
+      const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+      const X = d => pad.l + (d / dist) * iw;
+      const Y = p => pad.t + ((clamp(p, lo, hi) - lo) / (hi - lo)) * ih;
+      return {
+        pad,
+        pts: iv => iv.map(s => [X((s.a + s.b) / 2), Y(s.pace)]),
+        grid(rule) {
+          let out = '';
+          const step = Math.max(1, Math.ceil((hi - lo) / Math.max(1, ih / 18)));
+          for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+            out += `${rule(pad.l, Y(p), w - pad.r, Y(p))}<text class="hc-gps__lab" x="${w - pad.r + 6}" y="${(Y(p) + 3.5).toFixed(1)}">${km(p).slice(0, -2)}</text>`;
+          }
+          for (let d = 500; d < dist; d += 500) {
+            out += `${rule(X(d), pad.t, X(d), h - pad.b)}<text class="hc-gps__lab hc-gps__lab--x" x="${X(d).toFixed(1)}" y="${h - 3}">${d}</text>`;
+          }
+          return out;
+        },
+        hover(px) {
+          const d = clamp((px - pad.l) / iw, 0, 0.9999) * dist;
+          const seg = lines.map(l => l.iv.find(s => d >= s.a && d < s.b) || null);
+          const ref = seg.find(Boolean);
+          if (!ref) return null;
+          return {
+            x: X((ref.a + ref.b) / 2),
+            dots: seg.map(s => s && [X((s.a + s.b) / 2), Y(s.pace)]),
+            head: `${ref.a}–${ref.b} m`,
+            vals: seg.map(s => s && km(s.pace)),
+          };
+        },
+      };
+    }
+
+    function pfPaceHover(host, ev) {
+      const G = host._geom;
+      const tip = host.querySelector('.hc-tip'), hov = host.querySelector('.hc-gps__hover');
+      if (!G || !tip || !hov) return;
+      const r = host.getBoundingClientRect();
+      const at = G.hover(ev.clientX - r.left);
+      if (!at) { host.classList.remove('is-hover'); return; }
+      const ln = hov.querySelector('line');
+      ln.setAttribute('x1', at.x); ln.setAttribute('x2', at.x);
+      ln.setAttribute('y1', G.pad.t); ln.setAttribute('y2', G.h - G.pad.b);
+      hov.querySelectorAll('circle').forEach((c, i) => {
+        const p = at.dots[i];
+        c.style.display = p ? '' : 'none';
+        if (!p) return;
+        c.setAttribute('cx', p[0].toFixed(1));
+        c.setAttribute('cy', p[1].toFixed(1));
+      });
+      tip.innerHTML = `<b>${at.head}</b>${G.lines.map((l, i) => (at.vals[i] ? `<span style="--c:${l.c}"${l.ideal ? ' class="is-ideal"' : ''}>${at.vals[i]}</span>` : '')).join('')}`;
+      tip.style.left = `${clamp(at.x, tip.offsetWidth / 2, r.width - tip.offsetWidth / 2)}px`;
+      tip.style.removeProperty('top');
+      host.classList.add('is-hover');
+    }
+
+    // Each label is key over value, centred on its spoke, so it stays inside
+    // the square whichever way the spoke points.
+    // A main with no evidence sits at the breed median, hollow, not at zero.
+    // Ratings centre on 65, so the radar runs 25–95 to keep shapes apart.
+    const AXES = ABILITY;
+    const radial = v => clamp(((v ?? 65) - 25) / 70, 0.04, 1);
+    function drawPfRadar(host, m) {
+      const s = Math.floor(Math.min(host.clientWidth, host.clientHeight));
+      if (s < 80) return;
+      const n = AXES.length, c = s / 2, R = c - 30;
+      const ang = i => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      const P = (i, f) => [c + Math.cos(ang(i)) * R * f, c + Math.sin(ang(i)) * R * f];
+      const pts = mm => AXES.map((k, i) => P(i, radial(mm.stat[k]?.value)));
+      const poly = list => list.map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+      const id = `hcr${++uid}`;
+      let out = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" class="${host.dataset.drawn ? 'is-static' : ''}">
+        <defs><radialGradient id="${id}" cx="${c}" cy="${c}" r="${R}" gradientUnits="userSpaceOnUse">
+          <stop offset="0" style="stop-color:var(--hc-accent);stop-opacity:.05"/><stop offset="1" style="stop-color:var(--hc-accent);stop-opacity:.36"/>
+        </radialGradient></defs>`;
+      [0.25, 0.5, 0.75, 1].forEach(f => { out += `<polygon class="hc-radar__ring" points="${poly(AXES.map((_, i) => P(i, f)))}"/>`; });
+      AXES.forEach((_, i) => { const [x, y] = P(i, 1); out += `<line class="hc-radar__spoke" x1="${c}" y1="${c}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; });
+      const own = pts(m);
+      out += `<g class="pf-radar__shape"><polygon fill="url(#${id})" points="${poly(own)}"/>${own.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4"${m.stat[AXES[i]]?.value == null ? ' class="is-none"' : ''}/>`).join('')}</g>`;
+      out += '<g class="pf-radar__vs"></g>';
+      AXES.forEach((k, i) => {
+        const st = m.stat[k];
+        const [x, y] = P(i, 1);
+        // The two-line label hangs below its anchor, so the top one sits further out.
+        const sin = Math.sin(ang(i));
+        const off = sin < -0.9 ? 18 : sin > 0.9 ? 14 : 15;
+        const lx = (x + Math.cos(ang(i)) * off).toFixed(1), ly = (y + Math.sin(ang(i)) * off).toFixed(1);
+        out += `<text class="pf-radar__k${st.est ? ' is-est' : ''}" x="${lx}" y="${ly}"><tspan class="pf-radar__kk" x="${lx}" dy="-0.3em">${st.short.toUpperCase()}</tspan><tspan class="pf-radar__kv" x="${lx}" dy="1.25em">${st.value ?? '–'}${st.est ? '*' : ''}<tspan class="pf-radar__kvs" data-k="${k}"></tspan></tspan><title>${esc(`${st.label}: ${st.basis}`)}</title></text>`;
+      });
+      host.innerHTML = `${out}</svg>`;
+      host.dataset.drawn = '1';
+      host._rg = { c, pts, poly };
+      host._vsPts = null;
+      overlay(host, host.closest('.hc')?._vs?.sel || null, false);
+    }
+
+    // One rival is a second shape that slides from the last one; the whole
+    // field is every rival's outline, and the labels give this horse's rank.
+    function overlay(host, sel, tween) {
+      const G = host._rg;
+      const g = host.querySelector('.pf-radar__vs');
+      const own = host.closest('.hc')?._m;
+      if (!G || !g || !own) return;
+      cancelAnimationFrame(host._tw || 0);
+      host.querySelectorAll('.pf-radar__kvs').forEach(t => {
+        const k = t.dataset.k, mine = own.stat[k]?.value;
+        let v = '';
+        if (sel?.one) v = sel.one.stat[k]?.value ?? '–';
+        else if (sel?.all && mine != null) v = `#${1 + sel.all.filter(x => (x.stat[k]?.value ?? -1) > mine).length}`;
+        t.textContent = v;
+        t.setAttribute('dx', v === '' ? '0' : '4');
+      });
+      g.classList.toggle('is-out', !sel);
+      if (!sel) { host._vsPts = null; return; }
+      if (sel.all) {
+        host._vsPts = null;
+        g.dataset.kind = 'all';
+        g.innerHTML = sel.all.map(x => `<polygon class="pf-radar__vs-all" points="${G.poly(G.pts(x))}"/>`).join('');
+        if (tween) { g.classList.remove('is-fresh'); void g.getBoundingClientRect(); g.classList.add('is-fresh'); }
+        return;
+      }
+      const to = G.pts(sel.one);
+      const from = host._vsPts || to.map(() => [G.c, G.c]);
+      host._vsPts = to;
+      if (g.dataset.kind !== 'one') {
+        g.dataset.kind = 'one';
+        g.classList.remove('is-fresh');
+        g.innerHTML = `<polygon class="pf-radar__vs-shape"/>${to.map(() => '<circle r="2.2"/>').join('')}`;
+      }
+      const shape = g.querySelector('polygon');
+      const dots = g.querySelectorAll('circle');
+      const put = list => {
+        shape.setAttribute('points', G.poly(list));
+        dots.forEach((d, i) => { d.setAttribute('cx', list[i][0].toFixed(1)); d.setAttribute('cy', list[i][1].toFixed(1)); });
+      };
+      if (!tween || !motion()) { put(to); return; }
+      put(from);
+      const t0 = performance.now();
+      const frame = now => {
+        const k = Math.min(1, (now - t0) / 460);
+        const e = k < 0.5 ? 4 * k ** 3 : 1 - (-2 * k + 2) ** 3 / 2;
+        put(to.map((p, i) => [from[i][0] + (p[0] - from[i][0]) * e, from[i][1] + (p[1] - from[i][1]) * e]));
+        if (k < 1) host._tw = requestAnimationFrame(frame);
+      };
+      host._tw = requestAnimationFrame(frame);
+    }
+
+    // The rating steps aside when a long name would run into it.
+    function fit(hc) {
+      const view = hc.parentElement;
+      if (!view) return;
+      const ovr = hc.classList.contains('hc--profile') && hc.querySelector('.hc-ovr');
+      const head = view.querySelector('.game-leg__horse-head');
+      const name = head?.querySelector('.game-leg__horse-name');
+      if (ovr && name && ovr.offsetParent === hc) {
+        ovr.style.removeProperty('translate');
+        const clash = head.offsetLeft + name.offsetLeft + name.offsetWidth + 28 - (hc.offsetLeft + ovr.offsetLeft);
+        if (clash > 0) ovr.style.translate = `${Math.ceil(clash)}px 0`;
+      }
+    }
+
+    const ro = new ResizeObserver(list => list.forEach(({ target }) => {
+      if (target.classList.contains('hc')) { fit(target); return; }
+      const hc = target.closest('.hc');
+      if (!hc?._m) return;
+      if (target.dataset.hcPfgps != null) drawPfGps(target, hc._m);
+      else if (target.dataset.hcRadar === 'pf') drawPfRadar(target, hc._m);
+    }));
+
+    // ── The layer ──
+    // The head is measured untransformed: its name is still flying in from
+    // the row when the layer goes in.
+    function measure(view) {
+      const head = view.querySelector('.game-leg__horse-head');
+      if (!head) return;
+      view.style.setProperty('--hc-head-b', `${Math.round(head.offsetTop + head.offsetHeight)}px`);
+    }
+
+    function mount(view, base) {
+      const m = view._hc.m;
+      const old = view.querySelector(':scope > .hc');
+      const hc = document.createElement('div');
+      hc.className = `hc hc--${variant}`;
+      hc._m = m;
+      hc.style.setProperty('--hc-base', `${Math.round(base)}ms`);
+      hc.innerHTML = T[variant](m);
+      view.dataset.hc = variant;
+      measure(view);
+      view.prepend(hc);
+      ro.observe(hc);
+      hc.querySelectorAll('[data-hc-pfgps], [data-hc-radar]').forEach(el => ro.observe(el));
+      requestAnimationFrame(() => hc.classList.add('is-in'));
+      if (old) {
+        old.classList.add('is-out');
+        setTimeout(() => old.remove(), 220);
+        const x = view.querySelector('.game-leg__horse-x');
+        if (x && motion()) x.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: 'ease' });
+      }
+    }
+
+    const fade = view => view.querySelectorAll(':scope > .hc, :scope > .hc-tabs').forEach(el => el.classList.add('is-out'));
+
+    const syncTabs = view => view.querySelectorAll('[data-hc-tab]').forEach(b => {
+      const on = b.dataset.hcTab === variant;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+
+    // The foot strip the view took over from the leg: one tab per design.
+    function tabs(view) {
+      const nav = document.createElement('nav');
+      nav.className = 'hc-tabs';
+      nav.setAttribute('role', 'tablist');
+      nav.setAttribute('aria-label', 'card designs');
+      nav.innerHTML = VARIANTS.map((id, i) =>
+        `<button type="button" class="hc-tab" role="tab" data-hc-tab="${id}"><b>${i + 1}</b>${id}</button>`).join('');
+      nav.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-hc-tab]');
+        if (b) setVariant(b.dataset.hcTab, { user: true });
+      });
+      view.appendChild(nav);
+      syncTabs(view);
+    }
+
+    function setVariant(id, { user = false } = {}) {
+      if (!VARIANTS.includes(id) || id === variant) return;
+      variant = id;
+      document.querySelectorAll('.game-leg__horse').forEach(view => {
+        if (!view._hc) return;
+        view.dataset.hc = variant;
+        syncTabs(view);
+        if (view._hc.m && !view._hc.out) mount(view, 0);
+      });
+      if (user) variantListeners.forEach(fn => fn(id));
+    }
+
+    function attach(view) {
+      if (view._hc) return;
+      const ctx = view.closest('[data-leg]')?._horse || {};
+      const entry = ctx.entry;
+      const number = ctx.number;
+      view._hc = { number, t0: performance.now() };
+      view.dataset.hc = variant;
+      tabs(view);
+      view.querySelector('.game-leg__horse-x')?.addEventListener('click', () => { view._hc.out = true; fade(view); }, { capture: true });
+      const head = view.querySelector('.game-leg__horse-head');
+      if (head) {
+        new MutationObserver(() => {
+          measure(view);
+          const hc = view.querySelector(':scope > .hc:not(.is-out)');
+          if (hc) fit(hc);
+        }).observe(head, { childList: true, subtree: true, characterData: true });
+      }
+      const settle = () => { waiters.splice(0).forEach(f => f()); };
+      if (!entry) { settle(); return; }
+      load(entry, ctx).then(([rows, sibs, gps, blood, ratings]) => {
+        if (!view.isConnected || view._hc.out) { settle(); return; }
+        view._hc.m = model(entry, rows || [], sibs || [], gps, ctx, blood, ratings);
+        const base = motion() ? Math.max(0, 420 - (performance.now() - view._hc.t0)) : 0;
+        mount(view, base);
+        settle();
+        if (!prefetched.has(ctx.raceId)) {
+          prefetched.add(ctx.raceId);
+          setTimeout(() => prefetch(ctx), 1500);
+        }
+      });
+    }
+
+    // The rest of the race, one horse at a time, for the next name clicked.
+    const prefetched = new Set();
+    const prefetch = ctx => (ctx.raceData?.results || [])
+      .reduce((p, e) => p.then(() => load(e, ctx)), Promise.resolve());
+
+    const legs = document.getElementById('gameLegs') || document.body;
+    new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(node => {
+      if (node.nodeType !== 1) return;
+      if (node.classList.contains('game-leg__horse')) attach(node);
+      else node.querySelectorAll?.('.game-leg__horse').forEach(attach);
+    }))).observe(legs, { childList: true, subtree: true });
+
+    document.addEventListener('keydown', ev => {
+      if (ev.key !== 'Escape') return;
+      document.querySelectorAll('.game-leg__horse').forEach(view => { if (view._hc) view._hc.out = true; fade(view); });
+    }, true);
+
+    window.HorseCards = {
+      variants: VARIANTS,
+      get variant() { return variant; },
+      setVariant: id => setVariant(id),
+      onVariant(fn) {
+        variantListeners.add(fn);
+        return () => variantListeners.delete(fn);
+      },
+      whenRendered() {
+        const open = [...document.querySelectorAll('.game-leg__horse')].find(v => v._hc && !v._hc.out);
+        if (open?._hc.m) return Promise.resolve();
+        return new Promise(resolve => {
+          waiters.push(resolve);
+          setTimeout(resolve, 4000);
+        });
+      },
+    };
+  })();
+</script>

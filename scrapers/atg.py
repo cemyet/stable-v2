@@ -161,11 +161,16 @@ def store_race_raw(conn, atg_race_id: str, race_date: date | None,
 def scrape_day(conn, date_str: str, *,
                statuses: frozenset[str] = FINAL_STATUSES,
                skip_done: bool = False,
+               refetch_statuses: frozenset[str] = frozenset(),
                delay: float | None = None,
                client: httpx.Client | None = None,
                log=print) -> dict:
     """Fetch the calendar for `date_str`, then fetch + store selected trot
-    race payloads. Returns counts."""
+    race payloads. Returns counts.
+
+    `refetch_statuses` are fetched even when `skip_done` has a 200 for the same
+    status: a start list changes (drivers, scratches, shoes) while the race
+    stays "upcoming"."""
     if delay is None:
         delay = config.REQUEST_DELAY
     own_client = client is None
@@ -193,7 +198,7 @@ def scrape_day(conn, date_str: str, *,
 
         for rid, rdate, rstatus in listed:
             status_label = rstatus or "unknown"
-            if (rid, status_label) in done:
+            if (rid, status_label) in done and status_label not in refetch_statuses:
                 counts["skipped"] += 1
                 continue
             status, payload = fetch_race(client, rid)

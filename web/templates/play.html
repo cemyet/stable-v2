@@ -122,23 +122,23 @@
 
         const entries = tracks.map(t => {
           const headlineId = t.headline;
-          const gameIdById = {};
-          if (headlineId && t.headlineGameId) gameIdById[headlineId] = t.headlineGameId;
-          for (const s of t.satellites) {
-            if (s.gameId) gameIdById[s.id] = s.gameId;
-          }
           const satelliteIds = [];
-          if (headlineId) satelliteIds.push(headlineId);
+          const satelliteHrefs = [];
+          const add = (id, gameId) => {
+            satelliteIds.push(id);
+            satelliteHrefs.push(gameId ? `/game/${gameId}` : null);
+          };
+          if (headlineId) add(headlineId, t.headlineGameId);
+          for (const h of t.extraHeadlines || []) add(h.id, h.gameId);
           for (const id of cyanOrder) {
-            if (t.satellites.some(s => s.id === id)) {
-              satelliteIds.push(id);
-            }
+            const s = t.satellites.find(sat => sat.id === id);
+            if (s) add(id, s.gameId);
           }
           return {
             trackName: t.trackName,
             gameTypeId: headlineId || (satelliteIds[0] || 'v4'),
             satelliteIds,
-            satelliteHrefs: satelliteIds.map(id => gameIdById[id] ? `/game/${gameIdById[id]}` : null),
+            satelliteHrefs,
             sphereSize: window.HOME_SPHERE_SIZE || 87,
             headlineHref: t.headlineGameId ? `/game/${t.headlineGameId}` : null,
             jackpot: !!t.jackpot,

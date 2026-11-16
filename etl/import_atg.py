@@ -380,7 +380,7 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
 
     Returns counts: {races, entries, horses, persons, skipped_reason}
     """
-    stats = {"races": 0, "entries": 0, "horses": 0, "persons": 0}
+    stats = {"races": 0, "entries": 0, "horses": 0, "persons": 0, "pruned": 0}
     if not raw or not isinstance(raw, dict):
         return {**stats, "skipped_reason": "empty_raw"}
 
@@ -434,9 +434,12 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
                           raw_payload={"sport": sport, "prize": raw.get("prize")})
     stats["races"] = 1
 
+    seen_horses: set[int] = set()
+    all_mapped = True
     for s in starts:
         h = s.get("horse") or {}
         if not h.get("name"):
+            all_mapped = False
             continue
         prog = _safe_int(s.get("number"))
         horse_id = _upsert_horse_from_start(v2_cur, h, race_date,
@@ -444,7 +447,9 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
                                             race_id=race_id,
                                             program_number=prog)
         if horse_id is None:
+            all_mapped = False
             continue
+        seen_horses.add(horse_id)
         stats["horses"] += 1
 
         # Driver from start.driver; trainer is nested under horse.trainer.
@@ -470,6 +475,11 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
         start_num = _safe_int(s.get("number"))
         scratched = (start_num in scratched_nums) or bool(result.get("scratched"))
         ptext = _placement_text_from_result(result, scratched=scratched)
+        # Unclassified gait-break (started, no official place) is galopp + DQ.
+        # Official ATG `disqualified` is often unset when they only send
+        # galloped + place 0 / no time (`ug`); treat those the same.
+        unclassified_gal = bool(result.get("galloped")) and placement is None
+        is_dq = bool(result.get("disqualified")) or unclassified_gal
 
         entry_fields: dict[str, Any] = {
             "program_number": start_num,
@@ -478,7 +488,7 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
             "finish_order": finish_order,
             "placement_text": ptext,
             "withdrawn": scratched,
-            "disqualified": bool(result.get("disqualified")),
+            "disqualified": is_dq,
             "galopp": bool(result.get("galloped")),
             "time_seconds": _km_time_to_seconds(km),
             "time_text": _km_time_to_text(km),
@@ -546,7 +556,7 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
              WHERE race_id = %s AND horse_id = %s
             """,
             (placement, ptext, finish_order,
-             bool(result.get("disqualified")),
+             is_dq,
              scratched,
              bool(result.get("galloped")),
              entry_fields.get("time_seconds"),
@@ -562,6 +572,28 @@ def ingest_race(v2_cur, atg_race_id: str, raw: dict) -> dict:
              race_id, horse_id),
         )
         stats["entries"] += 1
+
+    # Upcoming cards are re-fetched until they run, so a horse taken off the
+    # start list (replaced by a reserve, re-drawn) would otherwise linger.
+    # Only for unrun races where every start resolved to a horse; scratched
+    # horses stay listed by ATG and are kept.
+    if all_mapped and seen_horses and race_date >= date.today():
+        v2_cur.execute(
+            """
+            DELETE FROM entry
+             WHERE race_id = %s AND placement IS NULL
+               AND NOT (horse_id = ANY(%s))
+               AND NOT EXISTS (SELECT 1 FROM entry e2
+                                WHERE e2.race_id = entry.race_id
+                                  AND e2.placement IS NOT NULL)
+            RETURNING entry_id
+            """,
+            (race_id, list(seen_horses)),
+        )
+        gone = [r[0] for r in v2_cur.fetchall()]
+        if gone:
+            v2_cur.execute("DELETE FROM ml_prediction WHERE entry_id = ANY(%s)", (gone,))
+            stats["pruned"] = len(gone)
 
     return stats
 
@@ -606,7 +638,7 @@ def load_atg_from_raw(v2_conn, *,
     )
 
     totals = {"scanned": 0, "ingested": 0, "skipped": 0,
-              "races": 0, "entries": 0, "horses": 0, "persons": 0,
+              "races": 0, "entries": 0, "horses": 0, "persons": 0, "pruned": 0,
               "by_skip": {}}
 
     own_read = read_conn is None
@@ -644,7 +676,7 @@ def load_atg_from_raw(v2_conn, *,
                         totals["by_skip"][k] = totals["by_skip"].get(k, 0) + 1
                     else:
                         totals["ingested"] += 1
-                        for k in ("races", "entries", "horses", "persons"):
+                        for k in ("races", "entries", "horses", "persons", "pruned"):
                             totals[k] += s.get(k, 0)
                     batch_count += 1
                     if batch_count >= batch_size:

@@ -96,11 +96,34 @@
       return 'any track';
     }
 
+    // Race models (xlead / xodds / xwin) test against baselines per race.
+    const CMP_COLS = [
+      ['logloss', 'log loss'], ['winner_logloss', 'winner ll'], ['cross_entropy_vs_market', 'x-ent mkt'],
+      ['top1', 'top-1'], ['p_leader', 'p(leader)'], ['p_winner', 'p(winner)'],
+      ['corr_log_odds', 'corr mkt'], ['same_favourite', 'same fav'], ['races', 'races'],
+    ];
+    function compareTable(t) {
+      const src = { ...(t.race || t), ...(t.ablation || {}) };
+      const rows = Object.entries(src).filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v)
+        && (v.logloss != null || v.winner_logloss != null));
+      if (!rows.length) return '';
+      const cols = CMP_COLS.filter(([k]) => rows.some(([, v]) => v[k] != null));
+      const fmt = (k, v) => v == null ? '—'
+        : k === 'races' ? v.toLocaleString()
+        : ['top1', 'p_leader', 'p_winner', 'same_favourite'].includes(k) ? fmtPct(v) : (+v).toFixed(4);
+      return `<div class="md-section">forward test vs baselines</div>
+        <table class="cal-table"><thead><tr><th></th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+        <tbody>${rows.map(([name, v]) => `<tr><td>${esc(name.replace(/_/g, ' '))}</td>`
+          + cols.map(([k]) => `<td>${fmt(k, v[k])}</td>`).join('') + '</tr>').join('')}</tbody></table>`
+        + (t.gap_closed != null ? `<div class="md-slice-info" style="margin-top:8px">gap closed (uniform → market): <code>${fmtPct(t.gap_closed)}</code></div>` : '');
+    }
+
     fetch(`/api/ml/models/${mid}`).then(r => r.json()).then(m => {
       const t = m.metrics?.test || {};
       const tr = m.metrics?.train || {};
       const sl = m.slice_def || {};
       const yrs = sl.years ? `${sl.years[0]}–${sl.years[1]}` : '';
+      const cmp = compareTable(t);
 
       let html = `
         <h2 class="md-title">${esc(m.name)}</h2>
@@ -112,6 +135,8 @@
           <span style="font-size:11px">${m.created_at ? m.created_at.slice(0, 10) : ''}</span>
         </div>
 
+        ${cmp}
+        <div ${cmp && t.roc_auc == null ? 'hidden' : ''}>
         <div class="md-section">test metrics</div>
         <div class="md-metrics">
           <div class="md-metric"><div class="v">${t.roc_auc ?? '—'}</div><div class="k">roc auc</div></div>
@@ -129,6 +154,7 @@
           <div class="md-metric"><div class="v">${tr.pr_auc ?? '—'}</div><div class="k">pr auc</div></div>
           <div class="md-metric"><div class="v">${tr.n ? tr.n.toLocaleString() : '—'}</div><div class="k">train n</div></div>
           <div class="md-metric"><div class="v">${m.metrics?.n_iter ?? '—'}</div><div class="k">iterations</div></div>
+        </div>
         </div>
 
         <div class="md-section">analysis</div>

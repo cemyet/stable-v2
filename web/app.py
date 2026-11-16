@@ -46,6 +46,8 @@ import core.config as _config
 import unicodedata as _unicodedata
 
 from core.db import get_connection
+import core.bloodline as bloodline
+import core.ratings.api as ratings_api
 import core.reduce_system as reduce_system
 
 app = Flask(__name__)
@@ -482,7 +484,11 @@ def _atg_live_pools(atg_race_id: str) -> dict | None:
         if game_type and isinstance(pools.get(game_type), dict):
             bd = pools[game_type].get('betDistribution')
             trend = pools[game_type].get('trend')
-        out_starts.append({
+        # ATG only sends `originalDriver` once the declared driver has been
+        # replaced, and the card we imported may still name the original.
+        swapped = s.get('originalDriver') or None
+        driver = s.get('driver') or {}
+        out_start = {
             'number': s.get('number'),
             'horseId': (s.get('horse') or {}).get('id'),
             'horseName': (s.get('horse') or {}).get('name'),
@@ -492,7 +498,18 @@ def _atg_live_pools(atg_race_id: str) -> dict | None:
             'platsMax': _odds(plats.get('maxOdds')),
             'betDist': round(bd / 100, 2) if isinstance(bd, (int, float)) else None,
             'trend': trend,
-        })
+            'post': s.get('postPosition'),
+            'driverChanged': bool(swapped),
+        }
+        if swapped:
+            name, short = _atg_person_display(driver)
+            out_start.update({
+                'driverName': name,
+                'driverShort': short,
+                '_atgDriverId': driver.get('id'),
+                'originalDriverName': _atg_person_display(swapped)[0],
+            })
+        out_starts.append(out_start)
     poolinfo = leg.get('pools') or {}
     return {
         'gameType': game_type,
@@ -839,6 +856,9 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             'mother_father': atg_ped['mother_father'],
             'number': s.get('number'),
             'distance': s.get('distance') or race_distance,
+            'post': s.get('postPosition'),
+            'driver_changed': bool(s.get('originalDriver')),
+            'trainer_new': False,
             'placement': None,
             'placement_text': None,
             'time_text': None,
@@ -865,6 +885,9 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             'contributors': ['atg'],
             'xgal_track': None,
             'xgal_general': None,
+            'xlead': None,
+            'xodds_p': None,
+            'xwin': None,
             'pre_starts': 0,
             'pre_wins': 0,
             'post_starts': 0,
@@ -1000,8 +1023,17 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         finally:
             c.close()
 
+    def _q_last_trainer():
+        c = get_db()
+        try:
+            with c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as qc:
+                return _batch_horse_last_trainer(qc, horse_ids, race_date)
+        finally:
+            c.close()
+
+    last_trainer: dict = {}
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    with ThreadPoolExecutor(max_workers=6) as pool:
+    with ThreadPoolExecutor(max_workers=7) as pool:
         futures = {
             pool.submit(_q_stats): 'stats',
             pool.submit(_q_d_wr): 'd_wr',
@@ -1009,6 +1041,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
             pool.submit(_q_df): 'df',
             pool.submit(_q_tf): 'tf',
             pool.submit(_q_gear): 'gear',
+            pool.submit(_q_last_trainer): 'last_trainer',
         }
         for fut in as_completed(futures):
             key = futures[fut]
@@ -1028,6 +1061,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
                 tf_map = result
             elif key == 'gear':
                 gear_hist = result
+            elif key == 'last_trainer':
+                last_trainer = result
 
     for r in rows:
         db_ped = ped_map.get(r['horse_id'], {})
@@ -1052,6 +1087,8 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         r['pre_prize_kr'] = pre['prize']
         r['post_prize_kr'] = pre['prize']
         _apply_gear_debut(r, gear_hist.get(r['horse_id']) or [])
+        r['trainer_new'] = _is_new_trainer(
+            r['trainer_id'], last_trainer.get(r['horse_id']))
         if r['driver_id']:
             r['d_wr'] = d_wr_map.get(r['driver_id'])
             r['df'] = df_map.get(r['driver_id'], {}).get('form')
@@ -1084,6 +1121,7 @@ def _race_entries_atg_live(cur, atg_race_id: str):
         'atg_url': _atg_race_url(atg_race_id),
         'is_upcoming': is_upcoming,
         'gal_models': None,
+        'xodds_payout': None,
         'has_kmtid': False,
         'home_stretch_m': None,
         'primary_source': 'atg',
@@ -1100,6 +1138,25 @@ def _format_atg_race_display_name(name: str) -> str:
     if ' - ' in s:
         s = s.rsplit(' - ', 1)[-1].strip()
     return s
+
+
+_PRIZE_NUM = r'\(?\d(?:[\d.\u00a0]*\d)?\)?'
+_PRIZE_LADDER_RE = _re_mod.compile(
+    rf'({_PRIZE_NUM}(?:\s*-\s*{_PRIZE_NUM})+)\s*(kr|sek|nok|eur|dkk)?\b',
+    _re_mod.IGNORECASE)
+
+
+def _format_atg_prize_ladder(prize: str | None) -> str | None:
+    """The placings' prize money as one ladder, '40000-20000-(3000) kr'.
+    A bracketed place only pays when the field is big enough."""
+    m = _PRIZE_LADDER_RE.search(prize or '')
+    if not m:
+        return None
+    ladder = _re_mod.sub(r'[.\s\u00a0]', '', m.group(1))
+    currency = (m.group(2) or '').lower()
+    if not currency:
+        return ladder
+    return f"{ladder} {currency if currency == 'kr' else currency.upper()}"
 
 
 def _format_atg_race_distance_label(distance, start_method) -> str | None:
@@ -1128,6 +1185,8 @@ def _parse_atg_game_races(data: dict) -> list[dict]:
             'raceNumber': i + 1,
             'atgRaceId': race.get('id'),
             'name': _format_atg_race_display_name(raw_name),
+            'fullName': _re_mod.sub(r'\s+', ' ', raw_name).strip() or None,
+            'prize': _format_atg_prize_ladder(race.get('prize')),
             'starters': len(starts),
             'scratched': sum(1 for s in starts if s.get('scratched')),
             'startTime': race.get('startTime') or race.get('scheduledStartTime'),
@@ -1216,6 +1275,7 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
         trackName, trackId, headline (id like 'v64' or None),
         headlineGameId (ATG game id),
         headlineStartTime, headlineRaceCount,
+        extraHeadlines [{id, gameId, startTime, raceCount, jackpot}],
         jackpot (bool — headline game has rollover pool),
         jackpotAmount, estimatedJackpot (öre, when jackpot),
         satellites [{id, gameId, startTime, raceCount}]
@@ -1238,6 +1298,10 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
     # Per-race bet types appear once per leg; track how many games (= races)
     # each track has so satellite bubbles show the full card count.
     track_game_counts: dict[int, dict[str, int]] = {tid: {} for tid in trot_tracks}
+    # Special occasions put a second headline on a day that already has one
+    # (a V65 on a V85 Saturday), so every headline game is kept, not just
+    # the first per type.
+    track_headlines: dict[int, list[tuple[str, dict]]] = {tid: [] for tid in trot_tracks}
 
     for game_type, game_list in games_raw.items():
         if not isinstance(game_list, list):
@@ -1250,6 +1314,8 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
                     )
                     if game_type not in track_games[tid]:
                         track_games[tid][game_type] = game
+                    if game_type in _HEADLINE_HIERARCHY:
+                        track_headlines[tid].append((game_type, game))
 
     # Build output per track
     result = []
@@ -1257,14 +1323,21 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
         track_name = track_info.get('name', f'Track {tid}')
         tg = track_games.get(tid, {})
 
-        # Determine headline
-        headline = None
-        headline_game = None
-        for h in _HEADLINE_HIERARCHY:
-            if h in tg:
-                headline = h
-                headline_game = tg[h]
-                break
+        headlines = sorted(
+            track_headlines.get(tid, []),
+            key=lambda item: (_HEADLINE_HIERARCHY.index(item[0]), item[1].get('startTime') or ''),
+        )
+        headline, headline_game = headlines[0] if headlines else (None, None)
+        extra_headlines = [
+            {
+                'id': _atg_game_id_to_internal(h),
+                'gameId': g.get('id', ''),
+                'startTime': g.get('startTime', ''),
+                'raceCount': len(g.get('races', [])),
+                'jackpot': _atg_game_has_jackpot(g),
+            }
+            for h, g in headlines[1:]
+        ]
 
         jackpot = _atg_game_has_jackpot(headline_game)
 
@@ -1289,7 +1362,9 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
         # track/date. For dates further out the calendar lists the scheduled
         # game *types* (e.g. V85) but no game id yet — those render greyed out
         # and non-clickable on the home page.
-        posted = bool(headline_game_id) or any(s.get('gameId') for s in satellites)
+        posted = (bool(headline_game_id)
+                  or any(s.get('gameId') for s in satellites)
+                  or any(h.get('gameId') for h in extra_headlines))
 
         entry = {
             'trackName': track_name,
@@ -1302,6 +1377,7 @@ def _build_upcoming_tracks(data: dict) -> list[dict]:
             'jackpotAmount': headline_game.get('jackpotAmount') if jackpot else None,
             'estimatedJackpot': headline_game.get('estimatedJackpot') if jackpot else None,
             'posted': posted,
+            'extraHeadlines': extra_headlines,
             'satellites': satellites,
         }
         result.append(entry)
@@ -1487,16 +1563,11 @@ def _ore_to_sek(value) -> float:
     return 0.0
 
 
-@app.route('/api/atg/game/<game_id>/pool')
-def atg_game_pool(game_id):
-    """Live pool pots + row% for guessing a coupon's payout.
-
-    `tierPools` is the money sitting in each N-rätt pot (SEK). After the race
-    `resultPayouts` is the official dividend per winning unit. ATG stores both
-    in öre."""
-    data = _fetch_atg_game(game_id)
+def _coupon_pool_snapshot(game_id: str, data: dict | None = None) -> dict | None:
+    """Small, reusable view of an ATG game for coupon result calculations."""
+    data = data or _fetch_atg_game(game_id)
     if not data:
-        return jsonify({'error': 'not found'}), 404
+        return None
 
     game_type = str(data.get('type') or game_id.split('_')[0] or '').upper()
     rule = _COUPON_GAME_RULES.get(game_type) or {}
@@ -1517,6 +1588,8 @@ def atg_game_pool(game_id):
             tier_pools[tier] = round(turnover * _COUPON_RTP * share, 2)
 
     result_payouts = None
+    result_systems = {}
+    jackpotted = []
     raw_result = (pool.get('result') or {}).get('payouts') or {}
     if isinstance(raw_result, dict) and raw_result:
         result_payouts = {}
@@ -1524,9 +1597,14 @@ def atg_game_pool(game_id):
             if not isinstance(value, dict):
                 continue
             try:
-                result_payouts[int(key)] = _ore_to_sek(value.get('payout'))
+                tier = int(key)
             except (TypeError, ValueError):
                 continue
+            if isinstance(value.get('systems'), int):
+                result_systems[tier] = value['systems']
+            if value.get('jackpot'):
+                jackpotted.append(tier)
+            result_payouts[tier] = _ore_to_sek(value.get('payout'))
         if not result_payouts:
             result_payouts = None
 
@@ -1546,6 +1624,9 @@ def atg_game_pool(game_id):
             bet = (start.get('pools') or {}).get(game_type) or {}
             bd = bet.get('betDistribution')
             pct = round(bd / 100.0, 2) if isinstance(bd, (int, float)) else None
+            # ATG's trend is the recent move in the horse's share of the
+            # pool as a fraction (a race's trends sum to zero).
+            trend = bet.get('trend')
             place = (start.get('result') or {}).get('place')
             if place == 1 and number is not None and not scratched:
                 winner = number
@@ -1553,6 +1634,7 @@ def atg_game_pool(game_id):
                 'number': number,
                 'name': horse.get('name') or '',
                 'pct': pct,
+                'trend': round(trend * 100, 2) if isinstance(trend, (int, float)) else None,
                 'scratched': scratched,
             })
         legs.append({
@@ -1562,7 +1644,7 @@ def atg_game_pool(game_id):
             'starts': starts,
         })
 
-    return jsonify({
+    return {
         'gameId': data.get('id') or game_id,
         'gameType': game_type,
         'turnover': turnover,
@@ -1572,8 +1654,97 @@ def atg_game_pool(game_id):
         'resultPayouts': (
             {str(k): v for k, v in sorted(result_payouts.items())}
             if result_payouts else None),
+        # Winning systems per tier, and the tiers ATG rolled into a jackpot.
+        'resultSystems': {str(k): v for k, v in sorted(result_systems.items())} or None,
+        'jackpottedTiers': sorted(jackpotted),
+        'status': pool.get('status') or data.get('status'),
+        'systemCount': pool.get('systemCount'),
+        # Carried in from the last draw, in kronor (not öre like the pots).
+        'jackpotAmount': pool.get('jackpotAmount'),
+        'addOns': pool.get('addOns') or [],
         'legs': legs,
-    })
+    }
+
+
+@app.route('/api/atg/game/<game_id>/pool')
+def atg_game_pool(game_id):
+    """Live pool pots + row% for guessing a coupon's payout.
+
+    `tierPools` is the money sitting in each N-rätt pot (SEK). After the race
+    `resultPayouts` is the official dividend per winning unit. ATG stores both
+    in öre."""
+    snapshot = _coupon_pool_snapshot(game_id)
+    if not snapshot:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(snapshot)
+
+
+_AGENT_TTL = 60
+
+
+@app.route('/api/atg/game/<game_id>/agent')
+def atg_game_agent(game_id):
+    """The coupon agent's coupon for an open game (core/coupon_agent.py):
+    picks, weights, stake units and copies for the builder to start from.
+    Until every leg's win pool holds money it is 'preliminary' (xwin
+    against xodds), then 'live' (xedge over the win odds)."""
+    import time
+    from datetime import datetime
+    cache_key = f'atg_agent_{game_id}'
+    hit = _leaderboard_cache.get(cache_key)
+    if hit and time.time() - hit[0] < _AGENT_TTL:
+        return jsonify(hit[1])
+    try:
+        from core import coupon_agent as CA
+    except ImportError:
+        return jsonify({'error': 'the coupon agent needs numpy on this server'}), 503
+    data = _fetch_atg_game(game_id)
+    if not data:
+        return jsonify({'error': 'not found'}), 404
+    game_type = str(data.get('type') or game_id.split('_')[0] or '').upper()
+    rule = _COUPON_GAME_RULES.get(game_type)
+    if not rule:
+        return jsonify({'error': f'{game_type} is not a marking game'}), 400
+    race_ids = [r.get('id') for r in data.get('races') or [] if isinstance(r, dict) and r.get('id')]
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT model_id, name, slice_def->'policy' AS policy FROM ml_model
+                           WHERE target = 'coupon_agent' ORDER BY created_at DESC, model_id DESC LIMIT 1""")
+            agent = cur.fetchone()
+            cur.execute("""SELECT DISTINCT ON (target) target, model_id FROM ml_model
+                           WHERE target IN ('xwin', 'xodds', 'xedge')
+                           ORDER BY target, created_at DESC, model_id DESC""")
+            models = {r['model_id']: r['target'] for r in cur.fetchall()}
+            cur.execute("""SELECT r.atg_race_id, e.program_number, p.model_id, p.prob
+                           FROM race r JOIN entry e ON e.race_id = r.race_id
+                           JOIN ml_prediction p ON p.entry_id = e.entry_id
+                           WHERE r.atg_race_id = ANY(%s) AND p.model_id = ANY(%s) AND p.prob IS NOT NULL
+                             AND e.program_number IS NOT NULL""", (race_ids, list(models)))
+            preds = {}
+            for r in cur.fetchall():
+                preds.setdefault((r['atg_race_id'], int(r['program_number'])), {})[models[r['model_id']]] = float(r['prob'])
+    finally:
+        conn.close()
+    if not agent or not agent['policy']:
+        return jsonify({'error': 'no coupon agent is registered'}), 404
+    policy = agent['policy']
+    est = (policy.get('turnover') or {}).get(game_type) or {}
+    track = game_id.split('_')[2] if game_id.count('_') >= 3 else ''
+    try:
+        game, mode, alt, facts = CA.live_game(data, preds, rule['line_price'], _COUPON_TIER_SHARE[game_type],
+                                              (est.get('tracks') or {}).get(track) or est.get('all'), _COUPON_RTP)
+        out = CA.suggest(game, alt, policy[mode])
+    except (ValueError, KeyError) as exc:
+        return jsonify({'error': str(exc)}), 409
+    for leg, picks in zip(facts['legs'], out.pop('legs')):
+        leg['picks'] = picks
+    out.update({'gameId': game_id, 'gameType': game_type, 'model': {'id': agent['model_id'], 'name': agent['name']},
+                'mode': 'live' if mode == 'live' else 'preliminary', 'legs': facts['legs'],
+                'turnover': facts['turnover'], 'turnoverUsed': facts['turnover_used'],
+                'linePrice': rule['line_price'], 'at': datetime.now().isoformat(timespec='seconds')})
+    _leaderboard_cache[cache_key] = (time.time(), out)
+    return jsonify(out)
 
 
 def _pct(num, den):
@@ -1803,6 +1974,16 @@ def _game_context(game_id):
 
     is_jackpot = _atg_game_has_jackpot(game_info)
 
+    # What the calendar knows before the pool is fetched, for the hero's
+    # overview. Jackpot sums are kronor here.
+    overview = {
+        'startTime': start_time or None,
+        'raceCount': race_count,
+        'jackpotAmount': (game_info or {}).get('jackpotAmount') if is_jackpot else None,
+        'estimatedJackpot': (game_info or {}).get('estimatedJackpot') if is_jackpot else None,
+        'returnToPlayer': (game_info or {}).get('returnToPlayer'),
+    }
+
     # ATG's numeric track code doubles as the `trackcode` in a file-betting
     # coupon, so keep it around for the reduced-system handoff.
     try:
@@ -1823,6 +2004,7 @@ def _game_context(game_id):
         'time_display': time_display,
         'date_str': date_str,
         'is_jackpot': is_jackpot,
+        'game_overview': overview,
     }
 
 
@@ -1888,7 +2070,10 @@ def _prewarm_cache() -> None:
 _threading.Thread(target=_prewarm_cache, daemon=True).start()
 
 
-_QUALIFIER_RE = r"^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$"
+# Prov/premie codes only. Bare `g` is unclassified galopp (often no official
+# time / DNF), not a qualifier — it counts as a start and is excluded from
+# clean% via galopp/DQ, same as a gait-break that was formally disqualified.
+_QUALIFIER_RE = r"^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$"
 _NOT_QUALIFIER = f"COALESCE(e.placement_text,'') !~ '{_QUALIFIER_RE}'"
 _IS_WIN   = f"e.placement_text = '1' AND NOT COALESCE(e.disqualified, false) AND {_NOT_QUALIFIER}"
 _IS_PLACED = f"e.placement_text IN ('1','2','3') AND NOT COALESCE(e.disqualified, false) AND {_NOT_QUALIFIER}"
@@ -2621,7 +2806,7 @@ _COUPON_GAME_RULES = {
              'pay_tiers': (5, 6, 7, 8)},
     'V85':  {'legs': 8, 'line_price': 0.50, 'max_systems': 5000,
              'pay_tiers': (5, 6, 7, 8)},
-    'V75':  {'legs': 7, 'line_price': 0.50, 'max_systems': 5000,
+    'V75':  {'legs': 7, 'line_price': 0.60, 'max_systems': 5000,   # 0.50 before the 2026-11-28 relaunch
              'pay_tiers': (5, 6, 7)},
     'GS75': {'legs': 7, 'line_price': 1.00, 'max_systems': 5000,
              'pay_tiers': (5, 6, 7)},
@@ -2647,9 +2832,46 @@ _COUPON_TIER_SHARE = {
 }
 
 
-# Mirrors REDUCED_MIN / REDUCED_MAX in the game page's Reduced module.
+# Mirrors REDUCED_MIN / REDUCED_MAX / REDUCED_EPS in the game page's Reduced
+# module.
 _REDUCED_MIN = 1.0
-_REDUCED_MAX = 200.0
+_REDUCED_MAX = 1000.0
+_REDUCED_EPS = 0.001
+
+# The coupon-wide scale bar: 5% of the system at the bottom, ten times it at
+# the top. Mirrors COUPON_SCALE_STEPS on the game page.
+_COUPON_SCALE_MIN = 0.05
+_COUPON_SCALE_MAX = 10.0
+
+
+def _coupon_scale(value) -> float:
+    try:
+        scale = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    if not 0 < scale < float('inf'):
+        return 1.0
+    return round(min(max(scale, _COUPON_SCALE_MIN), _COUPON_SCALE_MAX), 4)
+
+
+_AIM_MODES = {'custom', 'market', 'slope', 'top', 'uniform', 'cascade', 'multiplied'}
+_RANKED_AIM_MODES = {'cascade'}
+# Gone from the builder. Coupons saved with these modes build as Auto.
+_RETIRED_AIM_MODES = {'semi', 'tactical', 'fade', 'extended'}
+
+
+def _aim_mode(value, schema=0) -> str:
+    """Saved aim policy. Schema 0 stored the ranked fan under ``uniform``."""
+    mode = str(value or '').lower()
+    try:
+        legacy = int(schema or 0) < 1
+    except (TypeError, ValueError):
+        legacy = True
+    if legacy and mode == 'uniform':
+        mode = 'cascade'
+    if mode == 'pool':
+        mode = 'multiplied'
+    return mode if mode in _AIM_MODES else ''
 
 
 def _clean_reduction(raw, legs) -> dict | None:
@@ -2669,6 +2891,7 @@ def _clean_reduction(raw, legs) -> dict | None:
         return None
 
     by_race = {leg['raceId']: leg for leg in legs}
+    aim_schema = raw.get('aimSchema') or 0
     out_legs = []
     weighted = False
     reduced = False
@@ -2709,11 +2932,68 @@ def _clean_reduction(raw, legs) -> dict | None:
         # is neither, so it does not count.
         caps = {n: min(max(v, _REDUCED_MIN), _REDUCED_MAX)
                 for n, v in numbers(raw_leg.get('caps')).items()
-                if abs(v - weights[n]) >= 0.05}
+                if abs(v - weights[n]) >= _REDUCED_EPS}
         reduced = reduced or any(v < weights[n] for n, v in caps.items())
         levered = levered or any(v > weights[n] for n, v in caps.items())
 
         coverage = {n: caps.get(n, weights[n]) for n in picks}
+
+        # Where each levered pick's extra stake is aimed, as unnormalised
+        # shares per other leg. Only kept for picks that really are levered,
+        # so an aim left behind by a cap the user has since dragged back
+        # cannot quietly reshape the coupon.
+        targets = {}
+        for key, spread in (raw_leg.get('targets') or {}).items():
+            try:
+                horse = int(key)
+            except (TypeError, ValueError):
+                continue
+            if horse not in picks or not isinstance(spread, dict):
+                continue
+            if coverage[horse] - weights[horse] <= 0.05:
+                continue
+            aimed = {}
+            for leg_key, shares in spread.items():
+                if not isinstance(shares, dict):
+                    continue
+                vals = {}
+                for h, v in shares.items():
+                    try:
+                        vals[str(int(h))] = round(max(0.0, float(v)), 4)
+                    except (TypeError, ValueError):
+                        continue
+                if vals and sum(vals.values()) > 0:
+                    aimed[str(leg_key)] = vals
+            if aimed:
+                targets[str(horse)] = aimed
+
+        # Policy is local to one lever flowing into one target leg. Auto is
+        # the default and is therefore omitted; the other modes must survive
+        # save/reopen even when their current shares happen to equal auto.
+        aim_modes = {}
+        for key, spread in (raw_leg.get('aimModes') or {}).items():
+            try:
+                horse = int(key)
+            except (TypeError, ValueError):
+                continue
+            if horse not in picks or not isinstance(spread, dict):
+                continue
+            if coverage[horse] - weights[horse] <= 0.05:
+                continue
+            per = {}
+            for leg_key, value in spread.items():
+                try:
+                    target_leg = int(leg_key)
+                except (TypeError, ValueError):
+                    continue
+                mode = _aim_mode(value, aim_schema)
+                if (target_leg != leg['leg']
+                        and 1 <= target_leg <= len(legs)
+                        and mode):
+                    per[str(target_leg)] = mode
+            if per:
+                aim_modes[str(horse)] = per
+
         rank_order = [str(k) for k in (raw_leg.get('rankOrder') or [])
                       if isinstance(k, (str, int))]
         reserves = []
@@ -2735,21 +3015,26 @@ def _clean_reduction(raw, legs) -> dict | None:
             'retention': round(max(0.0, sum(coverage.values()) / 100.0), 6),
             'reserves': reserves[:2],
             'rankOrder': rank_order,
+            'targets': targets,
+            'aimModes': aim_modes,
         })
 
-    if not out_legs or not (weighted or reduced or levered):
+    scale = _coupon_scale(raw.get('scale'))
+    if not out_legs or not (weighted or reduced or levered or scale != 1.0):
         return None
 
     # An untouched leg's coverage sums to 100, so it multiplies in as 1.0.
-    retention = 1.0
+    retention = scale
     for leg in out_legs:
         retention *= leg['retention']
 
     return {
         'weighted': weighted,
-        'reduced': reduced,
-        'levered': levered,
+        'reduced': reduced or scale < 1.0,
+        'levered': levered or scale > 1.0,
         'retention': round(retention, 6),
+        'scale': scale,
+        'aimSchema': 2,
         'legs': out_legs,
     }
 
@@ -2764,37 +3049,215 @@ def play_coupons_page():
     return render_template('play_coupons.html', active_tab='stable_play_coupons')
 
 
+_COUPON_SELECT = """
+    SELECT coupon_id, name, game_type, atg_game_id, track_name,
+           game_date, selections, line_price, num_lines, cost,
+           payout, status, created_at, reduction, top_only
+    FROM coupon
+"""
+
+
+def _coupon_json(row) -> dict:
+    return {
+        'id': row['coupon_id'],
+        'name': row['name'] or '',
+        'gameType': row['game_type'],
+        'gameId': row['atg_game_id'],
+        'trackName': row['track_name'] or '',
+        'gameDate': row['game_date'].isoformat() if row['game_date'] else None,
+        'selections': row['selections'],
+        'reduction': row['reduction'],
+        'topOnly': bool(row.get('top_only')),
+        'topPool': reduce_system.top_pool(row['game_type']),
+        'linePrice': float(row['line_price']),
+        'numLines': row['num_lines'],
+        'cost': float(row['cost']),
+        'payout': float(row['payout']) if row['payout'] is not None else None,
+        'status': row['status'],
+        'createdAt': row['created_at'].isoformat() if row['created_at'] else None,
+    }
+
+
+def _coupon_boxes(row) -> tuple[list[reduce_system.Box], reduce_system.Plan | None]:
+    """Rebuild the exact stake represented by one saved coupon."""
+    reduction = row['reduction']
+    top_only = bool(row.get('top_only'))
+    if reduction and reduction.get('legs'):
+        plan = _reduced_plan({
+            'gameType': row['game_type'],
+            'gameId': row['atg_game_id'],
+            'gameDate': (
+                row['game_date'].isoformat() if row['game_date'] else ''),
+            'trackName': row['track_name'] or '',
+            'aimSchema': reduction.get('aimSchema') or 0,
+            'topOnly': top_only,
+            'scale': reduction.get('scale'),
+            'legs': reduction['legs'],
+        })
+        return reduce_system.solve(plan), plan
+
+    selections = sorted(row['selections'] or [], key=lambda leg: leg['leg'])
+    sets = tuple(tuple(sorted({int(n) for n in leg.get('numbers') or []}))
+                 for leg in selections)
+    if not sets or any(not numbers for numbers in sets):
+        raise reduce_system.ReduceError('coupon has an empty leg')
+    return [reduce_system.Box(sets, top_only=top_only)], None
+
+
+def _coupon_stake_hits(boxes: list[reduce_system.Box],
+                       winners: dict[int, int], legs: int) -> list[int]:
+    """Stake units with exactly N right, including box multipliers."""
+    total = [0] * (legs + 1)
+    for box in boxes:
+        poly = [1]
+        for leg_i, numbers in enumerate(box.sets, start=1):
+            winner = winners.get(leg_i)
+            hit = 1 if winner in numbers else 0
+            miss = len(numbers) - hit
+            nxt = [0] * (len(poly) + 1)
+            for right, count in enumerate(poly):
+                nxt[right] += count * miss
+                nxt[right + 1] += count * hit
+            poly = nxt
+        for right, count in enumerate(poly):
+            total[right] += count * box.multiplier
+    return total
+
+
+def _coupon_official_result(row, market: dict | None) -> dict | None:
+    """Calculate and classify a finished coupon from official ATG dividends."""
+    if not market or not market.get('resultPayouts'):
+        return None
+    market_legs = market.get('legs') or []
+    winners = {}
+    for leg in market_legs:
+        if leg.get('winner') is None:
+            return None
+        winners[int(leg['leg'])] = int(leg['winner'])
+    try:
+        boxes, _ = _coupon_boxes(row)
+    except reduce_system.ReduceError:
+        return None
+    hits = _coupon_stake_hits([b for b in boxes if not b.top_only],
+                              winners, len(market_legs))
+    dividends = market['resultPayouts']
+    payout = sum(
+        hits[int(tier)] * float(dividend or 0)
+        for tier, dividend in dividends.items()
+        if int(tier) < len(hits))
+    # A top-pool coupon shares the top tier's pot with fewer units, which is
+    # what the factor is; ATG's dividend is the normal one.
+    pool = reduce_system.top_pool(row['game_type'])
+    top_hits = None
+    if pool and any(b.top_only for b in boxes):
+        top_hits = _coupon_stake_hits([b for b in boxes if b.top_only],
+                                      winners, len(market_legs))
+        tier = pool['tier']
+        if tier < len(top_hits):
+            payout += (top_hits[tier] * pool['factor']
+                       * float(dividends.get(str(tier)) or 0))
+    payout = round(payout, 2)
+    out = {
+        'id': row['coupon_id'],
+        'payout': payout,
+        'status': 'won' if payout > 0 else 'lost',
+        'hits': {str(t): hits[int(t)] for t in market.get('payTiers') or []
+                 if int(t) < len(hits)},
+    }
+    if top_hits is not None and pool['tier'] < len(top_hits):
+        out['topHits'] = top_hits[pool['tier']]
+    return out
+
+
 @app.route('/api/coupons', methods=['GET'])
 def api_coupons_list():
     conn = get_db()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute("""
-                SELECT coupon_id, name, game_type, atg_game_id, track_name,
-                       game_date, selections, line_price, num_lines, cost,
-                       payout, status, created_at, reduction
-                FROM coupon
-                ORDER BY created_at DESC, coupon_id DESC
-            """)
+            cur.execute(_COUPON_SELECT + """
+                ORDER BY created_at DESC, coupon_id DESC""")
             rows = cur.fetchall()
     finally:
         conn.close()
-    return jsonify([{
-        'id': r['coupon_id'],
-        'name': r['name'] or '',
-        'gameType': r['game_type'],
-        'gameId': r['atg_game_id'],
-        'trackName': r['track_name'] or '',
-        'gameDate': r['game_date'].isoformat() if r['game_date'] else None,
-        'selections': r['selections'],
-        'reduction': r['reduction'],
-        'linePrice': float(r['line_price']),
-        'numLines': r['num_lines'],
-        'cost': float(r['cost']),
-        'payout': float(r['payout']) if r['payout'] is not None else None,
-        'status': r['status'],
-        'createdAt': r['created_at'].isoformat() if r['created_at'] else None,
-    } for r in rows])
+    return jsonify([_coupon_json(row) for row in rows])
+
+
+@app.route('/api/coupons/refresh-results', methods=['POST'])
+def api_coupons_refresh_results():
+    """Fill payout/status for finished coupons from official ATG results."""
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(_COUPON_SELECT + """
+                WHERE game_date <= CURRENT_DATE
+                ORDER BY coupon_id""")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    game_ids = sorted({row['atg_game_id'] for row in rows})
+    markets = {}
+    if game_ids:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(8, len(game_ids))) as pool:
+            fetched = pool.map(_fetch_atg_game, game_ids)
+            markets = {
+                game_id: _coupon_pool_snapshot(game_id, data)
+                for game_id, data in zip(game_ids, fetched)
+            }
+
+    updates = []
+    for row in rows:
+        result = _coupon_official_result(
+            row, markets.get(row['atg_game_id']))
+        if result:
+            updates.append(result)
+
+    if updates:
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                for item in updates:
+                    # Payout is the result. Status is the list the coupon
+                    # belongs to (saved, draft, played), so a finished game
+                    # must not pull a saved or draft coupon into played.
+                    cur.execute("""
+                        UPDATE coupon
+                        SET payout = %s
+                        WHERE coupon_id = %s
+                          AND status IN ('played', 'won', 'lost')
+                    """, (item['payout'], item['id']))
+                conn.commit()
+        finally:
+            conn.close()
+    return jsonify({'updated': updates})
+
+
+@app.route('/api/coupons', methods=['DELETE'])
+def api_coupons_delete_many():
+    body = request.get_json(silent=True) or {}
+    raw_ids = body.get('ids')
+    if not isinstance(raw_ids, list):
+        return jsonify({'error': 'ids must be a list'}), 400
+    try:
+        ids = sorted({int(value) for value in raw_ids if int(value) > 0})
+    except (TypeError, ValueError):
+        return jsonify({'error': 'invalid coupon id'}), 400
+    if not ids or len(ids) > 500:
+        return jsonify({'error': 'select between 1 and 500 coupons'}), 400
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM coupon
+                WHERE coupon_id = ANY(%s)
+                RETURNING coupon_id
+            """, (ids,))
+            deleted = sorted(row[0] for row in cur.fetchall())
+            conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'status': 'deleted', 'ids': deleted})
 
 
 @app.route('/api/coupons', methods=['POST'])
@@ -2815,12 +3278,21 @@ def api_coupons_save():
     if not isinstance(selections, list) or len(selections) != rule['legs']:
         return jsonify({'error': f'{game_type} needs {rule["legs"]} legs'}), 400
 
+    status = str(body.get('status') or 'saved')
+    if status not in ('saved', 'draft'):
+        return jsonify({'error': 'status must be saved or draft'}), 400
+
     clean = []
     num_lines = 1
+    unfinished = False
     for i, leg in enumerate(selections):
         numbers = sorted({int(n) for n in (leg.get('numbers') or [])})
-        if not numbers or any(n < 1 for n in numbers):
-            return jsonify({'error': f'leg {i + 1} has no horses selected'}), 400
+        if any(n < 1 for n in numbers):
+            return jsonify({'error': f'leg {i + 1} has an invalid horse'}), 400
+        if not numbers:
+            if status != 'draft':
+                return jsonify({'error': f'leg {i + 1} has no horses selected'}), 400
+            unfinished = True
         horse_names_raw = leg.get('horseNames') or {}
         horse_names = {}
         if isinstance(horse_names_raw, dict):
@@ -2837,15 +3309,41 @@ def api_coupons_save():
             'numbers': numbers,
             'horseNames': horse_names,
         })
-        num_lines *= len(numbers)
+        if numbers:
+            num_lines *= len(numbers)
+    if unfinished or not any(leg['numbers'] for leg in clean):
+        if status != 'draft':
+            return jsonify({'error': 'every leg needs a horse'}), 400
+        if not any(leg['numbers'] for leg in clean):
+            return jsonify({'error': 'a draft needs at least one horse'}), 400
+        num_lines = 0
+
+    top_only = bool(body.get('topOnly'))
+    if top_only and not reduce_system.top_pool(game_type):
+        return jsonify({'error': f'{game_type} has no top pool to play'}), 400
 
     # A moved system does not pay for the picks alone: reducing buys fewer
     # rows than the full coupon, levering buys a horse's rows more than once.
-    # Either way the price is what ATG would charge for what was built.
+    # Cascade and extended can also put non-picks into a lever's sub-coupon,
+    # so the row count cannot be recovered from the selected horses × retention.
+    # Build the same mathematical plan the submit/simulate endpoints use and
+    # price the actual stake units it produces.
     full_lines = num_lines
-    reduction = _clean_reduction(body.get('reduction'), clean)
+    reduction = None if unfinished else _clean_reduction(body.get('reduction'), clean)
     if reduction and (reduction['reduced'] or reduction['levered']):
-        num_lines = max(1, round(full_lines * reduction['retention']))
+        try:
+            price_plan = _reduced_plan({
+                'gameType': game_type,
+                'gameId': game_id,
+                'gameDate': body.get('gameDate') or '',
+                'trackName': body.get('trackName') or '',
+                'aimSchema': reduction.get('aimSchema') or 0,
+                'scale': reduction.get('scale'),
+                'legs': reduction['legs'],
+            })
+            num_lines = sum(box.units for box in reduce_system.solve(price_plan))
+        except reduce_system.ReduceError as exc:
+            return jsonify({'error': str(exc)}), 400
     cost = round(num_lines * rule['line_price'], 2)
 
     name = (body.get('name') or '').strip() or None
@@ -2865,20 +3363,21 @@ def api_coupons_save():
             cur.execute("""
                 INSERT INTO coupon (name, game_type, atg_game_id, track_name,
                                     game_date, selections, line_price,
-                                    num_lines, cost, reduction)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    num_lines, cost, reduction, top_only, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING coupon_id
             """, (name, game_type, game_id, track_name, game_date,
                   psycopg2.extras.Json(clean), rule['line_price'],
                   num_lines, cost,
-                  psycopg2.extras.Json(reduction) if reduction else None))
+                  psycopg2.extras.Json(reduction) if reduction else None,
+                  top_only, status))
             coupon_id = cur.fetchone()[0]
             conn.commit()
     finally:
         conn.close()
     return jsonify({'status': 'saved', 'id': coupon_id, 'numLines': num_lines,
                     'fullLines': full_lines, 'cost': cost,
-                    'reduction': reduction})
+                    'reduction': reduction, 'topOnly': top_only})
 
 
 @app.route('/api/coupons/<int:coupon_id>', methods=['DELETE'])
@@ -2891,6 +3390,228 @@ def api_coupons_delete(coupon_id):
     finally:
         conn.close()
     return jsonify({'status': 'deleted', 'id': coupon_id})
+
+
+@app.route('/api/coupons/<int:coupon_id>', methods=['PATCH'])
+def api_coupons_status(coupon_id):
+    """Move a coupon between the saved, draft and played lists."""
+    body = request.get_json(silent=True) or {}
+    status = str(body.get('status') or '')
+    if status not in ('saved', 'draft', 'played'):
+        return jsonify({'error': 'status must be saved, draft or played'}), 400
+    conn = get_db()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE coupon SET status = %s
+                WHERE coupon_id = %s
+                RETURNING coupon_id
+            """, (status, coupon_id))
+            if cur.fetchone() is None:
+                conn.rollback()
+                return jsonify({'error': 'coupon not found'}), 404
+            conn.commit()
+    finally:
+        conn.close()
+    return jsonify({'id': coupon_id, 'status': status})
+
+
+@app.route('/api/coupons/<int:coupon_id>/simulation')
+def api_coupon_simulation(coupon_id):
+    """Solved rows, full field and adjustments for the coupon grid."""
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(_COUPON_SELECT + " WHERE coupon_id = %s", (coupon_id,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({'error': 'coupon not found'}), 404
+
+    try:
+        boxes, plan = _coupon_boxes(row)
+    except reduce_system.ReduceError as exc:
+        return jsonify({'error': str(exc)}), 422
+
+    total_rows = sum(box.units for box in boxes)
+    selections = {
+        int(leg['leg']): leg for leg in (row['selections'] or [])
+    }
+    raw_reduction = (row['reduction'] or {}).get('legs') or []
+    reductions = {
+        int(leg['leg']): leg for leg in raw_reduction
+        if isinstance(leg, dict) and leg.get('leg') is not None
+    }
+
+    data = _fetch_atg_game(row['atg_game_id'])
+    market = _coupon_pool_snapshot(row['atg_game_id'], data) if data else None
+    market_legs = {
+        int(leg['leg']): leg for leg in ((market or {}).get('legs') or [])
+    }
+
+    row_counts: list[dict[int, int]] = [
+        {} for _ in range(len(boxes[0].sets))
+    ]
+    for box in boxes:
+        widths = [len(numbers) for numbers in box.sets]
+        for leg_i, numbers in enumerate(box.sets):
+            per_horse = box.multiplier
+            for other_i, width in enumerate(widths):
+                if other_i != leg_i:
+                    per_horse *= width
+            for number in numbers:
+                row_counts[leg_i][number] = (
+                    row_counts[leg_i].get(number, 0) + per_horse)
+
+    # Reverse lookup: which source lever points at each target horse.
+    aimed_by: dict[tuple[int, int], list[dict]] = {}
+    for source in raw_reduction:
+        source_leg = int(source.get('leg') or 0)
+        modes = source.get('aimModes') or {}
+        for source_number, target_legs in (source.get('targets') or {}).items():
+            if not isinstance(target_legs, dict):
+                continue
+            source_modes = modes.get(str(source_number), {})
+            for target_leg_raw, shares in target_legs.items():
+                try:
+                    target_leg = int(target_leg_raw)
+                except (TypeError, ValueError):
+                    continue
+                if not isinstance(shares, dict):
+                    continue
+                mode = str(source_modes.get(str(target_leg), 'auto'))
+                for number_raw, share in shares.items():
+                    try:
+                        number, amount = int(number_raw), float(share)
+                    except (TypeError, ValueError):
+                        continue
+                    if amount > 0:
+                        aimed_by.setdefault((target_leg, number), []).append({
+                            'sourceLeg': source_leg,
+                            'sourceNumber': int(source_number),
+                            'mode': mode,
+                        })
+
+    response_legs = []
+    n_legs = len(boxes[0].sets)
+    for leg_i in range(n_legs):
+        leg_no = leg_i + 1
+        selection = selections.get(leg_no) or {}
+        reduction = reductions.get(leg_no) or {}
+        market_leg = market_legs.get(leg_no) or {}
+        picked = {int(n) for n in selection.get('numbers') or []}
+        names = {
+            int(n): name for n, name in
+            (selection.get('horseNames') or {}).items()
+        }
+        starts = {
+            int(start['number']): start
+            for start in market_leg.get('starts') or []
+            if start.get('number') is not None
+        }
+        numbers = set(starts) | picked | set(row_counts[leg_i])
+        numbers |= {
+            int(n) for n in reduction.get('rankOrder') or []
+            if str(n).isdigit()
+        }
+        weights = reduction.get('weights') or {}
+        coverage = reduction.get('coverage') or {}
+        targets = reduction.get('targets') or {}
+        modes = reduction.get('aimModes') or {}
+        reserves = [int(n) for n in reduction.get('reserves') or []]
+        rank_order = []
+        for n in reduction.get('rankOrder') or []:
+            try:
+                num = int(n)
+            except (TypeError, ValueError):
+                continue
+            if num not in rank_order:
+                rank_order.append(num)
+        rank_index = {num: i for i, num in enumerate(rank_order)}
+
+        entries = []
+        for number in sorted(numbers):
+            start = starts.get(number) or {}
+            weight = weights.get(str(number))
+            covered = coverage.get(str(number))
+            aims = []
+            for target_leg_raw in dict.fromkeys([
+                    *(targets.get(str(number)) or {}),
+                    *(modes.get(str(number)) or {})]):
+                try:
+                    target_leg = int(target_leg_raw)
+                except (TypeError, ValueError):
+                    continue
+                aims.append({
+                    'targetLeg': target_leg,
+                    'mode': str(
+                        (modes.get(str(number)) or {}).get(
+                            str(target_leg), 'auto')),
+                })
+            count = row_counts[leg_i].get(number, 0)
+            entries.append({
+                'number': number,
+                'name': start.get('name') or names.get(number) or '',
+                'marketPct': start.get('pct'),
+                'couponPct': (
+                    round(100 * count / total_rows, 2)
+                    if total_rows else 0),
+                'rowCount': count,
+                'picked': number in picked,
+                'scratched': bool(start.get('scratched')),
+                'weightPct': float(weight) if weight is not None else None,
+                'coveragePct': (
+                    float(covered) if covered is not None else None),
+                'adjustmentPct': (
+                    round(float(covered) - float(weight), 2)
+                    if covered is not None and weight is not None else None),
+                'reserve': (
+                    reserves.index(number) + 1 if number in reserves else None),
+                'rank': rank_index.get(number),
+                'aims': aims,
+                'aimedBy': aimed_by.get((leg_no, number), []),
+            })
+        entries.sort(key=lambda e: (
+            e['rank'] if e['rank'] is not None else 999,
+            0 if e['picked'] else 1,
+            -(e['weightPct'] if e['weightPct'] is not None else -1),
+            e['number'],
+        ))
+        response_legs.append({
+            'leg': leg_no,
+            'raceId': (
+                market_leg.get('raceId') or selection.get('raceId') or
+                reduction.get('raceId') or ''),
+            'winner': market_leg.get('winner'),
+            'entries': entries,
+        })
+
+    warnings = []
+    if plan and plan.levers:
+        warnings.extend(reduce_system.verify(plan, boxes).warnings)
+
+    return jsonify({
+        'coupon': _coupon_json(row),
+        'rows': total_rows,
+        'distinctRows': len(reduce_system.row_units(boxes) or {}),
+        'boxes': [{
+            'legs': [
+                {'leg': i + 1, 'numbers': list(numbers)}
+                for i, numbers in enumerate(box.sets)
+            ],
+            'multiplier': box.multiplier,
+            'units': box.units,
+            'topOnly': box.top_only,
+        } for box in boxes],
+        'topPool': reduce_system.top_pool(row['game_type']),
+        'legs': response_legs,
+        'payTiers': (market or {}).get('payTiers') or [],
+        'tierPools': (market or {}).get('tierPools') or {},
+        'resultPayouts': (market or {}).get('resultPayouts'),
+        'turnover': (market or {}).get('turnover'),
+        'warnings': warnings,
+    })
 
 
 # =====================================================================
@@ -2913,6 +3634,7 @@ def _reduced_plan(body: dict) -> reduce_system.Plan:
             f'{game_type} needs {rule["legs"]} legs')
 
     legs = []
+    levers = []
     for i, leg in enumerate(raw_legs, start=1):
         if not isinstance(leg, dict):
             raise reduce_system.ReduceError(f'leg {i} is malformed')
@@ -2920,15 +3642,21 @@ def _reduced_plan(body: dict) -> reduce_system.Plan:
         if not picks:
             raise reduce_system.ReduceError(f'leg {i} has no horses selected')
 
-        coverage = {}
-        raw_cov = leg.get('coverage') or {}
-        for key, value in raw_cov.items():
-            try:
-                num = int(key)
-            except (TypeError, ValueError):
-                continue
-            if num in picks:
-                coverage[num] = max(0.0, float(value))
+        # Saved coupons keep four decimals. Solving a live draft at the same
+        # precision makes it deal exactly the rows its saved copy will; the
+        # rounding is sensitive enough for the fifth decimal to move rows.
+        def numbers(source, keep=picks):
+            out = {}
+            for key, value in (source or {}).items():
+                try:
+                    num, val = int(key), float(value)
+                except (TypeError, ValueError):
+                    continue
+                if keep is None or num in keep:
+                    out[num] = round(max(0.0, val), 4)
+            return out
+
+        coverage = numbers(leg.get('coverage'))
         # A leg the user never touched is an even split.
         for num in picks:
             coverage.setdefault(num, 100.0 / len(picks))
@@ -2942,14 +3670,78 @@ def _reduced_plan(body: dict) -> reduce_system.Plan:
             if num not in picks and num not in reserves:
                 reserves.append(num)
 
+        rank_order = []
+        for n in (leg.get('rankOrder') or []):
+            try:
+                num = int(n)
+            except (TypeError, ValueError):
+                continue
+            if num > 0 and num not in rank_order:
+                rank_order.append(num)
+
+        leg_no = int(leg.get('leg') or i)
         legs.append(reduce_system.Leg(
-            leg=int(leg.get('leg') or i),
+            leg=leg_no,
             race_id=str(leg.get('raceId') or ''),
             picks=picks,
             coverage=coverage,
             reserves=reserves[:2],
             starters=int(leg.get('starters') or 0),
+            order=rank_order or None,
         ))
+
+        # Only an aimed or multiplied lever is passed on. Left
+        # alone it is still just a margin, so a coupon nobody has aimed
+        # anything in builds from its coverage alone.
+        weights = numbers(leg.get('weights'))
+        raw_targets = leg.get('targets') or {}
+        raw_modes = leg.get('aimModes') or {}
+        aim_schema = body.get('aimSchema') or 0
+        for key in dict.fromkeys([*raw_targets, *raw_modes]):
+            try:
+                horse = int(key)
+            except (TypeError, ValueError):
+                continue
+            spread = raw_targets.get(key) or {}
+            if horse not in picks or not isinstance(spread, dict):
+                continue
+            amount = coverage.get(horse, 0.0) - weights.get(horse, 0.0)
+            if amount <= 0.05:
+                continue
+            targets = {}
+            for leg_key, shares in spread.items():
+                try:
+                    target_leg = int(leg_key)
+                except (TypeError, ValueError):
+                    continue
+                aimed = numbers(shares, keep=None)
+                if target_leg != leg_no and sum(aimed.values()) > 0:
+                    targets[target_leg] = aimed
+            horse_modes = (
+                raw_modes.get(str(horse))
+                or raw_modes.get(horse)
+                or {})
+            if not isinstance(horse_modes, dict):
+                horse_modes = {}
+            # Multiplied is a lever's policy as well as a shape: any one of
+            # its races set to it plays the whole lever for the top pool.
+            # That race keeps Auto's shape unless a thumb was dragged, in
+            # which case the dragged shares came along as its target.
+            pooled = any(_aim_mode(m, aim_schema) == 'multiplied'
+                         for m in horse_modes.values())
+            ranked_targets = set()
+            for target_leg in list(targets):
+                raw_mode = (horse_modes.get(str(target_leg))
+                            or horse_modes.get(target_leg))
+                mode = _aim_mode(raw_mode, aim_schema)
+                if str(raw_mode or '').lower() in _RETIRED_AIM_MODES:
+                    del targets[target_leg]
+                elif mode in _RANKED_AIM_MODES:
+                    ranked_targets.add(target_leg)
+            if targets or pooled:
+                levers.append(reduce_system.Lever(
+                    leg=leg_no, horse=horse, amount=amount, targets=targets,
+                    cascade_targets=frozenset(ranked_targets), pool=pooled))
 
     game_id = str(body.get('gameId') or '')
     track_code = body.get('trackCode')
@@ -2967,6 +3759,9 @@ def _reduced_plan(body: dict) -> reduce_system.Plan:
         game_date=str(body.get('gameDate') or ''),
         track_code=int(track_code) if track_code not in (None, '') else None,
         track_name=str(body.get('trackName') or ''),
+        levers=levers,
+        top_only=bool(body.get('topOnly')),
+        scale=_coupon_scale(body.get('scale')),
     )
 
 
@@ -2977,6 +3772,26 @@ def api_reduced_solve():
     try:
         plan = _reduced_plan(body)
         return jsonify(reduce_system.build(plan))
+    except reduce_system.ReduceError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception('reduced solve failed')
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/reduced/quote', methods=['POST'])
+def api_reduced_quote():
+    """Price a live reduced plan without serialising all its sub-coupons."""
+    body = request.get_json(silent=True) or {}
+    try:
+        plan = _reduced_plan(body)
+        rows = plan.rows
+        return jsonify({
+            'rows': rows,
+            'fullRows': plan.full_rows,
+            'linePrice': plan.line_price,
+            'cost': round(rows * plan.line_price, 2),
+        })
     except reduce_system.ReduceError as exc:
         return jsonify({'error': str(exc)}), 400
 
@@ -2995,6 +3810,9 @@ def api_reduced_atg_file():
         xml = reduce_system.atg_xml(plan, boxes)
     except reduce_system.ReduceError as exc:
         return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception('reduced file failed')
+        return jsonify({'error': str(exc)}), 500
 
     name = reduce_system.atg_filename(plan.game_type, plan.game_date, xml)
     return Response(xml, mimetype='application/xml', headers={
@@ -3363,6 +4181,89 @@ def _horse_is_in_field(conn, horse_id: int, atg_race_id: str) -> bool:
     if not atg_race_id or _builder_past(_atg_embedded_date(atg_race_id)):
         return False
     return horse_id in _race_field(conn, atg_race_id)
+
+
+@app.route('/api/horse/<int:horse_id>/card')
+def horse_card(horse_id):
+    """The horse page's passport head, for the game page's mini horse view."""
+    conn = get_db()
+    try:
+        if builder_only() and not _horse_is_in_field(
+                conn, horse_id, request.args.get('race', '').strip()):
+            return jsonify({'error': 'not found'}), 404
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT h.name, h.date_of_birth, h.gender_code, h.breed_code,
+                       h.color, h.sire_id, h.sire_name, h.dam_id, h.dam_name,
+                       gf.name AS mother_father_name
+                FROM horse h
+                LEFT JOIN horse m  ON m.horse_id  = h.dam_id
+                LEFT JOIN horse gf ON gf.horse_id = m.sire_id
+                WHERE h.horse_id = %s
+                """,
+                (horse_id,),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({'error': 'not found'}), 404
+    card = {
+        'horse_id': horse_id,
+        'name': row['name'] or '',
+        'birth_year': row['date_of_birth'].year if row['date_of_birth'] else None,
+        'gender': _GENDER_TEXT.get(row['gender_code'] or '', ''),
+        'breed': _BREED_TEXT.get(row['breed_code'] or '', ''),
+        'color': row['color'] or '',
+        'father': row['sire_name'] or '',
+        'mother': row['dam_name'] or '',
+        'mother_father': row['mother_father_name'] or '',
+    }
+    if not builder_only():
+        card['father_id'] = row['sire_id']
+        card['mother_id'] = row['dam_id']
+    return jsonify(card)
+
+
+@app.route('/api/horse/<int:horse_id>/bloodline')
+def horse_bloodline(horse_id):
+    """Gene shares by origin country and inbreeding, for the horse card's bloodline tabs."""
+    conn = get_db()
+    try:
+        if builder_only() and not _horse_is_in_field(
+                conn, horse_id, request.args.get('race', '').strip()):
+            return jsonify({'error': 'not found'}), 404
+        with conn.cursor() as cur:
+            result = bloodline.origin(cur, horse_id)
+            if result is not None:
+                result['inbreeding'] = bloodline.inbreeding(cur, horse_id)
+    finally:
+        conn.close()
+    if result is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(result)
+
+
+@app.route('/api/horse/<int:horse_id>/ratings')
+def horse_ratings(horse_id):
+    """Main and sub-ratings plus the overall, as known before the race day,
+    with the trainer and driver named for that race."""
+    from datetime import date as _d
+    race = request.args.get('race', '').strip()
+    conn = get_db()
+    try:
+        if builder_only() and not _horse_is_in_field(conn, horse_id, race):
+            return jsonify({'error': 'not found'}), 404
+        as_of = _atg_embedded_date(race) if race else None
+        with conn.cursor() as cur:
+            result = ratings_api.payload(cur, horse_id, as_of=as_of or _d.today(),
+                                         atg_race_id=race or None)
+    finally:
+        conn.close()
+    if result is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify(result)
 
 
 @app.route('/api/horse/<int:horse_id>/races')
@@ -4344,7 +5245,7 @@ _POST_MIN_STARTS_VIZ = 50  # ignore thin posts in the visualisation
 _TPS_COLS_CACHE = None
 _STARTED_RE = (
     r"'^(gdk|ejg|ejp|gd|gk|egk|egdk|gkd|gdj|gdb|gdek|gdgk|gdl|ddk|frdk|"
-    r"erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk|g)[0-9]?$|^[12]?[pP][0-9]?$'"
+    r"erj|ejk|ejgk|ejgd|ej|EJ|EJG|EJP|GDK|Gdk)[0-9]?$|^[12]?[pP][0-9]?$'"
 )
 _DIST_BOUNDS = {'short': (None, 1700), 'medium': (1701, 2250), 'long': (2251, None)}
 
@@ -4828,6 +5729,19 @@ def race_live_by_atg(atg_race_id):
     data = _atg_live_pools(atg_race_id)
     if not data:
         return jsonify({'error': 'no live pools'}), 404
+    # A replacement driver links to their own page, so resolve their id.
+    swapped = [s for s in data.get('starts') or [] if s.get('_atgDriverId') is not None]
+    if swapped and not builder_only():
+        conn = get_db()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                ids = _batch_resolve_atg_person_ids(cur, [s['_atgDriverId'] for s in swapped])
+        finally:
+            conn.close()
+        for s in swapped:
+            s['driverId'] = ids.get(str(s['_atgDriverId']))
+    for s in data.get('starts') or []:
+        s.pop('_atgDriverId', None)
     return jsonify(data)
 
 
@@ -4946,6 +5860,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                        e.age, e.sex,
                        e.sulky, e.sulky_changed,
                        e.tillagg,
+                       e.post, e.driver_changed,
                        e.shoe_code, e.shoe_front_changed, e.shoe_back_changed,
                        e.kmtid_actual_distance_m       AS kmtid_actual_m,
                        e.kmtid_actual_km_time_ms       AS kmtid_actual_km_ms,
@@ -4972,21 +5887,34 @@ def _race_entries(*, race_id=None, atg_race_id=None):
             entry_rows = cur.fetchall()
             entry_ids = [r['entry_id'] for r in entry_rows if r.get('entry_id')]
             gal_track_map, gal_general_map = {}, {}
+            lead_map, xodds_map, xwin_map = {}, {}, {}
+            xodds_payout = None
             gal_models = {'track': None, 'general': None, 'has_track_model': False}
             if entry_ids:
                 cur.execute(
                     """
                     SELECT p.entry_id, p.target, p.prob,
-                           m.model_id, m.name
+                           m.model_id, m.name, m.slice_def->>'payout' AS payout
                     FROM ml_prediction p
                     LEFT JOIN ml_model m ON m.model_id = p.model_id
                     WHERE p.entry_id = ANY(%s)
-                      AND p.target IN ('y_gal_track', 'y_gal_general', 'y_gal')
+                      AND p.target IN ('y_gal_track', 'y_gal_general', 'y_gal', 'y_lead', 'xodds', 'xwin')
                     """,
                     (entry_ids,),
                 )
                 for r in cur.fetchall():
                     prob = float(r['prob']) if r['prob'] is not None else None
+                    if r['target'] == 'y_lead':
+                        lead_map[r['entry_id']] = prob
+                        continue
+                    if r['target'] == 'xwin':
+                        xwin_map[r['entry_id']] = prob
+                        continue
+                    if r['target'] == 'xodds':
+                        xodds_map[r['entry_id']] = prob
+                        if r['payout']:
+                            xodds_payout = float(r['payout'])
+                        continue
                     if r['target'] in ('y_gal_track', 'y_gal'):
                         gal_track_map[r['entry_id']] = prob
                         if r['target'] == 'y_gal_track' and r['name']:
@@ -5035,6 +5963,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
             ped_map = _batch_horse_pedigree(cur, horse_ids)
             head_race_date = head.get('race_date')
             gear_hist = _batch_horse_gear_prior(
+                cur, horse_ids, head_race_date, race_id,
+            )
+            last_trainer = _batch_horse_last_trainer(
                 cur, horse_ids, head_race_date, race_id,
             )
             d_wr_map = _person_win_rates(conn, driver_ids, 'driver')
@@ -5117,6 +6048,9 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'number': r['number'],
                     'xgal_track': gal_track_map.get(r['entry_id']),
                     'xgal_general': gal_general_map.get(r['entry_id']),
+                    'xlead': lead_map.get(r['entry_id']),
+                    'xodds_p': xodds_map.get(r['entry_id']),
+                    'xwin': xwin_map.get(r['entry_id']),
                     'distance': r['distance'],
                     'primary_source': r['primary_source'],
                     'contributors': r.get('contributors') or [],
@@ -5141,6 +6075,10 @@ def _race_entries(*, race_id=None, atg_race_id=None):
                     'sulky': r['sulky'],
                     'sulky_changed': r['sulky_changed'],
                     'tillagg': r['tillagg'],
+                    'post': r['post'],
+                    'driver_changed': bool(r['driver_changed']),
+                    'trainer_new': _is_new_trainer(
+                        r['trainer_id'], last_trainer.get(r['horse_id'])),
                     'shoe_code': r['shoe_code'],
                     'shoe_front_changed': r['shoe_front_changed'],
                     'shoe_back_changed': r['shoe_back_changed'],
@@ -5216,6 +6154,7 @@ def _race_entries(*, race_id=None, atg_race_id=None):
         'atg_url': _atg_race_url(atg_rid) if atg_rid else None,
         'is_upcoming': is_upcoming,
         'gal_models': gal_models if is_upcoming else None,
+        'xodds_payout': xodds_payout,
         'has_kmtid': head.get('kmtid_id') is not None,
         # Length of this track's home stretch, so the GPS column can show the
         # upplopp sectional over the distance the stretch actually is here.
@@ -5341,6 +6280,41 @@ def _batch_horse_gear_prior(cur, horse_ids: list[int], before_date,
             (row['shoe_code'], row['sulky'])
         )
     return hist
+
+
+def _batch_horse_last_trainer(cur, horse_ids: list[int], before_date,
+                              before_race_id=None) -> dict[int, int]:
+    """Trainer at each horse's previous start, for the new-trainer mark."""
+    if not horse_ids or not before_date:
+        return {}
+    if before_race_id is not None:
+        extra = ("AND (r.race_date < %s OR "
+                 "(r.race_date = %s AND e.race_id < %s))")
+        params = (horse_ids, before_date, before_date, before_race_id)
+    else:
+        extra = "AND r.race_date < %s"
+        params = (horse_ids, before_date)
+    cur.execute(
+        f"""
+        SELECT DISTINCT ON (e.horse_id) e.horse_id, e.trainer_id
+        FROM entry e
+        JOIN race r ON r.race_id = e.race_id
+        WHERE e.horse_id = ANY(%s)
+          {extra}
+          AND NOT COALESCE(e.withdrawn, false)
+        ORDER BY e.horse_id, r.race_date DESC, e.race_id DESC
+        """,
+        params,
+    )
+    return {row['horse_id']: row['trainer_id'] for row in cur.fetchall()
+            if row['trainer_id'] is not None}
+
+
+def _is_new_trainer(trainer_id, previous_trainer_id) -> bool:
+    """A different trainer than at the horse's last start. A debutant, or a
+    last start with no trainer on record, has nothing to change from."""
+    return bool(trainer_id and previous_trainer_id
+                and trainer_id != previous_trainer_id)
 
 
 def _apply_gear_debut(row: dict, prior) -> None:
@@ -5865,6 +6839,182 @@ def api_ml_model_detail(model_id):
         conn.close()
 
 
+# Coupon viewer: the marking-game systems scripts/eval_pools.py settled for a
+# model (ml_pool_coupon), with the same game played on market / public picks.
+_COUPON_SORTS = {
+    'profit':   'c.ret - c.cost DESC',
+    'return':   'c.ret DESC',
+    'multiple': 'c.ret / NULLIF(c.cost, 0) DESC',
+    'public':   '(c.ret - c.cost) - COALESCE(pu.ret - pu.cost, 0) DESC',
+    'newest':   'g.game_date DESC, c.atg_game_id DESC',
+}
+
+
+@app.route('/api/ml/pools/coupon-options')
+def api_ml_coupon_options():
+    """Game types and rules with settled systems for a model, with totals."""
+    model_id = request.args.get('model_id', type=int)
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT g.game_type, c.rule, COUNT(*) AS games,
+                       SUM((c.ret > 0)::int) AS paid, SUM(c.cost) AS cost, SUM(c.ret) AS ret
+                FROM ml_pool_coupon c JOIN atg_game g USING (atg_game_id)
+                WHERE c.model_id = %s AND c.src = 'model'
+                GROUP BY 1, 2 ORDER BY 1, 2
+            """, (model_id,))
+            return jsonify({'options': cur.fetchall()})
+    finally:
+        conn.close()
+
+
+@app.route('/api/ml/pools/coupons')
+def api_ml_coupons():
+    """One page of a model's coupons for a game type and rule."""
+    a = request.args
+    model_id, gtype, rule = a.get('model_id', type=int), a.get('game_type', ''), a.get('rule', '')
+    order = _COUPON_SORTS.get(a.get('sort'), _COUPON_SORTS['profit'])
+    show = a.get('show', 'all')
+    limit = max(1, min(a.get('limit', 60, type=int), 300))
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT c.atg_game_id, g.game_date, g.game_type, t.name AS track,
+                       array_length(g.race_ids, 1) AS legs, g.turnover / 100.0 AS turnover,
+                       c.rows, c.cost, c.ret, c.legs_right,
+                       mk.cost AS market_cost, mk.ret AS market_ret, mk.legs_right AS market_right,
+                       pu.cost AS public_cost, pu.ret AS public_ret, pu.legs_right AS public_right,
+                       g.game_date >= m.created_at::date AS live
+                FROM ml_pool_coupon c
+                JOIN ml_model m ON m.model_id = c.model_id
+                JOIN atg_game g ON g.atg_game_id = c.atg_game_id
+                LEFT JOIN race r ON r.atg_race_id = g.race_ids[1]
+                LEFT JOIN track t ON t.track_id = r.track_id
+                LEFT JOIN ml_pool_coupon mk ON mk.model_id = c.model_id AND mk.atg_game_id = c.atg_game_id
+                                           AND mk.rule = c.rule AND mk.src = 'market'
+                LEFT JOIN ml_pool_coupon pu ON pu.model_id = c.model_id AND pu.atg_game_id = c.atg_game_id
+                                           AND pu.rule = c.rule AND pu.src = 'public'
+                WHERE c.model_id = %s AND c.src = 'model' AND c.rule = %s AND g.game_type = %s
+                  AND (%s <> 'paid' OR c.ret > 0)
+                  AND (%s <> 'all_right' OR c.legs_right = array_length(g.race_ids, 1))
+                  AND (%s <> 'one_short' OR c.legs_right = array_length(g.race_ids, 1) - 1)
+                ORDER BY {order}
+                LIMIT %s
+            """, (model_id, rule, gtype, show, show, show, limit))
+            rows = cur.fetchall()
+        for r in rows:
+            r['game_date'] = r['game_date'].isoformat()
+            for k in ('turnover', 'cost', 'ret', 'market_cost', 'market_ret', 'public_cost', 'public_ret'):
+                r[k] = float(r[k]) if r[k] is not None else None
+        return jsonify({'coupons': rows})
+    finally:
+        conn.close()
+
+
+@app.route('/api/ml/pools/coupon')
+def api_ml_coupon():
+    """One game in full: tiers paid, the three systems, every leg's field
+    with the model's / market's / public's chances and who was picked."""
+    a = request.args
+    model_id, gid, rule = a.get('model_id', type=int), a.get('game_id', ''), a.get('rule', '')
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT g.atg_game_id, g.game_type, g.game_date, g.rtp, g.turnover, g.system_count,
+                       g.tier_pots, g.payouts, g.race_ids, g.legs, m.target, m.name AS model_name
+                FROM atg_game g, ml_model m
+                WHERE g.atg_game_id = %s AND m.model_id = %s
+            """, (gid, model_id))
+            game = cur.fetchone()
+            if not game:
+                return jsonify({'error': 'not found'}), 404
+            cur.execute("""
+                SELECT src, rows, cost, ret, legs_right, picks FROM ml_pool_coupon
+                WHERE model_id = %s AND atg_game_id = %s AND rule = %s
+            """, (model_id, gid, rule))
+            systems = {r['src']: r for r in cur.fetchall()}
+            cur.execute("""
+                SELECT p.atg_race_id, p.number, p.win_odds, p.finish, p.scratched,
+                       r.race_number, r.distance, r.start_method, t.name AS track,
+                       e.entry_id, h.name AS horse
+                FROM atg_race_pool p
+                LEFT JOIN race r ON r.atg_race_id = p.atg_race_id
+                LEFT JOIN track t ON t.track_id = r.track_id
+                LEFT JOIN entry e ON e.race_id = r.race_id AND e.program_number = p.number
+                LEFT JOIN horse h ON h.horse_id = e.horse_id
+                WHERE p.atg_race_id = ANY(%s)
+                ORDER BY p.atg_race_id, p.number
+            """, (game['race_ids'],))
+            starters = cur.fetchall()
+            cur.execute("SELECT leg, number, bet_share FROM atg_game_start WHERE atg_game_id = %s", (gid,))
+            shares = {(r['leg'], r['number']): r['bet_share'] for r in cur.fetchall()}
+            eids = [s['entry_id'] for s in starters if s['entry_id']]
+            cur.execute("SELECT entry_id, prob FROM ml_backtest WHERE model_id = %s AND entry_id = ANY(%s)",
+                        (model_id, eids))
+            prob = {r['entry_id']: r['prob'] for r in cur.fetchall()}
+            cur.execute("SELECT entry_id, prob FROM ml_prediction WHERE model_id = %s AND target = %s "
+                        "AND entry_id = ANY(%s)", (model_id, game['target'], eids))
+            for r in cur.fetchall():
+                prob.setdefault(r['entry_id'], r['prob'])
+    finally:
+        conn.close()
+
+    picks = {src: s['picks'] for src, s in systems.items()}
+    winners = [set((lg or {}).get('winners') or []) for lg in (game['legs'] or [])]
+    legs = []
+    for i, rid in enumerate(game['race_ids']):
+        field = [s for s in starters if s['atg_race_id'] == rid]
+        live = [s for s in field if not s['scratched'] and s['win_odds'] and s['win_odds'] > 1]
+        pt = sum(prob.get(s['entry_id']) or 0.0 for s in live) or 1.0
+        qt = sum(1.0 / s['win_odds'] for s in live) or 1.0
+        rows = []
+        for s in field:
+            ok = s in live
+            p = (prob.get(s['entry_id']) or 0.0) / pt if ok else None
+            rows.append({
+                'number': s['number'], 'horse': s['horse'], 'scratched': bool(s['scratched']),
+                'odds': float(s['win_odds']) if s['win_odds'] else None, 'finish': s['finish'],
+                'p': p, 'q': (1.0 / s['win_odds']) / qt if ok else None,
+                'share': shares.get((i + 1, s['number'])),
+                'won': s['number'] in (winners[i] if i < len(winners) else set()),
+                'picked': {src: s['number'] in pk[i] for src, pk in picks.items() if i < len(pk)},
+            })
+        for key in ('p', 'q', 'share'):
+            order = sorted((r for r in rows if r[key] is not None), key=lambda r: -r[key])
+            for k, r in enumerate(order):
+                r['rank_' + key] = k + 1
+        head = field[0] if field else {}
+        legs.append({'race_id': rid, 'track': head.get('track'), 'race_number': head.get('race_number'),
+                     'distance': head.get('distance'), 'start_method': head.get('start_method'),
+                     'starters': sorted(rows, key=lambda r: -(r['p'] if r['p'] is not None else -1))})
+
+    # Rows of each system by number of legs right: a product of (misses + hits·x) per leg.
+    for src, s in systems.items():
+        poly = [1]
+        for i, pk in enumerate(s['picks']):
+            hit = 1 if i < len(winners) and set(pk) & winners[i] else 0
+            nxt = [0] * (len(poly) + 1)
+            for k, c in enumerate(poly):
+                nxt[k] += c * (len(pk) - hit)
+                nxt[k + 1] += c * hit
+            poly = nxt
+        s['by_right'] = {k: c for k, c in enumerate(poly) if c and k >= len(poly) - 4}
+        s['cost'], s['ret'] = float(s['cost']), float(s['ret'])
+    return jsonify({
+        'game': {**{k: game[k] for k in ('atg_game_id', 'game_type', 'rtp', 'system_count', 'target', 'model_name')},
+                 'game_date': game['game_date'].isoformat(),
+                 'turnover': (game['turnover'] or 0) / 100,
+                 'tiers': [{'tier': int(t), 'payout': (v.get('payout') or 0) / 100, 'systems': v.get('systems'),
+                            'jackpot': bool(v.get('jackpot')),
+                            'pot': ((game['tier_pots'] or {}).get(t) or 0) / 100}
+                           for t, v in sorted((game['payouts'] or {}).items(), key=lambda kv: -int(kv[0]))]},
+        'rule': rule, 'systems': systems, 'legs': legs,
+    })
+
+
 # =====================================================================
 # Admin
 # =====================================================================
@@ -5887,6 +7037,463 @@ def admin_matching_page():
 @app.route('/admin/design')
 def admin_design_page():
     return render_template('design.html', active_tab='design')
+
+
+# ---------------------------------------------------------------------------
+# Race lab — the real game page fed one made-up race, framed by the design
+# page's "game" tab. The field is active watchlist horses with xLabs traces
+# and race comments (their history, GPS, pedigree and siblings are real);
+# drivers, odds, pool shares and form are invented, and nothing here is
+# written anywhere.
+# ---------------------------------------------------------------------------
+
+RACE_LAB_TYPES = ('v64', 'v85', 'v86', 'v4', 'gs75', 'v65')
+RACE_LAB_GAME_ID = '{type}_lab'
+RACE_LAB_RACE_ID = 'lab_1'
+
+_RACE_LAB_DRIVERS = [
+    'Lindqvist Erik', 'Holm Sara', 'Berglund Mats', 'Ek Johanna', 'Sandberg Olle',
+    'Wallin Petra', 'Norén Kalle', 'Strand Lina', 'Forsberg Nils', 'Dahl Emma',
+    'Hedlund Anton', 'Åberg Maja', 'Sjöholm Viktor', 'Lundin Ida', 'Nyberg Jonas',
+    'Falk Hanna',
+]
+_RACE_LAB_RACES = {
+    'v64': ('Silverdivisionen', '100000-50000-25000-12500-8000-6000-(4000)-(4000)'),
+    'v65': ('Bronsdivisionen, Final', '100000-50000-25000-12500-8000-6000-(4000)-(4000)'),
+    'v85': ('Gulddivisionen', '200000-100000-50000-25000-15000-10000-(8000)-(8000)'),
+    'v86': ('Diamantstoet', '200000-100000-50000-25000-15000-10000-(8000)-(8000)'),
+    'gs75': ('Guldstoet, Final', '300000-150000-75000-37500-20000-12000-(10000)-(10000)'),
+    'v4': ('Klass I', '50000-25000-12500-6000-4000-3000'),
+}
+_RACE_LAB_TIPS = [
+    'Klassens bästa på pappret. Startsnabb och svår att passera — vinner härifrån.',
+    'Har vunnit allt som går att vinna. Ett självklart streck om formen sitter i.',
+    'Stark avslutning i senaste. Behöver lite flyt i spåret men har kapaciteten.',
+    'Ojämn men med toppnoteringar som räcker långt. Spännande som andrahandsval.',
+    'Tuff uppgift i det här sällskapet. Gör alltid sitt bästa — plats?',
+    'Kommer från ett längre uppehåll. Svår att tippa men kvaliteten finns.',
+    'Galopprisk från start. Om allt klaffar finns en överraskning här.',
+    'Startar bakom bilen för första gången på länge. Får se hur spåret passar.',
+]
+
+
+def _race_lab_horses() -> list[dict]:
+    """The 15 top-earning active horses that each have at least two xLabs
+    traces and two race comments. A smaller field is the top of this list."""
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT hs.horse_id, hs.name, hs.gender_code, hs.dob_year,
+                       hs.sire_name, hs.dam_name, hs.mgs_name, hs.starts,
+                       hs.wins, hs.gals, hs.prize_money_kr, hs.trainer_name,
+                       hs.last_start, x.n_xlabs, c.n_comments
+                FROM horse_stats hs
+                CROSS JOIN LATERAL (
+                    SELECT count(*) AS n_xlabs
+                    FROM entry e
+                    WHERE e.horse_id = hs.horse_id
+                      AND e.kmtid_actual_km_time_ms IS NOT NULL
+                      AND e.kmtid_intervals IS NOT NULL
+                ) x
+                CROSS JOIN LATERAL (
+                    SELECT count(*) AS n_comments
+                    FROM entry e
+                    JOIN entry_comment ec ON ec.entry_id = e.entry_id
+                    WHERE e.horse_id = hs.horse_id AND coalesce(ec.comment, '') <> ''
+                ) c
+                WHERE hs.starts > 0
+                  AND NOT coalesce(hs.is_dead, false)
+                  AND hs.last_start >= CURRENT_DATE - 365
+                  AND (hs.dob_year IS NULL OR hs.dob_year < EXTRACT(YEAR FROM CURRENT_DATE))
+                  AND x.n_xlabs >= 2
+                  AND c.n_comments >= 2
+                ORDER BY hs.prize_money_kr DESC NULLS LAST, hs.horse_id
+                LIMIT 15
+            """)
+            return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def _race_lab_groups(n: int, tillagg: int) -> list[int]:
+    """Sizes of the distance groups, base distance first."""
+    if not tillagg:
+        return [n]
+    base = min(max(-(-n // 2), n - 2 * tillagg), n - tillagg)
+    rest = n - base
+    return [base] + [rest // tillagg + (1 if i < rest % tillagg else 0) for i in range(tillagg)]
+
+
+def _race_lab_payload(type_id: str, n: int, start: str, tillagg: int, seed: int) -> dict:
+    import math
+    import random
+    from datetime import date as _d
+
+    horses = _cached('race_lab_horses', _race_lab_horses)
+    # The field is the same for every game type, so switching type compares
+    # colours on one race; `seed` only reshuffles the post order.
+    rng = random.Random(f'race-lab:{seed}')
+    field = horses[:n]
+    rng.shuffle(field)
+    while len(field) < n:
+        i = len(field) + 1
+        field.append({'horse_id': None, 'name': f'Lab Horse {i}', 'gender_code': 'V',
+                      'dob_year': None, 'sire_name': '', 'dam_name': '', 'mgs_name': '',
+                      'starts': 0, 'wins': 0, 'gals': 0, 'prize_money_kr': 0,
+                      'trainer_name': 'Trainer Lab', 'last_start': None,
+                      'n_xlabs': 0, 'n_comments': 0})
+
+    # Rich horses are favourites, give or take a seeded bad day.
+    strength = []
+    for h in field:
+        r = random.Random(f'race-lab:{seed}:{h["horse_id"]}')
+        strength.append(math.log10(float(h['prize_money_kr'] or 0) + 2e5) + r.gauss(0, 0.45))
+    mean = sum(strength) / n
+    weights = [math.exp(1.9 * (s - mean)) for s in strength]
+    total = sum(weights)
+    shares = [w / total for w in weights]
+
+    groups = _race_lab_groups(n, tillagg if start == 'V' else 0)
+    base_dist = 2140
+    drivers = random.Random(f'race-lab:{seed}:drivers').sample(_RACE_LAB_DRIVERS, n)
+    today = _d.today().isoformat()
+    game_id = RACE_LAB_GAME_ID.format(type=type_id.upper())
+    name, prize = _RACE_LAB_RACES.get(type_id, _RACE_LAB_RACES['v85'])
+    order = sorted(range(n), key=lambda i: -shares[i])
+    tip_rank = {i: rank for rank, i in enumerate(order)}
+
+    entries, starts, tips = [], [], {}
+    number = 0
+    for g, size in enumerate(groups):
+        for post in range(1, size + 1):
+            i = number
+            number += 1
+            h = field[i]
+            r = random.Random(f'race-lab:{seed}:{h["horse_id"]}:{number}')
+            starts_n = int(h['starts'] or 0)
+            wins_n = int(h['wins'] or 0)
+            gals_n = int(h['gals'] or 0)
+            age = (_d.today().year - h['dob_year']) if h['dob_year'] else r.randint(4, 9)
+            gal_rate = (gals_n + 1) / (starts_n + 8) if starts_n else 0.08
+            xgal = round(min(0.45, max(0.01, gal_rate * r.uniform(0.7, 1.4))), 4)
+            share = shares[i]
+            odds = round(min(999.0, max(1.05, 0.85 / share)), 2)
+            # Unnormalised on purpose: the list renormalises over the field.
+            xodds_p = share * math.exp(r.gauss(0, 0.35))
+            xlead = (math.exp(-0.25 * (post - 1)) * r.uniform(0.5, 1.5) * (1 + 3 * share)
+                     if g == 0 else 0.01 * r.random())
+            xwin = share * math.exp(r.gauss(0, 0.45))
+            drv = drivers[i]
+            trainer = h['trainer_name'] or 'Trainer Lab'
+            entries.append({
+                'age': max(2, min(14, age)),
+                'comment': None,
+                'contributors': [],
+                'd_wr': r.randint(40, 240),
+                'df': r.randint(0, 240),
+                'df_odds': r.randint(-120, 40),
+                'df_perf': r.choice([None, r.randint(380, 720)]),
+                'distance': base_dist + 20 * g,
+                'dq': False,
+                'driver_changed': r.random() < 0.06,
+                'driver_id': None,
+                'driver_name': fmtName(drv),
+                'driver_short': shortName(drv),
+                'entry_id': None,
+                'father': h['sire_name'] or '',
+                'gal': False,
+                'horse_id': h['horse_id'],
+                'horse_name': h['name'],
+                'kmtid_actual_km_ms': None, 'kmtid_actual_m': None,
+                'kmtid_best_100ms': None, 'kmtid_first_200ms': None,
+                'kmtid_intervals': None, 'kmtid_last_200ms': None, 'kmtid_slip_m': None,
+                'mother': h['dam_name'] or '',
+                'mother_father': h['mgs_name'] or '',
+                'number': number,
+                'odds': None,
+                'placement': None,
+                'placement_text': None,
+                'post': post,
+                'post_galadj_starts': max(0, starts_n - gals_n), 'post_galadj_wins': wins_n,
+                'post_prize_kr': int(h['prize_money_kr'] or 0),
+                'post_starts': starts_n, 'post_wins': wins_n,
+                'pre_galadj_starts': max(0, starts_n - gals_n), 'pre_galadj_wins': wins_n,
+                'pre_prize_kr': int(h['prize_money_kr'] or 0),
+                'pre_starts': starts_n, 'pre_wins': wins_n,
+                'primary_source': 'atg',
+                'prize_kr': '',
+                'sex': h['gender_code'] or 'V',
+                'shoe_back_changed': r.random() < 0.12,
+                'shoe_back_debut': False,
+                'shoe_code': r.choice(['1', '2', '3', '4', '4']),
+                'shoe_front_changed': r.random() < 0.12,
+                'shoe_front_debut': False,
+                'sulky': r.choice(['AM', 'VA']),
+                'sulky_changed': False,
+                'sulky_debut': False,
+                't_wr': r.randint(40, 240),
+                'tf': r.randint(0, 260),
+                'tf_odds': r.randint(-120, 40),
+                'tf_perf': r.choice([None, None, r.randint(350, 720)]),
+                'tillagg': (20 * g) or None,
+                'time_text': None,
+                'time_val': None,
+                'trainer_id': None,
+                'trainer_name': fmtName(trainer),
+                'trainer_new': r.random() < 0.05,
+                'trainer_short': shortName(trainer),
+                'withdrawn': False,
+                'xgal_general': xgal,
+                'xgal_track': xgal,
+                'xlead': xlead,
+                'xodds_p': xodds_p,
+                'xwin': xwin,
+            })
+            place = round(1 + (odds - 1) * r.uniform(0.18, 0.26), 2)
+            starts.append({
+                'betDist': round(100 * share, 2),
+                'driverChanged': False,
+                'horseId': None,
+                'horseName': h['name'],
+                'number': number,
+                'platsMax': round(place * 1.3, 2),
+                'platsMin': place,
+                'post': post,
+                'scratched': False,
+                'trend': round(r.uniform(-0.02, 0.02), 4),
+                'winOdds': odds,
+            })
+            tips[str(number)] = _RACE_LAB_TIPS[min(tip_rank[i], len(_RACE_LAB_TIPS) - 1)]
+
+    start_time = f'{today}T20:15:00'
+    distance_label = f"{base_dist}m {'volt' if start == 'V' else 'auto'}"
+    race = {
+        'atg_url': None,
+        'contributors': [],
+        'country': 'SE',
+        'distance': base_dist,
+        'gal_models': {'general': {'model_id': 0, 'name': 'lab'},
+                       'has_track_model': False,
+                       'track': {'model_id': 0, 'name': 'lab'}},
+        'xodds_payout': 0.85,
+        'has_kmtid': False,
+        'home_stretch_m': 200,
+        'is_upcoming': True,
+        'primary_source': 'atg',
+        'race_class': None,
+        'race_date': today,
+        'race_number': 1,
+        'source_pills': [],
+        'start_method': start,
+        'track': 'Solvalla',
+        'track_id': None,
+        'victory_margin': None,
+        'results': entries,
+    }
+    game = {
+        'gameId': game_id,
+        'gameType': type_id.upper(),
+        'races': [{
+            'atgRaceId': RACE_LAB_RACE_ID,
+            'distanceLabel': distance_label,
+            'fullName': f'Design Lab {name}',
+            'name': name,
+            'prize': f'{prize} kr',
+            'raceNumber': 1,
+            'scratched': 0,
+            'startTime': start_time,
+            'starters': n,
+            'status': 'upcoming',
+        }],
+    }
+    live = {
+        'atgUrl': None,
+        'gameId': game_id,
+        'gameType': type_id.upper(),
+        'leg': 1,
+        'nLegs': 1,
+        'startTime': start_time,
+        'starts': starts,
+        'status': 'upcoming',
+        'turnover': 4_812_300,
+    }
+    return {'gameId': game_id, 'raceId': RACE_LAB_RACE_ID,
+            'game': game, 'race': race, 'live': live, 'tips': tips}
+
+
+@app.route('/admin/design/game-lab')
+def admin_design_game_lab():
+    """One made-up race on the real game page, for the design page's iframe."""
+    args = request.args
+
+    def _int(key, default, lo, hi):
+        try:
+            return max(lo, min(hi, int(args.get(key, default))))
+        except (TypeError, ValueError):
+            return default
+
+    type_id = (args.get('type') or 'v85').lower()
+    if type_id not in RACE_LAB_TYPES:
+        type_id = 'v85'
+    start = 'V' if (args.get('start') or '').upper() == 'V' else 'A'
+    lab = _race_lab_payload(
+        type_id,
+        _int('n', 15, 6, 15),
+        start,
+        _int('tillagg', 1, 1, 4) if start == 'V' else 0,
+        _int('seed', 1, 0, 1_000_000),
+    )
+    start_time = lab['game']['races'][0]['startTime']
+    return render_template(
+        'game_lab.html', active_tab='design', race_lab=lab,
+        game_id=lab['gameId'], game_type_id=type_id,
+        game_type_label=type_id.upper(), game_type_brand=_game_type_brand(type_id),
+        track_name='Solvalla', track_country='SE', track_code=None,
+        track_passport=None, race_count=1,
+        time_display=start_time.replace('T', ' ')[:16],
+        date_str=lab['race']['race_date'], is_jackpot=False,
+        game_overview={'startTime': start_time, 'raceCount': 1,
+                       'jackpotAmount': None, 'estimatedJackpot': None,
+                       'returnToPlayer': None},
+    )
+
+
+def _race_lab_gps_shapes(start: str) -> list[tuple[float, list]]:
+    """Real xLabs 2140 m runs (placed horses) to borrow pace shapes from."""
+    def load():
+        conn = get_db()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT e.kmtid_actual_km_time_ms, e.kmtid_intervals
+                    FROM race r
+                    JOIN entry e ON e.race_id = r.race_id
+                                AND e.kmtid_actual_km_time_ms IS NOT NULL
+                    WHERE r.distance = 2140 AND r.start_method = %s
+                      AND e.placement_text IN ('1', '2', '3')
+                      AND e.kmtid_intervals IS NOT NULL
+                    LIMIT 300
+                """, (start,))
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+        shapes = []
+        for km_ms, intervals in rows:
+            if not intervals or len(intervals) < 20:
+                continue
+            if any(not isinstance(s.get('duration'), (int, float)) for s in intervals):
+                continue
+            shapes.append((float(km_ms), intervals))
+        return shapes
+    return _cached(f'race_lab_gps_{start}', load)
+
+
+def _horse_xlabs_gps(cur, horse_id: int, start: str) -> dict | None:
+    """The horse's own xLabs traces, one race distance only so the sections
+    line up: 2140 m when it has two there, else its most-run distance."""
+    cur.execute("""
+        SELECT r.race_date, t.name AS track, e.placement_text, r.distance,
+               r.start_method, e.kmtid_actual_km_time_ms AS km_ms,
+               e.kmtid_intervals AS intervals
+        FROM entry e
+        JOIN race r ON r.race_id = e.race_id
+        LEFT JOIN track t ON t.track_id = r.track_id
+        WHERE e.horse_id = %s
+          AND e.kmtid_actual_km_time_ms IS NOT NULL
+          AND e.kmtid_intervals IS NOT NULL
+        ORDER BY r.race_date DESC
+    """, (horse_id,))
+    groups: dict[int, list] = {}
+    for row in cur.fetchall():
+        iv = row['intervals'] or []
+        if len(iv) < 10 or any(not isinstance(s.get('duration'), (int, float)) for s in iv):
+            continue
+        groups.setdefault(int(row['distance'] or 0), []).append(row)
+    if not groups:
+        return None
+
+    def rank(item):
+        dist, runs = item
+        same = sum(1 for r in runs if r['start_method'] == start)
+        return (len(runs) >= 2, dist == 2140, same, len(runs), -abs(dist - 2140))
+
+    dist, runs = max(groups.items(), key=rank)
+    runs = runs[:8]
+    methods = [r['start_method'] for r in runs]
+    return {
+        'source': 'xlabs',
+        'start_method': max(set(methods), key=methods.count),
+        'distance': dist,
+        'races': [{
+            'race_date': r['race_date'].isoformat() if r['race_date'] else None,
+            'track': (r['track'] or '').strip().title(),
+            'placement_text': r['placement_text'],
+            'start_method': r['start_method'],
+            'km_ms': round(float(r['km_ms'])),
+            'intervals': [{'start': s['start'], 'end': s['end'],
+                           'duration': round(float(s['duration']), 1)} for s in r['intervals']],
+        } for r in runs],
+    }
+
+
+@app.route('/api/horse/<int:horse_id>/gps')
+def api_horse_gps(horse_id):
+    """The horse's own xLabs traces for the horse cards; none is an empty list."""
+    start = 'V' if (request.args.get('start') or '').upper() == 'V' else 'A'
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            own = _horse_xlabs_gps(cur, horse_id, start)
+    finally:
+        conn.close()
+    return jsonify(own or {'source': 'xlabs', 'races': []})
+
+
+@app.route('/admin/design/game-lab/gps/<int:horse_id>')
+def admin_design_game_lab_gps(horse_id):
+    """The horse's own xLabs traces. A horse that never had any gets a demo:
+    real 2140 m pace shapes rescaled to the km times of its fastest races."""
+    import random
+
+    start = 'V' if (request.args.get('start') or '').upper() == 'V' else 'A'
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            own = _horse_xlabs_gps(cur, horse_id, start)
+            if own:
+                return jsonify(own)
+            cur.execute("""
+                SELECT r.race_date, t.name AS track, e.placement_text, e.time_seconds
+                FROM entry e
+                JOIN race r ON r.race_id = e.race_id
+                LEFT JOIN track t ON t.track_id = r.track_id
+                WHERE e.horse_id = %s AND e.time_seconds > 0 AND NOT e.withdrawn
+                ORDER BY e.time_seconds ASC, r.race_date DESC
+                LIMIT 6
+            """, (horse_id,))
+            best = cur.fetchall()
+    finally:
+        conn.close()
+    shapes = _race_lab_gps_shapes(start)
+    if not shapes:
+        return jsonify({'source': 'demo', 'races': []})
+    rng = random.Random(f'race-lab-gps:{horse_id}:{start}')
+    picks = rng.sample(shapes, min(6, len(shapes)))
+    races = []
+    for i, (km_ms, intervals) in enumerate(picks):
+        meta = best[i] if i < len(best) else None
+        target = float(meta['time_seconds']) * 1000 if meta else km_ms * (1 + 0.004 * i)
+        k = target / km_ms
+        races.append({
+            'race_date': meta['race_date'].isoformat() if meta and meta['race_date'] else None,
+            'track': ((meta or {}).get('track') or '').strip().title(),
+            'placement_text': (meta or {}).get('placement_text'),
+            'km_ms': round(target),
+            'intervals': [{'start': s['start'], 'end': s['end'],
+                           'duration': round(float(s['duration']) * k, 1)} for s in intervals],
+        })
+    return jsonify({'source': 'demo', 'start_method': start, 'distance': 2140, 'races': races})
 
 
 
