@@ -541,20 +541,13 @@
       var(--sl-agent-bone);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(120, 110, 80, 0.12);
   }
-  /* Number sphere: the deep umber the build sphere's "race-day size" tick
-     fills with, lit from the top like the pearl. */
+  /* Number sphere: same flat umber as the build button ring / size tick. */
   .sl-row.is-picked.is-agent .sl-badge {
-    background:
-      radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 52%),
-      linear-gradient(160deg, #8f8160 0%, #6f664c 55%, #5a5240 100%);
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.45),
-      inset 0 -1px 2px rgba(30, 26, 16, 0.35);
+    background: #6f664c;
+    box-shadow: none;
   }
   .sl-row.is-picked.is-agent .sl-badge__digit { color: #fffdf6; }
-  .sl-row.is-picked.is-agent .sl-row__badge {
-    filter: drop-shadow(0 1px 1.5px rgba(70, 60, 36, 0.35));
-  }
+  .sl-row.is-picked.is-agent .sl-row__badge { filter: none; }
 
   /* The band always spans weight ↔ coverage; which of the two is on the left
      is the whole difference between a cut and a levered row.

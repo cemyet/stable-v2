@@ -81,11 +81,19 @@
     align-items: flex-start;
     gap: 36px;
   }
-  /* The coupon agent: the dock's sphere in the app's own palette — a bone
-     pearl face inside a pearl ring, where the dock has chrome. The rows it
-     leaves behind carry the same bone. Loads the agent's coupon into the
-     builder. */
+  /* The coupon agent's slide. Bone and umber are the agent's colours
+     everywhere it leaves a mark: the rows it picks fill bone, their number
+     spheres and the build sphere's band are umber. The sphere sits in an
+     orbit on a bone wash; the card beside it is the switcher, its
+     forward-test record and what it last built. */
   .game-hero { position: relative; }
+  .game-hero__slide[data-slide="build"] {
+    align-items: stretch;
+    justify-content: stretch;
+    background:
+      radial-gradient(ellipse 46% 92% at 27% 46%, rgba(255, 252, 242, 0.9) 0%, rgba(240, 232, 214, 0.55) 46%, transparent 78%),
+      linear-gradient(90deg, rgba(232, 223, 202, 0.5) 0%, rgba(232, 223, 202, 0.16) 58%, transparent 100%);
+  }
   .game-agent {
     --agent-pearl:
       linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(226, 229, 236, 0.7) 52%, rgba(252, 252, 254, 0.95)),
@@ -93,17 +101,50 @@
     --agent-bone:
       linear-gradient(145deg, rgba(255, 253, 246, 0.95), rgba(228, 221, 200, 0.6)),
       #e6e0cf;
-    position: absolute;
-    top: 0;
-    right: 0;
-    display: flex;
+    --agent-umber: #6f664c;
+    --agent-umber-ink: #4a4332;
+    --agent-hair: rgba(111, 102, 76, 0.24);
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: center;
-    gap: 14px;
-    z-index: 4;
+    width: 100%;
+    height: 100%;
+    padding: 0 40px 26px 0;
+    box-sizing: border-box;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   }
-  .game-agent__sphere {
-    --size: 84px;
+
+  /* Orbit: two hairline rings around the sphere, the inner one dashed and
+     turning slowly, like a dial waiting to be pressed. */
+  .game-agent__orbit {
     position: relative;
+    justify-self: center;
+    width: 176px;
+    height: 176px;
+    display: grid;
+    place-items: center;
+  }
+  .game-agent__orbit::before,
+  .game-agent__orbit::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .game-agent__orbit::before {
+    inset: 0;
+    border: 1px solid var(--agent-hair);
+  }
+  .game-agent__orbit::after {
+    inset: 17px;
+    border: 1px dashed rgba(111, 102, 76, 0.34);
+    animation: game-agent-spin 90s linear infinite;
+  }
+
+  .game-agent__sphere {
+    --size: 96px;
+    position: relative;
+    z-index: 1;
     width: var(--size);
     height: var(--size);
     padding: 0;
@@ -114,24 +155,21 @@
     -webkit-tap-highlight-color: transparent;
   }
   .game-agent__sphere:focus-visible {
-    outline: 2px solid rgba(18, 19, 22, 0.6);
-    outline-offset: 6px;
+    outline: 2px solid rgba(74, 67, 50, 0.6);
+    outline-offset: 8px;
   }
-  /* The pearl ring: a disc just larger than the face, showing as a band. */
+  /* Umber band: a disc just larger than the face. */
   .game-agent__sphere::before {
     content: '';
     position: absolute;
     inset: -8%;
     border-radius: 50%;
-    background: var(--agent-pearl);
+    background: var(--agent-umber);
     box-shadow:
-      inset 0 1px 1.5px rgba(255, 255, 255, 1),
-      inset 0 -1px 2px rgba(61, 63, 72, 0.16),
-      0 0 0 1px rgba(150, 150, 160, 0.32),
-      0 5px 14px rgba(60, 55, 40, 0.2);
+      0 0 0 1px rgba(70, 60, 36, 0.35),
+      0 6px 16px rgba(60, 55, 40, 0.24);
     transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
   }
-  /* Bone face: the dock sphere's pearl, warmed to the page's bone. */
   .game-agent__face {
     position: absolute;
     inset: 0;
@@ -147,7 +185,7 @@
       0 0 0 1px rgba(160, 150, 120, 0.3);
     transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
   }
-  /* A hot arc travelling around the pearl ring. */
+  /* A light arc travelling around the band. */
   .game-agent__halo {
     position: absolute;
     inset: -16%;
@@ -165,14 +203,11 @@
     animation: game-agent-spin 7s linear infinite;
   }
   .game-agent__word {
-    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     font-size: 13px;
     font-weight: 800;
-    letter-spacing: 1px;
-    color: #2a2a2c;
-    text-shadow:
-      0 0 2px rgba(255, 255, 255, 0.85),
-      0 0 6px rgba(255, 255, 255, 0.55);
+    letter-spacing: 1.4px;
+    color: var(--agent-umber-ink);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
   }
   .game-agent__sphere:hover .game-agent__face,
   .game-agent__sphere:focus-visible .game-agent__face {
@@ -187,16 +222,15 @@
   .game-agent__sphere:focus-visible::before {
     transform: translateY(-3px) scale(1.09);
     box-shadow:
-      inset 0 1px 1.5px rgba(255, 255, 255, 1),
-      inset 0 -1px 2px rgba(61, 63, 72, 0.16),
-      0 0 0 1px rgba(150, 150, 160, 0.4),
-      0 0 14px rgba(255, 255, 255, 0.9),
-      0 12px 24px rgba(60, 55, 40, 0.26);
+      0 0 0 1px rgba(70, 60, 36, 0.45),
+      0 0 14px rgba(111, 102, 76, 0.32),
+      0 14px 26px rgba(60, 55, 40, 0.28);
   }
   .game-agent__sphere:hover .game-agent__halo,
   .game-agent__sphere:focus-visible .game-agent__halo {
     animation-duration: 1.6s;
   }
+  .game-agent__orbit:has(.game-agent__sphere:hover)::after { animation-duration: 24s; }
   .game-agent__sphere:active .game-agent__face { transform: scale(0.95); }
   .game-agent__sphere:active::before { transform: scale(0.97); }
   .game-agent__sphere .sphere-btn__click-flash.is-active {
@@ -208,95 +242,176 @@
     20%  { opacity: 1; box-shadow: inset 0 0 22px 8px rgba(255, 252, 240, 0.9); }
     100% { opacity: 0; box-shadow: inset 0 0 36px 14px rgba(255, 252, 240, 0); }
   }
-  .game-agent__caption {
+
+  /* The card: eyebrow, the agent's name as the switcher with the race-day
+     switch beside it, its record, then what it last built. */
+  .game-agent__card {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    max-width: 250px;
-    text-align: right;
-    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    gap: 12px;
+    min-width: 0;
+    max-width: 380px;
   }
-  .game-agent__title {
+  .game-agent__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     font-size: 9px;
     font-weight: 800;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.8px;
     text-transform: uppercase;
-    color: #121316;
+    color: var(--agent-umber);
   }
-  .game-agent__line {
-    font-size: 10px;
-    line-height: 1.5;
-    color: color-mix(in srgb, var(--panel-ink, #2a2a2c) 82%, transparent);
+  .game-agent__eyebrow::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--agent-umber);
   }
-  .game-agent__line b { font-weight: 800; color: #121316; }
-  /* Which agent builds, and whether a days-ahead coupon is sized for the
-     race-day pot. */
-  .game-agent__controls {
+  .game-agent__head {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
     align-items: center;
-    gap: 6px;
-    margin: 2px 0 2px;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: -4px;
   }
   .game-agent__pick {
     appearance: none;
     -webkit-appearance: none;
-    max-width: 250px;
-    padding: 3px 20px 3px 8px;
-    border: 1px solid rgba(18, 19, 22, 0.22);
-    border-radius: 999px;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    padding: 0 20px 0 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
     background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23121316'/%3E%3C/svg%3E")
-        no-repeat right 8px center / 8px 5px,
-      var(--agent-pearl);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95);
-    font: 700 10px/1.3 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-    color: #121316;
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236f664c'/%3E%3C/svg%3E")
+        no-repeat right 2px center / 10px 6px;
+    font: 800 26px/1.1 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    letter-spacing: -0.03em;
+    color: var(--agent-umber-ink);
     cursor: pointer;
     text-overflow: ellipsis;
   }
-  .game-agent__pick:hover { border-color: rgba(18, 19, 22, 0.5); }
-  .game-agent__pick:focus-visible { outline: 2px solid rgba(18, 19, 22, 0.5); outline-offset: 2px; }
+  .game-agent__pick:hover { color: var(--agent-umber); }
+  .game-agent__pick:focus-visible { outline: 2px solid rgba(74, 67, 50, 0.45); outline-offset: 4px; border-radius: 4px; }
+  .game-agent__pick option { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+
   .game-agent__size {
+    flex: none;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 3px 8px;
-    border: 1px solid rgba(18, 19, 22, 0.22);
-    border-radius: 999px;
-    background: var(--agent-pearl);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95);
-    font: 700 10px/1.3 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-    color: color-mix(in srgb, #121316 70%, transparent);
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--agent-umber-ink) 62%, transparent);
     cursor: pointer;
     user-select: none;
-  }
-  .game-agent__size input { margin: 0; accent-color: #6f664c; cursor: pointer; }
-  .game-agent__size:has(input:checked) {
-    color: #121316;
-    background: var(--agent-bone);
-    border-color: rgba(120, 108, 76, 0.45);
-    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9);
+    transition: color 0.2s ease;
   }
   .game-agent__size[hidden] { display: none; }
-  .game-agent.is-error .game-agent__title { color: #9aa0a8; }
+  .game-agent__size input {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 16px;
+    margin: 0;
+    border-radius: 8px;
+    background: rgba(111, 102, 76, 0.2);
+    box-shadow: inset 0 1px 2px rgba(60, 52, 34, 0.18);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  .game-agent__size input::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fffdf6;
+    box-shadow: 0 1px 2px rgba(60, 52, 34, 0.35);
+    transition: transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
+  }
+  .game-agent__size input:checked { background: var(--agent-umber); }
+  .game-agent__size input:checked::before { transform: translateX(12px); }
+  .game-agent__size input:focus-visible { outline: 2px solid rgba(74, 67, 50, 0.45); outline-offset: 2px; }
+  .game-agent__size:has(input:checked) { color: var(--agent-umber-ink); }
+
+  /* Record: forward-test ROI, all games and this game type, for the policy
+     that would build this coupon. */
+  .game-agent__stats {
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid var(--agent-hair);
+    border-bottom: 1px solid var(--agent-hair);
+  }
+  .game-agent__stats:empty { display: none; }
+  .game-agent__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 18px 8px 0;
+  }
+  .game-agent__stat + .game-agent__stat {
+    padding-left: 18px;
+    border-left: 1px solid var(--agent-hair);
+  }
+  .game-agent__stat b {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--agent-umber-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .game-agent__stat b.is-down { color: #9a4a3a; }
+  .game-agent__stat span {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--agent-umber-ink) 55%, transparent);
+  }
+  .game-agent__stat--policy { margin-left: auto; padding-right: 0; justify-content: center; text-align: right; }
+  .game-agent__stat--policy b { font-size: 11px; letter-spacing: 0; line-height: 1.2; }
+
+  .game-agent__line {
+    margin: 0;
+    font-size: 10.5px;
+    line-height: 1.6;
+    color: color-mix(in srgb, var(--agent-umber-ink) 78%, transparent);
+  }
+  .game-agent__line b { font-weight: 800; color: var(--agent-umber-ink); }
+  .game-agent.is-error .game-agent__line { color: #9a4a3a; }
   .game-agent.is-thinking .game-agent__halo { animation-duration: 1.3s; }
   .game-agent.is-thinking .game-agent__face {
     animation: game-agent-think 1.1s ease-in-out infinite;
   }
+  .game-agent.is-thinking .game-agent__orbit::after { animation-duration: 6s; }
   @keyframes game-agent-think {
     50% { transform: scale(0.94); }
   }
   @media (prefers-reduced-motion: reduce) {
     .game-agent__halo,
+    .game-agent__orbit::after,
     .game-agent.is-thinking .game-agent__halo,
     .game-agent.is-thinking .game-agent__face { animation: none; }
   }
+  .game-hero__dot--build.is-active::before { background: #6f664c; }
   @media (max-width: 720px) {
-    .game-agent__caption { display: none; }
-    .game-agent__sphere { --size: 64px; }
+    .game-agent { grid-template-columns: 116px 1fr; padding: 0 16px 26px 0; }
+    .game-agent__orbit { width: 104px; height: 104px; }
+    .game-agent__orbit::after { inset: 10px; }
+    .game-agent__sphere { --size: 60px; }
+    .game-agent__card { gap: 8px; }
+    .game-agent__pick { font-size: 19px; }
+    .game-agent__line { display: none; }
   }
   .game-hero__title {
     margin: 0;
@@ -5598,6 +5713,7 @@
   <div class="game-page" style="--game-type-brand: {{ _brand_color }}">
     <header class="game-hero glass-panel--hybrid glass-panel--hybrid-{{ _hybrid.get(game_type_id, 'cyan') }}"
             style="--game-type-brand: {{ _brand_color }}">
+      {% set _agent = game_type_id in ('v86', 'v85', 'v75', 'gs75', 'v64', 'v65', 'v5', 'v4') %}
       <div class="game-hero__titles">
         <h1 class="game-hero__title" data-title="game">
           <span class="game-hero__game-pill" style="background-color: {{ _brand_color }}">{{ game_type_label }}</span>
@@ -5609,35 +5725,44 @@
         <h2 class="game-hero__title" data-title="track">{{ track_name }}</h2>
         {% endif %}
       </div>
-      {% if game_type_id in ('v86', 'v85', 'v75', 'gs75', 'v64', 'v65', 'v5', 'v4') %}
-      <div class="game-agent" id="gameAgent">
-        <div class="game-agent__caption" aria-live="polite">
-          <span class="game-agent__title">coupon agent</span>
-          <span class="game-agent__controls">
-            <select class="game-agent__pick" data-agent-pick aria-label="coupon agent" hidden></select>
-            <label class="game-agent__size" data-agent-size-wrap
-                   title="size a days-ahead coupon like the agent does on race day, for the pot the game is expected to reach">
-              <input type="checkbox" data-agent-size> race-day size
-            </label>
-          </span>
-          <span class="game-agent__line" data-agent-line>builds a coupon to start from</span>
-        </div>
-        <button type="button" class="game-agent__sphere" id="gameAgentBtn"
-                aria-label="build a coupon with the agent" title="the coupon agent builds a coupon to start from"></button>
-      </div>
-      {% endif %}
       <div class="game-hero__stage" id="heroStage">
-        <p class="game-hero__section" id="heroSectionTitle">OVERVIEW</p>
+        <p class="game-hero__section" id="heroSectionTitle">{{ 'BUILD' if _agent else 'OVERVIEW' }}</p>
         <div class="game-hero__glass">
-          <div class="game-hero__slide is-active" data-slide="overview"></div>
+          {% if _agent %}
+          <div class="game-hero__slide is-active" data-slide="build">
+            <div class="game-agent" id="gameAgent">
+              <div class="game-agent__orbit">
+                <button type="button" class="game-agent__sphere" id="gameAgentBtn"
+                        aria-label="build a coupon with the agent" title="the coupon agent builds a coupon to start from"></button>
+              </div>
+              <div class="game-agent__card" aria-live="polite">
+                <span class="game-agent__eyebrow">coupon agent</span>
+                <div class="game-agent__head">
+                  <select class="game-agent__pick" data-agent-pick aria-label="coupon agent" hidden></select>
+                  <label class="game-agent__size" data-agent-size-wrap
+                         title="size a days-ahead coupon like the agent does on race day, for the pot the game is expected to reach">
+                    <input type="checkbox" role="switch" data-agent-size>
+                    <span>race-day size</span>
+                  </label>
+                </div>
+                <div class="game-agent__stats" data-agent-stats></div>
+                <p class="game-agent__line" data-agent-line>builds a coupon to start from</p>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+          <div class="game-hero__slide{{ '' if _agent else ' is-active' }}" data-slide="overview"></div>
           <div class="game-hero__slide" data-slide="track"></div>
           <div class="game-hero__slide" data-slide="data"></div>
           <div class="game-hero__slide" data-slide="trends"></div>
           <div class="game-hero__dots" role="tablist" aria-label="hero panels">
-            <button type="button" class="game-hero__dot is-active" data-hero-dot="0" role="tab" aria-label="overview" aria-selected="true"></button>
-            <button type="button" class="game-hero__dot" data-hero-dot="1" role="tab" aria-label="track" aria-selected="false"></button>
-            <button type="button" class="game-hero__dot" data-hero-dot="2" role="tab" aria-label="data" aria-selected="false"></button>
-            <button type="button" class="game-hero__dot" data-hero-dot="3" role="tab" aria-label="trends" aria-selected="false"></button>
+            {% if _agent %}
+            <button type="button" class="game-hero__dot game-hero__dot--build is-active" data-hero-dot="0" role="tab" aria-label="build" aria-selected="true"></button>
+            {% endif %}
+            <button type="button" class="game-hero__dot{{ '' if _agent else ' is-active' }}" data-hero-dot="{{ 1 if _agent else 0 }}" role="tab" aria-label="overview" aria-selected="{{ 'false' if _agent else 'true' }}"></button>
+            <button type="button" class="game-hero__dot" data-hero-dot="{{ 2 if _agent else 1 }}" role="tab" aria-label="track" aria-selected="false"></button>
+            <button type="button" class="game-hero__dot" data-hero-dot="{{ 3 if _agent else 2 }}" role="tab" aria-label="data" aria-selected="false"></button>
+            <button type="button" class="game-hero__dot" data-hero-dot="{{ 4 if _agent else 3 }}" role="tab" aria-label="trends" aria-selected="false"></button>
           </div>
         </div>
         <button type="button" class="game-hero__arrow" data-hero-dir="-1" aria-label="Previous panel">
@@ -7000,20 +7125,33 @@
     const v = Math.round(r * 100);
     return `${v > 0 ? '+' : ''}${v}%`;
   }
+  const AGENT_POLICY = { live: 'race-day', preliminary: 'days-ahead', liveOnForecasts: 'race-day size' };
   function renderAgentPick() {
     if (agentSizeWrap) agentSizeWrap.hidden = agentMode === 'live';
     if (!agentPick || !agentList.length) return;
     const run = agentRun();
     const chosen = agentPrefs().model;
     agentPick.innerHTML = agentList.map(a => {
-      const roi = (a.roi || {})[run] || {};
-      const type = (roi.byType || {})[couponGameType];
       const sel = a.id === chosen ? ' selected' : '';
-      return `<option value="${a.id}"${sel}>${esc(a.name)} · ${agentRoiText(roi.all)} roi · ${esc(couponGameType)} ${agentRoiText(type)}</option>`;
+      return `<option value="${a.id}"${sel}>${esc(a.name)}</option>`;
     }).join('');
-    agentPick.title = 'forward-test ROI, all games and this game type, for the '
-      + ({ live: 'race-day policy', preliminary: 'days-ahead policy', liveOnForecasts: 'race-day sizing on days-ahead numbers' })[run];
+    agentPick.title = 'switch coupon agent';
     agentPick.hidden = false;
+    renderAgentStats();
+  }
+  function renderAgentStats() {
+    const box = agentEl && agentEl.querySelector('[data-agent-stats]');
+    if (!box || !agentPick) return;
+    const a = agentList.find(x => String(x.id) === agentPick.value) || agentList[0];
+    if (!a) { box.innerHTML = ''; return; }
+    const run = agentRun();
+    const roi = (a.roi || {})[run] || {};
+    const type = (roi.byType || {})[couponGameType];
+    const stat = (v, label) => `<div class="game-agent__stat"><b${v != null && v < 0 ? ' class="is-down"' : ''}>${agentRoiText(v)}</b><span>${esc(label)}</span></div>`;
+    box.title = 'forward-test ROI of the policy that would build this coupon';
+    box.innerHTML = stat(roi.all, 'roi · all games')
+      + stat(type, `roi · ${couponGameType}`)
+      + `<div class="game-agent__stat game-agent__stat--policy"><b>${esc(AGENT_POLICY[run])}</b><span>policy</span></div>`;
   }
   async function loadAgents() {
     try {
@@ -7030,7 +7168,6 @@
   function agentCaption(title, line, error = false) {
     if (!agentEl) return;
     agentEl.classList.toggle('is-error', !!error);
-    agentEl.querySelector('.game-agent__title').textContent = title;
     agentEl.querySelector('[data-agent-line]').innerHTML = line;
   }
 
@@ -7162,7 +7299,10 @@
       });
     }
     if (agentPick) {
-      agentPick.addEventListener('change', () => agentSavePrefs({ model: Number(agentPick.value) || null }));
+      agentPick.addEventListener('change', () => {
+        agentSavePrefs({ model: Number(agentPick.value) || null });
+        renderAgentStats();
+      });
     }
     renderAgentPick();
     loadAgents();
