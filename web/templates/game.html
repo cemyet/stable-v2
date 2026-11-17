@@ -168,7 +168,7 @@
     box-shadow:
       0 0 0 1px rgba(70, 60, 36, 0.35),
       0 6px 16px rgba(60, 55, 40, 0.24);
-    transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
+    transition: transform 0.2s ease, background-color 0.25s ease, box-shadow 0.25s ease;
   }
   .game-agent__face {
     position: absolute;
@@ -183,7 +183,7 @@
       inset 0 1px 2px rgba(255, 255, 255, 0.95),
       inset 0 -1px 3px rgba(110, 98, 66, 0.2),
       0 0 0 1px rgba(160, 150, 120, 0.3);
-    transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
+    transition: transform 0.2s ease;
   }
   /* A light arc travelling around the band. */
   .game-agent__halo {
@@ -209,30 +209,20 @@
     color: var(--agent-umber-ink);
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
   }
-  .game-agent__sphere:hover .game-agent__face,
-  .game-agent__sphere:focus-visible .game-agent__face {
-    transform: translateY(-3px) scale(1.06);
-    box-shadow:
-      inset 0 1px 2px rgba(255, 255, 255, 1),
-      inset 0 -1px 3px rgba(110, 98, 66, 0.24),
-      inset 0 0 16px rgba(255, 255, 255, 0.55),
-      0 0 0 1px rgba(160, 150, 120, 0.35);
-  }
+  /* Hover is quiet: the band deepens, the arc and the orbit run a little
+     faster. Nothing moves; a press sinks it a hair. */
   .game-agent__sphere:hover::before,
   .game-agent__sphere:focus-visible::before {
-    transform: translateY(-3px) scale(1.09);
+    background: #5f5741;
     box-shadow:
       0 0 0 1px rgba(70, 60, 36, 0.45),
-      0 0 14px rgba(111, 102, 76, 0.32),
-      0 14px 26px rgba(60, 55, 40, 0.28);
+      0 6px 16px rgba(60, 55, 40, 0.28);
   }
   .game-agent__sphere:hover .game-agent__halo,
-  .game-agent__sphere:focus-visible .game-agent__halo {
-    animation-duration: 1.6s;
-  }
-  .game-agent__orbit:has(.game-agent__sphere:hover)::after { animation-duration: 24s; }
-  .game-agent__sphere:active .game-agent__face { transform: scale(0.95); }
-  .game-agent__sphere:active::before { transform: scale(0.97); }
+  .game-agent__sphere:focus-visible .game-agent__halo { animation-duration: 3.5s; }
+  .game-agent__orbit:has(.game-agent__sphere:hover)::after { animation-duration: 40s; }
+  .game-agent__sphere:active .game-agent__face,
+  .game-agent__sphere:active::before { transform: scale(0.985); transition-duration: 0.08s; }
   .game-agent__sphere .sphere-btn__click-flash.is-active {
     animation-name: game-agent-flash;
   }
@@ -276,28 +266,67 @@
     gap: 14px;
     margin-top: -4px;
   }
-  .game-agent__pick {
-    appearance: none;
-    -webkit-appearance: none;
+  /* The switcher: the name between two thin chevrons, cycling through the
+     registered agents. The count shows only when there is more than one. */
+  .game-agent__switch {
+    display: flex;
+    align-items: center;
+    gap: 2px;
     min-width: 0;
-    max-width: 100%;
-    margin: 0;
-    padding: 0 20px 0 0;
+    margin-left: -6px;
+  }
+  .game-agent__step {
+    flex: none;
+    width: 22px;
+    height: 28px;
+    padding: 0;
+    display: grid;
+    place-items: center;
     border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236f664c'/%3E%3C/svg%3E")
-        no-repeat right 2px center / 10px 6px;
-    font: 800 26px/1.1 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+    border-radius: 6px;
+    background: none;
+    color: var(--agent-umber);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  }
+  .game-agent__step svg {
+    width: 9px;
+    height: 9px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .game-agent__step:hover:not(:disabled) { background: rgba(111, 102, 76, 0.12); color: var(--agent-umber-ink); }
+  .game-agent__step:focus-visible { outline: 2px solid rgba(74, 67, 50, 0.45); outline-offset: 0; }
+  .game-agent__step:disabled { opacity: 0.28; cursor: default; }
+  .game-agent__name {
+    min-width: 0;
+    padding: 0 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.1;
     letter-spacing: -0.03em;
     color: var(--agent-umber-ink);
-    cursor: pointer;
-    text-overflow: ellipsis;
   }
-  .game-agent__pick:hover { color: var(--agent-umber); }
-  .game-agent__pick:focus-visible { outline: 2px solid rgba(74, 67, 50, 0.45); outline-offset: 4px; border-radius: 4px; }
-  .game-agent__pick option { font-size: 13px; font-weight: 600; letter-spacing: 0; }
+  .game-agent__name.is-turning { animation: game-agent-turn 0.28s ease; }
+  @keyframes game-agent-turn {
+    0% { opacity: 0; transform: translateX(var(--turn-from, 6px)); }
+    100% { opacity: 1; transform: none; }
+  }
+  .game-agent__count {
+    margin-left: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: color-mix(in srgb, var(--agent-umber-ink) 50%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .game-agent__count:empty { display: none; }
 
   .game-agent__size {
     flex: none;
@@ -382,13 +411,46 @@
   .game-agent__stat--policy b { font-size: 11px; letter-spacing: 0; line-height: 1.2; }
 
   .game-agent__line {
-    margin: 0;
-    font-size: 10.5px;
-    line-height: 1.6;
-    color: color-mix(in srgb, var(--agent-umber-ink) 78%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 38px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: color-mix(in srgb, var(--agent-umber-ink) 72%, transparent);
   }
-  .game-agent__line b { font-weight: 800; color: var(--agent-umber-ink); }
+  .game-agent__out {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--agent-umber-ink);
+  }
+  .game-agent__out strong { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .game-agent__out em {
+    font-style: normal;
+    color: color-mix(in srgb, var(--agent-umber-ink) 62%, transparent);
+  }
+  .game-agent__tag {
+    flex: none;
+    padding: 2px 7px 2px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    line-height: 1.3;
+    background: var(--agent-umber);
+    color: #fffdf6;
+  }
+  .game-agent__tag.is-pass {
+    background: none;
+    color: var(--agent-umber);
+    box-shadow: inset 0 0 0 1px rgba(111, 102, 76, 0.5);
+  }
+  .game-agent__hint { color: color-mix(in srgb, var(--agent-umber-ink) 58%, transparent); }
   .game-agent.is-error .game-agent__line { color: #9a4a3a; }
+  .game-agent.is-thinking .game-agent__line { animation: game-agent-wait 1.4s ease-in-out infinite; }
+  @keyframes game-agent-wait { 50% { opacity: 0.45; } }
   .game-agent.is-thinking .game-agent__halo { animation-duration: 1.3s; }
   .game-agent.is-thinking .game-agent__face {
     animation: game-agent-think 1.1s ease-in-out infinite;
@@ -400,6 +462,8 @@
   @media (prefers-reduced-motion: reduce) {
     .game-agent__halo,
     .game-agent__orbit::after,
+    .game-agent__name.is-turning,
+    .game-agent.is-thinking .game-agent__line,
     .game-agent.is-thinking .game-agent__halo,
     .game-agent.is-thinking .game-agent__face { animation: none; }
   }
@@ -410,7 +474,7 @@
     .game-agent__orbit::after { inset: 10px; }
     .game-agent__sphere { --size: 60px; }
     .game-agent__card { gap: 8px; }
-    .game-agent__pick { font-size: 19px; }
+    .game-agent__name { font-size: 19px; }
     .game-agent__line { display: none; }
   }
   .game-hero__title {
@@ -5738,7 +5802,16 @@
               <div class="game-agent__card" aria-live="polite">
                 <span class="game-agent__eyebrow">coupon agent</span>
                 <div class="game-agent__head">
-                  <select class="game-agent__pick" data-agent-pick aria-label="coupon agent" hidden></select>
+                  <div class="game-agent__switch" role="group" aria-label="coupon agent">
+                    <button type="button" class="game-agent__step" data-agent-step="-1" aria-label="previous agent">
+                      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M7 1 2.5 5 7 9"/></svg>
+                    </button>
+                    <span class="game-agent__name" data-agent-name aria-live="polite">–</span>
+                    <button type="button" class="game-agent__step" data-agent-step="1" aria-label="next agent">
+                      <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M3 1 7.5 5 3 9"/></svg>
+                    </button>
+                    <span class="game-agent__count" data-agent-count></span>
+                  </div>
                   <label class="game-agent__size" data-agent-size-wrap
                          title="size a days-ahead coupon like the agent does on race day, for the pot the game is expected to reach">
                     <input type="checkbox" role="switch" data-agent-size>
@@ -5746,7 +5819,7 @@
                   </label>
                 </div>
                 <div class="game-agent__stats" data-agent-stats></div>
-                <p class="game-agent__line" data-agent-line>builds a coupon to start from</p>
+                <div class="game-agent__line" data-agent-line></div>
               </div>
             </div>
           </div>
@@ -7092,7 +7165,9 @@
      policy (?size=live). */
   const agentEl = document.getElementById('gameAgent');
   const agentBtn = document.getElementById('gameAgentBtn');
-  const agentPick = agentEl && agentEl.querySelector('[data-agent-pick]');
+  const agentNameEl = agentEl && agentEl.querySelector('[data-agent-name]');
+  const agentCountEl = agentEl && agentEl.querySelector('[data-agent-count]');
+  const agentSteps = agentEl ? Array.from(agentEl.querySelectorAll('[data-agent-step]')) : [];
   const agentSize = agentEl && agentEl.querySelector('[data-agent-size]');
   const agentSizeWrap = agentEl && agentEl.querySelector('[data-agent-size-wrap]');
   const AGENT_PREFS_KEY = 'stable-agent-prefs.v1';
@@ -7125,33 +7200,44 @@
     const v = Math.round(r * 100);
     return `${v > 0 ? '+' : ''}${v}%`;
   }
-  const AGENT_POLICY = { live: 'race-day', preliminary: 'days-ahead', liveOnForecasts: 'race-day size' };
-  function renderAgentPick() {
+  const AGENT_MODE = { live: 'live odds', preliminary: 'before odds', liveOnForecasts: 'race-day size' };
+  function agentChosen() {
+    const id = agentPrefs().model;
+    return agentList.find(a => a.id === id) || agentList[0] || null;
+  }
+  function renderAgentPick(turn = 0) {
     if (agentSizeWrap) agentSizeWrap.hidden = agentMode === 'live';
-    if (!agentPick || !agentList.length) return;
-    const run = agentRun();
-    const chosen = agentPrefs().model;
-    agentPick.innerHTML = agentList.map(a => {
-      const sel = a.id === chosen ? ' selected' : '';
-      return `<option value="${a.id}"${sel}>${esc(a.name)}</option>`;
-    }).join('');
-    agentPick.title = 'switch coupon agent';
-    agentPick.hidden = false;
+    const a = agentChosen();
+    if (agentNameEl) {
+      agentNameEl.textContent = a ? a.name : '–';
+      if (turn) {
+        agentNameEl.style.setProperty('--turn-from', `${turn * 6}px`);
+        agentNameEl.classList.remove('is-turning');
+        void agentNameEl.offsetWidth;
+        agentNameEl.classList.add('is-turning');
+      }
+    }
+    const many = agentList.length > 1;
+    agentSteps.forEach(b => { b.disabled = !many; });
+    if (agentCountEl) {
+      const i = a ? agentList.indexOf(a) : -1;
+      agentCountEl.textContent = many && i >= 0 ? `${i + 1}/${agentList.length}` : '';
+    }
     renderAgentStats();
   }
   function renderAgentStats() {
     const box = agentEl && agentEl.querySelector('[data-agent-stats]');
-    if (!box || !agentPick) return;
-    const a = agentList.find(x => String(x.id) === agentPick.value) || agentList[0];
+    if (!box) return;
+    const a = agentChosen();
     if (!a) { box.innerHTML = ''; return; }
     const run = agentRun();
     const roi = (a.roi || {})[run] || {};
     const type = (roi.byType || {})[couponGameType];
     const stat = (v, label) => `<div class="game-agent__stat"><b${v != null && v < 0 ? ' class="is-down"' : ''}>${agentRoiText(v)}</b><span>${esc(label)}</span></div>`;
-    box.title = 'forward-test ROI of the policy that would build this coupon';
-    box.innerHTML = stat(roi.all, 'roi · all games')
+    box.title = 'return on stake in the forward test, for the mode this coupon would be built in';
+    box.innerHTML = stat(roi.all, 'roi · all')
       + stat(type, `roi · ${couponGameType}`)
-      + `<div class="game-agent__stat game-agent__stat--policy"><b>${esc(AGENT_POLICY[run])}</b><span>policy</span></div>`;
+      + `<div class="game-agent__stat game-agent__stat--policy"><b>${esc(AGENT_MODE[run])}</b><span>mode</span></div>`;
   }
   async function loadAgents() {
     try {
@@ -7165,29 +7251,31 @@
     renderAgentPick();
   }
 
-  function agentCaption(title, line, error = false) {
+  function agentCaption(html, error = false) {
     if (!agentEl) return;
     agentEl.classList.toggle('is-error', !!error);
-    agentEl.querySelector('[data-agent-line]').innerHTML = line;
+    agentEl.querySelector('[data-agent-line]').innerHTML = html;
   }
+  const agentHint = text => `<span class="game-agent__hint">${esc(text)}</span>`;
 
-  function agentSummary(a) {
+  /* What the agent built, in two lines: whether it would play it, what it
+     costs and how often it pays anything; then its shape. */
+  function agentSummary(a, note) {
     const it = a.item || {};
     const pool = it.top && window.Coupon ? (Coupon.rules[couponGameType] || {}).topPool : null;
     const shape = [
       it.bankers ? `${it.bankers} banker${it.bankers > 1 ? 's' : ''}` : 'no bankers',
-      `${Math.round((it.cover || 0) * 100)}% cover`,
-      it.weight === 'flat' ? 'flat rows' : `weighted by ${it.weight === 'p' ? 'chance' : 'value'}`,
+      `covers ${Math.round((it.cover || 0) * 100)}% per leg`,
+      it.weight === 'flat' ? 'even rows' : it.weight === 'p' ? 'rows by chance' : 'rows by value',
       pool ? `${pool.label} only` : '',
-      Number(a.scale) !== 1 ? `×${a.scale}` : '',
     ].filter(Boolean).join(' · ');
     const kr = typeof couponKr === 'function' ? couponKr(Number(a.cost) || 0) : `${a.cost} kr`;
-    const odds = a.mode === 'live' ? 'on the live odds'
-      : a.sizing === 'live' ? 'preliminary numbers, race-day size: bigger swings'
-      : 'preliminary: before the win pools fill';
-    const pays = a.phit && a.phit.alt != null ? ` · ${Math.round(a.phit.alt * 100)}% to pay anything` : '';
-    return `${shape}<br>${kr}${pays}<br>${odds}<br>`
-      + (a.play ? '<b>the agent would play this</b>' : 'the agent would pass on this game');
+    const pays = a.phit && a.phit.alt != null ? `<em>pays out ${Math.round(a.phit.alt * 100)}% of the time</em>` : '';
+    const tag = a.play
+      ? '<span class="game-agent__tag" title="the agent would play this coupon">play</span>'
+      : '<span class="game-agent__tag is-pass" title="the agent would skip this game">pass</span>';
+    return `<div class="game-agent__out">${tag}<strong>${esc(kr)}</strong>${pays}</div>`
+      + agentHint(note || shape);
   }
 
   function agentApply(a) {
@@ -7250,10 +7338,11 @@
     if (typeof triggerSphereClickFlash === 'function') triggerSphereClickFlash(agentBtn);
     agentBusy = true;
     agentEl.classList.add('is-thinking');
-    agentCaption('coupon agent', 'thinking…');
+    agentCaption(agentHint('building…'));
     try {
       const qs = new URLSearchParams();
-      if (agentPick && agentPick.value) qs.set('model', agentPick.value);
+      const chosen = agentChosen();
+      if (chosen) qs.set('model', chosen.id);
       if (agentSize && agentSize.checked) qs.set('size', 'live');
       const res = await fetch(`/api/atg/game/${encodeURIComponent(gameId)}/agent?${qs}`);
       const a = await res.json().catch(() => ({}));
@@ -7264,17 +7353,17 @@
       if (cur && Coupon.totalPicks(cur) > 0) {
         const q = cur.gameId === gameId ? 'replace with the agent’s?' : `discard ${cur.gameType}?`;
         agentEl.classList.remove('is-thinking');
-        agentCaption(`agent · ${a.model.name}`, 'ready: answer in the dock');
+        agentCaption(agentHint('ready. replace your coupon? answer in the dock'));
         const ok = window.gameDockConfirm ? await window.gameDockConfirm(q) : confirm(q);
         if (!ok) {
-          agentCaption(`agent · ${a.model.name}`, `${agentSummary(a)}<br>not loaded: your coupon is kept`);
+          agentCaption(agentSummary(a, 'not loaded, your coupon is kept'));
           return;
         }
       }
       agentApply(a);
-      agentCaption(`agent · ${a.model.name}`, agentSummary(a));
+      agentCaption(agentSummary(a));
     } catch (err) {
-      agentCaption('coupon agent', String(err.message || err), true);
+      agentCaption(esc(String(err.message || err)), true);
     } finally {
       agentBusy = false;
       agentEl.classList.remove('is-thinking');
@@ -7289,7 +7378,9 @@
     const last = window.AgentCoupon ? AgentCoupon.get(gameId) : null;
     if (last && last.item) {
       agentMode = last.mode || null;
-      agentCaption(`agent · ${(last.model || {}).name || ''}`, agentSummary(last));
+      agentCaption(agentSummary(last));
+    } else {
+      agentCaption(agentHint('press build for a coupon to start from'));
     }
     if (agentSize) {
       agentSize.checked = !!agentPrefs().size;
@@ -7298,12 +7389,14 @@
         renderAgentPick();
       });
     }
-    if (agentPick) {
-      agentPick.addEventListener('change', () => {
-        agentSavePrefs({ model: Number(agentPick.value) || null });
-        renderAgentStats();
-      });
-    }
+    agentSteps.forEach(btn => btn.addEventListener('click', () => {
+      if (agentList.length < 2) return;
+      const dir = Number(btn.dataset.agentStep) || 1;
+      const i = Math.max(0, agentList.indexOf(agentChosen()));
+      const next = agentList[(i + dir + agentList.length) % agentList.length];
+      agentSavePrefs({ model: next.id });
+      renderAgentPick(dir);
+    }));
     renderAgentPick();
     loadAgents();
   }
