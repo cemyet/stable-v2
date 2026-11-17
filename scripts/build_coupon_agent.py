@@ -2,7 +2,8 @@
 
     .venv-ml/bin/python -m scripts.build_coupon_agent menus --mode race_day
     .venv-ml/bin/python -m scripts.build_coupon_agent menus --mode forecast
-    .venv-ml/bin/python -m scripts.build_coupon_agent train      # fit, test, register
+    .venv-ml/bin/python -m scripts.build_coupon_agent train      # fit, test, register, plays
+    .venv-ml/bin/python -m scripts.build_coupon_agent plays      # replay the agent's games for the ml page
 
 Menus (core/coupon_sim: 0–3 bankers by four rules, five coverages, flat or
 weighted rows, the top pool where there is one, each at five multipliers)
@@ -279,9 +280,96 @@ def train(args, log):
         conn.close()
 
 
+PLAY_RUNS = (('live', 'race_day', 'live'), ('preliminary', 'forecast', 'forecast'),
+             ('liveOnForecasts', 'forecast', 'live'))
+
+
+def _legs_right(game, W):
+    return int(sum(bool(w[lg.win].sum() > 0) for w, lg in zip(W, game.legs)))
+
+
+def _picked_by(game, item, k, by):
+    """The same coupon with the horses picked by the closing odds ('q') or
+    the public's shares ('s'): (cost, return, legs right, weights) at multiplier k."""
+    from dataclasses import replace
+    g = replace(game, legs=[replace(lg, p=getattr(lg, by)) for lg in game.legs])
+    W, U, _ = CS.coupon(g, item)
+    c, r = CS.settle(game, W, U, top=item.top)
+    return float(c[k]), float(r[k]), _legs_right(game, W), W
+
+
+def plays(args, log):
+    """Replay the registered agent's frozen policies over the cached menus and
+    store every game each one played (ml_agent_play), with its picks and the
+    same coupon picked by the market and by the public. No fitting."""
+    import io
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""SELECT model_id, name, slice_def->'policy', slice_def->>'test_since' FROM ml_model
+                           WHERE target = 'coupon_agent' AND (%s::int IS NULL OR model_id = %s)
+                           ORDER BY created_at DESC, model_id DESC LIMIT 1""", (args.model, args.model))
+            row = cur.fetchone()
+        if not row:
+            log('no coupon agent registered')
+            return
+        model_id, name, policy, test_since = row
+        split = pd.Timestamp(test_since)
+        tix = {t: n for n, t in enumerate(policy['types'])}
+        shape = CA.item_arrays(ITEMS)
+        log(f"agent #{model_id} {name}: replaying {', '.join(r for r, _, _ in PLAY_RUNS)}")
+        st, raw = PL.load(conn, SINCE)
+        buf, games, n = io.StringIO(), {}, 0
+        for run, menu, pol in PLAY_RUNS:
+            A, meta, src = load(menu)
+            if menu not in games:
+                with conn.cursor() as cur:
+                    own = backtest(cur, src['own']['model_id'])
+                games = {menu: {g.gid: g for g in CS.build_games(st, raw, own)}}
+                del own
+            by_gid = games[menu]
+            P = CA.parts(A['cost'], A['ev_own'], A['ev_alt'], A['phit_alt'], shape['units'])
+            i, k, c, r = CA.play(policy[pol]['theta'], P, shape, meta['type'].map(tix).values, A['cost'], A['ret'])
+            del P
+            played = np.nonzero(c > 0)[0]
+            for gi in played:
+                g = by_gid.get(meta['gid'].iat[gi])
+                if g is None:
+                    continue
+                item, kk = ITEMS[i[gi]], int(k[gi])
+                W, U, nr = CS.coupon(g, item)
+                mc, mr, mright, Wm = _picked_by(g, item, kk, 'q')
+                pc, pr, pright, Wp = _picked_by(g, item, kk, 's')
+                legs = [{'n': lg.numbers.tolist(), 'p': np.round(lg.p, 4).tolist(), 'q': np.round(lg.q, 4).tolist(),
+                         's': np.round(lg.s, 4).tolist(), 'w': np.round(w, 4).tolist(),
+                         'market': lg.numbers[wm > 0].tolist(), 'public': lg.numbers[wp > 0].tolist(),
+                         'win': lg.numbers[lg.win].tolist()} for lg, w, wm, wp in zip(g.legs, W, Wm, Wp)]
+                part = 'test' if meta['date'].iat[gi] >= split else 'train'
+                label = item.label + (f" · ×{int(CA.MULTS[kk])}" if CA.MULTS[kk] != 1 else '')
+                buf.write('\t'.join(map(str, (
+                    model_id, run, g.gid, g.date.date().isoformat(), g.gtype, part, label, int(CA.MULTS[kk]),
+                    int(nr), f"{c[gi]:.2f}", f"{r[gi]:.2f}", _legs_right(g, W),
+                    f"{mc:.2f}", f"{mr:.2f}", mright, f"{pc:.2f}", f"{pr:.2f}", pright,
+                    json.dumps(legs, separators=(',', ':'))))) + '\n')
+                n += 1
+            log(f"  {run:15s} {len(played):,} of {len(meta):,} games played")
+            del A
+        buf.seek(0)
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM ml_agent_play WHERE model_id = %s", (model_id,))
+            cur.copy_expert("COPY ml_agent_play (model_id, run, atg_game_id, game_date, game_type, part, item, mult, "
+                            "rows, cost, ret, legs_right, market_cost, market_ret, market_right, public_cost, "
+                            "public_ret, public_right, legs) FROM STDIN", buf)
+        conn.commit()
+        log(f"stored {n:,} plays for #{model_id}")
+    finally:
+        conn.close()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('cmd', choices=['menus', 'train'])
+    ap.add_argument('cmd', choices=['menus', 'train', 'plays'])
+    ap.add_argument('--model', type=int, help='plays: the agent to replay (default: the newest)')
     ap.add_argument('--mode', choices=list(MODES), default='race_day')
     ap.add_argument('--iters', type=int, default=40)
     ap.add_argument('--pop', type=int, default=64)
@@ -291,8 +379,12 @@ def main() -> int:
     log = _log_factory()
     if args.cmd == 'menus':
         build_menu(args.mode, log)
+    elif args.cmd == 'plays':
+        plays(args, log)
     else:
         train(args, log)
+        if not args.dry_run:
+            plays(args, log)
     return 0
 
 

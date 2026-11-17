@@ -1025,6 +1025,38 @@ CREATE TABLE IF NOT EXISTS ml_pool_coupon (
 CREATE INDEX IF NOT EXISTS ml_pool_coupon_rule_idx ON ml_pool_coupon (model_id, rule, src);
 
 -- =====================================================================
+-- ML_AGENT_PLAY — every game a coupon agent's frozen policy played
+-- (scripts/build_coupon_agent plays): the coupon, what the pool paid, the
+-- same coupon picked by the closing odds and by the public, and each leg's
+-- field. run = 'live' | 'preliminary' | 'liveOnForecasts'; part = 'train'
+-- (fitted on) | 'test' (forward). For the ml page's agent coupons and
+-- bankroll chart.
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS ml_agent_play (
+    model_id      INTEGER NOT NULL,
+    run           TEXT NOT NULL,
+    atg_game_id   TEXT NOT NULL,
+    game_date     DATE NOT NULL,
+    game_type     TEXT NOT NULL,
+    part          TEXT NOT NULL,
+    item          TEXT NOT NULL,
+    mult          SMALLINT NOT NULL,
+    rows          INTEGER NOT NULL,
+    cost          REAL NOT NULL,
+    ret           REAL NOT NULL,
+    legs_right    SMALLINT NOT NULL,
+    market_cost   REAL,
+    market_ret    REAL,
+    market_right  SMALLINT,
+    public_cost   REAL,
+    public_ret    REAL,
+    public_right  SMALLINT,
+    legs          JSONB NOT NULL,
+    PRIMARY KEY (model_id, run, atg_game_id)
+);
+CREATE INDEX IF NOT EXISTS ml_agent_play_run_idx ON ml_agent_play (model_id, run, game_date);
+
+-- =====================================================================
 -- ENTRY_OUTPERF — per-entry market outperformance ("s_form" building block).
 -- Within each race we rank runners by odds (market's expected order) and by
 -- finish_order (actual order); market_outperf = (odds_rank - fin_rank)/(n-1),
@@ -1622,6 +1654,7 @@ def drop_schema(conn) -> None:
             DROP TABLE IF EXISTS ml_prediction          CASCADE;
             DROP TABLE IF EXISTS ml_backtest            CASCADE;
             DROP TABLE IF EXISTS ml_pool_coupon         CASCADE;
+            DROP TABLE IF EXISTS ml_agent_play          CASCADE;
             DROP TABLE IF EXISTS person_merge_log       CASCADE;
             DROP TABLE IF EXISTS horse_merge_log        CASCADE;
             DROP TABLE IF EXISTS job_run                CASCADE;

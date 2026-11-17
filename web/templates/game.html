@@ -81,16 +81,18 @@
     align-items: flex-start;
     gap: 36px;
   }
-  /* The coupon agent: the dock's pearl sphere, with an ink band where its
-     chrome ring would be — the same ink as the rows it leaves behind, black
-     by day and white at night. Loads the agent's coupon into the builder. */
+  /* The coupon agent: the dock's sphere in the app's own palette — a bone
+     pearl face inside a pearl ring, where the dock has chrome. The rows it
+     leaves behind carry the same bone. Loads the agent's coupon into the
+     builder. */
   .game-hero { position: relative; }
   .game-agent {
-    --agent-ink: #121316;
-    --agent-ring: 0 0 0 3.5px var(--agent-ink);
-    --agent-ring-hot: 0 0 0 5px var(--agent-ink);
-    --agent-arc: rgba(255, 255, 255, 0.95);
-    --agent-arc-blend: screen;
+    --agent-pearl:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(226, 229, 236, 0.7) 52%, rgba(252, 252, 254, 0.95)),
+      #e7e8ec;
+    --agent-bone:
+      linear-gradient(145deg, rgba(255, 253, 246, 0.95), rgba(228, 221, 200, 0.6)),
+      #e6e0cf;
     position: absolute;
     top: 0;
     right: 0;
@@ -111,18 +113,25 @@
     border-radius: 50%;
     -webkit-tap-highlight-color: transparent;
   }
-  html.game-night .game-agent {
-    --agent-ink: #ffffff;
-    --agent-ring: 0 0 0 3.5px #ffffff, 0 0 0 4.5px #121316;
-    --agent-ring-hot: 0 0 0 5px #ffffff, 0 0 0 6px #121316;
-    --agent-arc: rgba(18, 19, 22, 0.9);
-    --agent-arc-blend: multiply;
-  }
   .game-agent__sphere:focus-visible {
     outline: 2px solid rgba(18, 19, 22, 0.6);
     outline-offset: 6px;
   }
-  /* Pearl face, the same fill as the dock coupon sphere. */
+  /* The pearl ring: a disc just larger than the face, showing as a band. */
+  .game-agent__sphere::before {
+    content: '';
+    position: absolute;
+    inset: -8%;
+    border-radius: 50%;
+    background: var(--agent-pearl);
+    box-shadow:
+      inset 0 1px 1.5px rgba(255, 255, 255, 1),
+      inset 0 -1px 2px rgba(61, 63, 72, 0.16),
+      0 0 0 1px rgba(150, 150, 160, 0.32),
+      0 5px 14px rgba(60, 55, 40, 0.2);
+    transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
+  }
+  /* Bone face: the dock sphere's pearl, warmed to the page's bone. */
   .game-agent__face {
     position: absolute;
     inset: 0;
@@ -130,18 +139,15 @@
     display: grid;
     place-items: center;
     z-index: 1;
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(236, 239, 245, 0.55)),
-      #e7e8ec;
-    border: 1px solid rgba(255, 255, 255, 0.95);
+    background: var(--agent-bone);
+    border: 1px solid rgba(255, 255, 255, 0.85);
     box-shadow:
       inset 0 1px 2px rgba(255, 255, 255, 0.95),
-      inset 0 -1px 2px rgba(61, 63, 72, 0.18),
-      var(--agent-ring),
-      0 4px 12px rgba(18, 19, 22, 0.22);
+      inset 0 -1px 3px rgba(110, 98, 66, 0.2),
+      0 0 0 1px rgba(160, 150, 120, 0.3);
     transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease;
   }
-  /* A hot arc travelling around the ink ring, in the chrome ring's place. */
+  /* A hot arc travelling around the pearl ring. */
   .game-agent__halo {
     position: absolute;
     inset: -16%;
@@ -150,12 +156,12 @@
     pointer-events: none;
     background: conic-gradient(from 0deg,
       transparent 0deg,
-      var(--agent-arc) 28deg,
+      rgba(255, 255, 255, 1) 28deg,
       transparent 64deg,
       transparent 360deg);
     -webkit-mask: radial-gradient(circle, transparent 78%, #000 83%, #000 91%, transparent 96%);
     mask: radial-gradient(circle, transparent 78%, #000 83%, #000 91%, transparent 96%);
-    mix-blend-mode: var(--agent-arc-blend);
+    mix-blend-mode: soft-light;
     animation: game-agent-spin 7s linear infinite;
   }
   .game-agent__word {
@@ -172,25 +178,35 @@
   .game-agent__sphere:focus-visible .game-agent__face {
     transform: translateY(-3px) scale(1.06);
     box-shadow:
-      inset 0 1px 2px rgba(255, 255, 255, 0.95),
-      inset 0 -1px 2px rgba(61, 63, 72, 0.18),
-      inset 0 0 14px rgba(18, 19, 22, 0.12),
-      var(--agent-ring-hot),
-      0 10px 22px rgba(18, 19, 22, 0.3);
+      inset 0 1px 2px rgba(255, 255, 255, 1),
+      inset 0 -1px 3px rgba(110, 98, 66, 0.24),
+      inset 0 0 16px rgba(255, 255, 255, 0.55),
+      0 0 0 1px rgba(160, 150, 120, 0.35);
+  }
+  .game-agent__sphere:hover::before,
+  .game-agent__sphere:focus-visible::before {
+    transform: translateY(-3px) scale(1.09);
+    box-shadow:
+      inset 0 1px 1.5px rgba(255, 255, 255, 1),
+      inset 0 -1px 2px rgba(61, 63, 72, 0.16),
+      0 0 0 1px rgba(150, 150, 160, 0.4),
+      0 0 14px rgba(255, 255, 255, 0.9),
+      0 12px 24px rgba(60, 55, 40, 0.26);
   }
   .game-agent__sphere:hover .game-agent__halo,
   .game-agent__sphere:focus-visible .game-agent__halo {
     animation-duration: 1.6s;
   }
   .game-agent__sphere:active .game-agent__face { transform: scale(0.95); }
+  .game-agent__sphere:active::before { transform: scale(0.97); }
   .game-agent__sphere .sphere-btn__click-flash.is-active {
     animation-name: game-agent-flash;
   }
   @keyframes game-agent-spin { to { transform: rotate(360deg); } }
   @keyframes game-agent-flash {
-    0%   { opacity: 0; box-shadow: inset 0 0 0 0 rgba(18, 19, 22, 0); }
-    20%  { opacity: 1; box-shadow: inset 0 0 22px 6px rgba(18, 19, 22, 0.35); }
-    100% { opacity: 0; box-shadow: inset 0 0 36px 14px rgba(18, 19, 22, 0); }
+    0%   { opacity: 0; box-shadow: inset 0 0 0 0 rgba(255, 252, 240, 0); }
+    20%  { opacity: 1; box-shadow: inset 0 0 22px 8px rgba(255, 252, 240, 0.9); }
+    100% { opacity: 0; box-shadow: inset 0 0 36px 14px rgba(255, 252, 240, 0); }
   }
   .game-agent__caption {
     display: flex;
@@ -234,7 +250,8 @@
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23121316'/%3E%3C/svg%3E")
         no-repeat right 8px center / 8px 5px,
-      rgba(255, 255, 255, 0.7);
+      var(--agent-pearl);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95);
     font: 700 10px/1.3 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     color: #121316;
     cursor: pointer;
@@ -249,15 +266,20 @@
     padding: 3px 8px;
     border: 1px solid rgba(18, 19, 22, 0.22);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--agent-pearl);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95);
     font: 700 10px/1.3 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
     color: color-mix(in srgb, #121316 70%, transparent);
     cursor: pointer;
     user-select: none;
   }
-  .game-agent__size input { margin: 0; accent-color: #121316; cursor: pointer; }
-  .game-agent__size:has(input:checked) { color: #fff; background: #121316; border-color: #121316; }
-  .game-agent__size:has(input:checked) input { accent-color: #fff; }
+  .game-agent__size input { margin: 0; accent-color: #6f664c; cursor: pointer; }
+  .game-agent__size:has(input:checked) {
+    color: #121316;
+    background: var(--agent-bone);
+    border-color: rgba(120, 108, 76, 0.45);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  }
   .game-agent__size[hidden] { display: none; }
   .game-agent.is-error .game-agent__title { color: #9aa0a8; }
   .game-agent.is-thinking .game-agent__halo { animation-duration: 1.3s; }
@@ -5224,6 +5246,26 @@
     background: var(--night-lift);
     box-shadow: var(--night-glow);
   }
+  html.game-night .game-leg .sl-row:not(.sl-row--head).is-picked:not(:hover) { box-shadow: none; }
+  /* Links keep their night colour on hover (the global a:hover turns them
+     black); they only get heavier. Changed drivers and new trainers keep
+     their accent. */
+  html.game-night .game-leg :is(a, .fluid-highlight):is(:hover, :focus-visible) {
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  html.game-night .game-leg .sl-row:not(.sl-row--head) .sl-row__cells a:hover { font-weight: 600; }
+  html.game-night .game-leg .sl-row:not(.sl-row--head) .sl-row__cells a.sl-c-horse__name:hover {
+    color: var(--fg-heading) !important;
+    font-weight: 600;
+  }
+  html.game-night .game-leg .sl-row:not(.sl-row--head) :is(.sl-c-drv, .sl-c-trn):not(.is-changed):not(.is-new):hover {
+    color: var(--sl-ink-muted) !important;
+  }
+  html.game-night .game-leg .sl-row:not(.sl-row--head) :is(.sl-c-drv, .sl-c-trn):hover a {
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
   html.game-night .game-leg .sl-row:not(.sl-row--head):not(.is-picked) .sl-badge {
     background:
       linear-gradient(var(--night-face), var(--night-face)) padding-box,
@@ -5272,17 +5314,27 @@
     --sl-ink-fill: color-mix(in srgb, var(--accent-lever, #2f96d8) 34%, #0b0d11);
     --sl-band-tint: var(--sl-ink-fill);
   }
-  /* The agent's rows turn the other way: white ink, read dark through the
-     same difference blend. */
+  /* The agent's rows keep their bone at night. The fill stops partway
+     along a weighted row, so the text is white blended by difference:
+     dark over the bone, light over the night, whichever side of the edge
+     a letter lands. Flags would invert with it, so the ones on the bone
+     are inverted back (.is-off-ink marks the rest, paintAgent). */
   html.game-night .game-leg .sl-row.is-picked.is-agent {
-    --sl-agent-ink: #ffffff;
-    --sl-agent-on: #121316;
-    --sl-ink-fill: var(--sl-agent-ink);
-    --sl-thumb-fill: var(--sl-agent-ink);
-    --sl-badge-ink: var(--sl-agent-ink);
+    --sl-ink-fill: var(--sl-agent-bone);
   }
-  /* At night the light ground is the ink, so the flags on it are the
-     ones to invert back. */
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells {
+    mix-blend-mode: difference;
+  }
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells,
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells * {
+    color: #fff !important;
+    text-shadow: none !important;
+  }
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells *:not(img.flag) { filter: none !important; }
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa),
+  html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa) * {
+    color: rgba(255, 255, 255, 0.66) !important;
+  }
   html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells img.flag { filter: invert(1); }
   html.game-night .game-leg .sl-row.is-picked.is-agent .sl-row__cells img.flag.is-off-ink { filter: none; }
   html.game-night .game-leg .sl-row__ink::before {

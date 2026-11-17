@@ -58,6 +58,8 @@
       0 0 12px rgba(255, 255, 255, 0.55),
       0 0 24px rgba(255, 255, 255, 0.28);
   }
+  /* A pick is marked by its ink; only the hovered row glows. */
+  .sl-row:not(.sl-row--head).is-picked:not(:hover) { box-shadow: none; }
   /* History is a sibling under this row — clip the glow at the bottom so
      it cannot sit on top of the first history line. */
   .sl-row:not(.sl-row--head).is-prev-active {
@@ -522,44 +524,35 @@
     --sl-band-tint: var(--accent-lever-bright, #bfe6ff);
   }
   /* The coupon agent's own picks (the game page's build sphere), still at
-     the coverage it gave them: solid ink instead of the green wipe — black
-     by day, white at night (--sl-agent-ink, game.html). The fill stops
-     partway along a weighted row, so the text is white blended by
-     difference: white over the ink, ink over the paper, whichever side of
-     the edge a letter lands. Flags would invert with it, so the ones on
-     the light side are inverted back: past the edge by day (.is-off-ink,
-     paintAgent), on the ink at night (game.html). */
+     the coverage it gave them: the app's bone instead of the green wipe,
+     under a pearl sheen, with a pearl number sphere. Bone is light, so by
+     day the row reads as it always does; night mode keeps the same bone
+     and turns the text over it (game.html). */
   .sl-row.is-picked.is-agent {
-    --sl-agent-ink: #121316;
-    --sl-agent-on: #ffffff;
-    --sl-ink-fill: var(--sl-agent-ink);
-    --sl-thumb-fill: var(--sl-agent-ink);
-    --sl-badge-ink: var(--sl-agent-ink);
+    --sl-agent-bone: color-mix(in srgb, var(--bg, #f4f3ec) 74%, #c4ab78);
+    --sl-ink-fill: var(--sl-agent-bone);
+    --sl-thumb-fill: color-mix(in srgb, var(--bg, #f4f3ec) 25%, #8a7448);
+    --sl-badge-ink: var(--sl-agent-bone);
   }
   .sl-row.is-picked.is-agent .sl-row__ink::before {
     background:
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 55%),
-      var(--sl-agent-ink);
-    box-shadow: none;
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.12) 42%, rgba(255, 255, 255, 0) 70%),
+      linear-gradient(135deg, rgba(255, 253, 255, 0.28), rgba(255, 248, 240, 0.08) 50%, rgba(255, 255, 255, 0.22)),
+      var(--sl-agent-bone);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(120, 110, 80, 0.12);
   }
-  .sl-row.is-picked.is-agent .sl-row__cells {
-    mix-blend-mode: difference;
+  .sl-row.is-picked.is-agent .sl-badge {
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(236, 239, 245, 0.55)) padding-box,
+      #e7e8ec padding-box,
+      linear-gradient(145deg, #fffdf6, var(--sl-agent-bone)) border-box;
+    border: 1.5px solid transparent;
+    box-sizing: border-box;
   }
-  .sl-row.is-picked.is-agent .sl-row__cells,
-  .sl-row.is-picked.is-agent .sl-row__cells * {
-    color: #fff !important;
-    text-shadow: none !important;
-  }
-  .sl-row.is-picked.is-agent .sl-row__cells *:not(img.flag) { filter: none !important; }
-  .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa),
-  .sl-row.is-picked.is-agent .sl-row__cells :is(.sl-c-people, .sl-c-sa) * {
-    color: rgba(255, 255, 255, 0.66) !important;
-  }
-  .sl-row.is-picked.is-agent .sl-row__cells img.flag.is-off-ink { filter: invert(1); }
+  .sl-row.is-picked.is-agent .sl-badge__digit { color: #1c1c1e; }
   .sl-row.is-picked.is-agent .sl-row__badge {
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(0 1px 1.5px rgba(90, 80, 50, 0.3));
   }
-  .sl-row.is-picked.is-agent .sl-badge__digit { color: var(--sl-agent-on); }
 
   /* The band always spans weight ↔ coverage; which of the two is on the left
      is the whole difference between a cut and a levered row.
@@ -3667,7 +3660,7 @@
     }
 
   /* A pick still exactly where the coupon agent put it (the game page's
-     build sphere) paints in ink instead of green: picked, at the coverage
+     build sphere) paints bone instead of green: picked, at the coverage
      the agent gave it. */
   function paintAgent(picks, weights, caps) {
       const want = (window.AgentCoupon && gameId) ? AgentCoupon.legFor(gameId, raceId) : null;
@@ -3690,8 +3683,9 @@
       });
     }
 
-    /* Flags past the ink's edge sit on the paper, where the difference
-       blend would invert them; mark them so the CSS inverts them back. */
+    /* Night mode reads the agent's rows through a difference blend, which
+       inverts the flags on the bone; mark the ones past the fill's edge so
+       the CSS (game.html) leaves those alone. */
     function agentFlags(row, partial) {
       const flags = row.querySelectorAll('.sl-row__cells img.flag');
       if (!flags.length) return;

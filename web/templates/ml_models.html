@@ -226,6 +226,31 @@
   .cp-leg td.who b { color: var(--accent-glow, #6ea8fe); font-weight: 500; }
   .cp-leg td.nm { text-align: left; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cp-leg th:nth-child(3) { text-align: left; }
+  .ag-chart { position: relative; margin: 4px 0 8px; }
+  .ag-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .ag-chart .ax { font: 10px var(--font-mono, ui-monospace, monospace); fill: var(--fg-muted); }
+  .ag-chart .grid { stroke: rgba(0, 0, 0, 0.07); stroke-width: 1; }
+  .ag-chart .base { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1; stroke-dasharray: 3 4; }
+  .ag-chart .train { fill: rgba(196, 171, 120, 0.16); }
+  .ag-chart .split { stroke: rgba(0, 0, 0, 0.45); stroke-width: 1; }
+  .ag-chart .line { fill: none; stroke: #1c1c1e; stroke-width: 1.6; stroke-linejoin: round; }
+  .ag-chart .line.fit { stroke: rgba(28, 28, 30, 0.42); }
+  .ag-chart .area { fill: url(#ag-bone); }
+  .ag-chart .dd { fill: rgba(176, 0, 16, 0.08); }
+  .ag-chart .cursor { stroke: rgba(0, 0, 0, 0.5); stroke-width: 1; }
+  .ag-chart .dot { fill: #1c1c1e; stroke: #fff; stroke-width: 1.5; }
+  .ag-tip {
+    position: absolute; top: 0; pointer-events: none; transform: translateX(-50%);
+    padding: 4px 8px; border-radius: 6px; white-space: nowrap;
+    font: 10px/1.5 var(--font-mono, ui-monospace, monospace); color: var(--fg);
+    background: linear-gradient(135deg, rgba(255, 253, 255, 0.95), rgba(244, 243, 236, 0.92));
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .ag-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 11px; color: var(--fg-muted); }
+  .ag-stats b { color: var(--fg); font-weight: 500; }
+  .cp-leg td.wt { color: var(--fg-muted); }
+  .cp-list td.ag-item { white-space: normal; text-align: left; min-width: 180px; max-width: 260px; line-height: 1.35; }
+  .cp-list th.ag-item { text-align: left; }
   .cp-tag { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #5fd38d; border: 1px solid rgba(95, 211, 141, 0.5); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
 
 {% endblock %}
@@ -465,10 +490,51 @@
           <p><b>What it looks at.</b> Before the race, each coupon's expected return under xedge's chances and under the market's alone (the public's winning rows estimated from its stake shares), its cost against the bankroll, its chance of paying anything, its shape and the game type. The score is linear in those; its weights are the policy.</p>
           <p><b>Two policies.</b> Days before a game the win pools are empty, so there are no odds for xedge to correct. Until every leg's win pool holds money the agent plays a <b>preliminary</b> policy on xwin's chances against xodds (the forecast of the odds); after that the <b>live</b> one on xedge against the odds. Each is fitted on its own inputs: without the market the forecasts expect several times what their coupons return, and the live policy fed them overbets.</p>
           <p><b>How it learned.</b> The cross-entropy method on the games before the test period: the weights that grow a 10,000 kr bankroll fastest (log growth), with each policy's three luckiest games left out so it can't be chosen for jackpots it happened to catch. Then frozen and played forward over every later game on out-of-sample chances, settled against what ATG paid with our stake diluting the pool. Read the interval and the result without the biggest win, not the headline. The backtest knows each leg's closing odds and the pool's final stake shares; on the day, later legs' odds are still forming when the game closes, so expect less.</p>
-          <p>The game page's <b>build</b> sphere loads the coupon it would play on that game into the builder, as a starting point. It is never handed in; picks still where the agent put them show in black ink (white at night). A <b>race-day size</b> switch there sizes a days-ahead coupon with the live policy, the "live policy on the forecasts" row above.</p>
+          <p>The game page's <b>build</b> sphere loads the coupon it would play on that game into the builder, as a starting point. It is never handed in; picks still where the agent put them show in bone. A <b>race-day size</b> switch there sizes a days-ahead coupon with the live policy, the "live policy on the forecasts" row above.</p>
         </div>
         <div class="ml-section-head">models</div>
         <div id="agent-general"></div>
+        <div class="ml-section-head">bankroll</div>
+        <div class="glass-panel ml-panel pool-block">
+          <p class="diag-note">The live agent's bankroll game by game: it stakes against a fixed 10,000 kr, so the line is that plus its running profit. The shaded stretch is the games it was fitted on; from the line on it plays forward, frozen. Hover for the day.</p>
+          <div class="cp-controls">
+            <label>policy <select id="ag-run">
+              <option value="live">live · xedge on the odds</option>
+              <option value="preliminary">preliminary · xwin on xodds</option>
+              <option value="liveOnForecasts">race-day size on the forecasts</option>
+            </select></label>
+            <label>game <select id="ag-game"></select></label>
+          </div>
+          <div class="ag-chart" id="ag-chart"></div>
+          <div class="ag-stats" id="ag-stats"></div>
+        </div>
+        <div class="ml-section-head">agent coupons</div>
+        <div class="glass-panel ml-panel pool-block">
+          <p class="diag-note">Every game the policy played, one row per game. Click a coupon for every leg: the agent's picks and weights, the same coupon picked by the closing odds and by the public, and who won.</p>
+          <div class="cp-controls">
+            <label>games <select id="ag-part">
+              <option value="test">forward test</option>
+              <option value="train">fitted on</option>
+              <option value="all">all</option>
+            </select></label>
+            <label>show <select id="ag-show">
+              <option value="all">all coupons</option>
+              <option value="paid">paid something</option>
+              <option value="all_right">every leg right</option>
+              <option value="one_short">one leg short</option>
+            </select></label>
+            <label>sort <select id="ag-sort">
+              <option value="profit">biggest profit</option>
+              <option value="return">biggest return</option>
+              <option value="multiple">return ÷ cost</option>
+              <option value="cost">biggest stake</option>
+              <option value="public">most ahead of the public</option>
+              <option value="newest">newest</option>
+            </select></label>
+          </div>
+          <div id="ag-list"></div>
+        </div>
+        <div id="ag-detail"></div>
       </div>
 
       <div class="ml-view" id="view-trainerform" hidden>
@@ -1190,7 +1256,9 @@
 
     function couponDetail(d) {
       const g = d.game, me = g.target;
-      const srcName = { model: me, market: 'market', public: 'public' };
+      const weighted = !!d.run;
+      const meL = d.run ? 'A' : me[0].toUpperCase();
+      const srcName = { model: d.run ? 'agent' : me, market: 'market', public: 'public' };
       const sysRows = ['model', 'market', 'public'].filter(s => d.systems[s]).map(s => {
         const x = d.systems[s];
         const by = Object.entries(x.by_right || {}).sort((a, b) => b[0] - a[0])
@@ -1208,11 +1276,13 @@
         const rows = lg.starters.map(s => {
           const sep = !cut && !s.picked.model && pickN > 0 ? (cut = true) : false;
           const who = ['model', 'market', 'public'].map(k => s.picked[k]
-            ? (k === 'model' ? `<b>${me[0].toUpperCase()}</b>` : k[0].toUpperCase()) : '·').join('');
+            ? (k === 'model' ? `<b>${meL}</b>` : k[0].toUpperCase()) : '·').join('');
           return `<tr class="${s.won ? 'won' : s.picked.model ? 'pick' : ''}${s.scratched ? ' scr' : ''}${sep ? ' sep' : ''}">`
             + `<td class="who">${who}</td><td>${s.number}</td><td class="nm" title="${attr(s.horse || '')}">${s.won ? '★ ' : ''}${esc(s.horse || '')}</td>`
             + `<td>${fmtPct(s.p)}</td><td${s.odds ? ` title="odds ${s.odds.toFixed(2)}"` : ''}>${fmtPct(s.q)}</td>`
-            + `<td>${fmtPct(s.share)}</td><td>${s.finish ?? ''}</td></tr>`;
+            + `<td>${fmtPct(s.share)}</td>`
+            + (weighted ? `<td class="wt">${s.weight > 0 ? Math.round(s.weight * 100) : ''}</td>` : '')
+            + `<td>${s.finish ?? ''}</td></tr>`;
         }).join('');
         const sub = w ? `winner ${w.number} ${esc(w.horse || '')} · ${me} rank ${w.rank_p ?? '—'} · market rank ${w.rank_q ?? '—'}`
           + ` · ${fmtPct(w.share)} streck (rank ${w.rank_share ?? '—'}) · ${me} picked ${pickN}` : 'no winner recorded';
@@ -1220,15 +1290,16 @@
             <h4>leg ${i + 1} · ${esc(lg.track || '')} race ${lg.race_number ?? '?'} · ${lg.distance ?? ''} m ${lg.start_method === 'A' ? 'auto' : lg.start_method === 'V' ? 'volt' : ''}</h4>
             <div class="sub">${sub}</div>
             <table class="cmp-table"><thead><tr>`
-          + th('picked', `Who picked the horse: ${me} (${me[0].toUpperCase()}), market (M), public (P). Sorted by ${me}'s chance; the line marks where ${me}'s cover stops.`)
+          + th('picked', `Who picked the horse: ${srcName.model} (${meL}), market (M), public (P). Sorted by ${me}'s chance; the line marks where ${me}'s cover stops.`)
           + th('nr') + th('horse') + th(me, `${me}'s win chance, normalised over the field.`)
           + th('mkt', 'The closing win odds as a chance, normalised over the field. Hover a value for the odds.')
           + th('streck', 'The public\'s share of this game\'s stakes on the horse in this leg.')
+          + (weighted ? th('wt', 'The agent\'s weight on the horse in this leg, out of 100: its share of the rows.') : '')
           + th('fin', 'Finishing position.')
           + `</tr></thead><tbody>${rows}</tbody></table></div>`;
       }).join('');
       return `<div class="glass-panel ml-panel pool-block">
-          <h4>${esc(g.game_type)} · ${esc(d.legs[0]?.track || '')} · ${esc(g.game_date)} · ${esc(d.rule)} · ${esc(me)} (${esc(g.model_name)})</h4>
+          <h4>${esc(g.game_type)} · ${esc(d.legs[0]?.track || '')} · ${esc(g.game_date)} · ${esc(d.rule)} · ${d.run ? `agent ${esc(g.model_name)} on ${esc(me)}` : `${esc(me)} (${esc(g.model_name)})`}</h4>
           <p class="diag-note">Turnover ${kr(g.turnover)} · ${g.rtp ?? 65}% back to the players · ${(g.system_count ?? 0).toLocaleString('sv-SE')} systems played.</p>
           <div class="cp-head">
             <div class="mc-block"><h4>the three coupons</h4><table class="cmp-table"><thead><tr>`
@@ -1248,6 +1319,188 @@
     ['cp-show', 'cp-sort'].forEach(id => cpEl(id).addEventListener('change', loadCoupons));
     cpEl('cp-game').addEventListener('change', e => { CP.game = e.target.value; fillCouponRules(); loadCoupons(); });
     cpEl('cp-rule').addEventListener('change', e => { CP.rule = e.target.value; loadCoupons(); });
+
+    // ---- agent: bankroll and coupons (ml_agent_play) ----
+    let AG = { model: null, opts: [], game: '', sel: null };
+    const agRun = () => cpEl('ag-run').value;
+    const krShort = v => {
+      const a = Math.abs(v);
+      return a >= 1e6 ? `${(v / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M` : a >= 1e4 ? `${Math.round(v / 1000)}k` : Math.round(v).toLocaleString('sv-SE');
+    };
+
+    function loadAgent(m) {
+      AG.model = m || null;
+      if (!m) return;
+      fetch(`/api/ml/agent/options?model_id=${m.model_id}`).then(r => r.json()).then(d => {
+        AG.opts = d.options || [];
+        fillAgentGames();
+        loadBankroll();
+        loadAgentPlays();
+      });
+    }
+
+    function fillAgentGames() {
+      const rows = AG.opts.filter(o => o.run === agRun());
+      const types = POOL_ORDER.filter(t => rows.some(o => o.game_type === t));
+      const sum = (t, part) => rows.filter(o => (!t || o.game_type === t) && o.part === part)
+        .reduce((a, o) => ({ n: a.n + o.played, c: a.c + o.cost, r: a.r + o.ret }), { n: 0, c: 0, r: 0 });
+      const label = t => {
+        const s = sum(t, 'test');
+        return `${t || 'all games'} · ${s.n.toLocaleString('sv-SE')} played · ${sgn(s.c ? s.r / s.c - 1 : null)}`;
+      };
+      if (AG.game && !types.includes(AG.game)) AG.game = '';
+      cpEl('ag-game').innerHTML = ['', ...types].map(t =>
+        `<option value="${t}"${t === AG.game ? ' selected' : ''}>${label(t)}</option>`).join('');
+    }
+
+    function loadBankroll() {
+      if (!AG.model) return;
+      const q = new URLSearchParams({ model_id: AG.model.model_id, run: agRun() });
+      if (AG.game) q.set('game_type', AG.game);
+      cpEl('ag-chart').innerHTML = '<div class="ml-empty">loading…</div>';
+      fetch('/api/ml/agent/bankroll?' + q).then(r => r.json()).then(renderBankroll);
+    }
+
+    function renderBankroll(d) {
+      const el = cpEl('ag-chart'), stats = cpEl('ag-stats');
+      const days = d.days || [];
+      if (!days.length) {
+        el.innerHTML = '<div class="ml-empty">no games played. run <code>scripts.build_coupon_agent plays</code>.</div>';
+        stats.innerHTML = '';
+        return;
+      }
+      // One point per day: the bankroll after that day's games.
+      const B = d.bankroll, pts = [];
+      let eq = B, peak = B, dd = 0, ddFrom = null, ddTo = null, peakAt = null, played = { train: 0, test: 0 };
+      const cost = { train: 0, test: 0 }, ret = { train: 0, test: 0 };
+      days.forEach(([date, part, n, c, r]) => {
+        eq += r - c;
+        played[part] += n; cost[part] += c; ret[part] += r;
+        const t = Date.parse(date);
+        if (pts.length && pts[pts.length - 1].t === t) Object.assign(pts[pts.length - 1], { v: eq, n: pts[pts.length - 1].n + n, c: pts[pts.length - 1].c + c, r: pts[pts.length - 1].r + r });
+        else pts.push({ t, date, part, v: eq, n, c, r });
+        if (eq > peak) { peak = eq; peakAt = t; }
+        if (peak - eq > dd) { dd = peak - eq; ddFrom = peakAt; ddTo = t; }
+      });
+      const W = 1000, H = 280, L = 62, R = 14, T = 14, Bm = 26;
+      const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+      const lo = Math.min(B, ...pts.map(p => p.v)), hi = Math.max(B, ...pts.map(p => p.v));
+      const pad = (hi - lo) * 0.06 || 1;
+      const y0 = lo - pad, y1 = hi + pad;
+      const X = t => L + (t - t0) / Math.max(t1 - t0, 1) * (W - L - R);
+      const Y = v => T + (1 - (v - y0) / (y1 - y0)) * (H - T - Bm);
+      const split = d.testSince ? Date.parse(d.testSince) : null;
+      const path = list => list.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.v).toFixed(1)}`).join('');
+      const fit = pts.filter(p => p.part === 'train'), fwd = pts.filter(p => p.part === 'test');
+      if (fit.length && fwd.length) fwd.unshift(fit[fit.length - 1]);
+      const all = path(pts);
+      const area = `${all}L${X(t1).toFixed(1)},${Y(y0).toFixed(1)}L${X(t0).toFixed(1)},${Y(y0).toFixed(1)}Z`;
+      const ticksY = [];
+      const step = (() => { const raw = (y1 - y0) / 5, p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 5, 10].map(m => m * p).find(s => s >= raw); })();
+      for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) ticksY.push(v);
+      const ticksX = [];
+      for (let y = new Date(t0).getFullYear(); y <= new Date(t1).getFullYear() + 1; y++) {
+        const t = Date.UTC(y, 0, 1);
+        if (t > t0 && t < t1) ticksX.push([t, String(y)]);
+      }
+      el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="bankroll">
+          <defs><linearGradient id="ag-bone" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#c4ab78" stop-opacity="0.32"/><stop offset="1" stop-color="#f4f3ec" stop-opacity="0"/>
+          </linearGradient></defs>
+          ${split && split > t0 ? `<rect class="train" x="${L}" y="${T}" width="${Math.max(0, Math.min(X(split), W - R) - L)}" height="${H - T - Bm}"/>` : ''}
+          ${ticksY.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text class="ax" x="${L - 8}" y="${Y(v) + 3}" text-anchor="end">${krShort(v)}</text>`).join('')}
+          ${ticksX.map(([t, s]) => `<text class="ax" x="${X(t)}" y="${H - 8}" text-anchor="middle">${s}</text>`).join('')}
+          ${ddFrom != null ? `<rect class="dd" x="${X(ddFrom)}" y="${T}" width="${Math.max(1, X(ddTo) - X(ddFrom))}" height="${H - T - Bm}"/>` : ''}
+          <line class="base" x1="${L}" x2="${W - R}" y1="${Y(B)}" y2="${Y(B)}"/>
+          ${split && split > t0 && split < t1 ? `<line class="split" x1="${X(split)}" x2="${X(split)}" y1="${T}" y2="${H - Bm}"/>
+            <text class="ax" x="${X(split) - 6}" y="${T + 11}" text-anchor="end">fitted on</text>
+            <text class="ax" x="${X(split) + 6}" y="${T + 11}">forward test</text>` : ''}
+          <path class="area" d="${area}"/>
+          ${fit.length ? `<path class="line fit" d="${path(fit)}"/>` : ''}
+          ${fwd.length ? `<path class="line" d="${path(fwd)}"/>` : ''}
+          <line class="cursor" x1="0" x2="0" y1="${T}" y2="${H - Bm}" visibility="hidden"/>
+          <circle class="dot" r="3.5" visibility="hidden"/>
+        </svg><div class="ag-tip" hidden></div>`;
+      const svg = el.querySelector('svg'), cur = svg.querySelector('.cursor'), dot = svg.querySelector('.dot');
+      const tip = el.querySelector('.ag-tip');
+      svg.addEventListener('mousemove', e => {
+        const box = svg.getBoundingClientRect();
+        const x = (e.clientX - box.left) / box.width * W;
+        const t = t0 + (x - L) / (W - L - R) * (t1 - t0);
+        let lo2 = 0, hi2 = pts.length - 1;
+        while (lo2 < hi2) { const mid = (lo2 + hi2) >> 1; if (pts[mid].t < t) lo2 = mid + 1; else hi2 = mid; }
+        const p = (lo2 > 0 && Math.abs(pts[lo2 - 1].t - t) < Math.abs(pts[lo2].t - t)) ? pts[lo2 - 1] : pts[lo2];
+        const px = X(p.t), py = Y(p.v);
+        cur.setAttribute('x1', px); cur.setAttribute('x2', px); cur.setAttribute('visibility', 'visible');
+        dot.setAttribute('cx', px); dot.setAttribute('cy', py); dot.setAttribute('visibility', 'visible');
+        tip.hidden = false;
+        tip.style.left = `${px / W * box.width}px`;
+        tip.innerHTML = `${esc(p.date)} · ${p.part === 'test' ? 'forward' : 'fitted on'}<br><b>${kr(p.v)}</b> · `
+          + `${p.n} game${p.n > 1 ? 's' : ''} · staked ${kr(p.c)} · paid ${kr(p.r)}`;
+      });
+      svg.addEventListener('mouseleave', () => {
+        cur.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); tip.hidden = true;
+      });
+      const roi = part => cost[part] ? sgn(ret[part] / cost[part] - 1) : '—';
+      const fwdProfit = ret.test - cost.test;
+      stats.innerHTML = [
+        `forward test <b>${played.test.toLocaleString('sv-SE')}</b> games · ROI <b>${roi('test')}</b> · profit <b>${krSigned(fwdProfit)}</b> kr`,
+        `fitted on <b>${played.train.toLocaleString('sv-SE')}</b> · ROI <b>${roi('train')}</b>`,
+        `end <b>${kr(eq)}</b> · peak <b>${kr(peak)}</b>`,
+        `deepest drop <b>${kr(dd)}</b>${ddFrom != null ? ` (${new Date(ddFrom).toISOString().slice(0, 10)} → ${new Date(ddTo).toISOString().slice(0, 10)}, red)` : ''}`,
+      ].map(s => `<span>${s}</span>`).join('');
+    }
+
+    function loadAgentPlays() {
+      if (!AG.model) return;
+      const types = POOL_ORDER.filter(t => AG.opts.some(o => o.run === agRun() && o.game_type === t));
+      const gtype = AG.game || (types.includes('V64') ? 'V64' : types[0]);
+      if (!gtype) { cpEl('ag-list').innerHTML = '<div class="ml-empty">no games played.</div>'; return; }
+      const q = new URLSearchParams({ model_id: AG.model.model_id, run: agRun(), game_type: gtype,
+                                      part: cpEl('ag-part').value, show: cpEl('ag-show').value,
+                                      sort: cpEl('ag-sort').value, limit: 80 });
+      cpEl('ag-list').innerHTML = '<div class="ml-empty">loading…</div>';
+      fetch('/api/ml/agent/plays?' + q).then(r => r.json()).then(d => {
+        const list = d.plays || [];
+        if (!list.length) { cpEl('ag-list').innerHTML = '<div class="ml-empty">no coupons match.</div>'; return; }
+        const T = {
+          date: 'Race day. "fitted" marks games the policy was fitted on.',
+          coupon: 'What the agent chose from the menu: bankers and their rule, coverage, flat or weighted rows, stake units and copies.',
+          right: 'Legs where the coupon had the winner, out of all legs.',
+          cost: 'What the coupon cost: rows × units × row price × copies.',
+          return: 'What the coupon would have been paid, with our own winning rows added to the pool.',
+          market: 'Profit of the same coupon with the horses picked by the closing win odds, and its legs right.',
+          public: 'Profit of the same coupon with the horses picked by the public\'s stake shares, and its legs right.',
+        };
+        cpEl('ag-list').innerHTML = `<div class="diag-note">${esc(gtype)}${AG.game ? '' : ' (pick a game above for another type)'}</div>`
+          + `<table class="cmp-table cp-list"><thead><tr>`
+          + th('date', T.date) + th('track') + th('coupon', T.coupon).replace('<th', '<th class="ag-item"') + th('rows') + th('cost', T.cost)
+          + th('return', T.return) + th('profit') + th('right', T.right) + th('market', T.market) + th('public', T.public)
+          + '</tr></thead><tbody>'
+          + list.map(c => `<tr data-g="${attr(c.atg_game_id)}" class="${c.atg_game_id === AG.sel ? 'sel' : ''}">`
+            + `<td>${esc(c.game_date)}${c.part === 'train' ? '<span class="cp-tag" style="color:var(--fg-muted);border-color:var(--border)">fitted</span>' : ''}</td>`
+            + `<td>${esc(c.track || '')}</td><td class="ag-item">${esc(c.item)}</td>`
+            + `<td>${c.rows.toLocaleString('sv-SE')}</td><td>${kr(c.cost)}</td><td>${kr(c.ret)}</td>`
+            + `<td>${krSigned(c.ret - c.cost)}</td><td>${c.legs_right}/${c.legs}</td>`
+            + `<td>${c.market_cost != null ? krSigned(c.market_ret - c.market_cost) + ` <small>${c.market_right}/${c.legs}</small>` : '—'}</td>`
+            + `<td>${c.public_cost != null ? krSigned(c.public_ret - c.public_cost) + ` <small>${c.public_right}/${c.legs}</small>` : '—'}</td></tr>`).join('')
+          + '</tbody></table>';
+        cpEl('ag-list').querySelectorAll('tbody tr').forEach(tr => tr.addEventListener('click', () => {
+          AG.sel = tr.dataset.g;
+          cpEl('ag-list').querySelectorAll('tbody tr').forEach(x => x.classList.toggle('sel', x === tr));
+          const q2 = new URLSearchParams({ model_id: AG.model.model_id, run: agRun(), game_id: AG.sel });
+          cpEl('ag-detail').innerHTML = '<div class="ml-empty">loading…</div>';
+          fetch('/api/ml/agent/play?' + q2).then(r => r.json()).then(dd => {
+            cpEl('ag-detail').innerHTML = couponDetail(dd);
+            cpEl('ag-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }));
+      });
+    }
+
+    cpEl('ag-run').addEventListener('change', () => { fillAgentGames(); loadBankroll(); loadAgentPlays(); });
+    cpEl('ag-game').addEventListener('change', e => { AG.game = e.target.value; loadBankroll(); loadAgentPlays(); });
+    ['ag-part', 'ag-show', 'ag-sort'].forEach(id => cpEl(id).addEventListener('change', loadAgentPlays));
 
     // ---- overview ----
     function renderOverview(live, xgal) {
@@ -1329,6 +1582,7 @@
         render('xwin-general',  byCat.xwin,  'xwin', false);
         render('xedge-general', byCat.xedge, 'xedge', false);
         render('agent-general', byCat.agent, 'coupon-agent', false);
+        loadAgent(live.coupon_agent);
         render('trainerform-general', byCat.trainerform, 'trainer-form');
         render('upcoming-general',    byCat.upcoming,    'race-outcome');
 

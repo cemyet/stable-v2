@@ -7058,6 +7058,192 @@ def api_ml_coupon():
     })
 
 
+# Agent coupons: every game a coupon agent's frozen policy played
+# (scripts/build_coupon_agent plays → ml_agent_play).
+_AGENT_RUNS = ('live', 'preliminary', 'liveOnForecasts')
+_AGENT_SORTS = {
+    'profit':   'a.ret - a.cost DESC',
+    'return':   'a.ret DESC',
+    'multiple': 'a.ret / NULLIF(a.cost, 0) DESC',
+    'public':   '(a.ret - a.cost) - COALESCE(a.public_ret - a.public_cost, 0) DESC',
+    'cost':     'a.cost DESC',
+    'newest':   'a.game_date DESC, a.atg_game_id DESC',
+}
+
+
+@app.route('/api/ml/agent/options')
+def api_ml_agent_options():
+    """Per run and game type: games played, cost and return, train and test."""
+    model_id = request.args.get('model_id', type=int)
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT run, game_type, part, COUNT(*) AS played, SUM(cost) AS cost, SUM(ret) AS ret
+                           FROM ml_agent_play WHERE model_id = %s GROUP BY 1, 2, 3 ORDER BY 1, 2, 3""", (model_id,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    for r in rows:
+        r['cost'], r['ret'] = float(r['cost']), float(r['ret'])
+    return jsonify({'options': rows})
+
+
+@app.route('/api/ml/agent/bankroll')
+def api_ml_agent_bankroll():
+    """The run's profit day by day (all game types, or one), train and test,
+    for the bankroll chart: the agent stakes against a fixed bankroll, so
+    the line is that bankroll plus the running profit."""
+    a = request.args
+    model_id, run, gtype = a.get('model_id', type=int), a.get('run', 'live'), a.get('game_type') or None
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""SELECT game_date, part, COUNT(*) AS played, SUM(cost) AS cost, SUM(ret) AS ret,
+                                  MAX(ret - cost) AS best
+                           FROM ml_agent_play WHERE model_id = %s AND run = %s
+                             AND (%s::text IS NULL OR game_type = %s)
+                           GROUP BY 1, 2 ORDER BY 1, 2""", (model_id, run, gtype, gtype))
+            days = cur.fetchall()
+            cur.execute("SELECT (slice_def->>'bankroll')::float AS bankroll, slice_def->>'test_since' AS test_since "
+                        "FROM ml_model WHERE model_id = %s", (model_id,))
+            m = cur.fetchone() or {}
+    finally:
+        conn.close()
+    return jsonify({'bankroll': m.get('bankroll') or 10000, 'testSince': m.get('test_since'),
+                    'days': [[d['game_date'].isoformat(), d['part'], d['played'], round(float(d['cost']), 2),
+                              round(float(d['ret']), 2)] for d in days]})
+
+
+@app.route('/api/ml/agent/plays')
+def api_ml_agent_plays():
+    """One page of a run's coupons for a game type."""
+    a = request.args
+    model_id, run, gtype = a.get('model_id', type=int), a.get('run', 'live'), a.get('game_type', '')
+    part = a.get('part', 'test')
+    order = _AGENT_SORTS.get(a.get('sort'), _AGENT_SORTS['profit'])
+    show = a.get('show', 'all')
+    limit = max(1, min(a.get('limit', 80, type=int), 300))
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(f"""
+                SELECT a.atg_game_id, a.game_date, a.game_type, a.part, a.item, a.mult, a.rows, a.cost, a.ret,
+                       a.legs_right, jsonb_array_length(a.legs) AS legs, t.name AS track,
+                       a.market_cost, a.market_ret, a.market_right, a.public_cost, a.public_ret, a.public_right
+                FROM ml_agent_play a
+                JOIN atg_game g ON g.atg_game_id = a.atg_game_id
+                LEFT JOIN race r ON r.atg_race_id = g.race_ids[1]
+                LEFT JOIN track t ON t.track_id = r.track_id
+                WHERE a.model_id = %s AND a.run = %s AND a.game_type = %s AND (%s = 'all' OR a.part = %s)
+                  AND (%s <> 'paid' OR a.ret > 0)
+                  AND (%s <> 'all_right' OR a.legs_right = jsonb_array_length(a.legs))
+                  AND (%s <> 'one_short' OR a.legs_right = jsonb_array_length(a.legs) - 1)
+                ORDER BY {order}
+                LIMIT %s
+            """, (model_id, run, gtype, part, part, show, show, show, limit))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    for r in rows:
+        r['game_date'] = r['game_date'].isoformat()
+        for k in ('cost', 'ret', 'market_cost', 'market_ret', 'public_cost', 'public_ret'):
+            r[k] = float(r[k]) if r[k] is not None else None
+    return jsonify({'plays': rows})
+
+
+@app.route('/api/ml/agent/play')
+def api_ml_agent_play():
+    """One of the agent's games in full, in the pools coupon viewer's shape:
+    tiers paid, the agent's / market's / public's coupon, every leg's field
+    with the agent's chances, its weights and who was picked."""
+    a = request.args
+    model_id, run, gid = a.get('model_id', type=int), a.get('run', 'live'), a.get('game_id', '')
+    conn = get_db()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT a.*, g.rtp, g.turnover, g.system_count, g.tier_pots, g.payouts, g.race_ids,
+                       m.name AS model_name, m.slice_def->'source'->>'target' AS own,
+                       m.slice_def->'forecast'->'own'->>'target' AS own_forecast
+                FROM ml_agent_play a JOIN atg_game g USING (atg_game_id) JOIN ml_model m USING (model_id)
+                WHERE a.model_id = %s AND a.run = %s AND a.atg_game_id = %s
+            """, (model_id, run, gid))
+            p = cur.fetchone()
+            if not p:
+                return jsonify({'error': 'not found'}), 404
+            cur.execute("""
+                SELECT p.atg_race_id, p.number, p.win_odds, p.finish, p.scratched,
+                       r.race_number, r.distance, r.start_method, t.name AS track, h.name AS horse
+                FROM atg_race_pool p
+                LEFT JOIN race r ON r.atg_race_id = p.atg_race_id
+                LEFT JOIN track t ON t.track_id = r.track_id
+                LEFT JOIN entry e ON e.race_id = r.race_id AND e.program_number = p.number
+                LEFT JOIN horse h ON h.horse_id = e.horse_id
+                WHERE p.atg_race_id = ANY(%s)
+            """, (p['race_ids'],))
+            pool = {(s['atg_race_id'], s['number']): s for s in cur.fetchall()}
+    finally:
+        conn.close()
+    belief = (p['own_forecast'] or 'xwin') if run != 'live' else (p['own'] or 'xedge')
+    legs, picks = [], {'model': [], 'market': [], 'public': []}
+    for i, lg in enumerate(p['legs']):
+        rid = p['race_ids'][i] if i < len(p['race_ids']) else None
+        won = set(lg['win'])
+        picks['model'].append([n for n, w in zip(lg['n'], lg['w']) if w > 0])
+        picks['market'].append(lg.get('market') or [])
+        picks['public'].append(lg.get('public') or [])
+        rows = []
+        for j, n in enumerate(lg['n']):
+            s = pool.get((rid, n)) or {}
+            rows.append({'number': n, 'horse': s.get('horse'), 'scratched': bool(s.get('scratched')),
+                         'odds': float(s['win_odds']) if s.get('win_odds') else None, 'finish': s.get('finish'),
+                         'p': lg['p'][j], 'q': lg['q'][j], 'share': lg['s'][j], 'weight': lg['w'][j],
+                         'won': n in won,
+                         'picked': {k: n in picks[k][i] for k in picks}})
+        for key in ('p', 'q', 'share'):
+            for k, r in enumerate(sorted(rows, key=lambda r: -r[key])):
+                r['rank_' + key] = k + 1
+        head = next(iter(s for s in pool.values() if s['atg_race_id'] == rid), {})
+        legs.append({'race_id': rid, 'track': head.get('track'), 'race_number': head.get('race_number'),
+                     'distance': head.get('distance'), 'start_method': head.get('start_method'),
+                     'starters': sorted(rows, key=lambda r: -r['p'])})
+    winners = [set(lg['win']) for lg in p['legs']]
+
+    def by_right(pk):
+        poly = [1]
+        for i, nums in enumerate(pk):
+            hit = 1 if set(nums) & winners[i] else 0
+            nxt = [0] * (len(poly) + 1)
+            for k, c in enumerate(poly):
+                nxt[k] += c * (len(nums) - hit)
+                nxt[k + 1] += c * hit
+            poly = nxt
+        return {k: c for k, c in enumerate(poly) if c and k >= len(poly) - 4}
+
+    def rows_of(pk):
+        n = 1
+        for nums in pk:
+            n *= max(len(nums), 1)
+        return n
+    systems = {'model': {'rows': p['rows'], 'cost': float(p['cost']), 'ret': float(p['ret']),
+                         'legs_right': p['legs_right'], 'by_right': by_right(picks['model'])}}
+    for src in ('market', 'public'):
+        if p[f'{src}_cost'] is not None:
+            systems[src] = {'rows': rows_of(picks[src]), 'cost': float(p[f'{src}_cost']),
+                            'ret': float(p[f'{src}_ret']), 'legs_right': p[f'{src}_right'],
+                            'by_right': by_right(picks[src])}
+    return jsonify({
+        'game': {'atg_game_id': gid, 'game_type': p['game_type'], 'rtp': p['rtp'], 'system_count': p['system_count'],
+                 'target': belief, 'model_name': p['model_name'], 'game_date': p['game_date'].isoformat(),
+                 'turnover': (p['turnover'] or 0) / 100,
+                 'tiers': [{'tier': int(t), 'payout': (v.get('payout') or 0) / 100, 'systems': v.get('systems'),
+                            'jackpot': bool(v.get('jackpot')),
+                            'pot': ((p['tier_pots'] or {}).get(t) or 0) / 100}
+                           for t, v in sorted((p['payouts'] or {}).items(), key=lambda kv: -int(kv[0]))]},
+        'rule': p['item'], 'run': run, 'part': p['part'], 'mult': p['mult'], 'systems': systems, 'legs': legs,
+    })
+
+
 # =====================================================================
 # Admin
 # =====================================================================
